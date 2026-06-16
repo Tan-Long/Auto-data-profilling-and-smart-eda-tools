@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VSF Data Profiler Report</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --paper: #fffaf1;
+      --ink: #1e2521;
+      --muted: #667069;
+      --line: #d8cdbd;
+      --accent: #0f6b5f;
+      --danger: #a83a2a;
+      --warn: #a86b00;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #d7eadf, transparent 38%), var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 Georgia, "Times New Roman", serif;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+    header {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, #fffdf7, #eee3d3);
+      padding: 28px;
+      box-shadow: 12px 12px 0 rgba(15, 107, 95, 0.13);
+    }
+    h1, h2, h3 {
+      line-height: 1.1;
+      margin: 0 0 16px;
+    }
+    h1 {
+      font-size: clamp(38px, 6vw, 72px);
+      letter-spacing: -0.05em;
+    }
+    h2 {
+      margin-top: 36px;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+    h3 {
+      margin-top: 24px;
+      color: var(--accent);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 16px;
+    }
+    .metric {
+      display: block;
+      font-size: 30px;
+      font-weight: 700;
+    }
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #e5dccd;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    code, pre {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+    }
+    pre {
+      overflow: auto;
+      background: #16221f;
+      color: #f8f1e3;
+      padding: 14px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: white;
+      background: var(--accent);
+      font-size: 12px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+    }
+    .P0, .P1, .NOT_READY { background: var(--danger); }
+    .P2, .WARN { background: var(--warn); }
+    .P3, .READY { background: var(--accent); }
+    .muted { color: var(--muted); }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .button {
+      display: inline-block;
+      background: var(--accent);
+      color: #fffaf1;
+      padding: 8px 12px;
+      text-decoration: none;
+      border: 1px solid #09443d;
+      font-weight: 700;
+    }
+    .diagram-frame {
+      width: 100%;
+      height: min(70vh, 680px);
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .schema-table code {
+      white-space: nowrap;
+    }
+    .bar-list {
+      display: grid;
+      gap: 10px;
+      margin: 14px 0 22px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(140px, 260px) 1fr minmax(56px, auto);
+      gap: 10px;
+      align-items: center;
+    }
+    .bar-label {
+      overflow-wrap: anywhere;
+      font-weight: 700;
+    }
+    .bar-track {
+      height: 12px;
+      background: #e5dccd;
+      border: 1px solid var(--line);
+    }
+    .bar-fill {
+      min-width: 2px;
+      height: 100%;
+      background: var(--accent);
+    }
+    .bar-fill.warn { background: var(--warn); }
+    .bar-fill.danger { background: var(--danger); }
+    .bar-value {
+      text-align: right;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+    }
+    @media (max-width: 720px) {
+      main { padding: 20px 12px 48px; }
+      table { display: block; overflow-x: auto; }
+      .diagram-frame { height: 520px; }
+      .bar-row { grid-template-columns: 1fr; }
+      .bar-value { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="label">VSF Data Profiler</p>
+      <h1>Data Quality Report</h1>
+      <p class="muted">Deterministic report. Influence analysis is association, not causation.</p>
+      <div class="grid">
+        <div class="card"><span class="metric">{{ summary.table_count }}</span><span class="label">Tables</span></div>
+        <div class="card"><span class="metric">{{ summary.column_count }}</span><span class="label">Columns</span></div>
+        <div class="card"><span class="metric">{{ summary.row_count }}</span><span class="label">Rows</span></div>
+        <div class="card"><span class="metric">{{ summary.issue_count }}</span><span class="label">Issues</span></div>
+        <div class="card"><span class="metric">{{ summary.critical_issue_count }}</span><span class="label">P0/P1</span></div>
+      </div>
+      {% if l4_report.available %}
+      <p><strong>Senior Data Scientist narrative:</strong> <a href="{{ l4_report.path }}">{{ l4_report.path }}</a>{% if l4_report.guardrail_path %} · <a href="{{ l4_report.guardrail_path }}">{{ l4_report.guardrail_path }}</a>{% endif %}</p>
+      {% endif %}
+      {% if schema_parse_report.available %}
+      <p><strong>Schema parse diagnostics:</strong> <a href="{{ schema_parse_report.path }}">{{ schema_parse_report.path }}</a></p>
+      {% endif %}
+      {% if lineage_graph.available %}
+      <p><strong>Lineage graph:</strong> <a href="{{ lineage_graph.path }}">{{ lineage_graph.path }}</a></p>
+      {% endif %}
+      {% if connector_metadata.available %}
+      <p><strong>Connector metadata:</strong> <a href="{{ connector_metadata.path }}">{{ connector_metadata.path }}</a></p>
+      {% endif %}
+    </header>
+
+    <section>
+      <h2>Dataset Verdict</h2>
+      {% if dataset_verdict.available %}
+      <p><strong>Verdict artifact:</strong> <a href="{{ dataset_verdict.path }}">{{ dataset_verdict.path }}</a></p>
+      <p><span class="pill {{ dataset_verdict.verdict }}">{{ dataset_verdict.verdict }}</span> <strong>Risk score:</strong> {{ dataset_verdict.risk_score }}/100</p>
+      <p>{{ dataset_verdict.verdict_rationale }}</p>
+      <div class="grid">
+        <div class="card"><span class="metric">{{ dataset_verdict.issue_total }}</span><span class="label">Issues</span></div>
+        {% for severity, count in dataset_verdict.severity_counts.items() %}
+        <div class="card"><span class="metric">{{ count }}</span><span class="label">{{ severity }}</span></div>
+        {% endfor %}
+      </div>
+      <h3>Top Blockers</h3>
+      <table>
+        <thead><tr><th>Rank</th><th>Severity</th><th>Issue</th><th>Table</th><th>Columns</th><th>Bad Count</th><th>Bad Rate</th><th>Sample</th></tr></thead>
+        <tbody>
+          {% for blocker in dataset_verdict.top_blockers %}
+          <tr>
+            <td>{{ blocker.rank }}</td>
+            <td><span class="pill {{ blocker.severity }}">{{ blocker.severity }}</span></td>
+            <td>{{ blocker.issue_type }}</td>
+            <td>{{ blocker.table }}</td>
+            <td>{{ blocker.columns | join(", ") }}</td>
+            <td>{{ blocker.bad_count }}</td>
+            <td>{{ blocker.bad_rate | pct }}</td>
+            <td>{% if blocker.sample_bad_rows_path %}<a href="{{ blocker.sample_bad_rows_path }}">{{ blocker.sample_bad_rows_path }}</a>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td>0</td><td>none</td><td>none</td><td>none</td><td>none</td><td>0</td><td>0.00%</td><td>none</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h3>Affected Tables</h3>
+      <table>
+        <thead><tr><th>Table</th><th>Max Severity</th><th>Issues</th><th>Bad Count</th><th>Issue Types</th></tr></thead>
+        <tbody>
+          {% for table in dataset_verdict.affected_tables %}
+          <tr>
+            <td>{{ table.table }}</td>
+            <td><span class="pill {{ table.max_severity }}">{{ table.max_severity }}</span></td>
+            <td>{{ table.issue_count }}</td>
+            <td>{{ table.bad_count }}</td>
+            <td>{{ table.issue_types | join(", ") }}</td>
+          </tr>
+          {% else %}
+          <tr><td>none</td><td>none</td><td>0</td><td>0</td><td>none</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h3>Verdict Next Actions</h3>
+      <ul>
+        {% for action in dataset_verdict.recommended_next_actions %}
+        <li>{{ action }}</li>
+        {% else %}
+        <li>No actions required.</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>Dataset verdict metadata was not provided for this report.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Visual Summary</h2>
+      {% if chart_specs.available %}
+      <p><strong>Chart specs:</strong></p>
+      <table>
+        <thead><tr><th>Chart Spec</th><th>Sources</th></tr></thead>
+        <tbody>
+          {% for chart in chart_specs.paths %}
+          <tr><td><a href="{{ chart.path }}">{{ chart.path }}</a></td><td>{{ chart.source_artifacts | join(", ") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if chart_specs.risk_summary.available %}
+      <h3>Dataset Risk</h3>
+      <p><span class="pill {{ chart_specs.risk_summary.verdict }}">{{ chart_specs.risk_summary.verdict }}</span> <strong>{{ chart_specs.risk_summary.risk_score }}/100</strong> risk score across {{ chart_specs.risk_summary.issue_count }} issues.</p>
+      <div class="bar-row">
+        <div class="bar-label">Risk score</div>
+        <div class="bar-track"><div class="bar-fill danger" style="width: {{ chart_specs.risk_summary.bar_width_pct }}%;"></div></div>
+        <div class="bar-value">{{ chart_specs.risk_summary.risk_score }}/100</div>
+      </div>
+      {% endif %}
+
+      <h3>Issue Counts by Severity</h3>
+      <div class="bar-list">
+        {% for row in chart_specs.issue_severity.data %}
+        <div class="bar-row">
+          <div class="bar-label">{{ row.severity }}</div>
+          <div class="bar-track"><div class="bar-fill {% if row.severity in ['P0', 'P1'] %}danger{% elif row.severity == 'P2' %}warn{% endif %}" style="width: {{ row.bar_width_pct }}%;"></div></div>
+          <div class="bar-value">{{ row.count }}</div>
+        </div>
+        {% else %}
+        <p>No severity counts were generated.</p>
+        {% endfor %}
+      </div>
+
+      <h3>Issue Counts by Type</h3>
+      <div class="bar-list">
+        {% for row in chart_specs.issue_type.data %}
+        <div class="bar-row">
+          <div class="bar-label">{{ row.issue_type }}</div>
+          <div class="bar-track"><div class="bar-fill danger" style="width: {{ row.bar_width_pct }}%;"></div></div>
+          <div class="bar-value">{{ row.count }}</div>
+        </div>
+        {% else %}
+        <p>No issue type counts were generated.</p>
+        {% endfor %}
+      </div>
+
+      <h3>Top Missingness by Column</h3>
+      <div class="bar-list">
+        {% for row in chart_specs.missingness_columns.data %}
+        <div class="bar-row">
+          <div class="bar-label"><code>{{ row.field }}</code></div>
+          <div class="bar-track"><div class="bar-fill warn" style="width: {{ row.bar_width_pct }}%;"></div></div>
+          <div class="bar-value">{{ row.null_rate | pct }}</div>
+        </div>
+        {% else %}
+        <p>No missingness counts were generated.</p>
+        {% endfor %}
+      </div>
+
+      <h3>Relationship FK Health</h3>
+      <div class="bar-list">
+        {% for row in chart_specs.relationship_health.data %}
+        <div class="bar-row">
+          <div class="bar-label">{{ row.status }}</div>
+          <div class="bar-track"><div class="bar-fill {% if row.status == 'invalid' %}danger{% elif row.status in ['warning', 'skipped'] %}warn{% endif %}" style="width: {{ row.bar_width_pct }}%;"></div></div>
+          <div class="bar-value">{{ row.count }}</div>
+        </div>
+        {% else %}
+        <p>No relationship health counts were generated.</p>
+        {% endfor %}
+      </div>
+
+      {% if chart_specs.influence_top_features.available %}
+      <h3>Influence Top Features</h3>
+      <div class="bar-list">
+        {% for row in chart_specs.influence_top_features.data %}
+        <div class="bar-row">
+          <div class="bar-label">{{ row.feature }}</div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ row.bar_width_pct }}%;"></div></div>
+          <div class="bar-value">{{ "%.4f" | format(row.score) }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% else %}
+      <p>Chart specs were not provided for this report.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Execution Flow</h2>
+      {% if execution_flow.available %}
+      <p><strong>Run ID:</strong> <code>{{ execution_flow.run_id }}</code></p>
+      <p><strong>Status:</strong> {{ execution_flow.status }}{% if execution_flow.duration_seconds %} in {{ execution_flow.duration_seconds }} seconds{% endif %}</p>
+      <p><strong>Output directory:</strong> <code>{{ execution_flow.output_dir }}</code></p>
+      <table>
+        <thead><tr><th>Stage</th><th>Status</th><th>Duration Seconds</th><th>Details</th></tr></thead>
+        <tbody>
+          {% for stage in execution_flow.stages %}
+          <tr>
+            <td>{{ stage.name }}</td>
+            <td><span class="pill">{{ stage.status }}</span></td>
+            <td>{{ stage.duration_seconds }}</td>
+            <td>{{ stage.details }}{% if stage.error %}; error={{ stage.error }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h3>Runtime Artifacts</h3>
+      <table>
+        <thead><tr><th>Artifact</th><th>Path</th></tr></thead>
+        <tbody>
+          {% for artifact in execution_flow.artifacts %}
+          <tr><td>{{ artifact.name }}</td><td><code>{{ artifact.path }}</code></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>Runtime execution metadata was not provided for this report.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Lineage Graph</h2>
+      {% if lineage_graph.available %}
+      <p><strong>Lineage artifact:</strong> <a href="{{ lineage_graph.path }}">{{ lineage_graph.path }}</a></p>
+      <div class="grid">
+        <div class="card"><span class="metric">{{ lineage_graph.source_system_count }}</span><span class="label">Sources</span></div>
+        <div class="card"><span class="metric">{{ lineage_graph.table_count }}</span><span class="label">Tables</span></div>
+        <div class="card"><span class="metric">{{ lineage_graph.column_count }}</span><span class="label">Columns</span></div>
+        <div class="card"><span class="metric">{{ lineage_graph.relationship_count }}</span><span class="label">Relationships</span></div>
+        <div class="card"><span class="metric">{{ lineage_graph.stage_count }}</span><span class="label">Stages</span></div>
+        <div class="card"><span class="metric">{{ lineage_graph.artifact_count }}</span><span class="label">Artifacts</span></div>
+      </div>
+      <p><strong>Dependency edges:</strong> {{ lineage_graph.edge_count }}</p>
+      <p><strong>Evidence artifacts:</strong> {{ lineage_graph.evidence_artifacts | join(", ") }}</p>
+      {% else %}
+      <p>Lineage graph metadata was not provided for this report.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Dataset Overview</h2>
+      <table>
+        <thead><tr><th>Table</th><th>Rows</th><th>Columns</th><th>File Size MB</th></tr></thead>
+        <tbody>
+          {% for table in profile.tables.values() %}
+          <tr><td>{{ table.table }}</td><td>{{ table.row_count }}</td><td>{{ table.column_count }}</td><td>{{ table.file_size_mb }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Schema Validation</h2>
+      <p><strong>Missing tables:</strong> {{ profile.catalog.missing_tables | join(", ") if profile.catalog.missing_tables else "none" }}</p>
+      <p><strong>Extra CSV files:</strong> {{ profile.catalog.extra_csvs | join(", ") if profile.catalog.extra_csvs else "none" }}</p>
+      {% if schema_parse_report.available %}
+      <p><strong>Schema parse report:</strong> <a href="{{ schema_parse_report.path }}">{{ schema_parse_report.path }}</a></p>
+      <p><strong>Parse status:</strong> <span class="pill {% if schema_parse_report.status == 'parsed_with_warnings' %}P2{% endif %}">{{ schema_parse_report.status }}</span>; <strong>parsed objects:</strong> tables={{ schema_parse_report.table_count }}, columns={{ schema_parse_report.column_count }}, relationships={{ schema_parse_report.relationship_count }}; <strong>diagnostics:</strong> warnings={{ schema_parse_report.warning_count }}, unsupported={{ schema_parse_report.unsupported_count }}</p>
+      <h3>Schema Parse Diagnostics</h3>
+      <table>
+        <thead><tr><th>Severity</th><th>Code</th><th>Line</th><th>Message</th></tr></thead>
+        <tbody>
+          {% for diagnostic in schema_parse_report.diagnostics %}
+          <tr><td>{{ diagnostic.severity }}</td><td><code>{{ diagnostic.code }}</code></td><td>{{ diagnostic.line or "" }}</td><td>{{ diagnostic.message }}</td></tr>
+          {% else %}
+          <tr><td>info</td><td>none</td><td></td><td>No parser diagnostics.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      {% if schema_evaluation.available %}
+      <p><strong>Schema evaluation:</strong> <a href="{{ schema_evaluation.path }}">{{ schema_evaluation.path }}</a></p>
+      <p><strong>Mapped tables:</strong> {{ schema_evaluation.mapped_table_count }}; <strong>schema issue references:</strong> {{ schema_evaluation.schema_issue_count }}</p>
+      {% endif %}
+      {% if connector_metadata.available %}
+      <h3>Connector Metadata</h3>
+      <p><strong>Connector artifact:</strong> <a href="{{ connector_metadata.path }}">{{ connector_metadata.path }}</a></p>
+      <p><strong>Source:</strong> {{ connector_metadata.source_type }}; <strong>introspection:</strong> {{ connector_metadata.introspection_status }}; <strong>extraction:</strong> {{ connector_metadata.extraction_status }}; <strong>secrets redacted:</strong> {{ connector_metadata.secrets_redacted }}</p>
+      <table>
+        <thead><tr><th>Table</th><th>Source Table</th><th>Rows Extracted</th><th>Row Estimate</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for table in connector_metadata.tables %}
+          <tr><td><code>{{ table.table }}</code></td><td><code>{{ table.source_table }}</code></td><td>{{ table.rows_extracted }}</td><td>{{ table.row_count_estimate or "" }}</td><td>{{ table.status }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Relationship Graph</h2>
+      {% if relationship_graph.available %}
+      <p><strong>Graph artifact:</strong> <a href="{{ relationship_graph.path }}">{{ relationship_graph.path }}</a></p>
+      <p><strong>Nodes:</strong> {{ relationship_graph.node_count }}; <strong>edges:</strong> {{ relationship_graph.edge_count }}; <strong>junction tables:</strong> {{ relationship_graph.junction_table_count }}; <strong>many-to-many:</strong> {{ relationship_graph.many_to_many_relationship_count }}</p>
+      <table>
+        <thead><tr><th>Status</th><th>Count</th></tr></thead>
+        <tbody>
+          {% for status, count in relationship_graph.status_counts.items() %}
+          <tr><td>{{ status }}</td><td>{{ count }}</td></tr>
+          {% else %}
+          <tr><td>none</td><td>0</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h3>Cardinality Counts</h3>
+      <table>
+        <thead><tr><th>Cardinality</th><th>Count</th></tr></thead>
+        <tbody>
+          {% for cardinality, count in relationship_graph.cardinality_counts.items() %}
+          <tr><td>{{ cardinality }}</td><td>{{ count }}</td></tr>
+          {% else %}
+          <tr><td>none</td><td>0</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h3>Relationship Status</h3>
+      <table>
+        <thead><tr><th>Source</th><th>Target</th><th>Declared Cardinality</th><th>Observed Cardinality</th><th>Status</th><th>Reason</th></tr></thead>
+        <tbody>
+          {% for edge in relationship_graph.edges %}
+          <tr>
+            <td><code>{{ edge.source }}</code></td>
+            <td><code>{{ edge.target }}</code></td>
+            <td>{{ edge.declared_cardinality }}</td>
+            <td>{{ edge.observed_cardinality }}</td>
+            <td><span class="pill {% if edge.status == 'invalid' %}P1{% elif edge.status == 'warning' %}P2{% endif %}">{{ edge.status }}</span></td>
+            <td>{{ edge.reason }}</td>
+          </tr>
+          {% else %}
+          <tr><td>none</td><td>none</td><td>none</td><td>none</td><td>none</td><td>none</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h3>Junction Tables</h3>
+      <table>
+        <thead><tr><th>Table</th><th>Parent Tables</th><th>Cardinality</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for junction in relationship_graph.junction_tables %}
+          <tr><td><code>{{ junction.table }}</code></td><td>{{ junction.parent_tables | join(", ") }}</td><td>{{ junction.cardinality }}</td><td>{{ junction.status }}</td></tr>
+          {% else %}
+          <tr><td>none</td><td>none</td><td>none</td><td>none</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>Relationship graph artifact was not provided.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>DBML Diagram and CSV Mapping</h2>
+      <p class="muted">{{ schema_diagram.dbdiagram_note }}</p>
+      <div class="actions">
+        {% if schema_diagram.dbdiagram_url_available %}
+        <a class="button" href="{{ schema_diagram.dbdiagram_url }}" target="_blank" rel="noopener">Open DBML diagram in dbdiagram.io</a>
+        {% endif %}
+        <a class="button" href="{{ schema_diagram.dbml_path }}">Download generated DBML</a>
+      </div>
+
+      {% if schema_diagram.dbdiagram_url_available %}
+      <iframe class="diagram-frame" src="{{ schema_diagram.dbdiagram_url }}" loading="lazy" allowfullscreen title="DBML ER diagram"></iframe>
+      {% else %}
+      <pre>DBML diagram link unavailable because this schema is too large for a URL. Open {{ schema_diagram.dbml_path }} and paste it into dbdiagram.io.</pre>
+      {% endif %}
+
+      <h3>CSV to DBML Table Mapping</h3>
+      <table class="schema-table">
+        <thead><tr><th>Status</th><th>DBML Table</th><th>CSV File</th><th>Primary Key</th><th>Foreign Keys</th></tr></thead>
+        <tbody>
+          {% for table in schema_diagram.tables %}
+          <tr>
+            <td><span class="pill">{{ table.status }}</span></td>
+            <td><code>{{ table.table }}</code></td>
+            <td>{% if table.csv_path %}<code>{{ table.csv_path }}</code>{% else %}missing{% endif %}</td>
+            <td><code>{{ table.primary_key | join(", ") if table.primary_key else "none" }}</code></td>
+            <td>
+              {% for fk in table.foreign_keys %}
+              <div><code>{{ fk.column }}</code> -> <code>{{ fk.parent_table }}.{{ fk.parent_column }}</code></div>
+              {% else %}
+              none
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% for extra in schema_diagram.extra_csvs %}
+          <tr>
+            <td><span class="pill P2">{{ extra.status }}</span></td>
+            <td><code>{{ extra.table }}</code></td>
+            <td><code>{{ extra.csv_path }}</code></td>
+            <td>n/a</td>
+            <td>n/a</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h3>Relationships</h3>
+      <table class="schema-table">
+        <thead><tr><th>Child</th><th>Parent</th></tr></thead>
+        <tbody>
+          {% for rel in schema_diagram.relationships %}
+          <tr>
+            <td><code>{{ rel.child_table }}.{{ rel.child_column }}</code></td>
+            <td><code>{{ rel.parent_table }}.{{ rel.parent_column }}</code></td>
+          </tr>
+          {% else %}
+          <tr><td>none</td><td>none</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Top Data Quality Issues</h2>
+      <table>
+        <thead><tr><th>Issue</th><th>Severity</th><th>Type</th><th>Table</th><th>Columns</th><th>Bad Count</th><th>Bad Rate</th><th>Sample</th><th>Suggested Fix</th></tr></thead>
+        <tbody>
+          {% for issue in top_issues %}
+          <tr>
+            <td>{{ issue.issue_id }}</td>
+            <td><span class="pill {{ issue.severity }}">{{ issue.severity }}</span></td>
+            <td>{{ issue.issue_type }}</td>
+            <td>{{ issue.table }}</td>
+            <td>{{ issue.columns | join(", ") }}</td>
+            <td>{{ issue.bad_count }}</td>
+            <td>{{ issue.bad_rate | pct }}</td>
+            <td>{% if issue.sample_bad_rows_path %}<a href="{{ issue.sample_bad_rows_path }}">{{ issue.sample_bad_rows_path }}</a>{% endif %}</td>
+            <td>{{ issue.suggested_fix[0] if issue.suggested_fix else "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Relationship Integrity</h2>
+      <table>
+        <thead><tr><th>Issue</th><th>Type</th><th>Child/Parent</th><th>Columns</th><th>Bad Count</th></tr></thead>
+        <tbody>
+          {% for issue in relationship_issues %}
+          <tr><td>{{ issue.issue_id }}</td><td>{{ issue.issue_type }}</td><td>{{ issue.table }} -> {{ issue.parent_table or "" }}</td><td>{{ issue.columns | join(", ") }}</td><td>{{ issue.bad_count }}</td></tr>
+          {% else %}
+          <tr><td>none</td><td>none</td><td>none</td><td>none</td><td>0</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Table Profiles</h2>
+      {% for table in profile.tables.values() %}
+      <h3>{{ table.table }}</h3>
+      <table>
+        <thead><tr><th>Column</th><th>Expected</th><th>Inferred</th><th>Null Rate</th><th>Distinct</th><th>Invalid Casts</th></tr></thead>
+        <tbody>
+          {% for column in table.columns.values() %}
+          <tr><td>{{ column.name }}</td><td>{{ column.expected_type_from_dbml or "" }}</td><td>{{ column.inferred_type }}</td><td>{{ column.null_rate | pct }}</td><td>{{ column.distinct_count }}</td><td>{{ column.invalid_cast_count }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+    </section>
+
+    <section>
+      <h2>Influence Analysis</h2>
+      <p><strong>Target:</strong> <code>{{ influence.target or "none" }}</code></p>
+      <table>
+        <thead><tr><th>Feature</th><th>Score</th><th>Direction</th><th>Method</th><th>Interpretation</th></tr></thead>
+        <tbody>
+          {% for feature in influence.top_features %}
+          <tr><td>{{ feature.feature }}</td><td>{{ "%.4f" | format(feature.score) }}</td><td>{{ feature.direction or "" }}</td><td>{{ feature.method }}</td><td>{{ feature.interpretation }}</td></tr>
+          {% else %}
+          <tr><td>none</td><td>0</td><td>none</td><td>none</td><td>No influence features were produced.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Recommended Dev Actions</h2>
+      <ul>
+        {% for action in recommended_actions %}
+        <li>{{ action }}</li>
+        {% else %}
+        <li>No actions required.</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section>
+      <h2>Appendix: Evidence SQL and Sample Paths</h2>
+      {% for issue in issues %}
+      <h3>{{ issue.issue_id }} {{ issue.issue_type }}</h3>
+      <p><strong>Sample:</strong> {% if issue.sample_bad_rows_path %}<a href="{{ issue.sample_bad_rows_path }}">{{ issue.sample_bad_rows_path }}</a>{% else %}none{% endif %}</p>
+      <p><strong>Suggested fix:</strong> {{ issue.suggested_fix | join("; ") }}</p>
+      <pre>{{ issue.evidence_sql }}</pre>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>

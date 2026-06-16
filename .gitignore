@@ -1,0 +1,23 @@
+# Python local development and generated VSF demo artifacts.
+.DS_Store
+._*
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+htmlcov/
+.vercel/
+node_modules/
+playwright-report/
+test-results/
+.interface-design/
+
+data/
+outputs/
