@@ -146,11 +146,11 @@
             </div>
             <div class="runtime-column">
               <div class="runtime-heading">
-                <strong>Generated artifacts</strong>
+                <strong>Generated results</strong>
                 <span id="artifactCount">0 files</span>
               </div>
               <div class="artifact-list" id="artifactList">
-                <p class="muted">Artifact links are loaded from <code>run_summary.json</code>.</p>
+                <p class="muted">Generated result previews and artifact links load from <code>run_summary.json</code>.</p>
               </div>
             </div>
           </div>
@@ -331,12 +331,20 @@
             </div>
             <a class="button secondary" id="dbdiagramLink" href="#" target="_blank" rel="noopener" aria-disabled="true">Open dbdiagram</a>
           </div>
+          <div class="diagram-status-row">
+            <p class="form-message" id="diagramMessage" role="status">Local diagram preview renders from browser DBML state.</p>
+            <span class="badge" id="diagramSourceBadge">Local preview</span>
+          </div>
+          <div class="diagram-warnings" id="diagramWarnings" hidden></div>
           <div class="diagram-empty" id="diagramEmpty">
             <div class="diagram-glyph" aria-hidden="true"></div>
             <strong>Preparing demo DBML diagram</strong>
             <p>The demo contract loads automatically. Upload your own DBML/CSV files to replace it.</p>
           </div>
-          <iframe id="diagramFrame" class="diagram-frame" title="DBML ER diagram preview" hidden></iframe>
+          <div class="local-diagram" id="localDiagram" hidden>
+            <svg id="diagramSvg" class="diagram-svg" role="img" aria-label="Local DBML schema diagram"></svg>
+          </div>
+          <iframe id="diagramFrame" class="diagram-frame" title="External dbdiagram preview" hidden aria-hidden="true"></iframe>
         </article>
 
         <aside class="panel preflight-panel" id="issues">

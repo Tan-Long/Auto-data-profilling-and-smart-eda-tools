@@ -545,9 +545,14 @@ automation, or raw-data plotting to produce these reports.
 
 The local web runner renders an interactive dashboard from the same generated
 chart specs and machine artifacts. Dashboard filtering and drilldown are
-client-side presentation over artifact JSON. The dashboard must use web-runner
-artifact URLs and must not read raw CSV files, infer new profiling facts, or
-rerun the profiler.
+client-side presentation over artifact JSON. Its Generated results panel may
+summarize dataset verdict, issue counts, table impact, runtime summary, and
+report links from those artifacts while preserving raw artifact links. The
+DBML diagram panel renders browser preflight state before a run and prefers
+generated `schema_diagram.json`, `relationship_graph.json`, and
+`schema_parse_report.json` artifact evidence after a run. The dashboard must
+use web-runner artifact URLs and must not read raw CSV files, infer new
+profiling facts, or rerun the profiler.
 
 Roadmap chart artifacts:
 
@@ -706,8 +711,8 @@ Static browser preflight:
 - reads DBML files in the browser;
 - reads only CSV headers;
 - maps CSV files to DBML tables;
-- displays PK/FK relationships;
-- generates a dbdiagram.io link.
+- displays PK/FK relationships in a local schema diagram;
+- generates a dbdiagram.io link as a secondary external action.
 
 The Vercel deployment serves only this static preflight UI. It does not run the
 Python/DuckDB backend, database connectors, local path mode, LLM narrative

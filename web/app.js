@@ -91,6 +91,11 @@ const els = {
   dbdiagramLink: document.querySelector("#dbdiagramLink"),
   diagramFrame: document.querySelector("#diagramFrame"),
   diagramEmpty: document.querySelector("#diagramEmpty"),
+  diagramMessage: document.querySelector("#diagramMessage"),
+  diagramSourceBadge: document.querySelector("#diagramSourceBadge"),
+  diagramWarnings: document.querySelector("#diagramWarnings"),
+  localDiagram: document.querySelector("#localDiagram"),
+  diagramSvg: document.querySelector("#diagramSvg"),
   mappedMetric: document.querySelector("#mappedMetric"),
   missingMetric: document.querySelector("#missingMetric"),
   extraMetric: document.querySelector("#extraMetric"),
@@ -212,6 +217,11 @@ const relationshipIssueTypes = new Set([
 ]);
 
 const severityOrder = ["P0", "P1", "P2", "P3"];
+const localDiagramLimits = {
+  tables: 24,
+  relationships: 60,
+};
+const postRunDiagramArtifacts = ["schema_diagram.json"];
 
 els.dbmlInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -774,6 +784,7 @@ function renderAll() {
   renderCsvList();
   renderEdges();
   renderMapping();
+  renderDiagram();
   renderRunner();
   renderDashboard();
   renderControls();
@@ -1036,21 +1047,198 @@ function renderStages(job) {
 function renderArtifacts(artifacts) {
   els.artifactList.innerHTML = "";
   if (!artifacts.length) {
-    els.artifactList.innerHTML = `<p class="muted">Artifact links are loaded from <code>run_summary.json</code>.</p>`;
+    els.artifactList.innerHTML = `<p class="muted">Generated result previews and artifact links load from <code>run_summary.json</code>.</p>`;
     return;
   }
-  artifacts.forEach((artifact) => {
-    const link = document.createElement("a");
-    link.className = "artifact-link";
-    link.href = artifact.url;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.innerHTML = `
+  els.artifactList.innerHTML = renderGeneratedResults(artifacts);
+}
+
+function renderGeneratedResults(artifacts) {
+  return `
+    <div class="generated-results">
+      ${renderGeneratedResultPreviews(artifacts)}
+      ${renderGeneratedReportLinks(artifacts)}
+      <div class="generated-links-block">
+        <div class="runtime-heading compact">
+          <strong>Raw artifact links</strong>
+          <span>${integerText(artifacts.length)} files</span>
+        </div>
+        <div class="artifact-link-list">
+          ${artifacts.map((artifact) => renderRawArtifactLink(artifact)).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderGeneratedResultPreviews(artifacts) {
+  if (state.dashboardLoadingJobId && !state.dashboardArtifactIndex) {
+    return `
+      <div class="generated-result-grid">
+        <article class="generated-result-card">
+          <div class="generated-result-heading">
+            <strong>Loading generated results</strong>
+            <span>artifact URLs</span>
+          </div>
+          <p class="muted">Fetching chart specs and machine artifacts from the completed job.</p>
+        </article>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="generated-result-grid">
+      ${renderGeneratedVerdictPreview(artifacts)}
+      ${renderGeneratedIssueCountsPreview(artifacts)}
+      ${renderGeneratedTableImpactPreview(artifacts)}
+      ${renderGeneratedRuntimePreview(artifacts)}
+    </div>
+  `;
+}
+
+function renderGeneratedVerdictPreview(artifacts) {
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const hasVerdict = Boolean(Object.keys(verdict).length);
+  const riskScore = verdict.risk_score ?? verdict.summary?.risk_score;
+  const verdictLabel = verdict.verdict || verdict.summary?.verdict || "Waiting";
+  const issueCount = verdict.issue_counts?.total ?? getDashboardIssues().length;
+  const blockers = Array.isArray(verdict.top_blockers) ? verdict.top_blockers.length : 0;
+  const body = hasVerdict
+    ? `
+      <div class="generated-result-kpi">
+        <strong>${escapeHtml(verdictLabel)}</strong>
+        <span>${escapeHtml(riskScore === undefined ? "--" : `${integerText(riskScore)}/100`)} risk</span>
+      </div>
+      <p>${integerText(issueCount)} issues · ${integerText(blockers)} top blockers</p>
+    `
+    : `<p class="muted">Waiting for <code>dataset_verdict.json</code> from the dashboard artifact loader.</p>`;
+  return generatedResultCard("Dataset verdict", "dataset_verdict.json", body, artifacts);
+}
+
+function renderGeneratedIssueCountsPreview(artifacts) {
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const runSummary = generatedRunSummary();
+  const issues = getDashboardIssues();
+  const bySeverity = verdict.issue_counts?.by_severity || runSummary.issue_counts?.by_severity || {};
+  const total = verdict.issue_counts?.total ?? runSummary.issue_counts?.total ?? issues.length;
+  const severityRows = severityOrder.map((severity) => `
+    <span><code>${escapeHtml(severity)}</code> ${integerText(bySeverity[severity])}</span>
+  `).join("");
+  return generatedResultCard(
+    "Issue counts",
+    "issues.json",
+    `
+      <div class="generated-result-kpi">
+        <strong>${integerText(total)}</strong>
+        <span>issues</span>
+      </div>
+      <div class="generated-mini-list">${severityRows}</div>
+    `,
+    artifacts,
+  );
+}
+
+function renderGeneratedTableImpactPreview(artifacts) {
+  const assessmentArtifact = state.dashboardArtifacts["table_assessments.json"] || {};
+  const assessments = getDashboardTableAssessments();
+  const summary = assessmentArtifact.summary || {};
+  const tableCount = summary.table_count ?? assessments.length;
+  const averageHealth = summary.average_health_score;
+  const notReady = summary.readiness_counts?.NOT_READY ?? assessments.filter((row) => row.readiness === "NOT_READY").length;
+  const topTables = assessments
+    .slice()
+    .sort((a, b) => (
+      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
+      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      String(a.table || "").localeCompare(String(b.table || ""))
+    ))
+    .slice(0, 3)
+    .map((assessment) => `<code>${escapeHtml(assessment.table)}</code>`)
+    .join("");
+  const body = tableCount
+    ? `
+      <div class="generated-result-kpi">
+        <strong>${integerText(tableCount)}</strong>
+        <span>tables</span>
+      </div>
+      <p>${integerText(notReady)} not ready · ${averageHealth === undefined ? "--" : integerText(averageHealth)} avg health</p>
+      ${topTables ? `<div class="generated-mini-list">${topTables}</div>` : ""}
+    `
+    : `<p class="muted">Waiting for <code>table_assessments.json</code>.</p>`;
+  return generatedResultCard("Table impact", "table_assessments.json", body, artifacts);
+}
+
+function renderGeneratedRuntimePreview(artifacts) {
+  const runSummary = generatedRunSummary();
+  const stages = Array.isArray(runSummary.stage_timings) ? runSummary.stage_timings : [];
+  const failedStages = Array.isArray(runSummary.failed_stages) ? runSummary.failed_stages.length : 0;
+  const status = runSummary.status || state.currentJob?.status || "pending";
+  const duration = runSummary.duration_seconds;
+  const body = `
+    <div class="generated-result-kpi">
+      <strong>${escapeHtml(status)}</strong>
+      <span>${integerText(stages.length)} stages</span>
+    </div>
+    <p>${duration === undefined ? "--" : `${Number(duration).toFixed(2)}s`} runtime · ${integerText(failedStages)} failed stages</p>
+  `;
+  return generatedResultCard("Runtime summary", "run_summary.json", body, artifacts);
+}
+
+function renderGeneratedReportLinks(artifacts) {
+  const reportLinks = [
+    ["report.html", "Report HTML"],
+    ["report.md", "Report Markdown"],
+    ["l4_report.md", "L4 report"],
+  ]
+    .map(([path, label]) => {
+      const url = artifactUrlFromArtifacts(path, artifacts);
+      return url
+        ? `<a class="generated-report-link" href="${escapeHtml(url)}" target="_blank" rel="noopener"><strong>${escapeHtml(label)}</strong><code>${escapeHtml(path)}</code></a>`
+        : "";
+    })
+    .filter(Boolean)
+    .join("");
+
+  if (!reportLinks) {
+    return "";
+  }
+
+  return `
+    <div class="generated-report-links" aria-label="Generated report links">
+      ${reportLinks}
+    </div>
+  `;
+}
+
+function generatedResultCard(title, artifactPath, body, artifacts) {
+  const artifactUrl = artifactUrlFromArtifacts(artifactPath, artifacts);
+  return `
+    <article class="generated-result-card">
+      <div class="generated-result-heading">
+        <strong>${escapeHtml(title)}</strong>
+        ${artifactUrl ? `<a href="${escapeHtml(artifactUrl)}" target="_blank" rel="noopener">${escapeHtml(artifactPath)}</a>` : `<span>${escapeHtml(artifactPath)}</span>`}
+      </div>
+      ${body}
+    </article>
+  `;
+}
+
+function renderRawArtifactLink(artifact) {
+  return `
+    <a class="artifact-link" href="${escapeHtml(artifact.url)}" target="_blank" rel="noopener">
       <strong>${escapeHtml(artifact.label)}</strong>
       <code>${escapeHtml(artifact.path)}</code>
-    `;
-    els.artifactList.appendChild(link);
-  });
+    </a>
+  `;
+}
+
+function generatedRunSummary() {
+  return state.dashboardArtifacts["run_summary.json"] || state.currentJob?.summary || {};
+}
+
+function artifactUrlFromArtifacts(path, artifacts = state.currentJob?.artifacts || []) {
+  const artifact = artifacts.find((item) => item.path === path);
+  return artifact?.url || state.dashboardArtifactIndex?.artifact_urls?.[path] || "";
 }
 
 function resetDashboardState() {
@@ -1082,7 +1270,14 @@ async function loadDashboard(jobId) {
       throw new Error(dashboardArtifactIndex.error || "Dashboard artifact discovery failed.");
     }
 
-    const artifactEntries = Object.entries(dashboardArtifactIndex.artifact_urls || {});
+    const artifactUrls = { ...(dashboardArtifactIndex.artifact_urls || {}) };
+    postRunDiagramArtifacts.forEach((artifactPath) => {
+      const artifactUrl = artifactUrlFromArtifacts(artifactPath, state.currentJob?.artifacts || []);
+      if (artifactUrl && !artifactUrls[artifactPath]) {
+        artifactUrls[artifactPath] = artifactUrl;
+      }
+    });
+    const artifactEntries = Object.entries(artifactUrls);
     const loadedArtifacts = {};
     await Promise.all(
       artifactEntries.map(async ([artifactPath, artifactUrl]) => {
@@ -1102,6 +1297,8 @@ async function loadDashboard(jobId) {
     renderDashboardMessage(error.message || "Unable to load dashboard artifacts.", "error");
   } finally {
     renderDashboard();
+    renderJob();
+    renderDiagram();
   }
 }
 
@@ -2499,15 +2696,360 @@ function scoreText(value) {
 }
 
 function renderDiagram() {
-  if (!state.dbmlText) {
+  const model = buildDiagramModel();
+  updateDbdiagramLink(model.externalUrl);
+  renderDiagramDiagnostics(model.parseReport);
+
+  els.diagramFrame.hidden = true;
+  els.diagramFrame.removeAttribute("src");
+
+  if (!model.hasInput) {
+    renderDiagramState(
+      "empty",
+      "Preparing demo DBML diagram",
+      "The local preview renders here from browser DBML state. Upload DBML/CSV files or reset the demo.",
+      model,
+    );
     return;
   }
-  const url = buildDbdiagramUrl(state.dbmlText);
-  els.dbdiagramLink.href = url;
-  els.dbdiagramLink.setAttribute("aria-disabled", "false");
-  els.diagramFrame.src = url;
-  els.diagramFrame.hidden = false;
+
+  if (model.error) {
+    renderDiagramState("error", "Local DBML preview unavailable", model.error, model);
+    return;
+  }
+
+  if (model.tables.length > localDiagramLimits.tables || model.relationships.length > localDiagramLimits.relationships) {
+    renderDiagramState(
+      "large",
+      "Diagram is too large for local preview",
+      `${integerText(model.tables.length)} tables and ${integerText(model.relationships.length)} relationships were found. Open the generated DBML link or inspect the artifact table instead.`,
+      model,
+    );
+    return;
+  }
+
+  if (!model.tables.length) {
+    renderDiagramState(
+      "error",
+      "No DBML tables parsed",
+      "The local preview could not find table declarations in the current DBML. Run the backend parser for full diagnostics.",
+      model,
+    );
+    return;
+  }
+
   els.diagramEmpty.hidden = true;
+  els.localDiagram.hidden = false;
+  els.diagramMessage.textContent = `${model.sourceLabel} · ${integerText(model.tables.length)} tables · ${integerText(model.relationships.length)} relationships`;
+  els.diagramMessage.dataset.status = model.source === "artifact" ? "success" : "idle";
+  els.diagramSourceBadge.textContent = model.sourceBadge;
+  drawLocalDiagram(model);
+}
+
+function buildDiagramModel() {
+  const schemaDiagram = state.dashboardArtifacts["schema_diagram.json"];
+  const relationshipGraph = state.dashboardArtifacts["relationship_graph.json"];
+  const parseReport = state.dashboardArtifacts["schema_parse_report.json"];
+  if (schemaDiagram || relationshipGraph) {
+    return buildArtifactDiagramModel(schemaDiagram || {}, relationshipGraph || {}, parseReport || null);
+  }
+  return buildPreflightDiagramModel();
+}
+
+function buildPreflightDiagramModel() {
+  const hasInput = Boolean(state.dbmlText);
+  return {
+    source: "preflight",
+    sourceLabel: "Local preflight",
+    sourceBadge: "Browser DBML",
+    hasInput,
+    error: hasInput && !state.tables.length ? "No table declarations were parsed by the lightweight browser preview." : "",
+    externalUrl: hasInput ? buildDbdiagramUrl(state.dbmlText) : "",
+    parseReport: null,
+    tables: state.tables.map((table) => {
+      const csvStem = state.mapping.get(table.name) || "";
+      const csvFile = state.csvFiles.find((file) => file.stem === csvStem);
+      return {
+        name: table.name,
+        status: csvFile ? "mapped" : "missing_csv",
+        csvPath: csvFile?.name || "",
+        rowCount: null,
+        columnCount: table.columns.length,
+        columns: table.columns.map((column) => ({
+          name: column.name,
+          type: column.type,
+          isPk: Boolean(column.pk || table.primaryKey.includes(column.name)),
+          isFk: Boolean(column.fk),
+          fkTarget: column.fk ? `${column.fk.parentTable}.${column.fk.parentColumn}` : "",
+        })),
+      };
+    }),
+    relationships: state.relationships.map((rel) => ({
+      id: `${rel.childTable}.${rel.childColumn}->${rel.parentTable}.${rel.parentColumn}`,
+      childTable: rel.childTable,
+      childColumns: [rel.childColumn],
+      parentTable: rel.parentTable,
+      parentColumns: [rel.parentColumn],
+      status: "preflight",
+      label: "FK",
+    })),
+  };
+}
+
+function buildArtifactDiagramModel(schemaDiagram, relationshipGraph, parseReport) {
+  const schemaTables = Array.isArray(schemaDiagram.tables) ? schemaDiagram.tables : [];
+  const graphNodes = Array.isArray(relationshipGraph.nodes) ? relationshipGraph.nodes : [];
+  const graphEdges = Array.isArray(relationshipGraph.edges) ? relationshipGraph.edges : [];
+  const graphNodeByTable = new Map(graphNodes.map((node) => [String(node.table || ""), node]));
+  const tableNames = uniqueSorted([
+    ...schemaTables.map((table) => table.table).filter(Boolean),
+    ...graphNodes.map((node) => node.table).filter(Boolean),
+  ]);
+  const relationships = graphEdges.length
+    ? graphEdges.map((edge) => ({
+      id: edge.id || `${edge.source_table}.${edge.source_column}->${edge.target_table}.${edge.target_column}`,
+      childTable: edge.source_table || "",
+      childColumns: arrayOfStrings(edge.source_columns).length ? arrayOfStrings(edge.source_columns) : arrayOfStrings([edge.source_column]),
+      parentTable: edge.target_table || "",
+      parentColumns: arrayOfStrings(edge.target_columns).length ? arrayOfStrings(edge.target_columns) : arrayOfStrings([edge.target_column]),
+      status: edge.status || "",
+      label: edge.status || edge.cardinality || "FK",
+    }))
+    : (Array.isArray(schemaDiagram.relationships) ? schemaDiagram.relationships : []).map((rel) => ({
+      id: `${rel.child_table || rel.childTable}.${rel.child_column || rel.childColumn}->${rel.parent_table || rel.parentTable}.${rel.parent_column || rel.parentColumn}`,
+      childTable: rel.child_table || rel.childTable || "",
+      childColumns: arrayOfStrings(rel.child_columns || [rel.child_column || rel.childColumn]),
+      parentTable: rel.parent_table || rel.parentTable || "",
+      parentColumns: arrayOfStrings(rel.parent_columns || [rel.parent_column || rel.parentColumn]),
+      status: "",
+      label: rel.declared_cardinality || rel.relationship_type || "FK",
+    }));
+  const schemaTableByName = new Map(schemaTables.map((table) => [String(table.table || ""), table]));
+  return {
+    source: "artifact",
+    sourceLabel: "Generated artifacts",
+    sourceBadge: "schema_diagram.json",
+    hasInput: Boolean(schemaTables.length || graphNodes.length || state.dbmlText),
+    error: "",
+    externalUrl: schemaDiagram.dbdiagram_url || (state.dbmlText ? buildDbdiagramUrl(state.dbmlText) : ""),
+    parseReport,
+    tables: tableNames.map((tableName) => {
+      const schemaTable = schemaTableByName.get(tableName) || {};
+      const graphNode = graphNodeByTable.get(tableName) || {};
+      return {
+        name: tableName,
+        status: graphNode.status || schemaTable.status || "mapped",
+        csvPath: graphNode.csv_path || schemaTable.csv_path || "",
+        rowCount: graphNode.row_count ?? null,
+        columnCount: graphNode.column_count ?? schemaTable.column_count ?? 0,
+        columns: diagramColumnsFromArtifacts(schemaTable, graphNode),
+      };
+    }),
+    relationships: relationships.filter((rel) => rel.childTable && rel.parentTable),
+  };
+}
+
+function diagramColumnsFromArtifacts(schemaTable, graphNode) {
+  const byName = new Map();
+  function ensureColumn(name) {
+    if (!name) {
+      return null;
+    }
+    if (!byName.has(name)) {
+      byName.set(name, { name, type: "", isPk: false, isFk: false, fkTarget: "" });
+    }
+    return byName.get(name);
+  }
+  arrayOfStrings(graphNode.primary_key || schemaTable.primary_key).forEach((columnName) => {
+    const column = ensureColumn(columnName);
+    if (column) {
+      column.isPk = true;
+    }
+  });
+  const foreignKeys = [
+    ...(Array.isArray(schemaTable.foreign_keys) ? schemaTable.foreign_keys : []),
+    ...(Array.isArray(graphNode.foreign_keys) ? graphNode.foreign_keys : []),
+  ];
+  foreignKeys.forEach((fk) => {
+    const column = ensureColumn(fk.column || fk.child_column || fk.source_column);
+    if (column) {
+      column.isFk = true;
+      column.fkTarget = `${fk.parent_table || fk.target_table || ""}.${fk.parent_column || fk.target_column || ""}`.replace(/^\./, "").replace(/\.$/, "");
+    }
+  });
+  const columns = [...byName.values()];
+  if (!columns.length && Number(schemaTable.column_count || graphNode.column_count || 0) > 0) {
+    columns.push({
+      name: `${integerText(schemaTable.column_count || graphNode.column_count)} columns`,
+      type: "",
+      isPk: false,
+      isFk: false,
+      fkTarget: "",
+      summary: true,
+    });
+  }
+  return columns.sort((a, b) => Number(b.isPk) - Number(a.isPk) || Number(b.isFk) - Number(a.isFk) || a.name.localeCompare(b.name));
+}
+
+function updateDbdiagramLink(url) {
+  if (url) {
+    els.dbdiagramLink.href = url;
+    els.dbdiagramLink.setAttribute("aria-disabled", "false");
+    return;
+  }
+  els.dbdiagramLink.href = "#";
+  els.dbdiagramLink.setAttribute("aria-disabled", "true");
+}
+
+function renderDiagramDiagnostics(report) {
+  if (!report) {
+    els.diagramWarnings.hidden = true;
+    els.diagramWarnings.innerHTML = "";
+    return;
+  }
+  const counts = report.counts || {};
+  const diagnostics = Array.isArray(report.diagnostics) ? report.diagnostics : [];
+  const unsupported = Array.isArray(report.unsupported_constructs) ? report.unsupported_constructs : [];
+  const problemCount = Number(counts.warnings || 0) + Number(counts.errors || 0) + Number(counts.unsupported_constructs || 0);
+  const detailRows = [
+    ...diagnostics.slice(0, 3).map((item) => item.message || item.code || JSON.stringify(item)),
+    ...unsupported.slice(0, 3).map((item) => item.message || item.construct || JSON.stringify(item)),
+  ].filter(Boolean);
+  els.diagramWarnings.hidden = false;
+  els.diagramWarnings.classList.toggle("warning", problemCount > 0);
+  els.diagramWarnings.innerHTML = `
+    <strong>Schema parse diagnostics</strong>
+    <span><code>schema_parse_report.json</code> · ${escapeHtml(report.status || "unknown")} · ${integerText(problemCount)} warnings/issues</span>
+    ${detailRows.length ? `<ul>${detailRows.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>` : ""}
+  `;
+}
+
+function renderDiagramState(kind, title, message, model) {
+  els.localDiagram.hidden = true;
+  els.diagramEmpty.hidden = false;
+  els.diagramEmpty.dataset.state = kind;
+  els.diagramEmpty.innerHTML = `
+    <div class="diagram-glyph" aria-hidden="true"></div>
+    <strong>${escapeHtml(title)}</strong>
+    <p>${escapeHtml(message)}</p>
+  `;
+  els.diagramMessage.textContent = `${model.sourceLabel || "Local preview"} · ${kind}`;
+  els.diagramMessage.dataset.status = kind === "error" ? "error" : "idle";
+  els.diagramSourceBadge.textContent = model.sourceBadge || "Local preview";
+  els.diagramSvg.innerHTML = "";
+}
+
+function drawLocalDiagram(model) {
+  const layout = layoutLocalDiagram(model);
+  els.diagramSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+  els.diagramSvg.innerHTML = `
+    <defs>
+      <marker id="diagram-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z"></path>
+      </marker>
+    </defs>
+    <g class="diagram-edges">
+      ${model.relationships.map((rel) => diagramRelationshipSvg(rel, layout.positions)).join("")}
+    </g>
+    <g class="diagram-tables">
+      ${model.tables.map((table) => diagramTableSvg(table, layout.positions.get(table.name))).join("")}
+    </g>
+  `;
+}
+
+function layoutLocalDiagram(model) {
+  const nodeWidth = 232;
+  const nodeHeight = 154;
+  const xGap = 92;
+  const yGap = 42;
+  const margin = 28;
+  const tableCount = Math.max(model.tables.length, 1);
+  const columnCount = tableCount <= 3 ? tableCount : tableCount <= 8 ? 2 : 3;
+  const rowCount = Math.ceil(tableCount / columnCount);
+  const width = Math.max(720, margin * 2 + columnCount * nodeWidth + Math.max(columnCount - 1, 0) * xGap);
+  const height = Math.max(360, margin * 2 + rowCount * nodeHeight + Math.max(rowCount - 1, 0) * yGap);
+  const positions = new Map();
+  model.tables
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((table, index) => {
+      const column = index % columnCount;
+      const row = Math.floor(index / columnCount);
+      positions.set(table.name, {
+        x: margin + column * (nodeWidth + xGap),
+        y: margin + row * (nodeHeight + yGap),
+        width: nodeWidth,
+        height: nodeHeight,
+      });
+    });
+  return { width, height, positions };
+}
+
+function diagramRelationshipSvg(rel, positions) {
+  const source = positions.get(rel.childTable);
+  const target = positions.get(rel.parentTable);
+  if (!source || !target) {
+    return "";
+  }
+  const x1 = source.x + source.width;
+  const y1 = source.y + 58;
+  const x2 = target.x;
+  const y2 = target.y + 58;
+  const sameColumn = Math.abs(source.x - target.x) < 4;
+  const mid = sameColumn ? x1 + 52 : x1 + (x2 - x1) / 2;
+  const path = sameColumn
+    ? `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2 + target.width} ${y2}`
+    : `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`;
+  const labelX = sameColumn ? mid : (x1 + x2) / 2;
+  const labelY = (y1 + y2) / 2 - 6;
+  const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
+  return `
+    <path class="diagram-edge ${escapeHtml(diagramStatusTone(rel.status))}" d="${path}" marker-end="url(#diagram-arrow)">
+      <title>${escapeHtml(label)}</title>
+    </path>
+    <text class="diagram-edge-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateMiddle(rel.label || "FK", 18))}</text>
+  `;
+}
+
+function diagramTableSvg(table, position) {
+  if (!position) {
+    return "";
+  }
+  const columns = table.columns.slice(0, 5);
+  const overflow = Math.max(table.columns.length - columns.length, 0);
+  const lines = columns.map((column, index) => diagramColumnTspan(column, 70 + index * 16)).join("");
+  const overflowLine = overflow ? `<text class="diagram-column overflow" x="14" y="${70 + columns.length * 16}">+${integerText(overflow)} more key columns</text>` : "";
+  const meta = [
+    table.status === "mapped" ? "mapped CSV" : table.status === "missing_csv" ? "missing CSV" : table.status || "schema",
+    table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(table.columnCount)} columns`,
+  ].filter(Boolean).join(" · ");
+  return `
+    <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))}" data-diagram-table="${escapeHtml(table.name)}" transform="translate(${position.x} ${position.y})">
+      <title>${escapeHtml(`${table.name} · ${meta}`)}</title>
+      <rect class="diagram-table-box" width="${position.width}" height="${position.height}" rx="8"></rect>
+      <rect class="diagram-table-header" width="${position.width}" height="48" rx="8"></rect>
+      <text class="diagram-table-name" x="14" y="22">${escapeHtml(truncateMiddle(table.name, 26))}</text>
+      <text class="diagram-table-meta" x="14" y="40">${escapeHtml(truncateMiddle(meta, 34))}</text>
+      ${lines || `<text class="diagram-column" x="14" y="72">${integerText(table.columnCount)} columns</text>`}
+      ${overflowLine}
+    </g>
+  `;
+}
+
+function diagramColumnTspan(column, y) {
+  const role = column.isPk && column.isFk ? "PK/FK" : column.isPk ? "PK" : column.isFk ? "FK" : "COL";
+  const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
+  return `<text class="diagram-column ${column.isPk ? "pk" : ""} ${column.isFk ? "fk" : ""}" x="14" y="${y}"><tspan class="diagram-column-role">${escapeHtml(role)}</tspan> ${escapeHtml(truncateMiddle(`${column.name}${target}`, 32))}</text>`;
+}
+
+function diagramStatusTone(status) {
+  if (["invalid", "missing_csv", "failed", "error"].includes(status)) {
+    return "danger";
+  }
+  if (["warning", "skipped"].includes(status)) {
+    return "warn";
+  }
+  return "mapped";
 }
 
 function buildDbdiagramUrl(dbml) {

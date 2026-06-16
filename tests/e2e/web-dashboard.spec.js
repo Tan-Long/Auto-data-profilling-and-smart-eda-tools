@@ -14,6 +14,18 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page.goto("/");
   await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
+  await expect(page.locator("#localDiagram")).toBeVisible();
+  await expect(page.locator("#diagramFrame")).toBeHidden();
+  await expect(page.locator("#diagramSourceBadge")).toContainText("Browser DBML");
+  await expect(page.locator("#diagramMessage")).toContainText("Local preflight");
+  await expect(page.locator("#diagramSvg")).toContainText("orders");
+  await expect(page.locator("#diagramSvg")).toContainText("PK order_id");
+  await expect(page.locator("#diagramSvg")).toContainText("FK customer_id");
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveCount(1);
+  await expect(page.locator("#dbdiagramLink")).toHaveAttribute(
+    "href",
+    /https:\/\/dbdiagram\.io\/embed\?c=/,
+  );
 
   await page.locator("#runnerModePath").click();
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
@@ -40,6 +52,29 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardIssueCount")).toContainText("15/15 issues");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("verdict");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
+  await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
+  await expect(page.locator("#diagramMessage")).toContainText("Generated artifacts");
+  await expect(page.locator("#diagramWarnings")).toContainText("schema_parse_report.json");
+  await expect(page.locator("#diagramSvg")).toContainText("order_payments");
+  await expect(page.locator("#diagramSvg")).toContainText("invalid");
+  await expect(page.locator('#diagramSvg [data-diagram-table="order_payments"]')).toHaveCount(1);
+
+  await expect(page.getByText("Generated results")).toBeVisible();
+  const generatedResults = page.locator("#artifactList");
+  await expect(generatedResults).toContainText("Dataset verdict");
+  await expect(generatedResults).toContainText("NOT_READY");
+  await expect(generatedResults).toContainText("Issue counts");
+  await expect(generatedResults).toContainText("15 issues");
+  await expect(generatedResults).toContainText("Table impact");
+  await expect(generatedResults).toContainText("7 tables");
+  await expect(generatedResults).toContainText("Runtime summary");
+  await expect(generatedResults).toContainText("8 stages");
+  await expect(generatedResults).toContainText("Report HTML");
+  await expect(generatedResults).toContainText("report.html");
+  await expect(generatedResults).toContainText("Report Markdown");
+  await expect(generatedResults).toContainText("report.md");
+  await expect(generatedResults).toContainText("Raw artifact links");
+  await expect(generatedResults).toContainText("dataset_verdict.json");
 
   const dashboard = page.locator("#dashboardPanelGrid");
   await expect(dashboard).toContainText("Dataset verdict");

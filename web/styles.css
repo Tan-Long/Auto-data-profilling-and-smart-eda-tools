@@ -490,6 +490,45 @@ h3 {
   flex-direction: column;
 }
 
+.diagram-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.diagram-status-row .form-message {
+  margin: 0;
+}
+
+.diagram-warnings {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(36, 122, 69, 0.24);
+  border-radius: var(--radius-md);
+  background: #f6fbf8;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+}
+
+.diagram-warnings.warning {
+  border-color: rgba(154, 95, 0, 0.32);
+  background: #fff8eb;
+}
+
+.diagram-warnings span,
+.diagram-warnings li {
+  color: var(--foreground-secondary);
+}
+
+.diagram-warnings ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
 .diagram-empty {
   flex: 1;
   display: grid;
@@ -502,6 +541,14 @@ h3 {
   background: var(--surface-overlay);
   text-align: center;
   color: var(--foreground-secondary);
+}
+
+.diagram-empty[data-state="error"] {
+  border-color: rgba(178, 59, 50, 0.28);
+}
+
+.diagram-empty[data-state="large"] {
+  border-color: rgba(154, 95, 0, 0.32);
 }
 
 .diagram-empty strong {
@@ -520,12 +567,100 @@ h3 {
 }
 
 .diagram-frame {
+  display: none;
+}
+
+.local-diagram {
   flex: 1;
-  width: 100%;
   min-height: 480px;
+  overflow: auto;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: #fff;
+  background: var(--surface-overlay);
+}
+
+.diagram-svg {
+  display: block;
+  width: 100%;
+  min-width: 760px;
+  min-height: 480px;
+}
+
+.diagram-edge {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.6;
+  opacity: 0.86;
+}
+
+.diagram-edge.danger {
+  stroke: var(--destructive);
+}
+
+.diagram-edge.warn {
+  stroke: var(--warning);
+}
+
+.diagram-edge-label {
+  fill: var(--foreground-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.diagram-table-box {
+  fill: var(--surface-panel);
+  stroke: var(--border-default);
+  stroke-width: 1;
+}
+
+.diagram-table-header {
+  fill: var(--surface-inset);
+}
+
+.diagram-table-danger .diagram-table-box {
+  stroke: rgba(178, 59, 50, 0.42);
+}
+
+.diagram-table-warn .diagram-table-box {
+  stroke: rgba(154, 95, 0, 0.42);
+}
+
+.diagram-table-name {
+  fill: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.diagram-table-meta,
+.diagram-column,
+.diagram-column-role {
+  fill: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.diagram-table-meta {
+  fill: var(--foreground-tertiary);
+}
+
+.diagram-column.pk {
+  fill: var(--accent-strong);
+}
+
+.diagram-column.fk {
+  fill: var(--info);
+}
+
+.diagram-column.overflow {
+  fill: var(--foreground-muted);
+}
+
+.diagram-column-role {
+  fill: var(--foreground-primary);
 }
 
 .metric-grid {
@@ -1479,6 +1614,10 @@ h3 {
   overflow: auto;
 }
 
+.artifact-list {
+  max-height: 520px;
+}
+
 .stage-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1532,6 +1671,143 @@ h3 {
   color: var(--foreground-tertiary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+}
+
+.generated-results {
+  display: grid;
+  gap: 10px;
+}
+
+.generated-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.generated-result-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 138px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.generated-result-heading,
+.runtime-heading.compact {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.generated-result-heading a,
+.generated-result-heading span,
+.runtime-heading.compact span {
+  color: var(--foreground-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.generated-result-kpi {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.generated-result-kpi strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.generated-result-kpi span {
+  color: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.generated-result-card p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.generated-mini-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.generated-mini-list span,
+.generated-mini-list code {
+  min-height: 24px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.generated-report-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.generated-report-link {
+  display: grid;
+  gap: 4px;
+  min-height: 48px;
+  padding: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: #f6fbf8;
+  color: var(--foreground-primary);
+  text-decoration: none;
+}
+
+.generated-report-link:hover,
+.generated-report-link:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.generated-report-link code {
+  color: var(--foreground-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.generated-links-block {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.runtime-heading.compact {
+  margin-bottom: 0;
+}
+
+.artifact-link-list {
+  display: grid;
+  gap: 8px;
 }
 
 .mapping-table-wrap {
@@ -1628,6 +1904,8 @@ h3 {
   .dashboard-summary-strip,
   .dashboard-layout,
   .dashboard-panel-grid,
+  .generated-result-grid,
+  .generated-report-links,
   .table-impact-grid,
   .dashboard-detail-grid,
   .runner-grid,

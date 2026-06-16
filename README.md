@@ -45,8 +45,8 @@ Node/Playwright tooling is installed. See
 [docs/releases/v0.2-rc.md](docs/releases/v0.2-rc.md).
 
 Latest public prerelease:
-[VSF Data Profiler v0.2.0-rc2](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc2),
-with release notes in [docs/releases/v0.2.0-rc2.md](docs/releases/v0.2.0-rc2.md).
+[VSF Data Profiler v0.2.0-rc3](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc3),
+with release notes in [docs/releases/v0.2.0-rc3.md](docs/releases/v0.2.0-rc3.md).
 
 Expected artifacts:
 
@@ -249,9 +249,10 @@ The web workspace has two distinct surfaces:
 
 The static preflight UI lets a user upload a DBML file and related CSV files in
 the browser, auto-link CSV file stems to DBML tables, inspect PK/FK
-relationships, and open a generated dbdiagram.io visualization link. It does
-not run the Python/DuckDB profiler, database connectors, local path jobs, LLM
-narratives, package/PDF export, or backend dashboard jobs.
+relationships, and inspect a local schema diagram without depending on an
+external iframe. A generated dbdiagram.io link remains available as a secondary
+action. It does not run the Python/DuckDB profiler, database connectors, local
+path jobs, LLM narratives, package/PDF export, or backend dashboard jobs.
 
 Static preflight deployment:
 
@@ -275,7 +276,12 @@ generated artifact URLs such as
 `charts/*.json`, `issues.json`, `profile_summary.json`,
 `relationship_graph.json`, `dataset_verdict.json`,
 `table_assessments.json`, `schema_parse_report.json`, `lineage_graph.json`,
-`schema_evaluation.json`, `influence.json`, and `run_summary.json`.
+`schema_evaluation.json`, `schema_diagram.json`, `influence.json`, and
+`run_summary.json`. The DBML diagram panel switches from browser preflight
+state to generated `schema_diagram.json`, `relationship_graph.json`, and
+`schema_parse_report.json` artifacts after a run. The Generated results panel
+previews verdict, issue counts, table impact, runtime summary, and report links
+from those artifacts while keeping raw artifact links available.
 
 - Upload mode sends browser-selected DBML/CSV/rules files to the local backend
   and is intended for demos and small-to-medium local files.
@@ -303,6 +309,8 @@ v0.2 local release-candidate scope:
 - FK relationship checks with cardinality, composite FK, and junction-table support.
 - Issue catalog with evidence SQL and sample bad rows.
 - DBML diagram artifacts with a dbdiagram.io embed link and CSV-to-table mapping.
+- Local web-runner DBML diagram preview for table nodes, PK/FK columns, CSV
+  mapping status, relationship edges, and parser diagnostics.
 - Additive lineage graph artifact connecting input sources, schema entities,
   relationships, profiler stages, and generated artifacts.
 - Deterministic severity aggregation and dataset verdict artifact.

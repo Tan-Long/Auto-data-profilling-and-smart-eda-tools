@@ -1,6 +1,6 @@
 {
   "name": "auto-data-profilling-and-smart-eda-tools",
-  "version": "0.2.0-rc2",
+  "version": "0.2.0-rc3",
   "description": "Playwright E2E checks for the VSF Data Profiler web runner.",
   "private": true,
   "scripts": {

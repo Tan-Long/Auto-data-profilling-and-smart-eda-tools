@@ -59,7 +59,8 @@ The CLI produces:
 
 The web workspace presents a local data-quality console. It accepts DBML and CSV
 files in the browser, maps uploaded CSV files to DBML tables, shows primary keys
-and foreign keys, generates a dbdiagram.io visualization link, and can run local
+and foreign keys, renders a local schema diagram preview, keeps a dbdiagram.io
+visualization link as a secondary external action, and can run local
 `127.0.0.1` backend jobs through either browser upload mode or local path mode.
 Both modes run the same Python pipeline as the CLI. Completed web-runner jobs
 are reviewed primarily through an interactive dashboard that fetches generated
@@ -139,8 +140,10 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   link when the encoded DBML fits safely in a URL.
 - Show CSV-file-to-DBML-table mapping, primary keys, foreign keys, and
   relationships in the report.
-- Provide a local-first web UI for uploading DBML/CSV files, visualizing DBML,
-  and linking uploaded CSV files with DBML tables before running profiling.
+- Provide a local-first web UI for uploading DBML/CSV files, rendering a local
+  DBML diagram with table nodes, PK/FK columns, CSV mapping status, and
+  relationship edges, and linking uploaded CSV files with DBML tables before
+  running profiling.
 - Provide a local-only browser runner with separate upload mode and local path
   mode. Upload mode handles demo/small-medium DBML, CSV, and optional rules
   files. Local path mode validates browser-entered DBML, CSV directory, optional
@@ -153,7 +156,13 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   artifacts through web-runner artifact URLs, support severity/type/table
   filters, and show drilldown details with matching issues, affected
   tables/columns, counts/rates, relevant artifact links, and bounded sample CSV
-  links when available. It also renders a dedicated Table Impact section from
+  links when available. The runner's Generated results panel previews dataset
+  verdict, issue counts, table impact, runtime summary, and report links from
+  those generated artifacts while preserving raw artifact links. It also
+  switches the DBML diagram panel from browser preflight state to generated
+  `schema_diagram.json`, `relationship_graph.json`, and
+  `schema_parse_report.json` artifact evidence after a run, and renders a
+  dedicated Table Impact section from
   `table_assessments.json`, including table readiness, health score, role,
   affected-column count, relationship-risk count, and deterministic
   business-impact category.
