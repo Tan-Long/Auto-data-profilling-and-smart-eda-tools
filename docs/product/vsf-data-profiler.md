@@ -41,6 +41,7 @@ The CLI produces:
 - `schema_evaluation.json`
 - `relationship_graph.json`
 - `dataset_verdict.json`
+- `table_assessments.json`
 - `schema_diagram.json`
 - `schema_diagram.dbml`
 - `run.log`
@@ -56,13 +57,13 @@ The CLI produces:
   artifacts, bounded sample evidence, an optional zip archive, and optional
   `analysis_report.pdf` when `vsf-profiler package` is run.
 
-The web workspace accepts DBML and CSV files in the browser, maps uploaded CSV
-files to DBML tables, shows primary keys and foreign keys, generates a
-dbdiagram.io visualization link, and can run local `127.0.0.1` backend jobs
-through either browser upload mode or local path mode. Both modes run the same
-Python pipeline as the CLI. Completed web-runner jobs can be reviewed in an
-interactive dashboard that fetches generated artifact URLs instead of raw CSV
-files.
+The web workspace presents a local data-quality console. It accepts DBML and CSV
+files in the browser, maps uploaded CSV files to DBML tables, shows primary keys
+and foreign keys, generates a dbdiagram.io visualization link, and can run local
+`127.0.0.1` backend jobs through either browser upload mode or local path mode.
+Both modes run the same Python pipeline as the CLI. Completed web-runner jobs
+are reviewed primarily through an interactive dashboard that fetches generated
+artifact URLs instead of raw CSV files.
 
 The hosted Vercel deployment is a static preflight surface only. It serves the
 browser-side DBML/CSV mapping and visualization UI, but it does not host the
@@ -127,6 +128,10 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 - Generate a deterministic dataset verdict artifact with normalized severity
   counts, risk score, top blockers, affected tables, and recommended next
   actions.
+- Generate a deterministic per-table assessment artifact with one row per
+  profiled table, including role, health score, readiness, issue counts,
+  affected columns, relationship risks, name-token business impact category,
+  evidence artifact references, and recommended next actions.
 - Generate deterministic chart-spec artifacts from aggregate outputs for issue
   counts, missingness, relationship FK health, dataset risk, and influence top
   features when available.
@@ -148,7 +153,10 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   artifacts through web-runner artifact URLs, support severity/type/table
   filters, and show drilldown details with matching issues, affected
   tables/columns, counts/rates, relevant artifact links, and bounded sample CSV
-  links when available.
+  links when available. It also renders a dedicated Table Impact section from
+  `table_assessments.json`, including table readiness, health score, role,
+  affected-column count, relationship-risk count, and deterministic
+  business-impact category.
 - Provide interactive lineage and relationship graph views in the web-runner
   dashboard from `lineage_graph.json` and `relationship_graph.json`. The graph
   views support table, column, relationship, and runtime/artifact scopes plus
@@ -193,7 +201,8 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   web-runner artifact/dashboard lists.
 - Optionally generate a Senior Data Scientist narrative from existing structured
   artifacts only, guarded by validation that checks numeric claims,
-  table/column/issue references, and unsupported causal wording.
+  table/column/issue references, unsupported table/business-impact claims, and
+  unsupported causal wording.
 - Support a real OpenAI provider adapter behind the same guarded narrative
   boundary, configured by `.env` or environment variables, without making
   external calls in tests.

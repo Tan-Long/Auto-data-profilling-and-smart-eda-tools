@@ -7,6 +7,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from vsf_profiler.table_assessments import (
+    KNOWN_BUSINESS_IMPACT_CATEGORIES,
+    KNOWN_BUSINESS_IMPACT_LABELS,
+)
+
 
 SOURCE_ARTIFACTS = [
     "profile_summary.json",
@@ -14,6 +19,7 @@ SOURCE_ARTIFACTS = [
     "schema_evaluation.json",
     "relationship_graph.json",
     "dataset_verdict.json",
+    "table_assessments.json",
     "charts/*.json",
     "influence.json",
 ]
@@ -23,6 +29,7 @@ Use only the supplied JSON context, which is derived from deterministic structur
 Do not use external facts, raw CSV data, row-level samples, or unbounded examples.
 Do not invent numeric claims; every number must appear in the supplied evidence.
 Reference tables, columns, issue ids, issue types, severities, and verdicts only when they appear in the supplied evidence.
+Reference table business-impact categories only when they appear in table_assessments.json for that table.
 Do not use causal wording such as causes, caused, drives, leads to, due to, because, or root cause.
 Use association-only language for influence findings.
 Return concise Markdown with practical findings and next actions.
@@ -43,6 +50,14 @@ CAUSAL_PATTERNS = {
     "due_to": re.compile(r"\bdue\s+to\b", re.IGNORECASE),
     "because": re.compile(r"\bbecause\b", re.IGNORECASE),
     "root_cause": re.compile(r"\broot\s+cause\b", re.IGNORECASE),
+}
+UNSUPPORTED_BUSINESS_IMPACT_TERMS = {
+    "customer churn",
+    "customer retention",
+    "financial reporting",
+    "operational efficiency",
+    "profitability",
+    "revenue growth",
 }
 
 
@@ -207,6 +222,7 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
     relationship_graph = artifacts["relationship_graph"]
     charts = artifacts["chart_specs"]
     influence = artifacts["influence"]
+    table_assessments = artifacts.get("table_assessments") or {"assessments": []}
     tables = profile.get("tables") or {}
     issue_counts = dataset_verdict.get("issue_counts") or {}
     return {
@@ -256,6 +272,20 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
             "top_blockers": dataset_verdict.get("top_blockers") or [],
             "recommended_next_actions": dataset_verdict.get("recommended_next_actions") or [],
         },
+        "table_assessments": [
+            {
+                "table": row.get("table"),
+                "role": row.get("role"),
+                "health_score": row.get("health_score"),
+                "readiness": row.get("readiness"),
+                "issue_counts_by_severity": row.get("issue_counts_by_severity") or {},
+                "affected_columns": row.get("affected_columns") or [],
+                "relationship_risk_count": len(row.get("relationship_risks") or []),
+                "business_impact": row.get("business_impact") or {},
+                "recommended_next_actions": (row.get("recommended_next_actions") or [])[:3],
+            }
+            for row in (table_assessments.get("assessments") or [])[:10]
+        ],
         "chart_summaries": {
             name: spec.get("summary") or {}
             for name, spec in sorted(charts.items())
@@ -298,6 +328,17 @@ def deterministic_l4_narrative(context: dict[str, Any]) -> str:
         lines.append(
             f"- `{issue['issue_type']}` on {ref}: {issue['bad_count']} affected rows "
             f"with severity `{issue['severity']}`."
+        )
+    lines.extend(["", "## Per-Table Assessment", ""])
+    table_rows = context.get("table_assessments") or []
+    if not table_rows:
+        lines.append("No table assessment rows were present in `table_assessments.json`.")
+    for row in table_rows[:5]:
+        impact = row.get("business_impact") or {}
+        category = impact.get("category") or "general_analytics"
+        lines.append(
+            f"- `{row['table']}` is `{row['readiness']}` with health score "
+            f"{row['health_score']}, role `{row['role']}`, and impact category `{category}`."
         )
     lines.extend(
         [
@@ -349,18 +390,23 @@ def build_guardrail_evidence(
     return {
         "numbers": numbers,
         "refs": refs,
+        "business_impacts": _business_impact_evidence(artifacts),
     }
 
 
 def validate_narrative(markdown: str, evidence: dict[str, Any]) -> dict[str, Any]:
     checked_numbers, number_violations = _check_numbers(markdown, evidence["numbers"])
     checked_refs, ref_violations = _check_refs(markdown, evidence["refs"])
+    checked_business_refs, business_violations = _check_business_impact_claims(
+        markdown,
+        evidence.get("business_impacts") or {},
+    )
     causal_violations = _check_causal_wording(markdown)
-    violations = number_violations + ref_violations + causal_violations
+    violations = number_violations + ref_violations + business_violations + causal_violations
     return {
         "status": "failed" if violations else "passed",
         "checked_numbers": checked_numbers,
-        "checked_refs": checked_refs,
+        "checked_refs": checked_refs + checked_business_refs,
         "violations": violations,
     }
 
@@ -429,6 +475,84 @@ def _check_refs(
     return checked, violations
 
 
+def _check_business_impact_claims(
+    markdown: str,
+    business_evidence: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    by_table = business_evidence.get("by_table") or {}
+    allowed_terms = set(business_evidence.get("allowed_terms") or [])
+    known_terms = set(business_evidence.get("known_terms") or [])
+    checked: list[dict[str, Any]] = []
+    violations: list[dict[str, Any]] = []
+    if not known_terms:
+        return checked, violations
+
+    for sentence in _sentences(markdown):
+        normalized_sentence = _normalize_business_term(sentence)
+        matched_terms = [
+            term
+            for term in sorted(known_terms)
+            if _normalize_business_term(term) in normalized_sentence
+        ]
+        if not matched_terms:
+            if _looks_like_business_impact_claim(sentence):
+                violations.append(
+                    {
+                        "type": "business_impact",
+                        "claim": sentence.strip(),
+                        "message": "Business-impact claim does not match table_assessments.json evidence.",
+                    }
+                )
+            continue
+        mentioned_tables = [
+            table
+            for table in by_table
+            if re.search(rf"(?<![\w.])`?{re.escape(table)}`?(?![\w.])", sentence)
+        ]
+        for term in matched_terms:
+            normalized_term = _normalize_business_term(term)
+            evidence_paths = []
+            if normalized_term in allowed_terms:
+                evidence_paths.append("table_assessments.json")
+            status = "passed" if evidence_paths else "failed"
+            checked.append(
+                {
+                    "ref": term,
+                    "status": status,
+                    "evidence_paths": evidence_paths,
+                }
+            )
+            if status == "failed":
+                violations.append(
+                    {
+                        "type": "business_impact",
+                        "claim": term,
+                        "message": "Business-impact term is not present in table_assessments.json.",
+                    }
+                )
+                continue
+            for table in mentioned_tables:
+                table_terms = set(by_table.get(table) or [])
+                table_status = "passed" if normalized_term in table_terms else "failed"
+                checked.append(
+                    {
+                        "ref": f"{table}:{term}",
+                        "status": table_status,
+                        "evidence_paths": ["table_assessments.json"] if table_status == "passed" else [],
+                    }
+                )
+                if table_status == "failed":
+                    violations.append(
+                        {
+                            "type": "table_business_impact",
+                            "table": table,
+                            "claim": term,
+                            "message": "Table-specific business-impact claim does not match table_assessments.json.",
+                        }
+                    )
+    return checked, violations
+
+
 def _check_causal_wording(markdown: str) -> list[dict[str, Any]]:
     violations = []
     for label, pattern in CAUSAL_PATTERNS.items():
@@ -468,7 +592,19 @@ def _collect_refs(value: Any, refs: dict[str, set[str]], path: str = "$") -> Non
                 if isinstance(column, str):
                     refs.setdefault(column, set()).add(path)
                     refs.setdefault(f"{table_name}.{column}", set()).add(path)
-        for key in ("issue_id", "issue_type", "severity", "verdict", "status", "target", "feature"):
+        for key in (
+            "issue_id",
+            "issue_type",
+            "severity",
+            "verdict",
+            "status",
+            "target",
+            "feature",
+            "role",
+            "readiness",
+            "category",
+            "label",
+        ):
             ref = value.get(key)
             if isinstance(ref, str) and ref:
                 refs.setdefault(ref, set()).add(f"{path}.{key}")
@@ -478,6 +614,52 @@ def _collect_refs(value: Any, refs: dict[str, set[str]], path: str = "$") -> Non
     if isinstance(value, list):
         for index, item in enumerate(value):
             _collect_refs(item, refs, f"{path}[{index}]")
+
+
+def _business_impact_evidence(artifacts: dict[str, Any]) -> dict[str, Any]:
+    table_assessments = artifacts.get("table_assessments") or {}
+    by_table: dict[str, set[str]] = {}
+    allowed_terms: set[str] = set()
+    known_terms = set(KNOWN_BUSINESS_IMPACT_CATEGORIES) | set(KNOWN_BUSINESS_IMPACT_LABELS)
+    known_terms.update(term.replace("_", " ") for term in KNOWN_BUSINESS_IMPACT_CATEGORIES)
+    known_terms.update(UNSUPPORTED_BUSINESS_IMPACT_TERMS)
+    for row in table_assessments.get("assessments") or []:
+        table = row.get("table")
+        impact = row.get("business_impact") or {}
+        if not isinstance(table, str) or not table:
+            continue
+        row_terms = {
+            impact.get("category"),
+            str(impact.get("category") or "").replace("_", " "),
+            impact.get("label"),
+        }
+        normalized = {
+            _normalize_business_term(term)
+            for term in row_terms
+            if isinstance(term, str) and term
+        }
+        if normalized:
+            by_table[table] = normalized
+            allowed_terms.update(normalized)
+    return {
+        "by_table": {table: sorted(terms) for table, terms in by_table.items()},
+        "allowed_terms": sorted(allowed_terms),
+        "known_terms": sorted(term for term in known_terms if term),
+    }
+
+
+def _sentences(markdown: str) -> list[str]:
+    lines = [line.strip("-# > \t") for line in markdown.splitlines()]
+    text = " ".join(line for line in lines if line)
+    return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", text) if sentence.strip()]
+
+
+def _looks_like_business_impact_claim(sentence: str) -> bool:
+    return bool(re.search(r"\b(business\s+impact|impact\s+category)\b", sentence, re.IGNORECASE))
+
+
+def _normalize_business_term(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
 def _number_keys(number: str, *, is_percent: bool) -> list[str]:

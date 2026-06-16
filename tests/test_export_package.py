@@ -56,6 +56,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
         "report.html",
         "report.md",
         "dataset_verdict.json",
+        "table_assessments.json",
         "lineage_graph.json",
         "relationship_graph.json",
         "schema_parse_report.json",
@@ -75,6 +76,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert "report.html" in index_html
     assert "lineage_graph.json" in index_html
     assert "relationship_graph.json" in index_html
+    assert "table_assessments.json" in index_html
 
     with zipfile.ZipFile(result.zip_path) as archive:
         names = archive.namelist()

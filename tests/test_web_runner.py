@@ -23,6 +23,7 @@ REQUIRED_ARTIFACTS = {
     "schema_evaluation.json",
     "relationship_graph.json",
     "dataset_verdict.json",
+    "table_assessments.json",
     "run_events.jsonl",
     "run_summary.json",
     "report.html",
@@ -66,6 +67,7 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     assert (job.out_dir / "schema_evaluation.json").exists()
     assert (job.out_dir / "relationship_graph.json").exists()
     assert (job.out_dir / "dataset_verdict.json").exists()
+    assert (job.out_dir / "table_assessments.json").exists()
     assert (job.out_dir / "charts" / "issue_counts_by_type.json").exists()
     assert (job.out_dir / "run_events.jsonl").exists()
     assert (job.out_dir / "run_summary.json").exists()
@@ -220,6 +222,7 @@ def test_web_runner_dashboard_endpoint_lists_generated_artifact_urls(tmp_path):
             "profile_summary.json",
             "relationship_graph.json",
             "dataset_verdict.json",
+            "table_assessments.json",
             "schema_evaluation.json",
             "schema_parse_report.json",
             "lineage_graph.json",

@@ -200,6 +200,9 @@
       {% if lineage_graph.available %}
       <p><strong>Lineage graph:</strong> <a href="{{ lineage_graph.path }}">{{ lineage_graph.path }}</a></p>
       {% endif %}
+      {% if table_assessments.available %}
+      <p><strong>Table assessments:</strong> <a href="{{ table_assessments.path }}">{{ table_assessments.path }}</a></p>
+      {% endif %}
       {% if connector_metadata.available %}
       <p><strong>Connector metadata:</strong> <a href="{{ connector_metadata.path }}">{{ connector_metadata.path }}</a></p>
       {% endif %}
@@ -264,6 +267,51 @@
       </ul>
       {% else %}
       <p>Dataset verdict metadata was not provided for this report.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Per-Table Assessment</h2>
+      {% if table_assessments.available %}
+      <p><strong>Assessment artifact:</strong> <a href="{{ table_assessments.path }}">{{ table_assessments.path }}</a></p>
+      <div class="grid">
+        <div class="card"><span class="metric">{{ table_assessments.table_count }}</span><span class="label">Tables assessed</span></div>
+        <div class="card"><span class="metric">{{ table_assessments.average_health_score }}</span><span class="label">Avg health</span></div>
+        {% for readiness, count in table_assessments.readiness_counts.items() %}
+        <div class="card"><span class="metric">{{ count }}</span><span class="label">{{ readiness }}</span></div>
+        {% endfor %}
+      </div>
+      <table>
+        <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Issues</th><th>Relationship Risks</th><th>Business Impact</th><th>Affected Columns</th></tr></thead>
+        <tbody>
+          {% for row in table_assessments.assessments %}
+          <tr>
+            <td><code>{{ row.table }}</code></td>
+            <td>{{ row.role }}</td>
+            <td><span class="pill {{ row.readiness }}">{{ row.readiness }}</span></td>
+            <td>{{ row.health_score }}</td>
+            <td>{{ row.issue_total }}</td>
+            <td>{{ row.relationship_risk_count }}</td>
+            <td>{{ row.business_impact_label }}</td>
+            <td>{{ row.affected_columns | join(", ") if row.affected_columns else "none" }}</td>
+          </tr>
+          {% else %}
+          <tr><td>none</td><td>none</td><td>none</td><td>0</td><td>0</td><td>0</td><td>none</td><td>none</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h3>Table Assessment Next Actions</h3>
+      <ul>
+        {% for row in table_assessments.assessments %}
+        {% if row.recommended_next_actions %}
+        <li><code>{{ row.table }}</code>: {{ row.recommended_next_actions[0] }}</li>
+        {% endif %}
+        {% else %}
+        <li>No table-level actions were generated.</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>Table assessment metadata was not provided for this report.</p>
       {% endif %}
     </section>
 

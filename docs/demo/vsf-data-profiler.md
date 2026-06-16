@@ -9,7 +9,7 @@ existing synthetic demo dataset and does not require internet access.
    against a DBML schema. It uses DuckDB for large-file-friendly scans and
    writes static Markdown/HTML plus machine-readable artifacts.
 2. Run the release demo:
-   `PATH=".venv/bin:$PATH" make demo-full`
+   `PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-full`
 3. Open `outputs/demo_small/report.html`. Point out schema mapping,
    relationship checks, issue counts, visual summaries, dataset verdict, and
    execution flow.
@@ -34,22 +34,22 @@ existing synthetic demo dataset and does not require internet access.
 Default deterministic demo:
 
 ```bash
-PATH=".venv/bin:$PATH" make demo-small
+PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-small
 open outputs/demo_small/report.html
 ```
 
 Release-candidate demo:
 
 ```bash
-PATH=".venv/bin:$PATH" vsf-profiler doctor
-PATH=".venv/bin:$PATH" make demo-full
+PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler doctor
+PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-full
 open outputs/demo_small_package/index.html
 ```
 
 Fake LLM demo:
 
 ```bash
-PATH=".venv/bin:$PATH" vsf-profiler run \
+PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
   --rules data/demo_small/rules.yaml \
@@ -65,7 +65,7 @@ OpenAI smoke demo:
 ```bash
 cp .env.example .env
 # edit .env and set OPENAI_API_KEY; do not commit .env
-PATH=".venv/bin:$PATH" vsf-profiler run \
+PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
   --rules data/demo_small/rules.yaml \
@@ -88,6 +88,7 @@ open outputs/demo_small_l4_openai_smoke/report.html
 | `schema_evaluation.json` | DBML-vs-CSV conformance summary, including missing/extra table or column evidence and schema issue references. |
 | `relationship_graph.json` | Graph of tables and DBML relationships with observed FK health, cardinality, junction-table detection, and relationship issue links. |
 | `dataset_verdict.json` | Deterministic readiness verdict, risk score, top blockers, affected tables, and recommended next actions. |
+| `table_assessments.json` | One deterministic assessment per profiled table with role, health score, readiness, relationship risks, name-token business impact, evidence refs, and next actions. |
 | `charts/*.json` | Deterministic chart specs for issue counts, missingness, relationship FK health, risk, and influence top features. |
 | `l4_report.md` | Optional Senior Data Scientist narrative generated only when `--use-llm` runs; may be provider output or deterministic fallback. |
 | `guardrail_report.json` | Audit record for L4 validation: status, provider, fallback reason, checked numbers, checked refs, violations, and raw-data flags. |

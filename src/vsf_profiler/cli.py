@@ -52,6 +52,7 @@ from vsf_profiler.report_generator import generate_reports
 from vsf_profiler.runtime import RuntimeRecorder
 from vsf_profiler.schema_diagram import build_schema_diagram
 from vsf_profiler.schema_evaluation import build_schema_evaluation
+from vsf_profiler.table_assessments import build_table_assessments
 
 
 app = typer.Typer(help="VSF Data Profiler CLI")
@@ -469,6 +470,11 @@ def run_pipeline(
                 schema_evaluation=schema_evaluation,
                 relationship_graph=relationship_graph,
             )
+            table_assessments = build_table_assessments(
+                profile=profile,
+                issues=issue_catalog.issues,
+                relationship_graph=relationship_graph,
+            )
             chart_specs = build_chart_specs(
                 profile_summary=profile_summary_payload,
                 issues=issues_payload,
@@ -536,10 +542,20 @@ def run_pipeline(
                 runtime=runtime,
                 key="dataset_verdict",
             )
+            _write_json(
+                out_dir / "table_assessments.json",
+                table_assessments,
+                runtime=runtime,
+                key="table_assessments",
+            )
             _write_chart_specs(out_dir / "charts", chart_specs, runtime=runtime)
             runtime.set_issue_counts(issue_catalog.issues)
             stage.add_detail("artifact_count", len(runtime.report_context()["artifact_paths"]))
             stage.add_detail("chart_spec_count", len(chart_specs))
+            stage.add_detail(
+                "table_assessment_count",
+                table_assessments["summary"]["table_count"],
+            )
 
         l4_report_path: Path | None = None
         if use_llm:
@@ -553,6 +569,7 @@ def run_pipeline(
                         "schema_evaluation": schema_evaluation,
                         "relationship_graph": relationship_graph,
                         "dataset_verdict": dataset_verdict,
+                        "table_assessments": table_assessments,
                         "chart_specs": chart_specs,
                     },
                     provider=llm_provider,
@@ -586,6 +603,7 @@ def run_pipeline(
                 schema_evaluation=schema_evaluation,
                 relationship_graph=relationship_graph,
                 dataset_verdict=dataset_verdict,
+                table_assessments=table_assessments,
                 chart_specs=chart_specs,
                 run_summary=runtime.report_context(status="success"),
             )
@@ -602,6 +620,7 @@ def run_pipeline(
             schema_evaluation=schema_evaluation,
             relationship_graph=relationship_graph,
             dataset_verdict=dataset_verdict,
+            table_assessments=table_assessments,
             chart_specs=chart_specs,
             run_summary=runtime.report_context(status="success"),
             run_events=read_run_events(runtime.events_path),
@@ -625,6 +644,7 @@ def run_pipeline(
             schema_evaluation=schema_evaluation,
             relationship_graph=relationship_graph,
             dataset_verdict=dataset_verdict,
+            table_assessments=table_assessments,
             chart_specs=chart_specs,
             run_summary=runtime.report_context(status="success"),
         )

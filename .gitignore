@@ -17,7 +17,8 @@ htmlcov/
 node_modules/
 playwright-report/
 test-results/
-.interface-design/
+.interface-design/*
+!.interface-design/system.md
 
 data/
 outputs/

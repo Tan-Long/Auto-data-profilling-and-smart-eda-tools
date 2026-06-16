@@ -18,6 +18,7 @@ BASE_EVIDENCE_ARTIFACTS = [
     "schema_evaluation.json",
     "relationship_graph.json",
     "dataset_verdict.json",
+    "table_assessments.json",
     "run_events.jsonl",
     "run_summary.json",
 ]
@@ -29,6 +30,7 @@ MACHINE_REPORT_SOURCES = [
     "schema_evaluation.json",
     "relationship_graph.json",
     "dataset_verdict.json",
+    "table_assessments.json",
     "lineage_graph.json",
 ]
 
@@ -43,6 +45,7 @@ def build_lineage_graph(
     schema_evaluation: dict[str, Any],
     relationship_graph: dict[str, Any],
     dataset_verdict: dict[str, Any],
+    table_assessments: dict[str, Any],
     chart_specs: dict[str, dict[str, Any]],
     run_summary: dict[str, Any],
     run_events: list[dict[str, Any]],
@@ -258,6 +261,7 @@ def build_lineage_graph(
             )
 
     type_counts = Counter(node["type"] for node in nodes)
+    table_assessment_count = len(table_assessments.get("assessments") or [])
     evidence_artifacts = list(BASE_EVIDENCE_ARTIFACTS)
     if connector_metadata:
         evidence_artifacts.insert(3, "connector_metadata.json")
@@ -276,6 +280,7 @@ def build_lineage_graph(
                 "artifact_count": type_counts.get("artifact", 0),
                 "edge_count": len(edges),
                 "connector_source_type": (connector_metadata or {}).get("source_type", ""),
+                "table_assessment_count": table_assessment_count,
             },
             "evidence_artifacts": evidence_artifacts,
             "nodes": sorted(nodes, key=lambda node: (node["type"], node["id"])),
@@ -490,6 +495,7 @@ def _add_stage_artifact_edges(
             "schema_evaluation.json",
             "relationship_graph.json",
             "dataset_verdict.json",
+            "table_assessments.json",
             "schema_diagram.json",
             "schema_diagram.dbml",
         ],
@@ -531,11 +537,18 @@ def _add_artifact_dependency_edges(
         "schema_evaluation.json": ["schema_parse_report.json", "issues.json"],
         "relationship_graph.json": ["schema_parse_report.json", "issues.json"],
         "dataset_verdict.json": ["issues.json", "schema_evaluation.json", "relationship_graph.json"],
+        "table_assessments.json": [
+            "profile_summary.json",
+            "issues.json",
+            "relationship_graph.json",
+            "dataset_verdict.json",
+        ],
         "influence.json": ["profile_summary.json"],
         "lineage_graph.json": [
             "schema_parse_report.json",
             "schema_evaluation.json",
             "relationship_graph.json",
+            "table_assessments.json",
             "run_events.jsonl",
             "run_summary.json",
         ],

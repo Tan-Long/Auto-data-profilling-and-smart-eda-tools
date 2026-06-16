@@ -28,6 +28,7 @@ REQUIRED_ARTIFACTS = [
     "schema_evaluation.json",
     "relationship_graph.json",
     "dataset_verdict.json",
+    "table_assessments.json",
     "schema_diagram.json",
     "schema_diagram.dbml",
     "run.log",
@@ -341,6 +342,7 @@ def _render_index_html(
 ) -> str:
     verdict = _read_json(source_root / "dataset_verdict.json")
     relationship_graph = _read_json(source_root / "relationship_graph.json")
+    table_assessments = _read_json(source_root / "table_assessments.json")
     lineage_graph = _read_json(source_root / "lineage_graph.json")
     schema_parse = _read_json(source_root / "schema_parse_report.json")
     schema_evaluation = _read_json(source_root / "schema_evaluation.json")
@@ -358,6 +360,7 @@ def _render_index_html(
     verdict_label = verdict.get("verdict", "unknown")
     risk_score = verdict.get("risk_score", "n/a")
     relationship_summary = relationship_graph.get("summary") or {}
+    table_assessment_summary = table_assessments.get("summary") or {}
     lineage_summary = lineage_graph.get("summary") or {}
     parse_counts = schema_parse.get("counts") or {}
     eval_summary = schema_evaluation.get("summary") or {}
@@ -366,6 +369,11 @@ def _render_index_html(
         ("Issues", str(issue_counts.get("total", "0")), "Total findings"),
         ("Tables", str(eval_summary.get("mapped_table_count", "0")), "Mapped source tables"),
         ("Relationships", str(relationship_summary.get("edge_count", "0")), "FK edges"),
+        (
+            "Table assessments",
+            str(table_assessment_summary.get("table_count", "0")),
+            "Readiness rows",
+        ),
         ("Lineage", str(lineage_summary.get("edge_count", "0")), "Dependency edges"),
         ("Artifacts", str(len(artifact_index)), "Package files"),
     ]
@@ -543,6 +551,7 @@ def connector_summary_html(connector_metadata: dict[str, Any]) -> str:
 def _artifact_links() -> list[tuple[str, str]]:
     return [
         ("Dataset verdict", "dataset_verdict.json"),
+        ("Table assessments", "table_assessments.json"),
         ("Profile summary", "profile_summary.json"),
         ("Issues", "issues.json"),
         ("Schema parse", "schema_parse_report.json"),

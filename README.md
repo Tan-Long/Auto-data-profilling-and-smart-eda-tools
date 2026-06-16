@@ -5,7 +5,8 @@ CSV datasets against a DBML schema, detects common data quality and
 relationship issues, runs association-based influence analysis, and writes
 Markdown/HTML reports plus machine-readable artifacts.
 
-This repository contains the VSF Data Profiler product release candidate.
+This repository still carries Harness docs under `docs/` for agent workflow.
+The product implemented here is `VSF Data Profiler`.
 
 ## Setup
 
@@ -43,6 +44,10 @@ Playwright dashboard E2E when local
 Node/Playwright tooling is installed. See
 [docs/releases/v0.2-rc.md](docs/releases/v0.2-rc.md).
 
+Latest public prerelease:
+[VSF Data Profiler v0.2.0-rc2](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc2),
+with release notes in [docs/releases/v0.2.0-rc2.md](docs/releases/v0.2.0-rc2.md).
+
 Expected artifacts:
 
 ```text
@@ -54,6 +59,7 @@ outputs/demo_small/lineage_graph.json
 outputs/demo_small/schema_evaluation.json
 outputs/demo_small/relationship_graph.json
 outputs/demo_small/dataset_verdict.json
+outputs/demo_small/table_assessments.json
 outputs/demo_small/schema_diagram.json
 outputs/demo_small/schema_diagram.dbml
 outputs/demo_small/run.log
@@ -186,8 +192,8 @@ docker stop vsf-profiler-postgres-smoke
 ```
 
 When `VSF_POSTGRES_TEST_URL` is not set, the smoke skips explicitly. Docker is
-not required for the normal test suite unless local tooling chooses to provide
-it.
+not required for the normal test suite unless a local Harness/tooling setup
+chooses to provide it.
 
 ## Real MySQL/MariaDB Smoke
 
@@ -267,9 +273,9 @@ paths are validated locally without uploading CSV bytes through the browser.
 After a run completes, the local runner shows an interactive dashboard from
 generated artifact URLs such as
 `charts/*.json`, `issues.json`, `profile_summary.json`,
-`relationship_graph.json`, `dataset_verdict.json`, `schema_parse_report.json`,
-`lineage_graph.json`, `schema_evaluation.json`, `influence.json`, and
-`run_summary.json`.
+`relationship_graph.json`, `dataset_verdict.json`,
+`table_assessments.json`, `schema_parse_report.json`, `lineage_graph.json`,
+`schema_evaluation.json`, `influence.json`, and `run_summary.json`.
 
 - Upload mode sends browser-selected DBML/CSV/rules files to the local backend
   and is intended for demos and small-to-medium local files.
@@ -279,8 +285,8 @@ generated artifact URLs such as
 
 The static `report.html` keeps its deterministic Visual Summary. The web
 runner dashboard is the interactive browser view with filters and drilldown; it
-also renders lineage and relationship graphs from generated artifact JSON. It
-does not fetch raw CSV files or rerun the profiler.
+also renders table assessments, lineage, and relationship graphs from
+generated artifact JSON. It does not fetch raw CSV files or rerun the profiler.
 
 ## Scope
 

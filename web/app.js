@@ -68,6 +68,9 @@ const els = {
   dashboardTableFilter: document.querySelector("#dashboardTableFilter"),
   dashboardResetFilters: document.querySelector("#dashboardResetFilters"),
   dashboardMessage: document.querySelector("#dashboardMessage"),
+  dashboardSummaryStrip: document.querySelector("#dashboardSummaryStrip"),
+  tableImpactStatus: document.querySelector("#tableImpactStatus"),
+  tableImpactGrid: document.querySelector("#tableImpactGrid"),
   dashboardPanelGrid: document.querySelector("#dashboardPanelGrid"),
   dashboardGraphModeLineage: document.querySelector("#dashboardGraphModeLineage"),
   dashboardGraphModeRelationship: document.querySelector("#dashboardGraphModeRelationship"),
@@ -165,6 +168,7 @@ const dashboardMachineArtifacts = [
   "profile_summary.json",
   "relationship_graph.json",
   "dataset_verdict.json",
+  "table_assessments.json",
   "schema_evaluation.json",
   "lineage_graph.json",
   "influence.json",
@@ -297,6 +301,14 @@ els.dashboardResetFilters.addEventListener("click", () => {
 });
 
 els.dashboardPanelGrid.addEventListener("click", (event) => {
+  handleDashboardSelectionClick(event);
+});
+
+els.tableImpactGrid.addEventListener("click", (event) => {
+  handleDashboardSelectionClick(event);
+});
+
+function handleDashboardSelectionClick(event) {
   const target = event.target.closest("[data-dashboard-kind]");
   if (!target) {
     return;
@@ -307,7 +319,7 @@ els.dashboardPanelGrid.addEventListener("click", (event) => {
     label: target.dataset.dashboardLabel || target.textContent.trim(),
   };
   renderDashboardDrilldown();
-});
+}
 
 els.dashboardGraphModeLineage.addEventListener("click", () => {
   setDashboardGraphMode("lineage");
@@ -820,7 +832,7 @@ function renderEdges() {
   if (!state.relationships.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "Relationships sẽ hiện ở đây sau khi parse DBML.";
+    empty.textContent = "Relationships appear here after DBML parsing.";
     els.edgeList.appendChild(empty);
     return;
   }
@@ -835,7 +847,7 @@ function renderEdges() {
 function renderMapping() {
   els.mappingBody.innerHTML = "";
   if (!state.tables.length) {
-    els.mappingBody.innerHTML = `<tr><td colspan="6" class="empty-row">Upload DBML để bắt đầu mapping.</td></tr>`;
+    els.mappingBody.innerHTML = `<tr><td colspan="6" class="empty-row">Upload DBML to start mapping.</td></tr>`;
     return;
   }
 
@@ -1121,8 +1133,10 @@ function renderDashboard() {
       : "Waiting for run";
   els.dashboardIssueCount.textContent = `${filteredIssues.length}/${issues.length} issues`;
 
+  renderDashboardSummary(issues);
   renderDashboardFilters(issues);
   renderDashboardArtifacts();
+  renderTableImpactSection();
 
   if (!loaded) {
     els.dashboardPanelGrid.innerHTML = loading
@@ -1157,10 +1171,80 @@ function renderDashboard() {
   }
 }
 
+function renderDashboardSummary(issues) {
+  const artifactIndex = state.dashboardArtifactIndex;
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const assessmentArtifact = state.dashboardArtifacts["table_assessments.json"] || {};
+  const assessments = getDashboardTableAssessments();
+  const riskScore = verdict.risk_score ?? verdict.summary?.risk_score ?? "--";
+  const verdictLabel = verdict.verdict || verdict.summary?.verdict || (artifactIndex ? "unknown" : "Waiting");
+  const paths = Object.keys(artifactIndex?.artifact_urls || {});
+  els.dashboardSummaryStrip.innerHTML = `
+    <div><span>verdict</span><strong>${escapeHtml(verdictLabel)}</strong></div>
+    <div><span>risk</span><strong>${escapeHtml(riskScore === "--" ? "--" : `${integerText(riskScore)}/100`)}</strong></div>
+    <div><span>issues</span><strong>${integerText(issues.length)}</strong></div>
+    <div><span>tables</span><strong>${integerText(assessmentArtifact.summary?.table_count ?? assessments.length)}</strong></div>
+    <div><span>artifacts</span><strong>${integerText(paths.length)}</strong></div>
+  `;
+}
+
+function renderTableImpactSection() {
+  const loaded = Boolean(state.dashboardArtifactIndex);
+  const assessments = getDashboardTableAssessments()
+    .filter((assessment) => filterMatchesTable(assessment.table))
+    .sort((a, b) => (
+      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
+      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      String(a.table || "").localeCompare(String(b.table || ""))
+    ));
+
+  if (!loaded) {
+    els.tableImpactStatus.textContent = state.dashboardLoadingJobId
+      ? "Fetching table_assessments.json"
+      : "Waiting for table_assessments.json";
+    els.tableImpactGrid.innerHTML = `<p class="muted">Run a job to review per-table readiness and business impact.</p>`;
+    return;
+  }
+
+  els.tableImpactStatus.textContent = assessments.length
+    ? `${assessments.length} tables from table_assessments.json`
+    : "No matching table assessments";
+
+  if (!assessments.length) {
+    els.tableImpactGrid.innerHTML = `<p class="muted">No table assessments match the current table filter.</p>`;
+    return;
+  }
+
+  els.tableImpactGrid.innerHTML = assessments.slice(0, 12).map((assessment) => {
+    const impact = assessment.business_impact || {};
+    const columns = Array.isArray(assessment.affected_columns) ? assessment.affected_columns : [];
+    const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
+    const readiness = assessment.readiness || "unknown";
+    return `
+      <button class="table-impact-card" type="button" data-dashboard-kind="table_assessment" data-dashboard-value="${escapeHtml(assessment.table)}" data-dashboard-label="${escapeHtml(assessment.table)}">
+        <span>
+          <code>${escapeHtml(assessment.table)}</code>
+          <small>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</small>
+        </span>
+        <span class="table-impact-score">${integerText(assessment.health_score)}<small>health</small></span>
+        <span class="pill-status ${readinessPillClass(readiness)}">${escapeHtml(readiness)}</span>
+        <span class="table-impact-meta">
+          <span>${escapeHtml(impact.category || "general_analytics")}</span>
+          <span>${integerText(columns.length)} columns</span>
+          <span>${integerText(risks.length)} relationship risks</span>
+        </span>
+      </button>
+    `;
+  }).join("");
+}
+
 function renderDashboardFilters(issues) {
   const severities = uniqueSorted(issues.map((issue) => issue.severity), severityOrder);
   const issueTypes = uniqueSorted(issues.map((issue) => issue.issue_type));
-  const tables = uniqueSorted(issues.map((issue) => issue.table).filter(Boolean));
+  const tables = uniqueSorted([
+    ...issues.map((issue) => issue.table).filter(Boolean),
+    ...getDashboardTableAssessments().map((assessment) => assessment.table).filter(Boolean),
+  ]);
 
   setSelectOptions(els.dashboardSeverityFilter, "all", "All severities", severities, state.dashboardFilters.severity);
   setSelectOptions(els.dashboardIssueTypeFilter, "all", "All issue types", issueTypes, state.dashboardFilters.issueType);
@@ -2112,6 +2196,7 @@ function renderDashboardDrilldown() {
       <div><span>${uniqueSorted(issues.map((issue) => issue.table).filter(Boolean)).length}</span><p>tables</p></div>
       <div><span>${integerText(sum(issues.map((issue) => Number(issue.bad_count || 0))))}</span><p>bad rows</p></div>
     </div>
+    ${renderTableAssessmentDetails(selection)}
     ${renderIssueRows(issues)}
     ${renderDrilldownArtifacts(artifacts)}
   `;
@@ -2131,6 +2216,9 @@ function dashboardIssuesForSelection(selection) {
   if (selection.kind === "table") {
     return issues.filter((issue) => issue.table === selection.value);
   }
+  if (selection.kind === "table_assessment") {
+    return issues.filter((issue) => issue.table === selection.value);
+  }
   if (selection.kind === "relationship_status") {
     const relationshipIssueTypes = new Set([
       "ORPHAN_FOREIGN_KEY",
@@ -2141,6 +2229,35 @@ function dashboardIssuesForSelection(selection) {
     return issues.filter((issue) => relationshipIssueTypes.has(issue.issue_type));
   }
   return issues;
+}
+
+function renderTableAssessmentDetails(selection) {
+  if (!selection || selection.kind !== "table_assessment") {
+    return "";
+  }
+  const assessment = getDashboardTableAssessments().find((row) => row.table === selection.value);
+  if (!assessment) {
+    return "";
+  }
+  const impact = assessment.business_impact || {};
+  const columns = Array.isArray(assessment.affected_columns) ? assessment.affected_columns : [];
+  const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
+  return `
+    <div class="table-assessment-detail">
+      <div>
+        <strong><code>${escapeHtml(assessment.table)}</code></strong>
+        <p>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</p>
+      </div>
+      <span class="pill-status ${readinessPillClass(assessment.readiness)}">${escapeHtml(assessment.readiness || "unknown")}</span>
+      <dl class="graph-metadata">
+        <div><dt>health_score</dt><dd>${integerText(assessment.health_score)}/100</dd></div>
+        <div><dt>business_impact</dt><dd>${escapeHtml(impact.category || "general_analytics")}</dd></div>
+        <div><dt>impact_evidence</dt><dd>${escapeHtml(impact.rationale || "")}</dd></div>
+        <div><dt>affected_columns</dt><dd>${escapeHtml(columns.length ? columns.join(", ") : "none")}</dd></div>
+        <div><dt>relationship_risks</dt><dd>${integerText(risks.length)}</dd></div>
+      </dl>
+    </div>
+  `;
 }
 
 function renderIssueRows(issues) {
@@ -2197,8 +2314,14 @@ function drilldownArtifactsForSelection(selection) {
   }
   if (selection?.kind === "table") {
     paths.add("profile_summary.json");
+    paths.add("table_assessments.json");
     paths.add(dashboardChartPaths.missingTable);
     paths.add(dashboardChartPaths.missingColumns);
+  }
+  if (selection?.kind === "table_assessment") {
+    paths.add("table_assessments.json");
+    paths.add("profile_summary.json");
+    paths.add("relationship_graph.json");
   }
   if (selection?.kind === "relationship_status") {
     paths.add("relationship_graph.json");
@@ -2236,6 +2359,11 @@ function getDashboardIssues() {
   return Array.isArray(state.dashboardArtifacts["issues.json"])
     ? state.dashboardArtifacts["issues.json"]
     : [];
+}
+
+function getDashboardTableAssessments() {
+  const artifact = state.dashboardArtifacts["table_assessments.json"];
+  return Array.isArray(artifact?.assessments) ? artifact.assessments : [];
 }
 
 function getFilteredDashboardIssues() {
@@ -2276,6 +2404,7 @@ function artifactLabel(path) {
     "profile_summary.json": "Profile summary",
     "relationship_graph.json": "Relationship graph",
     "dataset_verdict.json": "Dataset verdict",
+    "table_assessments.json": "Table assessments",
     "schema_evaluation.json": "Schema evaluation",
     "influence.json": "Influence",
     "run_summary.json": "Run summary",
@@ -2304,6 +2433,20 @@ function dashboardTone(label) {
     return "warn";
   }
   return "";
+}
+
+function readinessPillClass(readiness) {
+  if (readiness === "NOT_READY") {
+    return "missing";
+  }
+  if (readiness === "WARN") {
+    return "extra";
+  }
+  return "mapped";
+}
+
+function readinessOrder(readiness) {
+  return { NOT_READY: 0, WARN: 1, READY: 2 }[readiness] ?? 99;
 }
 
 function countBy(items, keyFn) {

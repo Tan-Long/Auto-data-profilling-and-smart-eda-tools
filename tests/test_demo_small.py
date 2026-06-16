@@ -37,6 +37,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert (out_dir / "schema_evaluation.json").exists()
     assert (out_dir / "relationship_graph.json").exists()
     assert (out_dir / "dataset_verdict.json").exists()
+    assert (out_dir / "table_assessments.json").exists()
     assert (out_dir / "charts").is_dir()
     assert (out_dir / "schema_diagram.dbml").exists()
     assert (out_dir / "schema_diagram.json").exists()
@@ -53,6 +54,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text())
     relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text())
     dataset_verdict = json.loads((out_dir / "dataset_verdict.json").read_text())
+    table_assessments = json.loads((out_dir / "table_assessments.json").read_text())
     chart_specs = {
         path.name: json.loads(path.read_text())
         for path in sorted((out_dir / "charts").glob("*.json"))
@@ -83,6 +85,18 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert dataset_verdict["top_blockers"]
     assert dataset_verdict["affected_tables"]
     assert dataset_verdict["recommended_next_actions"]
+    assert table_assessments["artifact"] == "table_assessments"
+    assert table_assessments["summary"]["table_count"] == 7
+    assert len(table_assessments["assessments"]) == 7
+    assert {row["table"] for row in table_assessments["assessments"]} == set(
+        json.loads((out_dir / "profile_summary.json").read_text())["tables"]
+    )
+    assert any(row["readiness"] == "NOT_READY" for row in table_assessments["assessments"])
+    assert any(
+        row["business_impact"]["category"] == "customer_feedback"
+        for row in table_assessments["assessments"]
+        if row["table"] == "order_reviews"
+    )
     assert list(chart_specs) == [
         "dataset_verdict_risk_summary.json",
         "influence_top_features.json",
@@ -129,12 +143,16 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert "relationship_graph.json" in report_md
     assert "Dataset Verdict" in report_md
     assert "dataset_verdict.json" in report_md
+    assert "Per-Table Assessment" in report_md
+    assert "table_assessments.json" in report_md
     assert "Visual Summary" in report_md
     assert "charts/issue_counts_by_severity.json" in report_md
     assert "schema_evaluation.json" in report_html
     assert "relationship_graph.json" in report_html
     assert "Dataset Verdict" in report_html
     assert "dataset_verdict.json" in report_html
+    assert "Per-Table Assessment" in report_html
+    assert "table_assessments.json" in report_html
     assert "Visual Summary" in report_html
     assert "charts/issue_counts_by_severity.json" in report_html
     assert "Execution Flow" in report_md
@@ -167,6 +185,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "schema_evaluation",
         "relationship_graph",
         "dataset_verdict",
+        "table_assessments",
         "charts_dir",
         "chart_dataset_verdict_risk_summary",
         "chart_influence_top_features",

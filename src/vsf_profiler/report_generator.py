@@ -30,6 +30,7 @@ def generate_reports(
     schema_evaluation: dict[str, Any] | None = None,
     relationship_graph: dict[str, Any] | None = None,
     dataset_verdict: dict[str, Any] | None = None,
+    table_assessments: dict[str, Any] | None = None,
     chart_specs: dict[str, dict[str, Any]] | None = None,
     run_summary: dict[str, Any] | None = None,
 ) -> None:
@@ -44,6 +45,7 @@ def generate_reports(
         schema_evaluation,
         relationship_graph,
         dataset_verdict,
+        table_assessments,
         chart_specs,
         run_summary,
     )
@@ -76,6 +78,7 @@ def _build_context(
     schema_evaluation: dict[str, Any] | None,
     relationship_graph: dict[str, Any] | None,
     dataset_verdict: dict[str, Any] | None,
+    table_assessments: dict[str, Any] | None,
     chart_specs: dict[str, dict[str, Any]] | None,
     run_summary: dict[str, Any] | None,
 ) -> dict[str, Any]:
@@ -108,6 +111,7 @@ def _build_context(
         "schema_evaluation": _schema_evaluation_context(schema_evaluation),
         "relationship_graph": _relationship_graph_context(relationship_graph),
         "dataset_verdict": verdict_context,
+        "table_assessments": _table_assessments_context(table_assessments),
         "chart_specs": _chart_specs_context(chart_specs),
         "execution_flow": _execution_flow_context(run_summary),
         "l4_report": _l4_report_context(run_summary),
@@ -262,6 +266,40 @@ def _relationship_graph_context(relationship_graph: dict[str, Any] | None) -> di
             for edge in relationship_graph.get("edges", [])[:10]
         ],
         "junction_tables": relationship_graph.get("junction_tables", [])[:10],
+    }
+
+
+def _table_assessments_context(table_assessments: dict[str, Any] | None) -> dict[str, Any]:
+    if not table_assessments:
+        return {"available": False, "assessments": []}
+    summary = table_assessments.get("summary") or {}
+    assessments = []
+    for row in table_assessments.get("assessments", [])[:20]:
+        impact = row.get("business_impact") or {}
+        assessments.append(
+            {
+                "table": row.get("table", ""),
+                "role": row.get("role", ""),
+                "health_score": row.get("health_score", 0),
+                "readiness": row.get("readiness", ""),
+                "issue_total": sum((row.get("issue_counts_by_severity") or {}).values()),
+                "affected_columns": row.get("affected_columns") or [],
+                "relationship_risk_count": len(row.get("relationship_risks") or []),
+                "business_impact_category": impact.get("category", ""),
+                "business_impact_label": impact.get("label", ""),
+                "business_impact_rationale": impact.get("rationale", ""),
+                "recommended_next_actions": row.get("recommended_next_actions") or [],
+            }
+        )
+    return {
+        "available": True,
+        "path": "table_assessments.json",
+        "table_count": summary.get("table_count", 0),
+        "average_health_score": summary.get("average_health_score", 0),
+        "readiness_counts": summary.get("readiness_counts") or {},
+        "role_counts": summary.get("role_counts") or {},
+        "business_impact_counts": summary.get("business_impact_counts") or {},
+        "assessments": assessments,
     }
 
 

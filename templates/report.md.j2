@@ -9,6 +9,7 @@
 - P0/P1 issues: {{ summary.critical_issue_count }}
 - Schema parse diagnostics: `{{ schema_parse_report.path if schema_parse_report.available else "not available" }}`
 - Lineage graph: `{{ lineage_graph.path if lineage_graph.available else "not available" }}`
+- Table assessments: `{{ table_assessments.path if table_assessments.available else "not available" }}`
 {% if connector_metadata.available -%}
 - Connector metadata: `{{ connector_metadata.path }}`
 {% endif %}
@@ -59,7 +60,37 @@
 Dataset verdict metadata was not provided for this report.
 {% endif %}
 
-## 3. Visual Summary
+## 3. Per-Table Assessment
+
+{% if table_assessments.available -%}
+- Assessment artifact: `{{ table_assessments.path }}`
+- Tables assessed: {{ table_assessments.table_count }}
+- Average health score: {{ table_assessments.average_health_score }}/100
+- Readiness counts: {% for readiness, count in table_assessments.readiness_counts.items() %}{{ readiness }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
+- Role counts: {% for role, count in table_assessments.role_counts.items() %}{{ role }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
+
+| Table | Role | Readiness | Health | Issues | Relationship Risks | Business Impact | Affected Columns |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- |
+{% for row in table_assessments.assessments -%}
+| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.health_score }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.business_impact_label }} | {{ row.affected_columns | join(", ") if row.affected_columns else "none" }} |
+{% else -%}
+| none | none | none | 0 | 0 | 0 | none | none |
+{% endfor %}
+
+### Table Assessment Next Actions
+
+{% for row in table_assessments.assessments -%}
+{% if row.recommended_next_actions -%}
+- `{{ row.table }}`: {{ row.recommended_next_actions[0] }}
+{% endif -%}
+{% else -%}
+- No table-level actions were generated.
+{% endfor %}
+{% else -%}
+Table assessment metadata was not provided for this report.
+{% endif %}
+
+## 4. Visual Summary
 
 {% if chart_specs.available -%}
 | Chart Spec | Sources |
@@ -131,7 +162,7 @@ Dataset verdict metadata was not provided for this report.
 Chart specs were not provided for this report.
 {% endif %}
 
-## 4. Execution Flow
+## 5. Execution Flow
 
 {% if execution_flow.available -%}
 - Run ID: `{{ execution_flow.run_id }}`
@@ -154,7 +185,7 @@ Chart specs were not provided for this report.
 Runtime execution metadata was not provided for this report.
 {% endif %}
 
-## 5. Lineage Graph
+## 6. Lineage Graph
 
 {% if lineage_graph.available -%}
 - Lineage artifact: `{{ lineage_graph.path }}`
@@ -171,7 +202,7 @@ Runtime execution metadata was not provided for this report.
 Lineage graph metadata was not provided for this report.
 {% endif %}
 
-## 6. Dataset Overview
+## 7. Dataset Overview
 
 | Table | Rows | Columns | File Size MB |
 | --- | ---: | ---: | ---: |
@@ -179,7 +210,7 @@ Lineage graph metadata was not provided for this report.
 | {{ table.table }} | {{ table.row_count }} | {{ table.column_count }} | {{ table.file_size_mb }} |
 {% endfor %}
 
-## 7. Schema Validation
+## 8. Schema Validation
 
 - Missing tables: {{ profile.catalog.missing_tables | join(", ") if profile.catalog.missing_tables else "none" }}
 - Extra CSV files: {{ profile.catalog.extra_csvs | join(", ") if profile.catalog.extra_csvs else "none" }}
@@ -223,7 +254,7 @@ Lineage graph metadata was not provided for this report.
 {% endfor %}
 {% endif %}
 
-## 8. Relationship Graph
+## 9. Relationship Graph
 
 {% if relationship_graph.available -%}
 - Relationship graph artifact: `{{ relationship_graph.path }}`
@@ -253,7 +284,7 @@ Lineage graph metadata was not provided for this report.
 Relationship graph artifact was not provided.
 {% endif %}
 
-## 9. DBML Diagram and CSV Mapping
+## 10. DBML Diagram and CSV Mapping
 
 - Generated DBML: `{{ schema_diagram.dbml_path }}`
 - dbdiagram.io link: {% if schema_diagram.dbdiagram_url_available %}{{ schema_diagram.dbdiagram_url }}{% else %}unavailable because the schema is too large for a safe URL{% endif %}
@@ -280,7 +311,7 @@ Relationship graph artifact was not provided.
 | none | none |
 {% endfor %}
 
-## 10. Table Profiles
+## 11. Table Profiles
 
 {% for table in profile.tables.values() %}
 ### {{ table.table }}
@@ -292,7 +323,7 @@ Relationship graph artifact was not provided.
 {% endfor %}
 {% endfor %}
 
-## 11. Data Quality Issues
+## 12. Data Quality Issues
 
 | Issue | Severity | Type | Table | Columns | Bad Count | Bad Rate | Sample | Suggested Fix |
 | --- | --- | --- | --- | --- | ---: | ---: | --- | --- |
@@ -300,7 +331,7 @@ Relationship graph artifact was not provided.
 | {{ issue.issue_id }} | {{ issue.severity }} | {{ issue.issue_type }} | {{ issue.table }} | {{ issue.columns | join(", ") }} | {{ issue.bad_count }} | {{ issue.bad_rate | pct }} | {{ issue.sample_bad_rows_path or "" }} | {{ issue.suggested_fix[0] if issue.suggested_fix else "" }} |
 {% endfor %}
 
-## 12. Relationship Integrity
+## 13. Relationship Integrity
 
 | Issue | Type | Child/Parent | Columns | Bad Count |
 | --- | --- | --- | --- | ---: |
@@ -310,7 +341,7 @@ Relationship graph artifact was not provided.
 | none | none | none | none | 0 |
 {% endfor %}
 
-## 13. Influence Analysis
+## 14. Influence Analysis
 
 Target: `{{ influence.target or "none" }}`
 
@@ -324,7 +355,7 @@ Method: {{ influence.method }}. This is association, not causation.
 | none | 0 | none | none | No influence features were produced. |
 {% endfor %}
 
-## 14. Recommended Dev Actions
+## 15. Recommended Dev Actions
 
 {% for action in recommended_actions -%}
 - {{ action }}
@@ -332,7 +363,7 @@ Method: {{ influence.method }}. This is association, not causation.
 - No actions required.
 {% endfor %}
 
-## 15. Appendix: Evidence SQL and Sample Paths
+## 16. Appendix: Evidence SQL and Sample Paths
 
 {% for issue in issues %}
 ### {{ issue.issue_id }} {{ issue.issue_type }}

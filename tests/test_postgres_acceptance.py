@@ -20,6 +20,7 @@ REQUIRED_ARTIFACTS = {
     "relationship_graph.json",
     "lineage_graph.json",
     "dataset_verdict.json",
+    "table_assessments.json",
     "influence.json",
     "run.log",
     "run_events.jsonl",
@@ -217,6 +218,7 @@ def _assert_acceptance_outputs(
     relationship_graph = _read_json(out_dir / "relationship_graph.json")
     lineage_graph = _read_json(out_dir / "lineage_graph.json")
     dataset_verdict = _read_json(out_dir / "dataset_verdict.json")
+    table_assessments = _read_json(out_dir / "table_assessments.json")
     run_summary = _read_json(out_dir / "run_summary.json")
     issues = _read_json(out_dir / "issues.json")
     report_md = (out_dir / "report.md").read_text(encoding="utf-8")
@@ -240,6 +242,7 @@ def _assert_acceptance_outputs(
     assert lineage_graph["summary"]["relationship_count"] == 2
     assert "connector_metadata.json" in lineage_graph["evidence_artifacts"]
     assert dataset_verdict["issue_counts"]["total"] == len(issues)
+    assert table_assessments["summary"]["table_count"] == 3
     assert run_summary["status"] == "success"
     assert run_summary["inputs"]["postgres_chunk_rows"] == 2
     assert run_summary["artifact_paths"]["connector_metadata"] == "connector_metadata.json"
@@ -251,12 +254,14 @@ def _assert_acceptance_outputs(
     assert "Lineage Graph" in report_html
     assert "connector_metadata.json" in report_md
     assert "lineage_graph.json" in report_md
+    assert "table_assessments.json" in report_md
 
     dashboard_payloads = _dashboard_payloads(out_dir)
     dashboard = dashboard_payloads["dashboard"]
     assert dashboard["missing_artifacts"] == []
     assert "connector_metadata.json" in dashboard["artifact_urls"]
     assert "lineage_graph.json" in dashboard["artifact_urls"]
+    assert "table_assessments.json" in dashboard["artifact_urls"]
     assert "charts/issue_counts_by_type.json" in dashboard["chart_artifacts"]
 
     _assert_no_secret_leak(

@@ -36,6 +36,7 @@ EXPECTED_ARTIFACT_PATHS = {
     "schema_evaluation": "schema_evaluation.json",
     "relationship_graph": "relationship_graph.json",
     "dataset_verdict": "dataset_verdict.json",
+    "table_assessments": "table_assessments.json",
     "charts_dir": "charts",
     "chart_dataset_verdict_risk_summary": "charts/dataset_verdict_risk_summary.json",
     "chart_influence_top_features": "charts/influence_top_features.json",

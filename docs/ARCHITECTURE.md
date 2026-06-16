@@ -30,6 +30,7 @@ Current v0.2 local RC scope:
 - schema evaluation and relationship graph artifacts;
 - additive lineage graph artifact from existing structured evidence;
 - deterministic dataset verdict and risk scoring artifact;
+- deterministic per-table assessment and name-token business impact artifact;
 - deterministic chart-spec artifacts from aggregate outputs;
 - schema diagram artifacts;
 - runtime trace artifacts;
@@ -124,6 +125,7 @@ DBML + CSV directory + optional YAML rules + optional target column
   -> bounded influence/correlation analysis when target is provided
   -> issue aggregation and recommended actions
   -> deterministic dataset verdict
+  -> deterministic per-table assessment and business impact classification
   -> deterministic chart specs from aggregate artifacts
   -> optional LLM narrative with guardrail validation when --use-llm is set
   -> local lineage graph from source, schema, runtime, and artifact evidence
@@ -205,6 +207,7 @@ runner can share the same implementation.
 | `src/vsf_profiler/schema_evaluation.py` | DBML-vs-CSV conformance artifact generation. | Report artifact service. |
 | `src/vsf_profiler/relationship_graph.py` | Relationship graph artifact generation from DBML and DuckDB FK checks. | Report artifact service. |
 | `src/vsf_profiler/lineage_graph.py` | Lineage graph artifact generation from existing source, schema, runtime, and artifact evidence. | Report artifact service. |
+| `src/vsf_profiler/table_assessments.py` | Deterministic per-table readiness, role, relationship-risk, and name-token business-impact artifact generation from existing structured outputs. | Report artifact service. |
 | `src/vsf_profiler/chart_specs.py` | Deterministic chart specs from aggregate machine artifacts. | Report artifact service. |
 | `src/vsf_profiler/schema_diagram.py` | DBML diagram payload and dbdiagram link generation. | Report artifact service. |
 | `src/vsf_profiler/llm_narrative.py` | Optional L4 narrative context building, fake and OpenAI provider adapters, deterministic fallback, and guardrail validation. | Application presenter / provider boundary. |
@@ -254,6 +257,9 @@ The domain should converge on these stable concepts:
   non-causality wording.
 - `DatasetVerdict`: overall readiness, risk score, top blockers, warnings, and
   recommended next actions.
+- `TableAssessment`: per-profiled-table role, health score, readiness, issue
+  counts, affected columns, relationship risks, name-token business impact,
+  evidence artifact references, and recommended next actions.
 - `ChartSpec`: deterministic chart metadata and aggregate data with source
   artifact references.
 - `NarrativeReport`: optional LLM output plus guardrail validation status.
@@ -585,6 +591,7 @@ Current verdict outputs:
 
 - issue severity;
 - table-level risk;
+- deterministic table assessments with bounded business-impact categories;
 - relationship-level risk;
 - dataset-level readiness verdict such as `READY`, `WARN`, or `NOT_READY`;
 - top blockers and suggested next actions.
@@ -608,6 +615,7 @@ LLM input may include:
 - schema evaluation;
 - relationship graph summary;
 - verdict;
+- per-table assessment summary;
 - chart summaries;
 - influence summary.
 
@@ -633,6 +641,7 @@ Guardrail validation should run after generation:
 
 - verify numeric claims against allowed evidence;
 - verify issue/table/column references;
+- verify table/business-impact claims against `table_assessments.json`;
 - reject causal wording unless explicitly supported;
 - fall back to deterministic narrative if validation fails.
 
@@ -658,6 +667,7 @@ The output directory is the run contract.
 | `schema_evaluation.json` | DBML-vs-CSV table/column conformance and schema issue references. |
 | `relationship_graph.json` | Table nodes, direct FK edges, FK metrics, status, and evidence links. |
 | `dataset_verdict.json` | Readiness verdict, risk score, blockers, and recommendations. |
+| `table_assessments.json` | One assessment per profiled table with role, health score, readiness, relationship risks, business-impact category, evidence refs, and actions. |
 | `charts/` | Deterministic chart specs and report visual-summary data. |
 | `schema_diagram.json` | Diagram metadata and dbdiagram link. |
 | `schema_diagram.dbml` | DBML used for diagram rendering. |

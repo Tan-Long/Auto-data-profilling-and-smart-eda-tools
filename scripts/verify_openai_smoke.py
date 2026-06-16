@@ -17,6 +17,7 @@ DETERMINISTIC_ARTIFACTS = [
     "schema_evaluation.json",
     "relationship_graph.json",
     "dataset_verdict.json",
+    "table_assessments.json",
     "schema_diagram.json",
     "schema_diagram.dbml",
 ]

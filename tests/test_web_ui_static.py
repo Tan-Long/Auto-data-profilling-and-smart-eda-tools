@@ -3,11 +3,14 @@ from pathlib import Path
 
 def test_web_ui_contains_upload_mapping_and_visualization_regions():
     root = Path(__file__).resolve().parents[1] / "web"
+    design_system = Path(__file__).resolve().parents[1] / ".interface-design" / "system.md"
     html = (root / "index.html").read_text()
     css = (root / "styles.css").read_text()
     js = (root / "app.js").read_text()
+    design = design_system.read_text()
 
     required_html = [
+        "Data Quality Console",
         'id="dbmlInput"',
         'id="csvInput"',
         'id="visualizeButton"',
@@ -34,11 +37,17 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="dashboardSeverityFilter"',
         'id="dashboardIssueTypeFilter"',
         'id="dashboardTableFilter"',
+        'id="dashboardSummaryStrip"',
+        'id="tableImpact"',
+        'id="tableImpactGrid"',
+        'id="tableImpactStatus"',
         'id="dashboardDrilldown"',
-        "DBML Diagram",
+        "DBML diagram preview",
         "CSV to DBML Table Mapping",
-        "Run Python profiler",
-        "Visual Analytics",
+        "Start a local Python/DuckDB run",
+        "Dashboard",
+        "Table Impact",
+        "Vercel serves static preflight only",
         "Upload mode",
         "Local path mode",
         "Preparing demo DBML diagram",
@@ -50,6 +59,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     required_css_tokens = [
         "--surface-canvas",
         "--surface-panel",
+        "--surface-rail",
         "--accent",
         "--focus-ring",
         "@media (prefers-reduced-motion: reduce)",
@@ -66,6 +76,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "startPathRun",
         "loadDashboard",
         "renderDashboard",
+        "renderDashboardSummary",
+        "renderTableImpactSection",
         "renderDashboardDrilldown",
         "renderDashboardGraph",
         "buildLineageGraphView",
@@ -78,6 +90,12 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     ]
     for marker in required_js:
         assert marker in js
+
+    assert "restrained data-quality console" in design
+    assert "Table Impact" in design
+    assert "Georgia" not in css
+    assert "radial-gradient" not in css
+    assert "#fffaf0" not in css
 
 
 def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
@@ -96,6 +114,8 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "charts/influence_top_features.json" in js
     assert "lineage_graph.json" in js
     assert "relationship_graph.json" in js
+    assert "table_assessments.json" in js
+    assert "renderTableImpactSection" in js
     assert "data-graph-node-id" in js
     assert "profile_dataset" not in js
     assert "run_quality_checks" not in js

@@ -87,6 +87,7 @@ def test_fake_provider_writes_l4_report_and_passed_guardrail(tmp_path):
         "schema_evaluation.json",
         "relationship_graph.json",
         "dataset_verdict.json",
+        "table_assessments.json",
         "charts/*.json",
         "influence.json",
     ]
@@ -188,6 +189,20 @@ def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
             "risk_score": 42,
             "issue_counts": {"by_severity": {"P1": 1}, "by_type": {"ORPHAN_FOREIGN_KEY": 1}},
         },
+        "table_assessments": {
+            "assessments": [
+                {
+                    "table": "orders",
+                    "role": "fact",
+                    "health_score": 42,
+                    "readiness": "WARN",
+                    "business_impact": {
+                        "category": "order_fulfillment",
+                        "label": "Order fulfillment",
+                    },
+                }
+            ]
+        },
         "chart_specs": {},
         "influence": {"target": "orders.order_id", "top_features": [], "row_count": 0},
     }
@@ -210,6 +225,78 @@ def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
         "reference",
         "causal_wording",
     }
+
+
+def test_guardrail_rejects_unsupported_business_impact_claims():
+    artifacts = {
+        "profile_summary": {
+            "tables": {
+                "orders": {"row_count": 2, "column_count": 1, "columns": {"order_id": {}}},
+                "order_reviews": {"row_count": 2, "column_count": 1, "columns": {"review_id": {}}},
+            }
+        },
+        "issues": [],
+        "schema_evaluation": {"summary": {"mapped_table_count": 2}},
+        "relationship_graph": {"summary": {"edge_count": 0}},
+        "dataset_verdict": {
+            "verdict": "READY",
+            "risk_score": 0,
+            "issue_counts": {"by_severity": {}, "by_type": {}},
+        },
+        "table_assessments": {
+            "assessments": [
+                {
+                    "table": "orders",
+                    "role": "fact",
+                    "health_score": 100,
+                    "readiness": "READY",
+                    "business_impact": {
+                        "category": "order_fulfillment",
+                        "label": "Order fulfillment",
+                    },
+                },
+                {
+                    "table": "order_reviews",
+                    "role": "event",
+                    "health_score": 100,
+                    "readiness": "READY",
+                    "business_impact": {
+                        "category": "customer_feedback",
+                        "label": "Customer feedback",
+                    },
+                },
+            ]
+        },
+        "chart_specs": {},
+        "influence": {"target": None, "top_features": [], "row_count": 0},
+    }
+    context = build_narrative_context(artifacts)
+    evidence = build_guardrail_evidence(artifacts, context)
+
+    passed = validate_narrative(
+        "`orders` has impact category `order_fulfillment`.",
+        evidence,
+    )
+    mismatched = validate_narrative(
+        "`orders` has impact category `customer_feedback`.",
+        evidence,
+    )
+    unsupported = validate_narrative(
+        "`orders` has financial reporting business impact.",
+        evidence,
+    )
+
+    assert passed["status"] == "passed"
+    assert mismatched["status"] == "failed"
+    assert any(
+        violation["type"] == "table_business_impact"
+        for violation in mismatched["violations"]
+    )
+    assert unsupported["status"] == "failed"
+    assert any(
+        violation["type"] == "business_impact"
+        for violation in unsupported["violations"]
+    )
 
 
 def test_openai_provider_uses_responses_api_without_raw_csv_payload():
