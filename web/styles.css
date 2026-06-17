@@ -1920,6 +1920,31 @@ h3 {
   font-size: 12px;
 }
 
+.issue-location-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.issue-location-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 23px;
+  padding: 3px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.issue-location-summary code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .dashboard-issue-row a,
 .drilldown-artifacts a,
 .inline-preview-button,
@@ -2130,7 +2155,7 @@ h3 {
 .artifact-list {
   display: grid;
   gap: 8px;
-  max-height: 360px;
+  max-height: 560px;
   overflow: auto;
 }
 
@@ -2141,7 +2166,7 @@ h3 {
 .stage-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 10px;
   padding: 10px;
   border: 1px solid var(--border-subtle);
@@ -2168,6 +2193,81 @@ h3 {
   margin: 2px 0 0;
   color: var(--foreground-tertiary);
   font-size: 12px;
+}
+
+.stage-result {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+}
+
+.stage-result.pending {
+  color: var(--foreground-tertiary);
+  font-size: 12px;
+}
+
+.stage-result-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stage-result-heading strong {
+  font-size: 12px;
+}
+
+.stage-result-heading span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.stage-result-grid,
+.stage-result-artifacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stage-result-grid span,
+.stage-artifact-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  max-width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.stage-result-grid code,
+.stage-artifact-button code {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.stage-artifact-button {
+  cursor: pointer;
+}
+
+.stage-artifact-button:hover,
+.stage-artifact-button:focus-visible {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .artifact-link {
@@ -2750,6 +2850,83 @@ button.artifact-link {
 .artifact-preview-table th {
   background: var(--surface-inset);
   color: var(--foreground-secondary);
+  font-weight: 900;
+}
+
+.issue-sample-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.issue-sample-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(240px, 1.3fr);
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.issue-sample-banner strong {
+  display: block;
+  margin: 2px 0 4px;
+  font-size: 16px;
+}
+
+.issue-sample-banner span,
+.issue-sample-hint,
+.issue-sample-banner-grid span {
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.issue-sample-banner code,
+.issue-sample-hint strong,
+.issue-row-marker {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.issue-sample-banner-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.issue-sample-banner-grid span,
+.issue-sample-hint {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  overflow-wrap: anywhere;
+}
+
+.issue-sample-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.issue-column-highlight {
+  background: #fff7e8;
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+
+.artifact-preview-table th.issue-column-highlight {
+  color: var(--warning);
+}
+
+.issue-row-marker {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 112px;
+  background: var(--surface-inset);
+  color: var(--foreground-primary);
   font-weight: 900;
 }
 

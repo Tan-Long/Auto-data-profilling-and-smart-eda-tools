@@ -129,6 +129,18 @@ Data style: monospace with tabular numbers.
   relationship health, lineage inventory, verdict blockers, table impact, issue
   mix, runtime stages, and chart data. Raw JSON trees are a fallback, not the
   primary user-facing view.
+- Issue evidence must point below table level. Each issue row shows table,
+  affected columns, bad-row count, sample artifact path, and opens a row
+  evidence preview that labels sample rows and highlights affected cells.
+
+### Runtime Stages
+
+- Runtime stages should show immediate results, not only completed/running
+  status. Each stage row exposes compact result chips from `run_summary.json`
+  stage details and links to the generated artifacts that prove that stage.
+- Stage evidence is always visible after a run. Avoid hiding stage output behind
+  accordions; the demo should read as a progressive pipeline with visible
+  outcomes at every step.
 
 ### Table Impact
 
@@ -192,3 +204,5 @@ Data style: monospace with tabular numbers.
 | Preview generated artifacts inline | Demo reviewers should inspect reports, JSON artifacts, and sample CSVs in the web console instead of being sent to raw browser-rendered files | 2026-06-17 |
 | Show all local ERD columns by default | The local DBML diagram should behave like a dbdiagram-style schema view: users inspect every table column and see FK/PK relationships connected at row level | 2026-06-17 |
 | Render JSON artifacts as reviews, not object dumps | Demo reviewers need relationship/table/verdict evidence in product language; `Object(...)` tree views are too raw for the main artifact surface | 2026-06-17 |
+| Highlight issue sample rows and columns | Quality issues should be inspectable at table, row-sample, and affected-column level without forcing users to interpret raw CSV files | 2026-06-17 |
+| Show runtime stage results inline | After each pipeline stage, reviewers should see the concrete counts and artifacts produced without expanding a hidden panel or opening raw runtime JSON | 2026-06-17 |

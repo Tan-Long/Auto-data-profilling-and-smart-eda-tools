@@ -60,6 +60,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         for path in sorted((out_dir / "charts").glob("*.json"))
     }
     schema_diagram = json.loads((out_dir / "schema_diagram.json").read_text())
+    schema_diagram_dbml = (out_dir / "schema_diagram.dbml").read_text()
     run_summary = json.loads((out_dir / "run_summary.json").read_text())
     run_events = _events(out_dir)
     report_md = (out_dir / "report.md").read_text()
@@ -125,6 +126,10 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert chart_specs["dataset_verdict_risk_summary.json"]["summary"]["verdict"] == "NOT_READY"
     assert chart_specs["influence_top_features.json"]["data"]
     assert schema_diagram["dbdiagram_url"].startswith("https://dbdiagram.io/embed?c=")
+    order_items_block = schema_diagram_dbml.split("Table order_items {", 1)[1].split("\n}", 1)[0]
+    assert "indexes {\n    (order_id, order_item_id) [pk]\n  }" in order_items_block
+    assert "order_id varchar [pk" not in order_items_block
+    assert "order_item_id int [pk" not in order_items_block
     assert any(table["table"] == "orders" and table["csv_path"] for table in schema_diagram["tables"])
     assert any(
         rel["child_table"] == "orders" and rel["parent_table"] == "customers"

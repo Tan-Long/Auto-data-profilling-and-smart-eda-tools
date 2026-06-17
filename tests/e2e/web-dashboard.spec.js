@@ -84,6 +84,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramMessage")).toContainText("Generated artifacts");
   await expect(page.locator("#diagramWarnings")).toContainText("schema_parse_report.json");
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
+  await expect(page.locator("#diagramSvg")).toContainText("varchar");
+  await expect(page.locator("#diagramSvg")).toContainText("timestamp");
   await expect(page.locator("#diagramSvg")).toContainText("invalid");
   await expect(page.locator('#diagramSvg [data-diagram-table="order_payments"]')).toHaveCount(1);
   const customerRelationship = page.locator(
@@ -120,6 +122,17 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#artifactPreview")).toBeFocused();
   await expect(page.locator("#artifactPreviewMeta")).toContainText("report.md");
   await expect(page.locator("#artifactPreview")).toContainText("VSF");
+
+  const runtimeStages = page.locator("#stageList");
+  await expect(runtimeStages).toContainText("Stage result");
+  await expect(runtimeStages).toContainText("7 tables");
+  await expect(runtimeStages).toContainText("24 rows");
+  await expect(runtimeStages).toContainText("profile_summary.json");
+  await expect(runtimeStages).toContainText("relationship_graph.json");
+  await runtimeStages.locator('[data-artifact-path="profile_summary.json"]').first().click();
+  await expect(page.locator("#artifactPreview")).toBeFocused();
+  await expect(page.locator("#artifactPreviewMeta")).toContainText("profile_summary.json");
+  await expect(page.locator("#artifactPreview")).toContainText("Profile summary review");
 
   const dashboard = page.locator("#dashboardPanelGrid");
   await expect(dashboard).toContainText("Dataset verdict");
@@ -266,11 +279,17 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toBeFocused();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");
   await expect(page.locator("#dashboardDrilldown")).toContainText("matching issues");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Preview sample");
-  await page.locator('#dashboardDrilldown [data-artifact-path$=".csv"]').first().click();
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Table");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Columns");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Preview row evidence");
+  await page.locator('#dashboardDrilldown [data-artifact-action="preview-issue-sample"]').first().click();
   await expect(page.locator("#artifactPreview")).toBeFocused();
   await expect(page.locator("#artifactPreviewMeta")).toContainText(".csv");
+  await expect(page.locator("#artifactPreview")).toContainText("Issue row evidence");
+  await expect(page.locator("#artifactPreview")).toContainText("Sample row 1");
+  await expect(page.locator("#artifactPreview")).toContainText("Highlighted columns");
   await expect(page.locator("#artifactPreview table")).toBeVisible();
+  await expect(page.locator("#artifactPreview .issue-column-highlight").first()).toBeVisible();
 
   const rawCsvArtifactRequests = artifactRequests.filter(
     (url) => url.endsWith(".csv") && !url.includes("/samples/"),

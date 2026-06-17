@@ -51,8 +51,10 @@ def render_dbml_for_diagram(schema: Schema, catalog: CsvCatalog) -> str:
         csv_note = f"CSV: {_source_label(catalog_table)}" if catalog_table else "CSV: missing"
         blocks.append(f"Table {table_name} {{")
         blocks.append(f"  Note: '{_escape_dbml_note(csv_note)}'")
+        composite_primary_key = len(table_schema.primary_key) > 1
         for column in table_schema.columns.values():
-            blocks.append(f"  {_render_column(column)}")
+            suppress_column_pk = composite_primary_key and column.name in table_schema.primary_key
+            blocks.append(f"  {_render_column(column, suppress_pk=suppress_column_pk)}")
         if len(table_schema.primary_key) > 1:
             pk = ", ".join(table_schema.primary_key)
             blocks.extend(["", "  indexes {", f"    ({pk}) [pk]", "  }"])
@@ -61,9 +63,9 @@ def render_dbml_for_diagram(schema: Schema, catalog: CsvCatalog) -> str:
     return "\n".join(blocks).rstrip() + "\n"
 
 
-def _render_column(column: ColumnSchema) -> str:
+def _render_column(column: ColumnSchema, *, suppress_pk: bool = False) -> str:
     attrs: list[str] = []
-    if column.is_pk:
+    if column.is_pk and not suppress_pk:
         attrs.append("pk")
     if column.not_null:
         attrs.append("not null")
