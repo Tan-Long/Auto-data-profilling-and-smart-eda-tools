@@ -31,6 +31,17 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
   await expect(page.locator("#diagramInspector")).toContainText("orders");
   await expect(page.locator("#diagramInspector")).toContainText("Fact/event");
+  const mapping = page.locator("#mappingBody");
+  await expect(mapping).toContainText("customers.csv");
+  await expect(mapping).toContainText("orders.csv");
+  await expect(mapping).toContainText("order_items.csv");
+  await expect(mapping).toContainText("order_payments.csv");
+  await expect(mapping).toContainText("order_reviews.csv");
+  await expect(mapping).toContainText("products.csv");
+  await expect(mapping).toContainText("sellers.csv");
+  await expect(mapping).not.toContainText("undefined");
+  await expect(mapping).not.toContainText("missing CSV");
+  await expect(mapping).not.toContainText("extra CSV");
   await page.locator("#diagramColumnsToggle").click();
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#diagramSvg")).toContainText("order_status");
@@ -208,6 +219,17 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardArtifactLinks")).toContainText(
     "lineage_graph.json",
   );
+  const severityChartSource = page
+    .locator('#dashboardArtifactLinks [data-artifact-path="charts/issue_counts_by_severity.json"]')
+    .first();
+  await expect(severityChartSource).toContainText("View chart");
+  const popupOpened = page
+    .waitForEvent("popup", { timeout: 1000 })
+    .then(() => true)
+    .catch(() => false);
+  await severityChartSource.click();
+  await expect(page.locator('[data-dashboard-panel-path="charts/issue_counts_by_severity.json"]')).toBeFocused();
+  expect(await popupOpened).toBe(false);
 
   await page.locator("#dashboardSeverityFilter").selectOption("P1");
   await expect(page.locator("#dashboardIssueCount")).toContainText("/15 issues");
@@ -215,6 +237,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page
     .locator('[data-dashboard-kind="severity"][data-dashboard-value="P1"]')
     .click();
+  await expect(page.locator("#dashboardDrilldown")).toBeFocused();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");
   await expect(page.locator("#dashboardDrilldown")).toContainText("matching issues");
   await expect(page.locator("#dashboardDrilldown")).toContainText("sample CSV");

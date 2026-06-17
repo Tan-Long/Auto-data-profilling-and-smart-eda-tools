@@ -1594,13 +1594,20 @@ h3 {
 }
 
 .dashboard-card-heading a,
-.dashboard-card-heading span {
+.dashboard-card-heading span,
+.artifact-focus-button {
   color: var(--foreground-tertiary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   font-weight: 800;
   text-align: right;
   overflow-wrap: anywhere;
+}
+
+.dashboard-card:focus {
+  border-color: var(--accent);
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .dashboard-bars {
@@ -1859,7 +1866,8 @@ h3 {
 }
 
 .dashboard-issue-row a,
-.drilldown-artifacts a {
+.drilldown-artifacts a,
+.artifact-json-link {
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 800;
@@ -2098,7 +2106,15 @@ h3 {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
+  color: var(--foreground-primary);
   text-decoration: none;
+}
+
+button.artifact-link {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .artifact-link:hover,
@@ -2111,6 +2127,77 @@ h3 {
   color: var(--foreground-tertiary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+}
+
+.artifact-link span {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.artifact-link-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.artifact-link-stack .artifact-link {
+  min-height: 52px;
+}
+
+.artifact-json-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  align-self: center;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.artifact-json-link:hover,
+.artifact-json-link:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.artifact-reference {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.artifact-focus-button {
+  display: inline-grid;
+  justify-items: end;
+  gap: 2px;
+  max-width: 210px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.artifact-focus-button code {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+.artifact-focus-button span {
+  color: var(--accent-strong);
+}
+
+.artifact-focus-button:hover,
+.artifact-focus-button:focus-visible {
+  color: var(--accent-strong);
+  outline: none;
 }
 
 .generated-results {

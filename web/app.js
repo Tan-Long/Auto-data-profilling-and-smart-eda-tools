@@ -127,7 +127,7 @@ const els = {
 
 const demoDbml = `Table customers {
   customer_id varchar [pk, not null]
-  customer_name varchar
+  customer_name varchar [not null]
   customer_state varchar
 }
 
@@ -156,10 +156,29 @@ Table order_reviews {
   review_id varchar [pk, not null]
   order_id varchar [ref: > orders.order_id]
   review_score int
+  review_comment_message varchar
+}
+
+Table order_payments {
+  order_id varchar [ref: > orders.order_id]
+  payment_sequential int
+  payment_type varchar
+  payment_installments int
+  payment_value float
+}
+
+Table products {
+  product_id varchar [pk, not null]
+  product_category_name varchar
+}
+
+Table sellers {
+  seller_id varchar [pk, not null]
+  seller_state varchar
 }`;
 
 const demoCsvs = [
-  { name: "customers.csv", columns: ["customer_id", "customer_name", "customer_state"], size: 248 },
+  { name: "customers.csv", columns: ["customer_id", "customer_name", "customer_state"], size: 112 },
   {
     name: "orders.csv",
     columns: [
@@ -169,15 +188,39 @@ const demoCsvs = [
       "order_purchase_timestamp",
       "order_delivered_customer_date",
     ],
-    size: 512,
+    size: 370,
   },
   {
     name: "order_items.csv",
     columns: ["order_id", "order_item_id", "product_id", "seller_id", "price", "freight_value"],
-    size: 442,
+    size: 183,
   },
-  { name: "payments.csv", columns: ["order_id", "payment_value"], size: 144 },
+  {
+    name: "order_payments.csv",
+    columns: ["order_id", "payment_sequential", "payment_type", "payment_installments", "payment_value"],
+    size: 159,
+  },
+  {
+    name: "order_reviews.csv",
+    columns: ["review_id", "order_id", "review_score", "review_comment_message"],
+    size: 146,
+  },
+  { name: "products.csv", columns: ["product_id", "product_category_name"], size: 64 },
+  { name: "sellers.csv", columns: ["seller_id", "seller_state"], size: 42 },
 ];
+
+function csvStemFromName(name) {
+  return String(name || "").replace(/\.csv$/i, "");
+}
+
+function normalizeCsvFile(file) {
+  const name = file.name || `${file.stem || "table"}.csv`;
+  return {
+    ...file,
+    name,
+    stem: file.stem || csvStemFromName(name),
+  };
+}
 
 const dashboardChartPaths = {
   risk: "charts/dataset_verdict_risk_summary.json",
@@ -359,12 +402,40 @@ els.dashboardResetFilters.addEventListener("click", () => {
 });
 
 els.dashboardPanelGrid.addEventListener("click", (event) => {
+  handleArtifactNavigationClick(event);
+  if (event.defaultPrevented) {
+    return;
+  }
   handleDashboardSelectionClick(event);
 });
 
 els.tableImpactGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
 });
+
+els.artifactList.addEventListener("click", (event) => {
+  handleArtifactNavigationClick(event);
+});
+
+els.dashboardArtifactLinks.addEventListener("click", (event) => {
+  handleArtifactNavigationClick(event);
+});
+
+els.dashboardDrilldown.addEventListener("click", (event) => {
+  handleArtifactNavigationClick(event);
+});
+
+function handleArtifactNavigationClick(event) {
+  const target = event.target.closest("[data-artifact-action]");
+  if (!target) {
+    return;
+  }
+  const action = target.dataset.artifactAction;
+  const artifactPath = target.dataset.artifactPath || "";
+  if (action === "focus-dashboard-artifact" && focusDashboardArtifact(artifactPath)) {
+    event.preventDefault();
+  }
+}
 
 function handleDashboardSelectionClick(event) {
   const target = event.target.closest("[data-dashboard-kind]");
@@ -377,6 +448,7 @@ function handleDashboardSelectionClick(event) {
     label: target.dataset.dashboardLabel || target.textContent.trim(),
   };
   renderDashboardDrilldown();
+  focusDashboardDrilldown();
 }
 
 els.dashboardGraphModeLineage.addEventListener("click", () => {
@@ -642,7 +714,7 @@ function loadDemoState() {
   state.dbmlName = "demo_schema.dbml";
   state.dbmlFile = null;
   state.rulesFile = null;
-  state.csvFiles = demoCsvs;
+  state.csvFiles = demoCsvs.map(normalizeCsvFile);
   els.dbmlPathInput.value = "data/demo_small/schema.dbml";
   els.csvDirPathInput.value = "data/demo_small/csv";
   els.rulesPathInput.value = "data/demo_small/rules.yaml";
@@ -676,8 +748,10 @@ async function loadDbmlFile(file) {
 }
 
 async function loadCsvFiles(files) {
-  const parsed = await Promise.all(files.map(readCsvFile));
-  const existing = new Map(state.csvFiles.map((file) => [file.stem, file]));
+  const parsed = (await Promise.all(files.map(readCsvFile))).map(normalizeCsvFile);
+  const existing = new Map(
+    state.csvFiles.map(normalizeCsvFile).map((file) => [file.stem, file]),
+  );
   parsed.forEach((file) => existing.set(file.stem, file));
   state.csvFiles = [...existing.values()].sort((a, b) => a.name.localeCompare(b.name));
   autoLinkCsvs();
@@ -688,7 +762,7 @@ async function readCsvFile(file) {
   const text = await readFilePrefix(file, 64 * 1024);
   return {
     name: file.name,
-    stem: file.name.replace(/\.csv$/i, ""),
+    stem: csvStemFromName(file.name),
     size: file.size,
     columns: parseCsvHeader(text),
     sourceFile: file,
@@ -1312,7 +1386,7 @@ function generatedResultCard(title, artifactPath, body, artifacts) {
     <article class="generated-result-card">
       <div class="generated-result-heading">
         <strong>${escapeHtml(title)}</strong>
-        ${artifactUrl ? `<a href="${escapeHtml(artifactUrl)}" target="_blank" rel="noopener">${escapeHtml(artifactPath)}</a>` : `<span>${escapeHtml(artifactPath)}</span>`}
+        ${artifactUrl ? renderArtifactReference(artifactPath, artifactUrl) : `<span>${escapeHtml(artifactPath)}</span>`}
       </div>
       ${body}
     </article>
@@ -1320,6 +1394,9 @@ function generatedResultCard(title, artifactPath, body, artifacts) {
 }
 
 function renderRawArtifactLink(artifact) {
+  if (isDashboardChartArtifact(artifact.path)) {
+    return renderArtifactNavigationCard(artifact.path, artifact.url, artifact.label);
+  }
   return `
     <a class="artifact-link" href="${escapeHtml(artifact.url)}" target="_blank" rel="noopener">
       <strong>${escapeHtml(artifact.label)}</strong>
@@ -2782,10 +2859,10 @@ function renderInfluencePanel() {
 function dashboardPanel(title, artifactPath, body) {
   const artifactUrl = artifactUrlFor(artifactPath);
   return `
-    <article class="dashboard-card">
+    <article class="dashboard-card" data-dashboard-panel-path="${escapeHtml(artifactPath)}" tabindex="-1">
       <div class="dashboard-card-heading">
         <strong>${escapeHtml(title)}</strong>
-        ${artifactUrl ? `<a href="${escapeHtml(artifactUrl)}" target="_blank" rel="noopener">${escapeHtml(artifactPath)}</a>` : `<span>${escapeHtml(artifactPath)}</span>`}
+        ${artifactUrl ? renderArtifactReference(artifactPath, artifactUrl) : `<span>${escapeHtml(artifactPath)}</span>`}
       </div>
       ${body}
     </article>
@@ -2933,7 +3010,7 @@ function renderDrilldownArtifacts(artifacts) {
       ${artifacts.map((path) => {
         const url = artifactUrlFor(path);
         return url
-          ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><code>${escapeHtml(path)}</code></a>`
+          ? renderArtifactReference(path, url)
           : `<code>${escapeHtml(path)}</code>`;
       }).join("")}
     </div>
@@ -2984,10 +3061,12 @@ function renderDashboardArtifacts() {
     return;
   }
   els.dashboardArtifactLinks.innerHTML = paths.map((path) => `
-    <a class="artifact-link" href="${escapeHtml(artifactIndex.artifact_urls[path])}" target="_blank" rel="noopener">
-      <strong>${escapeHtml(artifactLabel(path))}</strong>
-      <code>${escapeHtml(path)}</code>
-    </a>
+    ${isDashboardChartArtifact(path)
+      ? renderArtifactNavigationCard(path, artifactIndex.artifact_urls[path], artifactLabel(path))
+      : `<a class="artifact-link" href="${escapeHtml(artifactIndex.artifact_urls[path])}" target="_blank" rel="noopener">
+          <strong>${escapeHtml(artifactLabel(path))}</strong>
+          <code>${escapeHtml(path)}</code>
+        </a>`}
   `).join("");
 }
 
@@ -3029,6 +3108,60 @@ function artifactUrlFor(path) {
     .split("/")
     .map((part) => encodeURIComponent(part))
     .join("/")}`;
+}
+
+function isDashboardChartArtifact(path) {
+  return Object.values(dashboardChartPaths).includes(path);
+}
+
+function renderArtifactReference(path, url) {
+  if (!isDashboardChartArtifact(path)) {
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><code>${escapeHtml(path)}</code></a>`;
+  }
+  return `
+    <span class="artifact-reference">
+      <button class="artifact-focus-button" type="button" data-artifact-action="focus-dashboard-artifact" data-artifact-path="${escapeHtml(path)}">
+        <code>${escapeHtml(path)}</code>
+        <span>View chart</span>
+      </button>
+      <a class="artifact-json-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">JSON</a>
+    </span>
+  `;
+}
+
+function renderArtifactNavigationCard(path, url, label) {
+  return `
+    <div class="artifact-link-stack">
+      <button class="artifact-link artifact-action-link" type="button" data-artifact-action="focus-dashboard-artifact" data-artifact-path="${escapeHtml(path)}">
+        <strong>${escapeHtml(label || artifactLabel(path))}</strong>
+        <code>${escapeHtml(path)}</code>
+        <span>View chart</span>
+      </button>
+      <a class="artifact-json-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">Open JSON</a>
+    </div>
+  `;
+}
+
+function focusDashboardArtifact(artifactPath) {
+  if (!artifactPath) {
+    return false;
+  }
+  const panel = [...els.dashboardPanelGrid.querySelectorAll("[data-dashboard-panel-path]")]
+    .find((item) => item.dataset.dashboardPanelPath === artifactPath);
+  if (!panel) {
+    return false;
+  }
+  panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  panel.focus({ preventScroll: true });
+  renderDashboardMessage(`${artifactLabel(artifactPath)} selected in Dashboard.`, "success");
+  return true;
+}
+
+function focusDashboardDrilldown() {
+  requestAnimationFrame(() => {
+    els.dashboardDrilldown.scrollIntoView({ behavior: "smooth", block: "start" });
+    els.dashboardDrilldown.focus({ preventScroll: true });
+  });
 }
 
 function artifactLabel(path) {
