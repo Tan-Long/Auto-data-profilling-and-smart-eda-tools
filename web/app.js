@@ -524,6 +524,10 @@ els.dashboardArtifactLinks.addEventListener("click", (event) => {
 
 els.dashboardDrilldown.addEventListener("click", (event) => {
   handleArtifactNavigationClick(event);
+  if (event.defaultPrevented) {
+    return;
+  }
+  handleDrilldownFilterClick(event);
 });
 
 els.artifactPreview.addEventListener("click", (event) => {
@@ -569,6 +573,15 @@ function handleDashboardSelectionClick(event) {
   };
   renderDashboardDrilldown();
   focusDashboardDrilldown();
+}
+
+function handleDrilldownFilterClick(event) {
+  const target = event.target.closest("[data-drilldown-severity]");
+  if (!target) {
+    return;
+  }
+  event.preventDefault();
+  setDrilldownSeverityFilter(target.dataset.drilldownSeverity || "all");
 }
 
 els.dashboardGraphModeLineage.addEventListener("click", () => {
@@ -3218,19 +3231,74 @@ function renderDashboardDrilldown() {
       <div><span>${uniqueSorted(issues.map((issue) => issue.table).filter(Boolean)).length}</span><p>tables</p></div>
       <div><span>${integerText(sum(issues.map((issue) => Number(issue.bad_count || 0))))}</span><p>bad rows</p></div>
     </div>
+    ${renderDrilldownSeverityFilters(selection)}
     ${renderTableAssessmentDetails(selection)}
     ${renderIssueRows(issues)}
     ${renderDrilldownArtifacts(artifacts)}
   `;
 }
 
-function dashboardIssuesForSelection(selection) {
-  const issues = getFilteredDashboardIssues();
+function renderDrilldownSeverityFilters(selection) {
+  const baseSelection = selection?.kind === "severity"
+    ? { kind: "overview", value: "", label: "Filtered issues" }
+    : selection;
+  const baseIssues = dashboardIssuesForSelection(baseSelection, {
+    ignoreSeverityFilter: true,
+    ignoreSelectionSeverity: true,
+  });
+  const counts = countBy(baseIssues, (issue) => issue.severity || "unknown");
+  const activeSeverity = selection?.kind === "severity"
+    ? selection.value
+    : state.dashboardFilters.severity;
+  const chips = [
+    { value: "all", label: "All", count: baseIssues.length },
+    ...severityOrder.map((severity) => ({
+      value: severity,
+      label: severity,
+      count: counts.get(severity) || 0,
+    })),
+  ];
+  return `
+    <div class="drilldown-severity-filter" aria-label="Drilldown severity filter">
+      <span>Severity filter</span>
+      <div class="drilldown-severity-chips">
+        ${chips.map((chip) => `
+          <button
+            class="drilldown-severity-chip ${chip.value === activeSeverity ? "active" : ""}"
+            type="button"
+            data-drilldown-severity="${escapeHtml(chip.value)}"
+            aria-pressed="${chip.value === activeSeverity ? "true" : "false"}"
+          >
+            <strong>${escapeHtml(chip.label)}</strong>
+            <small>${integerText(chip.count)}</small>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function setDrilldownSeverityFilter(severity) {
+  const normalizedSeverity = severityOrder.includes(severity) ? severity : "all";
+  state.dashboardFilters.severity = normalizedSeverity;
+  if (state.dashboardSelection?.kind === "severity") {
+    state.dashboardSelection = normalizedSeverity === "all"
+      ? { kind: "overview", value: "", label: "Filtered issues" }
+      : { kind: "severity", value: normalizedSeverity, label: normalizedSeverity };
+  }
+  renderDashboard();
+  focusDashboardDrilldown();
+}
+
+function dashboardIssuesForSelection(selection, options = {}) {
+  const issues = getFilteredDashboardIssues({ ignoreSeverityFilter: options.ignoreSeverityFilter });
   if (!selection || selection.kind === "overview" || selection.kind === "verdict") {
     return issues;
   }
   if (selection.kind === "severity") {
-    return issues.filter((issue) => issue.severity === selection.value);
+    return options.ignoreSelectionSeverity
+      ? issues
+      : issues.filter((issue) => issue.severity === selection.value);
   }
   if (selection.kind === "issue_type") {
     return issues.filter((issue) => issue.issue_type === selection.value);
@@ -3421,11 +3489,11 @@ function getDashboardTableAssessments() {
   return Array.isArray(artifact?.assessments) ? artifact.assessments : [];
 }
 
-function getFilteredDashboardIssues() {
+function getFilteredDashboardIssues(options = {}) {
   return getDashboardIssues().filter((issue) => {
     const filters = state.dashboardFilters;
     return (
-      (filters.severity === "all" || issue.severity === filters.severity) &&
+      (options.ignoreSeverityFilter || filters.severity === "all" || issue.severity === filters.severity) &&
       (filters.issueType === "all" || issue.issue_type === filters.issueType) &&
       (filters.table === "all" || issue.table === filters.table)
     );

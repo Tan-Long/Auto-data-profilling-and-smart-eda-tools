@@ -132,6 +132,10 @@ Data style: monospace with tabular numbers.
 - Issue evidence must point below table level. Each issue row shows table,
   affected columns, bad-row count, sample artifact path, and opens a row
   evidence preview that labels sample rows and highlights affected cells.
+- Drilldown severity filtering uses compact soft chips for All/P0/P1/P2/P3
+  with local counts, `aria-pressed` state, and synchronization with the global
+  dashboard severity select. The chip row belongs inside the drilldown evidence
+  panel so reviewers can narrow issues without leaving the current context.
 
 ### Runtime Stages
 
@@ -212,3 +216,4 @@ Data style: monospace with tabular numbers.
 | Highlight issue sample rows and columns | Quality issues should be inspectable at table, row-sample, and affected-column level without forcing users to interpret raw CSV files | 2026-06-17 |
 | Show runtime stage results inline | After each pipeline stage, reviewers should see the concrete counts and artifacts produced without expanding a hidden panel or opening raw runtime JSON | 2026-06-17 |
 | Clear ERD selection on outside intent | Diagram focus should behave like normal evidence selection: click table to inspect, click blank/outside or Escape to return to overview | 2026-06-17 |
+| Add soft drilldown severity chips | Drilldown should support quick P0/P1/P2/P3 narrowing in-place instead of forcing reviewers back to the global filter row or severity chart | 2026-06-17 |

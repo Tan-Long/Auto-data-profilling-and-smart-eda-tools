@@ -2006,6 +2006,65 @@ h3 {
   text-transform: uppercase;
 }
 
+.drilldown-severity-filter {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.drilldown-severity-filter > span {
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.drilldown-severity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.drilldown-severity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  cursor: pointer;
+}
+
+.drilldown-severity-chip:hover,
+.drilldown-severity-chip:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.drilldown-severity-chip.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-panel));
+  color: var(--accent-strong);
+}
+
+.drilldown-severity-chip strong,
+.drilldown-severity-chip small {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.drilldown-severity-chip small {
+  color: var(--foreground-tertiary);
+}
+
 .drilldown-artifacts {
   padding-top: 10px;
   border-top: 1px solid var(--border-subtle);

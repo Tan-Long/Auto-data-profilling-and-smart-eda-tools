@@ -32,6 +32,10 @@ Reference tables, columns, issue ids, issue types, severities, and verdicts only
 Reference table business-impact categories only when they appear in table_assessments.json for that table.
 Do not use causal wording such as causes, caused, drives, leads to, due to, because, or root cause.
 Use association-only language for influence findings.
+Read guardrail_contract before writing. Use only exact strings listed in guardrail_contract.allowed_code_refs when using backticks.
+Do not mention business-impact terms outside guardrail_contract.allowed_business_impact_categories or guardrail_contract.allowed_business_impact_labels.
+Start from deterministic_draft when it is present. You may improve wording only; do not add, remove, or change claims, numbers, references, or business-impact terms.
+If you are uncertain whether a claim is supported, return deterministic_draft unchanged.
 Return concise Markdown with practical findings and next actions.
 """
 
@@ -115,14 +119,7 @@ class OpenAINarrativeProvider:
         payload = {
             "model": self.model,
             "instructions": OPENAI_NARRATIVE_INSTRUCTIONS,
-            "input": json.dumps(
-                {
-                    "task": "Generate the guarded L4 Senior Data Scientist narrative.",
-                    "context": context,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
+            "input": json.dumps(_openai_request_input(context), ensure_ascii=False, sort_keys=True),
             "max_output_tokens": self.max_output_tokens,
         }
         headers = {
@@ -136,6 +133,108 @@ class OpenAINarrativeProvider:
             self.timeout_seconds,
         )
         return _extract_openai_text(response)
+
+
+def _openai_request_input(context: dict[str, Any]) -> dict[str, Any]:
+    request_input: dict[str, Any] = {
+        "task": "Generate the guarded L4 Senior Data Scientist narrative.",
+        "context": context,
+        "guardrail_contract": _prompt_guardrail_contract(context),
+    }
+    deterministic_draft = _safe_deterministic_draft(context)
+    if deterministic_draft:
+        request_input["deterministic_draft"] = deterministic_draft
+    return request_input
+
+
+def _safe_deterministic_draft(context: dict[str, Any]) -> str:
+    try:
+        return deterministic_l4_narrative(context)
+    except (KeyError, TypeError, IndexError):
+        return ""
+
+
+def _prompt_guardrail_contract(context: dict[str, Any]) -> dict[str, Any]:
+    refs: set[str] = {"association", "association-only"}
+    business_categories: set[str] = set()
+    business_labels: set[str] = set()
+    table_business_impacts: dict[str, dict[str, str]] = {}
+
+    for table in context.get("tables") or []:
+        table_name = table.get("table")
+        if not isinstance(table_name, str) or not table_name:
+            continue
+        refs.add(table_name)
+        for column in table.get("columns") or []:
+            if isinstance(column, str) and column:
+                refs.add(column)
+                refs.add(f"{table_name}.{column}")
+
+    for issue in context.get("top_issues") or []:
+        table_name = issue.get("table")
+        if isinstance(table_name, str) and table_name:
+            refs.add(table_name)
+        for key in ("issue_id", "issue_type", "severity"):
+            value = issue.get(key)
+            if isinstance(value, str) and value:
+                refs.add(value)
+        for column in issue.get("columns") or []:
+            if isinstance(column, str) and column:
+                refs.add(column)
+                if isinstance(table_name, str) and table_name:
+                    refs.add(f"{table_name}.{column}")
+
+    for row in context.get("table_assessments") or []:
+        table_name = row.get("table")
+        if isinstance(table_name, str) and table_name:
+            refs.add(table_name)
+        for key in ("role", "readiness"):
+            value = row.get(key)
+            if isinstance(value, str) and value:
+                refs.add(value)
+        impact = row.get("business_impact") or {}
+        category = impact.get("category")
+        label = impact.get("label")
+        if isinstance(category, str) and category:
+            refs.add(category)
+            business_categories.add(category)
+        if isinstance(label, str) and label:
+            refs.add(label)
+            business_labels.add(label)
+        if isinstance(table_name, str) and table_name:
+            table_business_impacts[table_name] = {
+                "category": category if isinstance(category, str) else "",
+                "label": label if isinstance(label, str) else "",
+            }
+
+    influence = context.get("influence") or {}
+    for key in ("target", "method"):
+        value = influence.get(key)
+        if isinstance(value, str) and value:
+            refs.add(value)
+    for feature in influence.get("top_features") or []:
+        for key in ("feature", "method", "direction"):
+            value = feature.get(key)
+            if isinstance(value, str) and value:
+                refs.add(value)
+
+    verdict = (context.get("summary") or {}).get("verdict")
+    if isinstance(verdict, str) and verdict:
+        refs.add(verdict)
+
+    return {
+        "allowed_code_refs": sorted(refs),
+        "allowed_business_impact_categories": sorted(business_categories),
+        "allowed_business_impact_labels": sorted(business_labels),
+        "allowed_table_business_impacts": table_business_impacts,
+        "disallowed_business_impact_examples": sorted(UNSUPPORTED_BUSINESS_IMPACT_TERMS),
+        "rules": [
+            "Use deterministic_draft as the baseline when present.",
+            "Do not introduce numeric claims outside supplied structured evidence.",
+            "Do not introduce table, column, issue, method, or business-impact references outside this contract.",
+            "Do not mention category values or sample-row values unless they are explicitly listed in allowed_code_refs.",
+        ],
+    }
 
 
 def generate_l4_narrative(
@@ -592,6 +691,9 @@ def _collect_refs(value: Any, refs: dict[str, set[str]], path: str = "$") -> Non
                 if isinstance(column, str):
                     refs.setdefault(column, set()).add(path)
                     refs.setdefault(f"{table_name}.{column}", set()).add(path)
+        bounded_profile_value = value.get("value")
+        if ".top_10_values" in path and isinstance(bounded_profile_value, str) and bounded_profile_value:
+            refs.setdefault(bounded_profile_value, set()).add(f"{path}.value")
         for key in (
             "issue_id",
             "issue_type",
@@ -600,6 +702,8 @@ def _collect_refs(value: Any, refs: dict[str, set[str]], path: str = "$") -> Non
             "status",
             "target",
             "feature",
+            "method",
+            "direction",
             "role",
             "readiness",
             "category",

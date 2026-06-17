@@ -144,6 +144,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderDashboardSummary",
         "renderTableImpactSection",
         "renderDashboardDrilldown",
+        "renderDrilldownSeverityFilters",
+        "setDrilldownSeverityFilter",
+        "data-drilldown-severity",
         "previewIssueSample",
         "renderIssueSampleButton",
         "renderIssueSampleContext",
@@ -228,7 +231,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
 
 
 def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
-    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    root = Path(__file__).resolve().parents[1] / "web"
+    js = (root / "app.js").read_text()
+    css = (root / "styles.css").read_text()
     assert 'fetch("/api/health"' in js
     assert 'fetch("/api/jobs"' in js
     assert 'fetch("/api/path-jobs"' in js
@@ -254,8 +259,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Review chart" in js
     assert "Likely cause:" in js
     assert "Suggested fix:" in js
+    assert "Severity filter" in js
     assert "FK issue means the declared relationship exists" in js
     assert "data-quality evidence" in js
+    assert ".drilldown-severity-chip.active" in css
     assert 'target="_blank"' not in js
 
 

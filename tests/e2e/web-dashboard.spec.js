@@ -347,6 +347,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toBeFocused();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");
   await expect(page.locator("#dashboardDrilldown")).toContainText("matching issues");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Severity filter");
+  await expect(page.locator('#dashboardDrilldown [data-drilldown-severity="P1"]')).toHaveAttribute("aria-pressed", "true");
+  await page.locator('#dashboardDrilldown [data-drilldown-severity="P0"]').click();
+  await expect(page.locator("#dashboardSeverityFilter")).toHaveValue("P0");
+  await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P0");
+  await expect(page.locator('#dashboardDrilldown [data-drilldown-severity="P0"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("PRIMARY_KEY_NULL");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Table");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Columns");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Preview row evidence");

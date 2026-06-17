@@ -285,6 +285,10 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
         "`orders` has financial reporting business impact.",
         evidence,
     )
+    relationship_integrity = validate_narrative(
+        "`orders` has relationship integrity business impact.",
+        evidence,
+    )
 
     assert passed["status"] == "passed"
     assert mismatched["status"] == "failed"
@@ -297,6 +301,65 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
         violation["type"] == "business_impact"
         for violation in unsupported["violations"]
     )
+    assert relationship_integrity["status"] == "failed"
+    assert any(
+        violation["type"] == "business_impact"
+        for violation in relationship_integrity["violations"]
+    )
+
+
+def test_guardrail_allows_structured_influence_methods_and_bounded_profile_values():
+    artifacts = {
+        "profile_summary": {
+            "tables": {
+                "orders": {
+                    "row_count": 5,
+                    "column_count": 2,
+                    "columns": {
+                        "order_id": {},
+                        "order_status": {
+                            "top_10_values": [
+                                {"value": "delivered", "count": 4},
+                                {"value": "created", "count": 1},
+                            ]
+                        },
+                    },
+                }
+            }
+        },
+        "issues": [],
+        "schema_evaluation": {"summary": {"mapped_table_count": 1}},
+        "relationship_graph": {"summary": {"edge_count": 0}},
+        "dataset_verdict": {
+            "verdict": "READY",
+            "risk_score": 0,
+            "issue_counts": {"by_severity": {}, "by_type": {}},
+        },
+        "table_assessments": {"assessments": []},
+        "chart_specs": {},
+        "influence": {
+            "target": "orders.order_status",
+            "method": "association_not_causation",
+            "row_count": 5,
+            "top_features": [
+                {
+                    "feature": "order_status",
+                    "score": 1.25,
+                    "direction": "category_effect",
+                    "method": "target_mean_by_category",
+                }
+            ],
+        },
+    }
+    context = build_narrative_context(artifacts)
+    evidence = build_guardrail_evidence(artifacts, context)
+
+    result = validate_narrative(
+        "`target_mean_by_category` is listed as an influence method, and `delivered` is a bounded profile value.",
+        evidence,
+    )
+
+    assert result["status"] == "passed"
 
 
 def test_openai_provider_uses_responses_api_without_raw_csv_payload():
@@ -342,9 +405,21 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
             "sample_rows_included": False,
             "sample_paths_may_be_referenced": True,
         },
-        "summary": {"table_count": 1, "row_count": 2},
+        "summary": {
+            "table_count": 1,
+            "column_count": 1,
+            "row_count": 2,
+            "issue_count": 0,
+            "risk_score": 0,
+            "verdict": "READY",
+            "severity_counts": {},
+            "issue_type_counts": {},
+        },
         "tables": [{"table": "orders", "columns": ["order_id"], "row_count": 2}],
         "top_issues": [],
+        "dataset_verdict": {"recommended_next_actions": []},
+        "table_assessments": [],
+        "influence": {"target": "orders.order_id", "top_features": []},
     }
 
     narrative = provider.generate(context)
@@ -359,7 +434,12 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
     assert call["payload"]["model"] == "gpt-test"
     assert call["payload"]["max_output_tokens"] == 345
     assert "raw CSV data" in call["payload"]["instructions"]
-    request_context = json.loads(call["payload"]["input"])["context"]
+    assert "deterministic_draft" in call["payload"]["instructions"]
+    request_payload = json.loads(call["payload"]["input"])
+    request_context = request_payload["context"]
+    assert "deterministic_draft" in request_payload
+    assert "guardrail_contract" in request_payload
+    assert "orders.order_id" in request_payload["guardrail_contract"]["allowed_code_refs"]
     assert request_context["privacy_contract"]["raw_csv_included"] is False
     assert request_context["privacy_contract"]["sample_rows_included"] is False
     assert ".csv" not in call["payload"]["input"]
