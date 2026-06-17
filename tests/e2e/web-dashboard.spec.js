@@ -25,7 +25,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramFitButton")).toBeVisible();
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramColumnsToggle")).toContainText("All columns");
+  await expect(page.locator("#diagramSvg")).toContainText("order_status");
   await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="order_items"]')).toHaveCount(1);
   await page.locator('#diagramSvg [data-diagram-table="orders"]').click();
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
@@ -43,8 +45,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(mapping).not.toContainText("missing CSV");
   await expect(mapping).not.toContainText("extra CSV");
   await page.locator("#diagramColumnsToggle").click();
-  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#diagramSvg")).toContainText("order_status");
+  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramColumnsToggle")).toContainText("Key columns only");
+  await expect(page.locator("#diagramSvg")).not.toContainText("order_status");
   await page.locator("#diagramResetSelection").click();
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
   await expect(page.locator("#dbdiagramLink")).toHaveAttribute(
@@ -224,6 +227,16 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardArtifactLinks")).toContainText(
     "lineage_graph.json",
   );
+  await page
+    .locator('#dashboardArtifactLinks [data-artifact-path="relationship_graph.json"]')
+    .first()
+    .click();
+  await expect(page.locator("#artifactPreview")).toBeFocused();
+  await expect(page.locator("#artifactPreviewMeta")).toContainText("relationship_graph.json");
+  await expect(page.locator("#artifactPreview")).toContainText("Relationship review");
+  await expect(page.locator("#artifactPreview")).toContainText("Relationship health");
+  await expect(page.locator("#artifactPreview")).toContainText("Tables in relationship graph");
+  await expect(page.locator("#artifactPreview")).not.toContainText("Object(9)");
   const stageListBox = await page.locator("#stageList").boundingBox();
   const generatedResultsBox = await page.locator("#artifactList").boundingBox();
   const drilldownBox = await page.locator("#dashboardDrilldown").boundingBox();

@@ -27,7 +27,7 @@ const state = {
   dashboardGraphSelection: null,
   diagramSelection: null,
   diagramExpanded: false,
-  diagramShowNonKey: false,
+  diagramShowNonKey: true,
   diagramFit: true,
   tables: [],
   relationships: [],
@@ -3207,7 +3207,7 @@ async function previewArtifact(artifactPath, artifactUrl = "") {
   try {
     const cached = state.dashboardArtifacts[artifactPath];
     if (kind === "json" && cached !== undefined) {
-      els.artifactPreview.innerHTML = renderJsonArtifactPreview(cached);
+      els.artifactPreview.innerHTML = renderJsonArtifactPreview(cached, artifactPath);
       return;
     }
     const response = await fetch(url);
@@ -3268,7 +3268,7 @@ function renderEmbeddedArtifactPreview(path, url, kind) {
 function renderArtifactPreviewContent(path, text, kind) {
   if (kind === "json") {
     try {
-      return renderJsonArtifactPreview(JSON.parse(text));
+      return renderJsonArtifactPreview(JSON.parse(text), path);
     } catch {
       return renderTextArtifactPreview(text, "Invalid JSON shown as text");
     }
@@ -3282,7 +3282,625 @@ function renderArtifactPreviewContent(path, text, kind) {
   return renderTextArtifactPreview(text, artifactLabel(path));
 }
 
-function renderJsonArtifactPreview(value) {
+function renderJsonArtifactPreview(value, path = "") {
+  const artifactPath = String(path || value?.artifact || "json artifact");
+  if (artifactPath === "relationship_graph.json") {
+    return renderRelationshipGraphArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "lineage_graph.json") {
+    return renderLineageGraphArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "dataset_verdict.json") {
+    return renderDatasetVerdictArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "table_assessments.json") {
+    return renderTableAssessmentsArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "issues.json" || Array.isArray(value)) {
+    return renderIssuesArtifactReview(artifactPath, Array.isArray(value) ? value : []);
+  }
+  if (artifactPath === "schema_evaluation.json") {
+    return renderSchemaEvaluationArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "schema_parse_report.json") {
+    return renderSchemaParseArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "profile_summary.json") {
+    return renderProfileSummaryArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "run_summary.json") {
+    return renderRunSummaryArtifactReview(artifactPath, value);
+  }
+  if (artifactPath === "influence.json") {
+    return renderInfluenceArtifactReview(artifactPath, value);
+  }
+  if (artifactPath.startsWith("charts/") || value?.artifact === "chart_spec") {
+    return renderChartSpecArtifactReview(artifactPath, value);
+  }
+  return renderGenericJsonArtifactReview(artifactPath, value);
+}
+
+function renderRelationshipGraphArtifactReview(path, artifact) {
+  const summary = objectOrEmpty(artifact?.summary);
+  const nodes = Array.isArray(artifact?.nodes) ? artifact.nodes : [];
+  const edges = Array.isArray(artifact?.edges) ? artifact.edges : [];
+  const issueEdges = edges
+    .slice()
+    .sort((a, b) => relationshipStatusOrder(a.status) - relationshipStatusOrder(b.status))
+    .slice(0, 8);
+  return artifactReviewShell(
+    "Relationship review",
+    path,
+    "FK health, cardinality, and table-level relationship evidence.",
+    `
+      ${artifactReviewKpis([
+        ["tables", summary.node_count ?? nodes.length],
+        ["relationships", summary.edge_count ?? edges.length],
+        ["invalid", summary.status_counts?.invalid ?? edges.filter((edge) => edge.status === "invalid").length],
+        ["junctions", summary.junction_table_count ?? 0],
+        ["many-to-many", summary.many_to_many_relationship_count ?? 0],
+      ])}
+      ${artifactReviewSection("Relationship health", issueEdges.length ? `
+        <div class="artifact-review-rows">
+          ${issueEdges.map((edge) => {
+            const metrics = objectOrEmpty(edge.metrics);
+            const evidence = Array.isArray(edge.evidence_links) ? edge.evidence_links : [];
+            const sourceColumns = arrayOfStrings(edge.source_columns).join(", ") || edge.source_column || "";
+            const targetColumns = arrayOfStrings(edge.target_columns).join(", ") || edge.target_column || "";
+            return `
+              <article class="artifact-review-row">
+                <div class="artifact-review-row-header">
+                  <strong><code>${escapeHtml(edge.source_table)}.${escapeHtml(sourceColumns)}</code> -> <code>${escapeHtml(edge.target_table)}.${escapeHtml(targetColumns)}</code></strong>
+                  ${artifactReviewPill(edge.status || "unknown")}
+                </div>
+                <p>${escapeHtml(edge.status_reason || edge.cardinality || edge.declared_cardinality || "Relationship evidence")}</p>
+                <div class="artifact-review-meta">
+                  <span>${escapeHtml(edge.cardinality || edge.declared_cardinality || "unknown cardinality")}</span>
+                  <span>${metrics.join_coverage === undefined ? "join coverage n/a" : `${percentText(metrics.join_coverage)} join coverage`}</span>
+                  <span>${integerText(metrics.orphan_count)} orphans</span>
+                  <span>${integerText(metrics.parent_duplicate_count)} parent duplicates</span>
+                  <span>${integerText(metrics.child_fk_null_count)} FK nulls</span>
+                </div>
+                ${evidence.length ? `<div class="artifact-review-chip-list">${evidence.slice(0, 4).map((item) => `<span>${escapeHtml(item.issue_type || item.issue_id || "issue")} · ${escapeHtml(item.severity || "")}</span>`).join("")}</div>` : ""}
+              </article>
+            `;
+          }).join("")}
+        </div>
+      ` : `<p class="muted">No relationships were declared in this artifact.</p>`)}
+      ${artifactReviewSection("Tables in relationship graph", nodes.length ? `
+        <div class="artifact-review-rows compact">
+          ${nodes.slice(0, 10).map((node) => `
+            <article class="artifact-review-row">
+              <div class="artifact-review-row-header">
+                <strong><code>${escapeHtml(node.table)}</code></strong>
+                ${artifactReviewPill(node.status || "mapped")}
+              </div>
+              <div class="artifact-review-meta">
+                <span>${integerText(node.row_count)} rows</span>
+                <span>${integerText(node.column_count)} columns</span>
+                <span>PK ${escapeHtml(arrayOfStrings(node.primary_key).join(", ") || "none")}</span>
+                <span>${integerText(Array.isArray(node.foreign_keys) ? node.foreign_keys.length : 0)} FK</span>
+                <span>${integerText(Array.isArray(node.referenced_by) ? node.referenced_by.length : 0)} inbound</span>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+        ${nodes.length > 10 ? `<p class="muted">Showing 10 of ${integerText(nodes.length)} tables.</p>` : ""}
+      ` : `<p class="muted">No table nodes were found.</p>`)}
+    `,
+  );
+}
+
+function renderLineageGraphArtifactReview(path, artifact) {
+  const summary = objectOrEmpty(artifact?.summary);
+  const nodes = Array.isArray(artifact?.nodes) ? artifact.nodes : [];
+  const edges = Array.isArray(artifact?.edges) ? artifact.edges : [];
+  const nodeTypes = [...countBy(nodes, (node) => node.type || "unknown").entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  return artifactReviewShell(
+    "Lineage review",
+    path,
+    "Source, schema, table, runtime, and artifact dependency evidence.",
+    `
+      ${artifactReviewKpis([
+        ["sources", summary.source_system_count],
+        ["tables", summary.table_count],
+        ["columns", summary.column_count],
+        ["stages", summary.stage_count],
+        ["artifacts", summary.artifact_count],
+        ["edges", summary.edge_count ?? edges.length],
+      ])}
+      ${artifactReviewSection("Node inventory", `
+        <div class="artifact-review-chip-list">
+          ${nodeTypes.map(([type, count]) => `<span>${escapeHtml(type)} · ${integerText(count)}</span>`).join("") || "<span>No nodes</span>"}
+        </div>
+      `)}
+      ${artifactReviewSection("Dependency examples", edges.length ? `
+        <div class="artifact-review-rows compact">
+          ${edges.slice(0, 8).map((edge) => `
+            <article class="artifact-review-row">
+              <div class="artifact-review-row-header">
+                <strong><code>${escapeHtml(truncateMiddle(edge.source, 42))}</code> -> <code>${escapeHtml(truncateMiddle(edge.target, 42))}</code></strong>
+                ${artifactReviewPill(edge.type || "edge")}
+              </div>
+              <div class="artifact-review-meta">
+                ${arrayOfStrings(edge.evidence).slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("") || "<span>no evidence links</span>"}
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No lineage edges were found.</p>`)}
+    `,
+  );
+}
+
+function renderDatasetVerdictArtifactReview(path, artifact) {
+  const counts = objectOrEmpty(artifact?.issue_counts);
+  const bySeverity = objectOrEmpty(counts.by_severity);
+  const blockers = Array.isArray(artifact?.top_blockers) ? artifact.top_blockers : [];
+  return artifactReviewShell(
+    "Dataset verdict review",
+    path,
+    "Release readiness, blocker issues, and recommended next actions.",
+    `
+      ${artifactReviewKpis([
+        ["verdict", artifact?.verdict || "unknown"],
+        ["risk", artifact?.risk_score === undefined ? "--" : `${integerText(artifact.risk_score)}/100`],
+        ["issues", counts.total ?? 0],
+        ["P0", bySeverity.P0 ?? 0],
+        ["P1", bySeverity.P1 ?? 0],
+      ])}
+      ${artifactReviewSection("Top blockers", blockers.length ? `
+        <div class="artifact-review-rows">
+          ${blockers.slice(0, 8).map((issue) => renderIssueReviewRow(issue)).join("")}
+        </div>
+      ` : `<p class="muted">No top blockers were listed.</p>`)}
+      ${artifactReviewSection("Next actions", arrayOfStrings(artifact?.recommended_next_actions).length ? `
+        <ul class="artifact-review-list">${arrayOfStrings(artifact.recommended_next_actions).slice(0, 6).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      ` : `<p class="muted">No recommended actions were listed.</p>`)}
+    `,
+  );
+}
+
+function renderTableAssessmentsArtifactReview(path, artifact) {
+  const summary = objectOrEmpty(artifact?.summary);
+  const assessments = Array.isArray(artifact?.assessments) ? artifact.assessments : [];
+  const sorted = assessments
+    .slice()
+    .sort((a, b) => (
+      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
+      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      String(a.table || "").localeCompare(String(b.table || ""))
+    ));
+  return artifactReviewShell(
+    "Table impact review",
+    path,
+    "Per-table readiness, health score, business impact, and relationship risk.",
+    `
+      ${artifactReviewKpis([
+        ["tables", summary.table_count ?? assessments.length],
+        ["avg health", summary.average_health_score ?? "--"],
+        ["not ready", summary.readiness_counts?.NOT_READY ?? sorted.filter((item) => item.readiness === "NOT_READY").length],
+        ["business areas", Object.keys(objectOrEmpty(summary.business_impact_counts)).length],
+      ])}
+      ${artifactReviewSection("Highest-risk tables", sorted.length ? `
+        <div class="artifact-review-rows">
+          ${sorted.slice(0, 8).map((assessment) => {
+            const impact = objectOrEmpty(assessment.business_impact);
+            const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
+            return `
+              <article class="artifact-review-row">
+                <div class="artifact-review-row-header">
+                  <strong><code>${escapeHtml(assessment.table)}</code></strong>
+                  ${artifactReviewPill(assessment.readiness || "unknown")}
+                </div>
+                <p>${escapeHtml(impact.label || "General analytics")} · ${escapeHtml(assessment.role || "unknown role")}</p>
+                <div class="artifact-review-meta">
+                  <span>${integerText(assessment.health_score)} health</span>
+                  <span>${integerText(assessment.row_count)} rows</span>
+                  <span>${integerText(assessment.column_count)} columns</span>
+                  <span>${integerText(risks.length)} relationship risks</span>
+                  <span>${integerText(arrayOfStrings(assessment.affected_columns).length)} affected columns</span>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      ` : `<p class="muted">No table assessments were found.</p>`)}
+    `,
+  );
+}
+
+function renderIssuesArtifactReview(path, issues) {
+  const bySeverity = countBy(issues, (issue) => issue.severity || "unknown");
+  const byType = [...countBy(issues, (issue) => issue.issue_type || "unknown").entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const badRows = sum(issues.map((issue) => Number(issue.bad_count || 0)));
+  return artifactReviewShell(
+    "Issue review",
+    path,
+    "Quality findings grouped by severity, table, and sample evidence.",
+    `
+      ${artifactReviewKpis([
+        ["issues", issues.length],
+        ["bad rows", badRows],
+        ["P0", bySeverity.get("P0") || 0],
+        ["P1", bySeverity.get("P1") || 0],
+        ["types", byType.length],
+      ])}
+      ${artifactReviewSection("Issue type mix", `
+        <div class="artifact-review-chip-list">
+          ${byType.slice(0, 10).map(([type, count]) => `<span>${escapeHtml(type)} · ${integerText(count)}</span>`).join("") || "<span>No issue types</span>"}
+        </div>
+      `)}
+      ${artifactReviewSection("Top issues", issues.length ? `
+        <div class="artifact-review-rows">
+          ${issues.slice(0, 10).map((issue) => renderIssueReviewRow(issue)).join("")}
+        </div>
+      ` : `<p class="muted">No issues were found.</p>`)}
+    `,
+  );
+}
+
+function renderSchemaEvaluationArtifactReview(path, artifact) {
+  const summary = objectOrEmpty(artifact?.summary);
+  const tables = Array.isArray(artifact?.tables) ? artifact.tables : [];
+  const relationships = Array.isArray(artifact?.relationships) ? artifact.relationships : [];
+  return artifactReviewShell(
+    "Schema evaluation review",
+    path,
+    "DBML-to-CSV mapping, schema issues, and declared relationships.",
+    `
+      ${artifactReviewKpis([
+        ["DBML tables", summary.dbml_table_count ?? tables.length],
+        ["mapped", summary.mapped_table_count ?? tables.filter((table) => table.status === "mapped").length],
+        ["missing", summary.missing_table_count ?? 0],
+        ["extra CSV", summary.extra_csv_count ?? 0],
+        ["schema issues", summary.schema_issue_count ?? 0],
+        ["relationships", relationships.length],
+      ])}
+      ${artifactReviewSection("Table mapping", tables.length ? `
+        <div class="artifact-review-rows compact">
+          ${tables.slice(0, 10).map((table) => `
+            <article class="artifact-review-row">
+              <div class="artifact-review-row-header">
+                <strong><code>${escapeHtml(table.table)}</code></strong>
+                ${artifactReviewPill(table.status || "unknown")}
+              </div>
+              <div class="artifact-review-meta">
+                <span>${integerText(table.dbml_column_count)} DBML columns</span>
+                <span>${integerText(table.csv_column_count)} CSV columns</span>
+                <span>${integerText(Array.isArray(table.schema_issues) ? table.schema_issues.length : 0)} schema issues</span>
+                <span>PK ${escapeHtml(arrayOfStrings(table.primary_key).join(", ") || "none")}</span>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No table mapping rows were found.</p>`)}
+    `,
+  );
+}
+
+function renderSchemaParseArtifactReview(path, artifact) {
+  const counts = objectOrEmpty(artifact?.counts);
+  const diagnostics = Array.isArray(artifact?.diagnostics) ? artifact.diagnostics : [];
+  const unsupported = Array.isArray(artifact?.unsupported_constructs) ? artifact.unsupported_constructs : [];
+  return artifactReviewShell(
+    "DBML parse review",
+    path,
+    "Parser status, DBML objects, diagnostics, and unsupported syntax.",
+    `
+      ${artifactReviewKpis([
+        ["status", artifact?.status || "unknown"],
+        ["tables", counts.tables ?? 0],
+        ["columns", counts.columns ?? 0],
+        ["relationships", counts.relationships ?? 0],
+        ["warnings", counts.warnings ?? diagnostics.filter((item) => item.severity === "warning").length],
+        ["unsupported", counts.unsupported_constructs ?? unsupported.length],
+      ])}
+      ${artifactReviewSection("Diagnostics", diagnostics.length ? `
+        <div class="artifact-review-rows compact">
+          ${diagnostics.slice(0, 8).map((diagnostic) => `
+            <article class="artifact-review-row">
+              <div class="artifact-review-row-header">
+                <strong>${escapeHtml(diagnostic.message || diagnostic.code || "Diagnostic")}</strong>
+                ${artifactReviewPill(diagnostic.severity || "info")}
+              </div>
+              <div class="artifact-review-meta">
+                <span>${escapeHtml(diagnostic.location || diagnostic.line || "no location")}</span>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No DBML parser diagnostics.</p>`)}
+    `,
+  );
+}
+
+function renderProfileSummaryArtifactReview(path, artifact) {
+  const tables = artifact?.tables && typeof artifact.tables === "object" ? Object.values(artifact.tables) : [];
+  const columnCount = sum(tables.map((table) => Number(table.column_count || 0)));
+  const rowCount = sum(tables.map((table) => Number(table.row_count || 0)));
+  return artifactReviewShell(
+    "Profile summary review",
+    path,
+    "Streaming table and column profile results.",
+    `
+      ${artifactReviewKpis([
+        ["tables", tables.length],
+        ["columns", columnCount],
+        ["rows", rowCount],
+      ])}
+      ${artifactReviewSection("Tables", tables.length ? `
+        <div class="artifact-review-rows compact">
+          ${tables.slice(0, 10).map((table) => {
+            const columns = table.columns && typeof table.columns === "object" ? Object.values(table.columns) : [];
+            const missingColumns = columns.filter((column) => Number(column.null_count || 0) > 0);
+            return `
+              <article class="artifact-review-row">
+                <div class="artifact-review-row-header">
+                  <strong><code>${escapeHtml(table.table)}</code></strong>
+                  <span>${integerText(table.row_count)} rows</span>
+                </div>
+                <div class="artifact-review-meta">
+                  <span>${integerText(table.column_count)} columns</span>
+                  <span>${integerText(missingColumns.length)} columns with nulls</span>
+                  <span>${escapeHtml(formatBytes(Number(table.file_size_mb || 0) * 1024 * 1024))}</span>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      ` : `<p class="muted">No table profiles were found.</p>`)}
+    `,
+  );
+}
+
+function renderRunSummaryArtifactReview(path, artifact) {
+  const stages = Array.isArray(artifact?.stage_timings) ? artifact.stage_timings : [];
+  const artifacts = Array.isArray(artifact?.artifact_paths) ? artifact.artifact_paths : [];
+  return artifactReviewShell(
+    "Runtime review",
+    path,
+    "Pipeline status, stage timing, and generated artifact inventory.",
+    `
+      ${artifactReviewKpis([
+        ["status", artifact?.status || "unknown"],
+        ["duration", artifact?.duration_seconds === undefined ? "--" : `${Number(artifact.duration_seconds).toFixed(2)}s`],
+        ["stages", stages.length],
+        ["artifacts", artifacts.length],
+        ["failed", Array.isArray(artifact?.failed_stages) ? artifact.failed_stages.length : 0],
+      ])}
+      ${artifactReviewSection("Stages", stages.length ? `
+        <div class="artifact-review-rows compact">
+          ${stages.map((stage) => `
+            <article class="artifact-review-row">
+              <div class="artifact-review-row-header">
+                <strong>${escapeHtml(stage.display_name || stage.name)}</strong>
+                ${artifactReviewPill(stage.status || "unknown")}
+              </div>
+              <div class="artifact-review-meta">
+                <span><code>${escapeHtml(stage.name)}</code></span>
+                <span>${stage.duration_seconds === undefined ? "--" : `${Number(stage.duration_seconds).toFixed(3)}s`}</span>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No stage timings were found.</p>`)}
+    `,
+  );
+}
+
+function renderInfluenceArtifactReview(path, artifact) {
+  const features = Array.isArray(artifact?.top_features) ? artifact.top_features : [];
+  return artifactReviewShell(
+    "Influence review",
+    path,
+    "Bounded influence analysis result for the selected target.",
+    `
+      ${artifactReviewKpis([
+        ["target", artifact?.target || "unknown"],
+        ["method", artifact?.method || "unknown"],
+        ["rows", artifact?.row_count ?? 0],
+        ["features", features.length],
+      ])}
+      ${artifactReviewSection("Top features", features.length ? `
+        <div class="artifact-review-rows compact">
+          ${features.slice(0, 8).map((feature) => `
+            <article class="artifact-review-row">
+              <div class="artifact-review-row-header">
+                <strong><code>${escapeHtml(feature.feature)}</code></strong>
+                <span>${scoreText(feature.score)}</span>
+              </div>
+              <p>${escapeHtml(feature.interpretation || feature.direction || "Feature influence evidence")}</p>
+              <div class="artifact-review-meta">
+                <span>${escapeHtml(feature.direction || "direction n/a")}</span>
+                <span>${escapeHtml(feature.method || "method n/a")}</span>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No influence features were generated.</p>`)}
+    `,
+  );
+}
+
+function renderChartSpecArtifactReview(path, artifact) {
+  const data = Array.isArray(artifact?.data) ? artifact.data : [];
+  const sourceArtifacts = arrayOfStrings(artifact?.source_artifacts);
+  return artifactReviewShell(
+    artifact?.title || "Chart spec review",
+    path,
+    `${escapeHtml(artifact?.chart_type || "chart")} spec rendered by the dashboard.`,
+    `
+      ${artifactReviewKpis([
+        ["chart id", artifact?.chart_id || "unknown"],
+        ["type", artifact?.chart_type || "unknown"],
+        ["rows", data.length],
+        ["sources", sourceArtifacts.length],
+      ])}
+      ${artifactReviewSection("Chart data", data.length ? `
+        <div class="artifact-review-rows compact">
+          ${data.slice(0, 10).map((row) => {
+            const entries = Object.entries(objectOrEmpty(row)).filter(([key]) => key !== "sort_order");
+            return `
+              <article class="artifact-review-row">
+                <div class="artifact-review-meta">
+                  ${entries.map(([key, item]) => `<span><code>${escapeHtml(key)}</code> ${escapeHtml(formatReviewValue(item))}</span>`).join("")}
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      ` : `<p class="muted">This chart spec has no data rows.</p>`)}
+      ${artifactReviewSection("Source artifacts", sourceArtifacts.length ? `
+        <div class="artifact-review-chip-list">${sourceArtifacts.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+      ` : `<p class="muted">No source artifacts listed.</p>`)}
+    `,
+  );
+}
+
+function renderGenericJsonArtifactReview(path, value) {
+  const isArray = Array.isArray(value);
+  const entries = isArray
+    ? value.map((item, index) => [String(index), item])
+    : Object.entries(objectOrEmpty(value));
+  const arrayCount = entries.filter(([, item]) => Array.isArray(item)).length;
+  const objectCount = entries.filter(([, item]) => item && typeof item === "object" && !Array.isArray(item)).length;
+  const primitiveCount = entries.length - arrayCount - objectCount;
+  return artifactReviewShell(
+    artifactLabel(path),
+    path,
+    "Structured JSON artifact summary.",
+    `
+      ${artifactReviewKpis([
+        [isArray ? "items" : "fields", entries.length],
+        ["arrays", arrayCount],
+        ["objects", objectCount],
+        ["values", primitiveCount],
+      ])}
+      ${artifactReviewSection("Top-level fields", entries.length ? `
+        <div class="artifact-review-rows compact">
+          ${entries.slice(0, 16).map(([key, item]) => `
+            <article class="artifact-review-row">
+              <div class="artifact-review-row-header">
+                <strong><code>${escapeHtml(key)}</code></strong>
+                <span>${escapeHtml(reviewValueKind(item))}</span>
+              </div>
+              <p>${escapeHtml(formatReviewValue(item))}</p>
+            </article>
+          `).join("")}
+        </div>
+        ${entries.length > 16 ? `<p class="muted">Showing 16 of ${integerText(entries.length)} top-level entries.</p>` : ""}
+      ` : `<p class="muted">Empty JSON artifact.</p>`)}
+    `,
+  );
+}
+
+function artifactReviewShell(title, path, subtitle, body) {
+  return `
+    <div class="artifact-review">
+      <div class="artifact-review-header">
+        <div>
+          <p class="eyebrow">Artifact review</p>
+          <h4>${escapeHtml(title)}</h4>
+          <code>${escapeHtml(path)}</code>
+        </div>
+        <span>${escapeHtml(subtitle)}</span>
+      </div>
+      ${body}
+    </div>
+  `;
+}
+
+function artifactReviewKpis(items) {
+  const rows = items
+    .filter((item) => item && item[1] !== undefined && item[1] !== null)
+    .map(([label, value]) => `
+      <div>
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(formatReviewValue(value))}</strong>
+      </div>
+    `)
+    .join("");
+  return `<div class="artifact-review-kpis">${rows}</div>`;
+}
+
+function artifactReviewSection(title, body) {
+  return `
+    <section class="artifact-review-section">
+      <div class="artifact-review-section-heading">
+        <strong>${escapeHtml(title)}</strong>
+      </div>
+      ${body}
+    </section>
+  `;
+}
+
+function artifactReviewPill(value) {
+  return `<span class="artifact-review-pill ${escapeHtml(artifactReviewTone(value))}">${escapeHtml(value || "unknown")}</span>`;
+}
+
+function artifactReviewTone(value) {
+  const text = String(value || "").toLowerCase();
+  if (["invalid", "not_ready", "failed", "error", "p0", "p1"].some((item) => text.includes(item))) {
+    return "danger";
+  }
+  if (["warning", "warn", "skipped", "pending", "unsupported", "p2"].some((item) => text.includes(item))) {
+    return "warn";
+  }
+  if (["valid", "ready", "success", "completed", "mapped", "parsed"].some((item) => text.includes(item))) {
+    return "success";
+  }
+  return "";
+}
+
+function renderIssueReviewRow(issue) {
+  const columns = arrayOfStrings(issue.columns).join(", ") || "n/a";
+  return `
+    <article class="artifact-review-row">
+      <div class="artifact-review-row-header">
+        <strong>${escapeHtml(issue.issue_type || issue.issue_id || "Issue")}</strong>
+        ${artifactReviewPill(issue.severity || "unknown")}
+      </div>
+      <p><code>${escapeHtml(issue.table || "unknown table")}</code> · ${escapeHtml(columns)}</p>
+      <div class="artifact-review-meta">
+        <span>${integerText(issue.bad_count)} bad rows</span>
+        <span>${percentText(issue.bad_rate)} bad rate</span>
+        ${issue.sample_bad_rows_path ? `<span>${escapeHtml(issue.sample_bad_rows_path)}</span>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function reviewValueKind(value) {
+  if (Array.isArray(value)) {
+    return "array";
+  }
+  if (value && typeof value === "object") {
+    return "object";
+  }
+  return typeof value;
+}
+
+function formatReviewValue(value) {
+  if (Array.isArray(value)) {
+    return `${integerText(value.length)} items`;
+  }
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value);
+    return `${integerText(keys.length)} fields${keys.length ? `: ${keys.slice(0, 4).join(", ")}` : ""}`;
+  }
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? integerText(value) : Number(value).toFixed(4);
+  }
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+  return truncateMiddle(String(value), 96);
+}
+
+function renderRawJsonArtifactPreview(value) {
   return `
     <div class="artifact-preview-json">
       ${jsonPreviewNode(value, 0)}
@@ -3607,7 +4225,7 @@ function updateDiagramControls(model) {
   els.diagramFitButton.setAttribute("aria-pressed", state.diagramFit ? "true" : "false");
   els.diagramDensityToggle.setAttribute("aria-pressed", state.diagramExpanded ? "true" : "false");
   els.diagramColumnsToggle.setAttribute("aria-pressed", state.diagramShowNonKey ? "true" : "false");
-  els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "Hide non-key columns" : "Show non-key columns";
+  els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "All columns" : "Key columns only";
   els.diagramResetSelection.disabled = !state.diagramSelection;
   els.diagramFitButton.disabled = !model.hasInput || Boolean(model.error);
 }
@@ -3854,7 +4472,10 @@ function layoutLocalDiagram(model) {
   const tableRecords = model.tables.map((table) => {
     const role = diagramTableRole(table, graph);
     const columnSet = diagramVisibleColumns(table);
-    const rowCount = Math.max(columnSet.visible.length, columnSet.hiddenCount ? columnSet.visible.length + 1 : columnSet.visible.length, 1);
+    const rowCount = Math.max(
+      columnSet.visible.length + (columnSet.hiddenCount ? 1 : 0),
+      1,
+    );
     return {
       table,
       role,
@@ -3863,7 +4484,7 @@ function layoutLocalDiagram(model) {
       hiddenCount: columnSet.hiddenCount,
       totalColumns: columnSet.totalColumns,
       width: nodeWidth,
-      height: Math.max(state.diagramExpanded ? 156 : 134, 74 + rowCount * 22 + 18),
+      height: Math.max(state.diagramExpanded ? 168 : 146, 62 + rowCount * 26 + 14),
     };
   });
   const originalLayers = [...new Set(tableRecords.map((record) => record.role.layer))].sort((a, b) => a - b);
@@ -3892,7 +4513,7 @@ function layoutLocalDiagram(model) {
     records.forEach((record) => {
       const columnY = new Map();
       record.visibleColumns.forEach((column, index) => {
-        columnY.set(column.name, y + 79 + index * 22);
+        columnY.set(column.name, y + 62 + index * 26 + 12);
       });
       positions.set(record.table.name, {
         x: margin + layer * (nodeWidth + xGap),
@@ -3970,10 +4591,8 @@ function diagramVisibleColumns(table) {
   const allColumns = (table.columns || []).filter((column) => !column.summary);
   const totalColumns = Number(table.columnCount || allColumns.length || 0);
   const keyColumns = allColumns.filter((column) => column.isPk || column.isFk || column.isUnique);
-  const candidates = state.diagramShowNonKey ? allColumns : keyColumns;
-  const limit = state.diagramExpanded ? (state.diagramShowNonKey ? 12 : 8) : (state.diagramShowNonKey ? 7 : 5);
-  const visible = candidates.slice(0, limit);
-  const hiddenCount = Math.max(totalColumns - visible.length, 0);
+  const visible = state.diagramShowNonKey ? allColumns : keyColumns;
+  const hiddenCount = state.diagramShowNonKey ? 0 : Math.max(totalColumns - visible.length, 0);
   return { visible, hiddenCount, totalColumns };
 }
 
@@ -4077,8 +4696,12 @@ function diagramTableSvg(record, position, selection) {
     return "";
   }
   const columns = record.visibleColumns;
-  const lines = columns.map((column, index) => diagramColumnTspan(column, 74 + index * 22)).join("");
-  const overflowLine = record.hiddenCount ? `<text class="diagram-column overflow" x="14" y="${74 + columns.length * 22}">+${integerText(record.hiddenCount)} columns</text>` : "";
+  const lines = columns
+    .map((column, index) => diagramColumnRowSvg(column, 62 + index * 26, position.width))
+    .join("");
+  const overflowLine = record.hiddenCount
+    ? diagramHiddenColumnRowSvg(record.hiddenCount, 62 + columns.length * 26, position.width)
+    : "";
   const meta = [
     table.status === "mapped" ? "mapped CSV" : table.status === "missing_csv" ? "missing CSV" : table.status || "schema",
     table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(record.totalColumns)} columns`,
@@ -4093,16 +4716,42 @@ function diagramTableSvg(record, position, selection) {
       <text class="diagram-table-meta" x="14" y="42">${escapeHtml(truncateMiddle(`${record.role.label} · ${meta}`, 38))}</text>
       <rect class="diagram-status-chip" x="${position.width - 78}" y="14" width="62" height="22" rx="11"></rect>
       <text class="diagram-status-text" x="${position.width - 47}" y="29" text-anchor="middle">${escapeHtml(table.status === "missing_csv" ? "missing" : table.status || "schema")}</text>
-      ${lines || `<text class="diagram-column empty" x="14" y="74">No key columns</text>`}
+      ${lines || `<text class="diagram-column empty" x="14" y="78">No columns</text>`}
       ${overflowLine}
     </g>
   `;
 }
 
-function diagramColumnTspan(column, y) {
+function diagramColumnRowSvg(column, y, width) {
   const role = column.isPk && column.isFk ? "PK/FK" : column.isPk ? "PK" : column.isFk ? "FK" : "COL";
-  const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
-  return `<text class="diagram-column ${column.isPk ? "pk" : ""} ${column.isFk ? "fk" : ""} ${!column.isPk && !column.isFk ? "non-key" : ""}" x="14" y="${y}" data-diagram-column="${escapeHtml(column.name)}"><tspan class="diagram-column-role">${escapeHtml(role)}</tspan> ${escapeHtml(truncateMiddle(`${column.name}${target}`, 34))}</text>`;
+  const type = column.type || "";
+  const badgeWidth = role === "PK/FK" ? 38 : 28;
+  const nameLimit = type ? 20 : 30;
+  const rowClass = [
+    "diagram-column-row",
+    column.isPk ? "pk" : "",
+    column.isFk ? "fk" : "",
+    !column.isPk && !column.isFk ? "non-key" : "",
+  ].filter(Boolean).join(" ");
+  return `
+    <g class="${rowClass}" data-diagram-column="${escapeHtml(column.name)}">
+      <title>${escapeHtml(`${role} ${column.name}${type ? ` ${type}` : ""}${column.fkTarget ? ` -> ${column.fkTarget}` : ""}`)}</title>
+      <rect class="diagram-column-row-bg" x="8" y="${y}" width="${width - 16}" height="24" rx="4"></rect>
+      <rect class="diagram-column-badge" x="14" y="${y + 5}" width="${badgeWidth}" height="14" rx="4"></rect>
+      <text class="diagram-column-role" x="${14 + badgeWidth / 2}" y="${y + 16}" text-anchor="middle">${escapeHtml(role)}</text>
+      <text class="diagram-column-name" x="${24 + badgeWidth}" y="${y + 16}">${escapeHtml(truncateMiddle(column.name, nameLimit))}</text>
+      ${type ? `<text class="diagram-column-type" x="${width - 14}" y="${y + 16}" text-anchor="end">${escapeHtml(truncateMiddle(type, 13))}</text>` : ""}
+    </g>
+  `;
+}
+
+function diagramHiddenColumnRowSvg(hiddenCount, y, width) {
+  return `
+    <g class="diagram-column-row overflow">
+      <rect class="diagram-column-row-bg" x="8" y="${y}" width="${width - 16}" height="24" rx="4"></rect>
+      <text class="diagram-column-name" x="14" y="${y + 16}">+${integerText(hiddenCount)} hidden columns</text>
+    </g>
+  `;
 }
 
 function diagramStatusTone(status) {

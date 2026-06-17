@@ -123,8 +123,12 @@ Data style: monospace with tabular numbers.
 - Rows expose status, count, rate, or health score directly; hover/focus changes
   border and background without layout shift.
 - Generated reports, machine artifacts, and sample CSVs preview inside the
-  dashboard Artifact preview panel by default. Opening raw JSON/Markdown in a
+  dashboard Artifact review panel by default. Opening raw JSON/Markdown in a
   separate browser tab is not the primary interaction.
+- Machine-readable artifacts should render as artifact-specific reviews first:
+  relationship health, lineage inventory, verdict blockers, table impact, issue
+  mix, runtime stages, and chart data. Raw JSON trees are a fallback, not the
+  primary user-facing view.
 
 ### Table Impact
 
@@ -141,13 +145,16 @@ Data style: monospace with tabular numbers.
   and generated artifacts: reference/dimension tables first, bridge tables
   between their related entities, fact/event hubs next, and child/detail tables
   last.
-- Table cards are compact by default with monospace table names, status pills,
-  PK/FK/key rows, and a `+N columns` indicator for hidden columns.
+- Table cards show all parsed columns by default, with monospace table names,
+  status pills, column type text, and compact PK/FK badges on each row. A
+  key-only mode is optional; it is not the default.
 - Relationship edges are orthogonal elbow paths. Default edges are muted;
   amber/red appears only for warning or invalid relationship evidence.
 - Edges must route through clear table-to-table corridors. Non-adjacent
   relationships use a two-corridor bus above or below intermediate table boxes;
   lines should not pass through table cards or jump to a global top rail.
+- Relationship endpoints attach to the exact FK/PK column row when the column
+  is visible, matching the mental model of dbdiagram.io-style schema diagrams.
 - Edge labels stay hidden until hover/focus/selection so the diagram reads as
   structure first and diagnostics second.
 - Diagram controls are compact evidence-tool controls: Fit view, expanded card
@@ -183,3 +190,5 @@ Data style: monospace with tabular numbers.
 | Default dashboard graphs to progressive disclosure for US-062 | Demo reviewers need readable topology first and artifact-level evidence only on selection or explicit toggles | 2026-06-17 |
 | Route local ERD edges through corridors instead of a global top rail | DBML relationships should read like a database diagram: table boxes first, orthogonal connectors second, and no lines cutting through intermediate cards | 2026-06-17 |
 | Preview generated artifacts inline | Demo reviewers should inspect reports, JSON artifacts, and sample CSVs in the web console instead of being sent to raw browser-rendered files | 2026-06-17 |
+| Show all local ERD columns by default | The local DBML diagram should behave like a dbdiagram-style schema view: users inspect every table column and see FK/PK relationships connected at row level | 2026-06-17 |
+| Render JSON artifacts as reviews, not object dumps | Demo reviewers need relationship/table/verdict evidence in product language; `Object(...)` tree views are too raw for the main artifact surface | 2026-06-17 |
