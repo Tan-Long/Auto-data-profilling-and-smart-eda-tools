@@ -1,5 +1,18 @@
 const { expect, test } = require("@playwright/test");
+const childProcess = require("node:child_process");
 const fs = require("node:fs");
+const path = require("node:path");
+
+test.beforeAll(() => {
+  const profilerBin = process.platform === "win32"
+    ? path.join(process.cwd(), ".venv", "Scripts", "vsf-profiler.exe")
+    : path.join(process.cwd(), ".venv", "bin", "vsf-profiler");
+  childProcess.execFileSync(
+    profilerBin,
+    ["demo", "create-olist-sample", "--out", "data/demo_olist"],
+    { stdio: "inherit" },
+  );
+});
 
 test("local path run renders the interactive dashboard from generated artifacts", async ({
   page,
@@ -18,31 +31,33 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramFrame")).toBeHidden();
   await expect(page.locator("#diagramSourceBadge")).toContainText("Browser DBML");
   await expect(page.locator("#diagramMessage")).toContainText("Local preflight");
-  await expect(page.locator("#diagramSvg")).toContainText("orders");
+  await expect(page.locator("#diagramSvg")).toContainText("olist_orders_dataset");
   await expect(page.locator("#diagramSvg")).toContainText("PK order_id");
   await expect(page.locator("#diagramSvg")).toContainText("FK customer_id");
-  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveCount(1);
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).toHaveCount(1);
   await expect(page.locator("#diagramFitButton")).toBeVisible();
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#diagramColumnsToggle")).toContainText("All columns");
   await expect(page.locator("#diagramSvg")).toContainText("order_status");
-  await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="order_items"]')).toHaveCount(1);
-  await page.locator('#diagramSvg [data-diagram-table="orders"]').click();
-  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
-  await expect(page.locator("#diagramInspector")).toContainText("orders");
+  await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="olist_order_items_dataset"]')).toHaveCount(1);
+  await page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]').click();
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).toHaveClass(/selected/);
+  await expect(page.locator("#diagramInspector")).toContainText("olist_orders_dataset");
   await expect(page.locator("#diagramInspector")).toContainText("Fact/event");
   await page.locator("#diagramSvg").click({ position: { x: 4, y: 4 } });
-  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).not.toHaveClass(/selected/);
   const mapping = page.locator("#mappingBody");
-  await expect(mapping).toContainText("customers.csv");
-  await expect(mapping).toContainText("orders.csv");
-  await expect(mapping).toContainText("order_items.csv");
-  await expect(mapping).toContainText("order_payments.csv");
-  await expect(mapping).toContainText("order_reviews.csv");
-  await expect(mapping).toContainText("products.csv");
-  await expect(mapping).toContainText("sellers.csv");
+  await expect(mapping).toContainText("olist_customers_dataset.csv");
+  await expect(mapping).toContainText("olist_orders_dataset.csv");
+  await expect(mapping).toContainText("olist_order_items_dataset.csv");
+  await expect(mapping).toContainText("olist_order_payments_dataset.csv");
+  await expect(mapping).toContainText("olist_order_reviews_dataset.csv");
+  await expect(mapping).toContainText("olist_products_dataset.csv");
+  await expect(mapping).toContainText("olist_sellers_dataset.csv");
+  await expect(mapping).toContainText("product_category_name_translation.csv");
+  await expect(mapping).toContainText("olist_geolocation_dataset.csv");
   await expect(mapping).not.toContainText("undefined");
   await expect(mapping).not.toContainText("missing CSV");
   await expect(mapping).not.toContainText("extra CSV");
@@ -50,7 +65,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramColumnsToggle")).toContainText("Key columns only");
   await expect(page.locator("#diagramSvg")).not.toContainText("order_status");
-  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).not.toHaveClass(/selected/);
   await expect(page.locator("#dbdiagramLink")).toHaveAttribute(
     "href",
     /https:\/\/dbdiagram\.io\/embed\?c=/,
@@ -59,10 +74,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#runnerModePath").click();
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
 
-  await page.locator("#dbmlPathInput").fill("data/demo_small/schema.dbml");
-  await page.locator("#csvDirPathInput").fill("data/demo_small/csv");
-  await page.locator("#rulesPathInput").fill("data/demo_small/rules.yaml");
-  await page.locator("#pathTargetInput").fill("order_reviews.review_score");
+  await page.locator("#dbmlPathInput").fill("data/demo_olist/schema.dbml");
+  await page.locator("#csvDirPathInput").fill("data/demo_olist/csv");
+  await page.locator("#rulesPathInput").fill("data/demo_olist/rules.yaml");
+  await page.locator("#pathTargetInput").fill("olist_order_reviews_dataset.review_score");
 
   await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
   await page.locator("#runPathProfilerButton").click();
@@ -84,27 +99,27 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
   await expect(page.locator("#diagramMessage")).toContainText("Generated artifacts");
   await expect(page.locator("#diagramWarnings")).toContainText("schema_parse_report.json");
-  await expect(page.locator("#diagramSvg")).toContainText("order_payments");
+  await expect(page.locator("#diagramSvg")).toContainText("olist_order_payments_dataset");
   await expect(page.locator("#diagramSvg")).toContainText("varchar");
   await expect(page.locator("#diagramSvg")).toContainText("timestamp");
   await expect(page.locator("#diagramSvg")).toContainText("FK issue");
-  await expect(page.locator('#diagramSvg [data-diagram-table="order_payments"]')).toHaveCount(1);
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_order_payments_dataset"]')).toHaveCount(1);
   const dbdiagramUrl = await page.locator("#dbdiagramLink").getAttribute("href");
   const dbdiagramDbml = await page.evaluate((href) => {
     const encoded = new URL(href).searchParams.get("c") || "";
     return decodeURIComponent(escape(atob(encoded)));
   }, dbdiagramUrl);
-  const orderItemsDbmlBlock = dbdiagramDbml.split("Table order_items {")[1].split("\n}")[0];
+  const orderItemsDbmlBlock = dbdiagramDbml.split("Table olist_order_items_dataset {")[1].split("\n}")[0];
   expect(orderItemsDbmlBlock).toContain("(order_id, order_item_id) [pk]");
   expect(orderItemsDbmlBlock).not.toContain("order_id varchar [pk");
   expect(orderItemsDbmlBlock).not.toContain("order_item_id int [pk");
-  await page.locator('#diagramSvg [data-diagram-table="orders"]').click();
-  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
+  await page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]').click();
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).toHaveClass(/selected/);
   await expect(page.locator("#diagramInspector")).toContainText("FK issue");
   await page.locator("#dashboardSummaryStrip").click();
-  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).not.toHaveClass(/selected/);
   const customerRelationship = page.locator(
-    '#diagramSvg [data-diagram-relationship="orders.customer_id->customers.customer_id"]',
+    '#diagramSvg [data-diagram-relationship="olist_orders_dataset.customer_id->olist_customers_dataset.customer_id"]',
   );
   await expect(customerRelationship).toHaveCount(1);
   await customerRelationship.focus();
@@ -123,7 +138,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(generatedResults).toContainText("Issue counts");
   await expect(generatedResults).toContainText("15 issues");
   await expect(generatedResults).toContainText("Table impact");
-  await expect(generatedResults).toContainText("7 tables");
+  await expect(generatedResults).toContainText("9 tables");
   await expect(generatedResults).toContainText("Runtime summary");
   await expect(generatedResults).toContainText("8 stages");
   await expect(generatedResults).toContainText("Report HTML");
@@ -140,8 +155,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   const runtimeStages = page.locator("#stageList");
   await expect(runtimeStages).toContainText("Stage result");
-  await expect(runtimeStages).toContainText("7 tables");
-  await expect(runtimeStages).toContainText("24 rows");
+  await expect(runtimeStages).toContainText("9 tables");
+  await expect(runtimeStages).toContainText("27 rows");
   await expect(runtimeStages).toContainText("profile_summary.json");
   await expect(runtimeStages).toContainText("relationship_graph.json");
   await runtimeStages.locator('[data-artifact-path="profile_summary.json"]').first().click();
@@ -161,12 +176,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#tableImpactStatus")).toContainText(
     "tables from table_assessments.json",
   );
-  await expect(page.locator("#tableImpactGrid")).toContainText("order_reviews");
+  await expect(page.locator("#tableImpactGrid")).toContainText("olist_order_reviews_dataset");
 
   await page
-    .locator('#tableImpactGrid [data-dashboard-kind="table_assessment"][data-dashboard-value="order_reviews"]')
+    .locator('#tableImpactGrid [data-dashboard-kind="table_assessment"][data-dashboard-value="olist_order_reviews_dataset"]')
     .click();
-  await expect(page.locator("#dashboardDrilldownMeta")).toContainText("order_reviews");
+  await expect(page.locator("#dashboardDrilldownMeta")).toContainText("olist_order_reviews_dataset");
   await expect(page.locator("#dashboardDrilldown")).toContainText("customer_feedback");
   await expect(page.locator("#dashboardDrilldown")).toContainText("table_assessments.json");
 
@@ -182,10 +197,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page
     .locator("#dashboardGraphSvg [data-graph-node-id]")
-    .filter({ hasText: "orders" })
+    .filter({ hasText: "olist_orders_dataset" })
     .first()
     .click();
-  await expect(page.locator("#dashboardGraphDrilldownMeta")).toContainText("orders");
+  await expect(page.locator("#dashboardGraphDrilldownMeta")).toContainText("olist_orders_dataset");
   await expect(page.locator("#dashboardGraphDrilldown")).toContainText(
     "lineage_graph.json",
   );
@@ -284,6 +299,23 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await severityChartSource.click();
   await expect(page.locator('[data-dashboard-panel-path="charts/issue_counts_by_severity.json"]')).toBeFocused();
   expect(await popupOpened).toBe(false);
+  await page
+    .locator('#dashboardArtifactLinks .artifact-json-link[data-artifact-path="charts/dataset_verdict_risk_summary.json"]')
+    .click();
+  await expect(page.locator("#artifactPreview")).toBeFocused();
+  await expect(page.locator("#artifactPreviewMeta")).toContainText(
+    "charts/dataset_verdict_risk_summary.json",
+  );
+  await expect(page.locator("#artifactPreview")).toContainText("Chart preview");
+  await expect(page.locator("#artifactPreview .artifact-chart-preview")).toBeVisible();
+  await expect(page.locator("#artifactPreview .risk-gauge")).toBeVisible();
+  await page
+    .locator('#dashboardArtifactLinks .artifact-json-link[data-artifact-path="charts/issue_counts_by_severity.json"]')
+    .click();
+  await expect(page.locator("#artifactPreviewMeta")).toContainText(
+    "charts/issue_counts_by_severity.json",
+  );
+  await expect(page.locator("#artifactPreview .artifact-chart-bar-row").first()).toBeVisible();
 
   await page.locator("#dashboardSeverityFilter").selectOption("P1");
   await expect(page.locator("#dashboardIssueCount")).toContainText("/15 issues");

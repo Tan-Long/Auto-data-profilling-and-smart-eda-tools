@@ -23,7 +23,7 @@ from vsf_profiler.connectors import (
 from vsf_profiler.csv_catalog import build_catalog
 from vsf_profiler.dataset_verdict import build_dataset_verdict
 from vsf_profiler.dbml_parser import parse_dbml_with_report
-from vsf_profiler.demo_data import create_small_demo, download_olist
+from vsf_profiler.demo_data import create_olist_sample, create_small_demo, download_olist
 from vsf_profiler.doctor import (
     build_doctor_report,
     format_doctor_report,
@@ -187,6 +187,15 @@ def demo_create_small(
     """Create a small local demo dataset with known injected defects."""
     root = create_small_demo(out)
     typer.echo(f"Created small demo dataset: {root}")
+
+
+@demo_app.command("create-olist-sample")
+def demo_create_olist_sample(
+    out: Path = typer.Option(Path("data/demo_olist"), "--out", help="Output directory."),
+) -> None:
+    """Create the bundled Olist-shaped demo dataset with known injected defects."""
+    root = create_olist_sample(out)
+    typer.echo(f"Created Olist sample demo dataset: {root}")
 
 
 @demo_app.command("download-olist")

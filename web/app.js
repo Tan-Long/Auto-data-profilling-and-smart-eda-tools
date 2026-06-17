@@ -128,25 +128,31 @@ const els = {
   loadDemoButton: document.querySelector("#loadDemoButton"),
 };
 
-const demoDbml = `Table customers {
+const demoDbml = `Table olist_customers_dataset {
   customer_id varchar [pk, not null]
-  customer_name varchar [not null]
+  customer_unique_id varchar
+  customer_zip_code_prefix int
+  customer_city varchar
   customer_state varchar
 }
 
-Table orders {
+Table olist_orders_dataset {
   order_id varchar [pk, not null]
-  customer_id varchar [ref: > customers.customer_id]
+  customer_id varchar [ref: > olist_customers_dataset.customer_id]
   order_status varchar
   order_purchase_timestamp timestamp
+  order_approved_at timestamp
+  order_delivered_carrier_date timestamp
   order_delivered_customer_date timestamp
+  order_estimated_delivery_date timestamp
 }
 
-Table order_items {
-  order_id varchar [ref: > orders.order_id]
+Table olist_order_items_dataset {
+  order_id varchar [ref: > olist_orders_dataset.order_id]
   order_item_id int
-  product_id varchar [ref: > products.product_id]
-  seller_id varchar [ref: > sellers.seller_id]
+  product_id varchar [ref: > olist_products_dataset.product_id]
+  seller_id varchar [ref: > olist_sellers_dataset.seller_id]
+  shipping_limit_date timestamp
   price float
   freight_value float
 
@@ -155,61 +161,149 @@ Table order_items {
   }
 }
 
-Table order_reviews {
-  review_id varchar [pk, not null]
-  order_id varchar [ref: > orders.order_id]
+Table olist_order_reviews_dataset {
+  review_id varchar
+  order_id varchar [ref: > olist_orders_dataset.order_id]
   review_score int
+  review_comment_title varchar
   review_comment_message varchar
+  review_creation_date timestamp
+  review_answer_timestamp timestamp
 }
 
-Table order_payments {
-  order_id varchar [ref: > orders.order_id]
+Table olist_order_payments_dataset {
+  order_id varchar [ref: > olist_orders_dataset.order_id]
   payment_sequential int
   payment_type varchar
   payment_installments int
   payment_value float
 }
 
-Table products {
+Table olist_products_dataset {
   product_id varchar [pk, not null]
-  product_category_name varchar
+  product_category_name varchar [ref: > product_category_name_translation.product_category_name]
+  product_name_lenght int
+  product_description_lenght int
+  product_photos_qty int
+  product_weight_g float
+  product_length_cm float
+  product_height_cm float
+  product_width_cm float
 }
 
-Table sellers {
+Table olist_sellers_dataset {
   seller_id varchar [pk, not null]
+  seller_zip_code_prefix int
+  seller_city varchar
   seller_state varchar
+}
+
+Table product_category_name_translation {
+  product_category_name varchar [pk, not null]
+  product_category_name_english varchar
+}
+
+Table olist_geolocation_dataset {
+  geolocation_zip_code_prefix int
+  geolocation_lat float
+  geolocation_lng float
+  geolocation_city varchar
+  geolocation_state varchar
 }`;
 
 const demoCsvs = [
-  { name: "customers.csv", columns: ["customer_id", "customer_name", "customer_state"], size: 112 },
   {
-    name: "orders.csv",
+    name: "olist_customers_dataset.csv",
+    columns: [
+      "customer_id",
+      "customer_unique_id",
+      "customer_zip_code_prefix",
+      "customer_city",
+      "customer_state",
+    ],
+    size: 220,
+  },
+  {
+    name: "olist_orders_dataset.csv",
     columns: [
       "order_id",
       "customer_id",
       "order_status",
       "order_purchase_timestamp",
+      "order_approved_at",
+      "order_delivered_carrier_date",
       "order_delivered_customer_date",
+      "order_estimated_delivery_date",
     ],
-    size: 370,
+    size: 620,
   },
   {
-    name: "order_items.csv",
-    columns: ["order_id", "order_item_id", "product_id", "seller_id", "price", "freight_value"],
-    size: 183,
+    name: "olist_order_items_dataset.csv",
+    columns: [
+      "order_id",
+      "order_item_id",
+      "product_id",
+      "seller_id",
+      "shipping_limit_date",
+      "price",
+      "freight_value",
+    ],
+    size: 260,
   },
   {
-    name: "order_payments.csv",
+    name: "olist_order_payments_dataset.csv",
     columns: ["order_id", "payment_sequential", "payment_type", "payment_installments", "payment_value"],
     size: 159,
   },
   {
-    name: "order_reviews.csv",
-    columns: ["review_id", "order_id", "review_score", "review_comment_message"],
-    size: 146,
+    name: "olist_order_reviews_dataset.csv",
+    columns: [
+      "review_id",
+      "order_id",
+      "review_score",
+      "review_comment_title",
+      "review_comment_message",
+      "review_creation_date",
+      "review_answer_timestamp",
+    ],
+    size: 310,
   },
-  { name: "products.csv", columns: ["product_id", "product_category_name"], size: 64 },
-  { name: "sellers.csv", columns: ["seller_id", "seller_state"], size: 42 },
+  {
+    name: "olist_products_dataset.csv",
+    columns: [
+      "product_id",
+      "product_category_name",
+      "product_name_lenght",
+      "product_description_lenght",
+      "product_photos_qty",
+      "product_weight_g",
+      "product_length_cm",
+      "product_height_cm",
+      "product_width_cm",
+    ],
+    size: 250,
+  },
+  {
+    name: "olist_sellers_dataset.csv",
+    columns: ["seller_id", "seller_zip_code_prefix", "seller_city", "seller_state"],
+    size: 132,
+  },
+  {
+    name: "product_category_name_translation.csv",
+    columns: ["product_category_name", "product_category_name_english"],
+    size: 64,
+  },
+  {
+    name: "olist_geolocation_dataset.csv",
+    columns: [
+      "geolocation_zip_code_prefix",
+      "geolocation_lat",
+      "geolocation_lng",
+      "geolocation_city",
+      "geolocation_state",
+    ],
+    size: 148,
+  },
 ];
 
 function csvStemFromName(name) {
@@ -761,10 +855,10 @@ function loadDemoState() {
   state.dbmlFile = null;
   state.rulesFile = null;
   state.csvFiles = demoCsvs.map(normalizeCsvFile);
-  els.dbmlPathInput.value = "data/demo_small/schema.dbml";
-  els.csvDirPathInput.value = "data/demo_small/csv";
-  els.rulesPathInput.value = "data/demo_small/rules.yaml";
-  els.pathTargetInput.value = "order_reviews.review_score";
+  els.dbmlPathInput.value = "data/demo_olist/schema.dbml";
+  els.csvDirPathInput.value = "data/demo_olist/csv";
+  els.rulesPathInput.value = "data/demo_olist/rules.yaml";
+  els.pathTargetInput.value = "olist_order_reviews_dataset.review_score";
   parseDbmlState();
   autoLinkCsvs();
   renderAll();
@@ -3362,7 +3456,7 @@ function renderArtifactReference(path, url) {
         <code>${escapeHtml(path)}</code>
         <span>View chart</span>
       </button>
-      <button class="artifact-json-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}">Preview spec</button>
+      <button class="artifact-json-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}">Review chart</button>
     </span>
   `;
 }
@@ -3375,7 +3469,7 @@ function renderArtifactNavigationCard(path, url, label) {
         <code>${escapeHtml(path)}</code>
         <span>View chart</span>
       </button>
-      <button class="artifact-json-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}">Preview spec</button>
+      <button class="artifact-json-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}">Review chart</button>
     </div>
   `;
 }
@@ -3983,6 +4077,7 @@ function renderChartSpecArtifactReview(path, artifact) {
         ["rows", data.length],
         ["sources", sourceArtifacts.length],
       ])}
+      ${artifactReviewSection("Chart preview", renderChartSpecPreview(artifact))}
       ${artifactReviewSection("Chart data", data.length ? `
         <div class="artifact-review-rows compact">
           ${data.slice(0, 10).map((row) => {
@@ -4002,6 +4097,106 @@ function renderChartSpecArtifactReview(path, artifact) {
       ` : `<p class="muted">No source artifacts listed.</p>`)}
     `,
   );
+}
+
+function renderChartSpecPreview(artifact) {
+  const chartType = String(artifact?.chart_type || "").toLowerCase();
+  if (chartType === "gauge") {
+    return renderArtifactGaugePreview(artifact);
+  }
+  return renderArtifactBarPreview(artifact);
+}
+
+function renderArtifactGaugePreview(artifact) {
+  const data = Array.isArray(artifact?.data) ? artifact.data : [];
+  const riskRow = data.find((row) => String(row?.label || "").toLowerCase() === "risk") || data[0] || {};
+  const riskScore = clampNumber(riskRow.value ?? artifact?.summary?.risk_score, 0, 100);
+  const verdict = artifact?.summary?.verdict || "Gauge";
+  const issueCount = artifact?.summary?.issue_count;
+  return `
+    <div class="artifact-chart-preview artifact-chart-gauge">
+      ${riskGaugeSvg(riskScore)}
+      <div class="artifact-chart-gauge-copy">
+        <strong>${integerText(riskScore)}/100 risk</strong>
+        <span>${escapeHtml(verdict)}</span>
+        ${issueCount === undefined ? "" : `<small>${integerText(issueCount)} issues from dataset_verdict.json</small>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderArtifactBarPreview(artifact) {
+  const rows = chartPreviewRows(artifact);
+  if (!rows.length) {
+    return `<p class="muted">This chart spec has no renderable rows.</p>`;
+  }
+  const maxValue = Math.max(...rows.map((row) => Math.abs(Number(row.value || 0))), 1);
+  return `
+    <div class="artifact-chart-preview artifact-chart-bars" role="img" aria-label="${escapeHtml(artifact?.title || "Chart preview")}">
+      ${rows.slice(0, 12).map((row) => {
+        const value = Number(row.value || 0);
+        const width = value === 0 ? 0 : Math.max(2, Math.round(Math.abs(value) / maxValue * 100));
+        return `
+          <div class="artifact-chart-bar-row">
+            <span class="artifact-chart-label">${escapeHtml(row.label)}</span>
+            <span class="artifact-chart-track">
+              <span class="artifact-chart-fill ${dashboardTone(row.label)}" style="width: ${width}%"></span>
+            </span>
+            <span class="artifact-chart-value">${escapeHtml(row.displayValue)}${row.detail ? `<small>${escapeHtml(row.detail)}</small>` : ""}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function chartPreviewRows(artifact) {
+  const data = Array.isArray(artifact?.data) ? artifact.data : [];
+  const chartType = String(artifact?.chart_type || "").toLowerCase();
+  return data.map((row, index) => {
+    const normalized = objectOrEmpty(row);
+    const label = chartPreviewLabel(normalized, index + 1);
+    const valueKey = chartPreviewValueKey(normalized);
+    const numericValue = Number(normalized[valueKey] ?? 0);
+    return {
+      label,
+      value: Number.isFinite(numericValue) ? numericValue : 0,
+      displayValue: chartPreviewDisplayValue(normalized[valueKey], valueKey, chartType),
+      detail: chartPreviewDetail(normalized),
+    };
+  });
+}
+
+function chartPreviewLabel(row, fallbackIndex) {
+  const key = ["severity", "issue_type", "table", "column", "status", "feature", "label"].find((candidate) => row[candidate] !== undefined && row[candidate] !== "");
+  return key ? String(row[key]) : `row ${fallbackIndex}`;
+}
+
+function chartPreviewValueKey(row) {
+  return ["count", "null_rate", "missing_rate", "value", "score"].find((candidate) => row[candidate] !== undefined && row[candidate] !== "") || "value";
+}
+
+function chartPreviewDisplayValue(value, valueKey, chartType) {
+  if (valueKey.includes("rate")) {
+    return percentText(value);
+  }
+  if (chartType === "horizontal_bar" || valueKey === "score") {
+    return scoreText(value);
+  }
+  return integerText(value);
+}
+
+function chartPreviewDetail(row) {
+  if (row.method) {
+    return row.method;
+  }
+  if (row.direction) {
+    return row.direction;
+  }
+  if (row.rank !== undefined) {
+    return `rank ${integerText(row.rank)}`;
+  }
+  return "";
 }
 
 function renderGenericJsonArtifactReview(path, value) {

@@ -209,6 +209,24 @@
     </header>
 
     <section>
+      <h2>Executive Summary</h2>
+      <p>
+        This run scanned <strong>{{ summary.table_count }}</strong> tables,
+        <strong>{{ summary.column_count }}</strong> columns, and
+        <strong>{{ summary.row_count }}</strong> rows. It found
+        <strong>{{ summary.issue_count }}</strong> quality issue(s), including
+        <strong>{{ summary.critical_issue_count }}</strong> P0/P1 issue(s).
+      </p>
+      {% if dataset_verdict.available %}
+      <p>
+        Dataset verdict is <span class="pill {{ dataset_verdict.verdict }}">{{ dataset_verdict.verdict }}</span>
+        with risk score <strong>{{ dataset_verdict.risk_score }}/100</strong>.
+        {{ dataset_verdict.verdict_rationale }}
+      </p>
+      {% endif %}
+    </section>
+
+    <section>
       <h2>Dataset Verdict</h2>
       {% if dataset_verdict.available %}
       <p><strong>Verdict artifact:</strong> <a href="{{ dataset_verdict.path }}">{{ dataset_verdict.path }}</a></p>

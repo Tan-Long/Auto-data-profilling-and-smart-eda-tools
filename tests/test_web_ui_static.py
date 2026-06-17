@@ -108,6 +108,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".artifact-preview",
         ".artifact-review",
         ".artifact-review-kpis",
+        ".artifact-chart-preview",
+        ".artifact-chart-gauge",
+        ".artifact-chart-bar-row",
         ".issue-location-summary",
         ".issue-sample-banner",
         ".issue-column-highlight",
@@ -149,6 +152,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "previewArtifact",
         "renderJsonArtifactPreview",
         "renderRelationshipGraphArtifactReview",
+        "renderChartSpecPreview",
+        "renderArtifactGaugePreview",
+        "renderArtifactBarPreview",
         "renderGenericJsonArtifactReview",
         "renderMarkdownArtifactPreview",
         "renderCsvArtifactPreview",
@@ -241,6 +247,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "run_quality_checks" not in js
     assert "XMLHttpRequest" not in js
     assert "diagramFrame.src =" not in js
+    assert "window.open" not in js
+    assert "Review chart" in js
+    assert 'target="_blank"' not in js
 
 
 def test_web_ui_path_mode_avoids_browser_directory_permission_api():
@@ -250,6 +259,15 @@ def test_web_ui_path_mode_avoids_browser_directory_permission_api():
 
     assert "webkitdirectory" not in html
     assert "showDirectoryPicker" not in js
+
+
+def test_playwright_dashboard_uses_isolated_configurable_port():
+    config = (Path(__file__).resolve().parents[1] / "playwright.config.js").read_text()
+
+    assert "VSF_E2E_PORT" in config
+    assert "18765" in config
+    assert "--port 8765" not in config
+    assert "127.0.0.1:8765" not in config
 
 
 def test_web_dashboard_uses_artifacts_not_raw_csv_fetches():

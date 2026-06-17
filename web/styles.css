@@ -2666,6 +2666,112 @@ button.artifact-link {
   font-size: 13px;
 }
 
+.artifact-chart-preview {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.artifact-chart-gauge {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.artifact-chart-gauge .risk-gauge {
+  width: 112px;
+  height: 112px;
+  flex-basis: 112px;
+}
+
+.artifact-chart-gauge-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.artifact-chart-gauge-copy strong {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.artifact-chart-gauge-copy span {
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.artifact-chart-gauge-copy small {
+  color: var(--foreground-tertiary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.artifact-chart-bars {
+  display: grid;
+  gap: 8px;
+}
+
+.artifact-chart-bar-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.36fr) minmax(120px, 1fr) minmax(68px, auto);
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.artifact-chart-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.artifact-chart-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-inset);
+}
+
+.artifact-chart-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.artifact-chart-fill.warn {
+  background: var(--warning);
+}
+
+.artifact-chart-fill.danger {
+  background: var(--destructive);
+}
+
+.artifact-chart-value {
+  display: grid;
+  justify-items: end;
+  color: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.artifact-chart-value small {
+  color: var(--foreground-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .artifact-review-rows {
   display: grid;
   gap: 8px;

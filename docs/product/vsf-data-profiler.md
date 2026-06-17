@@ -249,8 +249,8 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 
 ## Demo Contract
 
-`make demo-small` must run without internet and create a synthetic dataset with
-known data defects. The resulting `issues.json` must include:
+`make demo-small` must run without internet and create a bundled Olist-shaped
+dataset with known data defects. The resulting `issues.json` must include:
 
 - `DUPLICATE_PRIMARY_KEY`
 - `ORPHAN_FOREIGN_KEY`
@@ -259,8 +259,10 @@ known data defects. The resulting `issues.json` must include:
 - `DATE_ORDER_INVALID`
 - `REQUIRED_FIELD_NULL`
 
-Olist support is optional at runtime because it depends on Kaggle credentials,
-but the CLI must provide clear download and run commands.
+Full Kaggle Olist support is optional at runtime because it depends on Kaggle
+credentials, but the CLI must provide clear download and run commands. The
+default local demo must use Olist table/CSV names even when the full Kaggle
+dataset is not available.
 
 `make demo-full` must run the local release-candidate path: doctor checks,
 `make demo-small`, package export with zip and PDF, final artifact audit,

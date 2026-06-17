@@ -1,7 +1,7 @@
 # VSF Data Profiler Demo Package
 
 This is the concise v0.2 local release-candidate demo path. It uses the
-existing synthetic demo dataset and does not require internet access.
+bundled Olist-shaped demo dataset and does not require internet access.
 
 ## 5-10 Minute Demo Script
 
@@ -10,13 +10,13 @@ existing synthetic demo dataset and does not require internet access.
    writes static Markdown/HTML plus machine-readable artifacts.
 2. Run the release demo:
    `PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-full`
-3. Open `outputs/demo_small/report.html`. Point out schema mapping,
+3. Open `outputs/olist_demo/report.html`. Point out schema mapping,
    relationship checks, issue counts, visual summaries, dataset verdict, and
    execution flow.
 4. Show the artifact directory:
-   `find outputs/demo_small -maxdepth 2 -type f | sort`
+   `find outputs/olist_demo -maxdepth 2 -type f | sort`
 5. Run the fake LLM path to show deterministic guardrails without an API call.
-6. Open `outputs/demo_small_l4/report.html`, then show `l4_report.md` and
+6. Open `outputs/olist_demo_l4/report.html`, then show `l4_report.md` and
    `guardrail_report.json`.
 7. Run the OpenAI smoke path only when `.env` has `OPENAI_API_KEY`. Explain
    that OpenAI may produce unsupported claims; if so, guardrails reject the
@@ -35,7 +35,7 @@ Default deterministic demo:
 
 ```bash
 PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-small
-open outputs/demo_small/report.html
+open outputs/olist_demo/report.html
 ```
 
 Release-candidate demo:
@@ -43,21 +43,21 @@ Release-candidate demo:
 ```bash
 PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler doctor
 PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-full
-open outputs/demo_small_package/index.html
+open outputs/olist_demo_package/index.html
 ```
 
 Fake LLM demo:
 
 ```bash
 PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
-  --dbml data/demo_small/schema.dbml \
-  --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
-  --target order_reviews.review_score \
-  --out outputs/demo_small_l4 \
+  --dbml data/demo_olist/schema.dbml \
+  --csv-dir data/demo_olist/csv \
+  --rules data/demo_olist/rules.yaml \
+  --target olist_order_reviews_dataset.review_score \
+  --out outputs/olist_demo_l4 \
   --use-llm \
   --llm-provider fake
-open outputs/demo_small_l4/report.html
+open outputs/olist_demo_l4/report.html
 ```
 
 OpenAI smoke demo:
@@ -66,15 +66,15 @@ OpenAI smoke demo:
 cp .env.example .env
 # edit .env and set OPENAI_API_KEY; do not commit .env
 PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
-  --dbml data/demo_small/schema.dbml \
-  --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
-  --target order_reviews.review_score \
-  --out outputs/demo_small_l4_openai_smoke \
+  --dbml data/demo_olist/schema.dbml \
+  --csv-dir data/demo_olist/csv \
+  --rules data/demo_olist/rules.yaml \
+  --target olist_order_reviews_dataset.review_score \
+  --out outputs/olist_demo_l4_openai_smoke \
   --use-llm \
   --llm-provider openai
 .venv/bin/python scripts/verify_openai_smoke.py
-open outputs/demo_small_l4_openai_smoke/report.html
+open outputs/olist_demo_l4_openai_smoke/report.html
 ```
 
 ## Artifact Tour

@@ -136,6 +136,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         for rel in schema_diagram["relationships"]
     )
     assert "DBML Diagram and CSV Mapping" in report_html
+    assert "Executive Summary" in report_html
     assert "Schema Parse Diagnostics" in report_md
     assert "Schema Parse Diagnostics" in report_html
     assert "schema_parse_report.json" in report_md
