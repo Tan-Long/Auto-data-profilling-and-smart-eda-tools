@@ -35,6 +35,7 @@ def generate_reports(
     run_summary: dict[str, Any] | None = None,
 ) -> None:
     context = _build_context(
+        out_dir,
         profile,
         issues,
         influence,
@@ -64,11 +65,11 @@ def _template_env() -> Environment:
         lstrip_blocks=True,
     )
     env.filters["pct"] = lambda value: f"{float(value) * 100:.2f}%"
-    env.filters["relationship_status_label"] = _relationship_status_label
     return env
 
 
 def _build_context(
+    out_dir: Path,
     profile: ProfileSummary,
     issues: list[Issue],
     influence: InfluenceResult,
@@ -85,6 +86,15 @@ def _build_context(
 ) -> dict[str, Any]:
     sorted_issues = sorted(issues, key=issue_sort_key)
     verdict_context = _dataset_verdict_context(dataset_verdict)
+    schema_parse_context = _schema_parse_report_context(schema_parse_report)
+    connector_context = _connector_metadata_context(connector_metadata)
+    lineage_context = _lineage_graph_context(lineage_graph)
+    schema_context = _schema_evaluation_context(schema_evaluation)
+    relationship_context = _relationship_graph_context(relationship_graph)
+    table_assessment_context = _table_assessments_context(table_assessments)
+    chart_context = _chart_specs_context(chart_specs)
+    execution_context = _execution_flow_context(run_summary)
+    l4_context = _l4_report_context(run_summary, out_dir)
     table_count = len(profile.tables)
     column_count = sum(table.column_count for table in profile.tables.values())
     row_count = sum(table.row_count for table in profile.tables.values())
@@ -98,24 +108,34 @@ def _build_context(
                 1 for issue in issues if normalize_severity(issue.severity) in {"P0", "P1"}
             ),
         },
+        "scorecard": _scorecard_context(
+            table_count=table_count,
+            column_count=column_count,
+            row_count=row_count,
+            issues=sorted_issues,
+            dataset_verdict=verdict_context,
+            relationship_graph=relationship_context,
+            l4_report=l4_context,
+        ),
         "profile": profile,
         "issues": sorted_issues,
+        "issue_evidence": _issue_evidence_context(sorted_issues),
         "top_issues": sorted_issues[:15],
         "relationship_issues": [
             issue for issue in sorted_issues if issue.issue_type in RELATIONSHIP_ISSUES
         ],
         "influence": influence,
         "schema_diagram": schema_diagram,
-        "schema_parse_report": _schema_parse_report_context(schema_parse_report),
-        "connector_metadata": _connector_metadata_context(connector_metadata),
-        "lineage_graph": _lineage_graph_context(lineage_graph),
-        "schema_evaluation": _schema_evaluation_context(schema_evaluation),
-        "relationship_graph": _relationship_graph_context(relationship_graph),
+        "schema_parse_report": schema_parse_context,
+        "connector_metadata": connector_context,
+        "lineage_graph": lineage_context,
+        "schema_evaluation": schema_context,
+        "relationship_graph": relationship_context,
         "dataset_verdict": verdict_context,
-        "table_assessments": _table_assessments_context(table_assessments),
-        "chart_specs": _chart_specs_context(chart_specs),
-        "execution_flow": _execution_flow_context(run_summary),
-        "l4_report": _l4_report_context(run_summary),
+        "table_assessments": table_assessment_context,
+        "chart_specs": chart_context,
+        "execution_flow": execution_context,
+        "l4_report": l4_context,
         "recommended_actions": _recommended_actions(sorted_issues, verdict_context),
     }
 
@@ -135,6 +155,94 @@ def _recommended_actions(issues: list[Issue], dataset_verdict: dict[str, Any]) -
             if len(actions) >= 10:
                 return actions
     return actions
+
+
+def _scorecard_context(
+    *,
+    table_count: int,
+    column_count: int,
+    row_count: int,
+    issues: list[Issue],
+    dataset_verdict: dict[str, Any],
+    relationship_graph: dict[str, Any],
+    l4_report: dict[str, Any],
+) -> list[dict[str, Any]]:
+    severity_counts = dataset_verdict.get("severity_counts") or {}
+    blocker_count = sum(severity_counts.get(severity, 0) for severity in ("P0", "P1"))
+    relationship_counts = relationship_graph.get("status_counts") or {}
+    invalid_fk_count = relationship_counts.get("invalid", 0)
+    total_fk_count = relationship_graph.get("edge_count", 0)
+    l4_status = l4_report.get("status", "not_enabled")
+    l4_detail = (
+        f"{l4_report.get('provider', 'unknown')} provider"
+        if l4_report.get("available")
+        else "deterministic run"
+    )
+    return [
+        {
+            "label": "Verdict",
+            "value": dataset_verdict.get("verdict", "unknown"),
+            "detail": "dataset_verdict.json",
+            "tone": _tone_for_label(dataset_verdict.get("verdict", "")),
+        },
+        {
+            "label": "Risk",
+            "value": f"{dataset_verdict.get('risk_score', 0)}/100",
+            "detail": dataset_verdict.get("verdict_rationale", ""),
+            "tone": "danger" if _numeric(dataset_verdict.get("risk_score")) >= 75 else "warn",
+        },
+        {
+            "label": "Issues",
+            "value": len(issues),
+            "detail": f"{blocker_count} P0/P1 blockers",
+            "tone": "danger" if blocker_count else "ok",
+        },
+        {
+            "label": "Tables",
+            "value": table_count,
+            "detail": f"{row_count} rows, {column_count} columns",
+            "tone": "info",
+        },
+        {
+            "label": "FK Health",
+            "value": f"{invalid_fk_count}/{total_fk_count}",
+            "detail": "invalid relationship edges",
+            "tone": "danger" if invalid_fk_count else "ok",
+        },
+        {
+            "label": "L4",
+            "value": l4_status,
+            "detail": l4_detail,
+            "tone": _tone_for_l4_status(l4_status),
+        },
+    ]
+
+
+def _issue_evidence_context(issues: list[Issue], *, limit: int = 25) -> list[dict[str, Any]]:
+    rows = []
+    for issue in issues[:limit]:
+        parent = ""
+        if issue.parent_table:
+            parent_columns = ", ".join(issue.parent_columns or [])
+            parent = f"{issue.parent_table}.{parent_columns}" if parent_columns else issue.parent_table
+        rows.append(
+            {
+                "issue_id": issue.issue_id,
+                "severity": issue.severity,
+                "issue_type": issue.issue_type,
+                "table": issue.table,
+                "columns": issue.columns,
+                "columns_text": ", ".join(issue.columns) if issue.columns else "none",
+                "parent_ref": parent,
+                "bad_count": issue.bad_count,
+                "total_count": issue.total_count,
+                "bad_rate": issue.bad_rate,
+                "sample_bad_rows_path": issue.sample_bad_rows_path or "",
+                "probable_cause": "; ".join(issue.probable_causes[:2]) if issue.probable_causes else "",
+                "suggested_fix": issue.suggested_fix[0] if issue.suggested_fix else "",
+            }
+        )
+    return rows
 
 
 def _dataset_verdict_context(dataset_verdict: dict[str, Any] | None) -> dict[str, Any]:
@@ -248,7 +356,7 @@ def _relationship_graph_context(relationship_graph: dict[str, Any] | None) -> di
         "node_count": summary.get("node_count", 0),
         "edge_count": summary.get("edge_count", 0),
         "status_counts": status_counts,
-        "status_counts_text": _format_counts(status_counts, key_formatter=_relationship_status_label),
+        "status_counts_text": _format_counts(status_counts),
         "cardinality_counts": cardinality_counts,
         "cardinality_counts_text": _format_counts(cardinality_counts),
         "junction_table_count": summary.get("junction_table_count", 0),
@@ -257,7 +365,6 @@ def _relationship_graph_context(relationship_graph: dict[str, Any] | None) -> di
             {
                 "id": edge.get("id", ""),
                 "status": edge.get("status", ""),
-                "status_label": _relationship_status_label(edge.get("status", "")),
                 "declared_cardinality": edge.get("declared_cardinality", edge.get("cardinality", "")),
                 "cardinality": edge.get("cardinality", ""),
                 "observed_cardinality": edge.get("observed_cardinality", ""),
@@ -305,23 +412,10 @@ def _table_assessments_context(table_assessments: dict[str, Any] | None) -> dict
     }
 
 
-def _format_counts(counts: dict[str, Any], *, key_formatter: Any | None = None) -> str:
+def _format_counts(counts: dict[str, Any]) -> str:
     if not counts:
         return "none"
-    return ", ".join(f"{key_formatter(key) if key_formatter else key}={value}" for key, value in counts.items())
-
-
-def _relationship_status_label(value: Any) -> str:
-    normalized = str(value or "").lower()
-    if normalized == "invalid":
-        return "FK issue"
-    if normalized == "warning":
-        return "FK warning"
-    if normalized == "valid":
-        return "Healthy FK"
-    if normalized == "skipped":
-        return "Not checked"
-    return str(value or "unknown")
+    return ", ".join(f"{key}={value}" for key, value in counts.items())
 
 
 def _format_endpoint(table: str, columns: Any) -> str:
@@ -387,7 +481,7 @@ def _chart_data_context(
     limit: int | None = None,
 ) -> dict[str, Any]:
     if not spec:
-        return {"available": False, "data": []}
+        return {"available": False, "title": "", "path": "", "data": [], "summary": {}}
     rows = [dict(row) for row in spec.get("data", [])]
     if limit is not None:
         rows = rows[:limit]
@@ -422,9 +516,36 @@ def _with_bar_widths(rows: list[dict[str, Any]], value_key: str) -> list[dict[st
     enriched = []
     for row in rows:
         enriched_row = dict(row)
-        enriched_row["bar_width_pct"] = round(_abs_numeric(row.get(value_key)) / denominator * 100, 2)
+        bar_width_pct = round(_abs_numeric(row.get(value_key)) / denominator * 100, 2)
+        enriched_row["bar_width_pct"] = bar_width_pct
+        enriched_row["bar_text"] = _bar_text(bar_width_pct)
         enriched.append(enriched_row)
     return enriched
+
+
+def _bar_text(width_pct: float, *, width: int = 20) -> str:
+    filled = int(round(max(0.0, min(width_pct, 100.0)) / 100 * width))
+    return "#" * filled + "." * (width - filled)
+
+
+def _tone_for_label(label: str) -> str:
+    if label in {"P0", "P1", "NOT_READY", "invalid", "failed"}:
+        return "danger"
+    if label in {"P2", "WARN", "warning", "fallback_used", "skipped"}:
+        return "warn"
+    if label in {"P3", "READY", "passed", "success", "completed", "valid"}:
+        return "ok"
+    return "info"
+
+
+def _tone_for_l4_status(status: str) -> str:
+    if status == "passed":
+        return "ok"
+    if status == "fallback_used":
+        return "warn"
+    if status == "failed":
+        return "danger"
+    return "info"
 
 
 def _abs_numeric(value: Any) -> float:
@@ -471,18 +592,68 @@ def _execution_flow_context(run_summary: dict[str, Any] | None) -> dict[str, Any
     }
 
 
-def _l4_report_context(run_summary: dict[str, Any] | None) -> dict[str, Any]:
+def _l4_report_context(run_summary: dict[str, Any] | None, out_dir: Path) -> dict[str, Any]:
     if not run_summary:
-        return {"available": False}
+        return _l4_not_enabled_context()
     artifact_paths = run_summary.get("artifact_paths") or {}
     l4_path = artifact_paths.get("l4_report")
     if not l4_path:
-        return {"available": False}
+        return _l4_not_enabled_context()
+    details = _l4_stage_details(run_summary)
+    status = details.get("guardrail_status", "")
+    provider = details.get("provider", "")
+    fallback_reason = details.get("fallback_reason", "")
+    preview_lines = _l4_preview_lines(out_dir / l4_path)
     return {
         "available": True,
         "path": l4_path,
         "guardrail_path": artifact_paths.get("guardrail_report", ""),
+        "status": status or "unknown",
+        "status_class": status or "unknown",
+        "provider": provider or "unknown",
+        "model": details.get("model", ""),
+        "fallback_reason": fallback_reason,
+        "preview_lines": preview_lines,
+        "state_text": "Guarded L4 narrative available.",
     }
+
+
+def _l4_not_enabled_context() -> dict[str, Any]:
+    return {
+        "available": False,
+        "path": "",
+        "guardrail_path": "",
+        "status": "not_enabled",
+        "status_class": "not_enabled",
+        "provider": "none",
+        "model": "",
+        "fallback_reason": "",
+        "preview_lines": [],
+        "state_text": "L4 narrative was not enabled for this deterministic run.",
+    }
+
+
+def _l4_preview_lines(path: Path, *, limit: int = 10) -> list[str]:
+    if not path.is_file():
+        return []
+    lines = []
+    for raw_line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line = line.lstrip("#").strip()
+        if line:
+            lines.append(line)
+        if len(lines) >= limit:
+            break
+    return lines
+
+
+def _l4_stage_details(run_summary: dict[str, Any]) -> dict[str, Any]:
+    for stage in run_summary.get("stage_timings", []):
+        if stage.get("name") == "llm_narrative":
+            return stage.get("details") or {}
+    return {}
 
 
 def _format_duration(value: Any) -> str:

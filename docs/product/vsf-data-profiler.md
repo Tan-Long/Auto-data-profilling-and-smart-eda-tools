@@ -52,7 +52,9 @@ The CLI produces:
 - `report.html`
 - issue sample CSV files under `samples/`
 - optionally, `l4_report.md` and `guardrail_report.json` when `--use-llm`
-  runs the narrative path.
+  runs the narrative path. Reports and the local web dashboard surface the
+  guardrail status, provider, fallback reason, and links when those optional
+  artifacts exist.
 - export packages with `index.html`, `export_manifest.json`, copied generated
   artifacts, bounded sample evidence, an optional zip archive, and optional
   `analysis_report.pdf` when `vsf-profiler package` is run.
@@ -171,12 +173,8 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   business-impact category.
 - Provide interactive lineage and relationship graph views in the web-runner
   dashboard from `lineage_graph.json` and `relationship_graph.json`. The graph
-  views default to a low-noise source/schema/table/artifact-summary overview,
-  then reveal Focus and Full detail modes plus opt-in columns,
-  runtime/artifact fan-out, and invalid/warning relationship filtering. Node
-  selection highlights direct neighbors, fades unrelated graph elements, and
-  shows direct evidence, matching issues, and selected-table columns in the
-  graph drilldown without reading raw CSV rows.
+  views support table, column, relationship, and runtime/artifact scopes plus
+  node drilldown with metadata, matching issues, and evidence artifact links.
 - Package existing run output directories into self-contained offline analysis
   packages. Packages must include canonical generated artifacts, chart specs,
   relationship and lineage graphs, reports, runtime traces, bounded sample
@@ -209,8 +207,10 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 - Record runtime execution flow through a human-readable log, ordered JSONL
   events, and a summary with stage timings, issue counts, artifact paths, and
   skipped or failed stage details.
-- Generate deterministic Markdown and HTML reports with visual summaries without
-  requiring an LLM.
+- Generate deterministic Markdown and HTML reports with a Senior Data Scientist
+  review layout: executive scorecard, visual summaries from chart specs, table
+  impact, issue evidence, relationship/schema/lineage summary, and explicit
+  no-LLM or L4 guardrail state.
 - Link schema parse diagnostics from deterministic Markdown/HTML reports and
   web-runner artifact lists.
 - Link `lineage_graph.json` from deterministic Markdown/HTML reports and
@@ -218,7 +218,9 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 - Optionally generate a Senior Data Scientist narrative from existing structured
   artifacts only, guarded by validation that checks numeric claims,
   table/column/issue references, unsupported table/business-impact claims, and
-  unsupported causal wording.
+  unsupported causal wording. `guardrail_report.json` records provider, model,
+  status, fallback reason, raw CSV inclusion flag, checked claims, violations,
+  and additive `violation_count` metadata.
 - Support a real OpenAI provider adapter behind the same guarded narrative
   boundary, configured by `.env` or environment variables, without making
   external calls in tests.
@@ -226,6 +228,9 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   provider configuration is missing or guardrails reject provider output.
 - Link to `l4_report.md` and `guardrail_report.json` from the deterministic
   reports when those optional artifacts exist.
+- Keep the export package `index.html` and optional `analysis_report.pdf`
+  aligned with the same evidence-first review structure without adding raw CSV
+  files or changing generated artifact contracts.
 
 ## Non-Goals
 
@@ -249,8 +254,8 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 
 ## Demo Contract
 
-`make demo-small` must run without internet and create a bundled Olist-shaped
-dataset with known data defects. The resulting `issues.json` must include:
+`make demo-small` must run without internet and create a synthetic dataset with
+known data defects. The resulting `issues.json` must include:
 
 - `DUPLICATE_PRIMARY_KEY`
 - `ORPHAN_FOREIGN_KEY`
@@ -259,10 +264,8 @@ dataset with known data defects. The resulting `issues.json` must include:
 - `DATE_ORDER_INVALID`
 - `REQUIRED_FIELD_NULL`
 
-Full Kaggle Olist support is optional at runtime because it depends on Kaggle
-credentials, but the CLI must provide clear download and run commands. The
-default local demo must use Olist table/CSV names even when the full Kaggle
-dataset is not available.
+Olist support is optional at runtime because it depends on Kaggle credentials,
+but the CLI must provide clear download and run commands.
 
 `make demo-full` must run the local release-candidate path: doctor checks,
 `make demo-small`, package export with zip and PDF, final artifact audit,

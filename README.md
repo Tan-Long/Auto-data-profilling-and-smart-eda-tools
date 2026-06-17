@@ -21,12 +21,11 @@ Use `python -m venv .venv` instead if your system provides `python` as Python
 
 ## Local Release Demo
 
-The default local demo now uses a bundled Olist-shaped e-commerce dataset. No
-internet or Kaggle account is required for this path.
+No internet or Kaggle account is required.
 
 ```bash
 make demo-small
-open outputs/olist_demo/report.html
+open outputs/demo_small/report.html
 ```
 
 For a 5-10 minute guided walkthrough, command checklist, artifact tour, and L4
@@ -38,53 +37,50 @@ vsf-profiler doctor
 make demo-full
 ```
 
-The full demo runs the bundled Olist sample, exports
-`outputs/olist_demo_package/`, writes `analysis_report.pdf` and
-`outputs/olist_demo_package.zip`, audits the canonical artifacts, and runs the
+The full demo runs the synthetic demo, exports
+`outputs/demo_small_package/`, writes `analysis_report.pdf` and
+`outputs/demo_small_package.zip`, audits the canonical artifacts, and runs the
 Playwright dashboard E2E when local
 Node/Playwright tooling is installed. See
 [docs/releases/v0.2-rc.md](docs/releases/v0.2-rc.md).
-The E2E server uses port `18765` by default to avoid colliding with a normal
-local `vsf-profiler web --port 8765` session; override with `VSF_E2E_PORT` if
-needed.
 
 Latest public prerelease:
-[VSF Data Profiler v0.2.0-rc5](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc5),
-with release notes in [docs/releases/v0.2.0-rc5.md](docs/releases/v0.2.0-rc5.md).
+[VSF Data Profiler v0.2.0-rc2](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc2),
+with release notes in [docs/releases/v0.2.0-rc2.md](docs/releases/v0.2.0-rc2.md).
 
 Expected artifacts:
 
 ```text
-outputs/olist_demo/profile_summary.json
-outputs/olist_demo/issues.json
-outputs/olist_demo/influence.json
-outputs/olist_demo/schema_parse_report.json
-outputs/olist_demo/lineage_graph.json
-outputs/olist_demo/schema_evaluation.json
-outputs/olist_demo/relationship_graph.json
-outputs/olist_demo/dataset_verdict.json
-outputs/olist_demo/table_assessments.json
-outputs/olist_demo/schema_diagram.json
-outputs/olist_demo/schema_diagram.dbml
-outputs/olist_demo/run.log
-outputs/olist_demo/run_events.jsonl
-outputs/olist_demo/run_summary.json
-outputs/olist_demo/charts/
-outputs/olist_demo/report.md
-outputs/olist_demo/report.html
-outputs/olist_demo/samples/
+outputs/demo_small/profile_summary.json
+outputs/demo_small/issues.json
+outputs/demo_small/influence.json
+outputs/demo_small/schema_parse_report.json
+outputs/demo_small/lineage_graph.json
+outputs/demo_small/schema_evaluation.json
+outputs/demo_small/relationship_graph.json
+outputs/demo_small/dataset_verdict.json
+outputs/demo_small/table_assessments.json
+outputs/demo_small/schema_diagram.json
+outputs/demo_small/schema_diagram.dbml
+outputs/demo_small/run.log
+outputs/demo_small/run_events.jsonl
+outputs/demo_small/run_summary.json
+outputs/demo_small/charts/
+outputs/demo_small/report.md
+outputs/demo_small/report.html
+outputs/demo_small/samples/
 ```
 
 On Windows, open the report with:
 
 ```bash
-start outputs/olist_demo/report.html
+start outputs/demo_small/report.html
 ```
 
-## Full Olist Dataset
+## Olist Demo
 
-The bundled demo is intentionally small and deterministic. To run the full
-Kaggle Olist dataset, configure Kaggle CLI authentication first.
+The Olist demo requires Kaggle CLI authentication. The synthetic demo does not
+require internet access.
 
 ```bash
 python -m pip install kaggle
@@ -103,15 +99,15 @@ If `kaggle auth login` is unavailable in your Kaggle CLI version, configure
 vsf-profiler doctor
 
 vsf-profiler run \
-  --dbml data/demo_olist/schema.dbml \
-  --csv-dir data/demo_olist/csv \
-  --rules data/demo_olist/rules.yaml \
-  --target olist_order_reviews_dataset.review_score \
-  --out outputs/olist_demo
+  --dbml data/demo_small/schema.dbml \
+  --csv-dir data/demo_small/csv \
+  --rules data/demo_small/rules.yaml \
+  --target order_reviews.review_score \
+  --out outputs/demo_small
 
 vsf-profiler package \
-  --input outputs/olist_demo \
-  --output outputs/olist_demo_package \
+  --input outputs/demo_small \
+  --output outputs/demo_small_package \
   --zip \
   --pdf
 
@@ -143,26 +139,26 @@ vsf-profiler run \
   --out outputs/mysql_profile
 
 vsf-profiler run \
-  --dbml data/demo_olist/schema.dbml \
-  --csv-dir data/demo_olist/csv \
-  --rules data/demo_olist/rules.yaml \
-  --target olist_order_reviews_dataset.review_score \
-  --out outputs/olist_demo_l4 \
+  --dbml data/demo_small/schema.dbml \
+  --csv-dir data/demo_small/csv \
+  --rules data/demo_small/rules.yaml \
+  --target order_reviews.review_score \
+  --out outputs/demo_small_l4 \
   --use-llm \
   --llm-provider fake
 
 cp .env.example .env
 # edit .env and add OPENAI_API_KEY before using the real provider
 vsf-profiler run \
-  --dbml data/demo_olist/schema.dbml \
-  --csv-dir data/demo_olist/csv \
-  --rules data/demo_olist/rules.yaml \
-  --target olist_order_reviews_dataset.review_score \
-  --out outputs/olist_demo_l4_openai \
+  --dbml data/demo_small/schema.dbml \
+  --csv-dir data/demo_small/csv \
+  --rules data/demo_small/rules.yaml \
+  --target order_reviews.review_score \
+  --out outputs/demo_small_l4_openai \
   --use-llm \
   --llm-provider openai
 
-vsf-profiler demo create-olist-sample --out data/demo_olist
+vsf-profiler demo create-small --out data/demo_small
 vsf-profiler demo download-olist --out data/olist
 vsf-profiler demo run-olist --csv-dir data/olist --out outputs/olist_demo
 ```
@@ -283,7 +279,10 @@ generated artifact URLs such as
 `schema_evaluation.json`, `schema_diagram.json`, `influence.json`, and
 `run_summary.json`. The DBML diagram panel switches from browser preflight
 state to generated `schema_diagram.json`, `relationship_graph.json`, and
-`schema_parse_report.json` artifacts after a run. The Generated results panel
+`schema_parse_report.json` artifacts after a run. Its local ERD renderer uses
+deterministic table layers, compact PK/FK-focused cards, orthogonal
+relationship edges, fit/expanded/non-key controls, and table or relationship
+drilldown backed by existing artifact evidence. The Generated results panel
 previews verdict, issue counts, table impact, runtime summary, and report links
 from those artifacts while keeping raw artifact links available.
 
@@ -313,8 +312,9 @@ v0.2 local release-candidate scope:
 - FK relationship checks with cardinality, composite FK, and junction-table support.
 - Issue catalog with evidence SQL and sample bad rows.
 - DBML diagram artifacts with a dbdiagram.io embed link and CSV-to-table mapping.
-- Local web-runner DBML diagram preview for table nodes, PK/FK columns, CSV
-  mapping status, relationship edges, and parser diagnostics.
+- Local web-runner ERD-style DBML diagram preview for deterministic table
+  layers, compact PK/FK cards, orthogonal relationship edges, fit controls,
+  CSV mapping status, relationship drilldown, and parser diagnostics.
 - Additive lineage graph artifact connecting input sources, schema entities,
   relationships, profiler stages, and generated artifacts.
 - Deterministic severity aggregation and dataset verdict artifact.
@@ -329,6 +329,10 @@ v0.2 local release-candidate scope:
   writing `index.html`, `export_manifest.json`, copied generated artifacts,
   bounded sample evidence, an optional deterministic zip archive, and optional
   `analysis_report.pdf` without raw source CSV files.
+- Generated Markdown, HTML, package index, and package PDF reports use a
+  Senior Data Scientist review layout: executive scorecard, visual summaries,
+  table impact, issue evidence, relationship/schema/lineage summaries, and
+  explicit L4 guardrail state from existing artifacts only.
 - Release-candidate hardening with `vsf-profiler doctor`, `make demo-full`,
   and `scripts/verify_vsf_artifacts.py` for final artifact/package audits.
 - Large dataset benchmark guardrails with `make benchmark-small`,
@@ -337,7 +341,9 @@ v0.2 local release-candidate scope:
 - Optional guarded Senior Data Scientist narrative from structured artifacts
   only, writing `l4_report.md` and `guardrail_report.json` when enabled.
   The built-in providers are `fake` for local validation and `openai` for
-  opt-in API usage with `.env` configuration.
+  opt-in API usage with `.env` configuration. OpenAI-compatible model config is
+  validated before dispatch, and reports/dashboard views surface L4 guardrail
+  status, provider, fallback reason, and artifact links when L4 artifacts exist.
 - Olist-specific influence preset for `review_score`.
 
 Non-goals:

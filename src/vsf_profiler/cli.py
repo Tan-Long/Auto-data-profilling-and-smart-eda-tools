@@ -39,6 +39,8 @@ from vsf_profiler.influence_analyzer import (
 from vsf_profiler.issue_catalog import IssueCatalog
 from vsf_profiler.lineage_graph import build_lineage_graph, read_run_events
 from vsf_profiler.llm_narrative import (
+    DEFAULT_OPENAI_BASE_URL,
+    DEFAULT_OPENAI_MODEL,
     FakeNarrativeProvider,
     NarrativeProvider,
     OpenAINarrativeProvider,
@@ -773,14 +775,18 @@ def _llm_provider_from_config(name: str | None) -> NarrativeProvider | None:
         api_key = os.environ.get("OPENAI_API_KEY", "").strip()
         if not api_key:
             return None
-        return OpenAINarrativeProvider(
-            api_key=api_key,
-            model=os.environ.get("VSF_OPENAI_MODEL", "gpt-5.4-mini").strip() or "gpt-5.4-mini",
-            base_url=os.environ.get("VSF_OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
-            or "https://api.openai.com/v1",
-            timeout_seconds=_env_float("VSF_OPENAI_TIMEOUT_SECONDS", 60.0),
-            max_output_tokens=_env_int("VSF_OPENAI_MAX_OUTPUT_TOKENS", 1200),
-        )
+        try:
+            return OpenAINarrativeProvider(
+                api_key=api_key,
+                model=os.environ.get("VSF_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip()
+                or DEFAULT_OPENAI_MODEL,
+                base_url=os.environ.get("VSF_OPENAI_BASE_URL", DEFAULT_OPENAI_BASE_URL).strip()
+                or DEFAULT_OPENAI_BASE_URL,
+                timeout_seconds=_env_float("VSF_OPENAI_TIMEOUT_SECONDS", 60.0),
+                max_output_tokens=_env_int("VSF_OPENAI_MAX_OUTPUT_TOKENS", 1200),
+            )
+        except ValueError as exc:
+            raise typer.BadParameter(f"Invalid OpenAI L4 provider config: {exc}") from exc
     raise typer.BadParameter(
         f"Unsupported LLM provider '{provider_name}'. Supported providers: fake, openai."
     )

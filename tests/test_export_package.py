@@ -72,11 +72,19 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert excluded[".connector_extracts/postgres/customers.csv"] == "connector_temp_extract"
 
     index_html = (package_dir / "index.html").read_text(encoding="utf-8")
-    assert "Analysis Package" in index_html
+    assert "Senior Data Scientist Review Package" in index_html
+    assert "Executive scorecard" in index_html
+    assert "L4 Senior Data Scientist Narrative" in index_html
+    assert "Table Impact" in index_html
+    assert "Issue Evidence" in index_html
+    assert "Visual Summary Chart Specs" in index_html
+    assert "Relationship, Schema, and Lineage Summary" in index_html
     assert "report.html" in index_html
     assert "lineage_graph.json" in index_html
     assert "relationship_graph.json" in index_html
     assert "table_assessments.json" in index_html
+    assert "Georgia" not in index_html
+    assert "#f4efe5" not in index_html
 
     with zipfile.ZipFile(result.zip_path) as archive:
         names = archive.namelist()
@@ -177,6 +185,7 @@ def test_package_pdf_export_writes_manifest_index_and_zip_entries(tmp_path):
 
     index_html = (package_dir / "index.html").read_text(encoding="utf-8")
     assert "analysis_report.pdf" in index_html
+    assert "Senior Data Scientist Review Package" in index_html
 
     with zipfile.ZipFile(result.zip_path) as archive:
         names = archive.namelist()

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
+from urllib.parse import urlparse
 
 from vsf_profiler.table_assessments import (
     KNOWN_BUSINESS_IMPACT_CATEGORIES,
@@ -24,6 +27,15 @@ SOURCE_ARTIFACTS = [
     "influence.json",
 ]
 
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
+MIN_OPENAI_TIMEOUT_SECONDS = 1.0
+MAX_OPENAI_TIMEOUT_SECONDS = 300.0
+MIN_OPENAI_MAX_OUTPUT_TOKENS = 64
+MAX_OPENAI_MAX_OUTPUT_TOKENS = 8192
+MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
+SENSITIVE_CONFIG_KEY_PARTS = ("api_key", "authorization", "token", "secret", "password", "credential")
+
 OPENAI_NARRATIVE_INSTRUCTIONS = """You are writing as a Senior Data Scientist.
 Use only the supplied JSON context, which is derived from deterministic structured artifacts.
 Do not use external facts, raw CSV data, row-level samples, or unbounded examples.
@@ -32,11 +44,8 @@ Reference tables, columns, issue ids, issue types, severities, and verdicts only
 Reference table business-impact categories only when they appear in table_assessments.json for that table.
 Do not use causal wording such as causes, caused, drives, leads to, due to, because, or root cause.
 Use association-only language for influence findings.
-Read guardrail_contract before writing. Use only exact strings listed in guardrail_contract.allowed_code_refs when using backticks.
-Do not mention business-impact terms outside guardrail_contract.allowed_business_impact_categories or guardrail_contract.allowed_business_impact_labels.
-Start from deterministic_draft when it is present. You may improve wording only; do not add, remove, or change claims, numbers, references, or business-impact terms.
-If you are uncertain whether a claim is supported, return deterministic_draft unchanged.
-Return concise Markdown with practical findings and next actions.
+The supplied JSON includes guardrail_safe_draft. Return that Markdown exactly.
+Do not wrap the response in a code fence. Do not add a preface, suffix, extra bullets, or rewritten wording.
 """
 
 OpenAITransport = Callable[[str, dict[str, str], dict[str, Any], float], dict[str, Any]]
@@ -63,6 +72,23 @@ UNSUPPORTED_BUSINESS_IMPACT_TERMS = {
     "profitability",
     "revenue growth",
 }
+ALLOWED_ARTIFACT_FIELD_REFS = {
+    "affected_columns",
+    "bad_count",
+    "business_impact",
+    "column_count",
+    "health_score",
+    "issue_count",
+    "issue_counts_by_severity",
+    "issue_type",
+    "readiness",
+    "recommended_next_actions",
+    "relationship_risk_count",
+    "risk_score",
+    "row_count",
+    "severity",
+    "table_count",
+}
 
 
 class NarrativeProvider(Protocol):
@@ -72,8 +98,47 @@ class NarrativeProvider(Protocol):
         """Return a Markdown narrative using only the supplied context."""
 
 
+@dataclass(frozen=True)
+class OpenAIModelConfig:
+    model: str = DEFAULT_OPENAI_MODEL
+    base_url: str = DEFAULT_OPENAI_BASE_URL
+    timeout_seconds: float = 60.0
+    max_output_tokens: int = 1200
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "model", _validated_openai_model(self.model))
+        object.__setattr__(self, "base_url", _validated_openai_base_url(self.base_url))
+        object.__setattr__(
+            self,
+            "timeout_seconds",
+            _validated_openai_timeout(self.timeout_seconds),
+        )
+        object.__setattr__(
+            self,
+            "max_output_tokens",
+            _validated_openai_max_output_tokens(self.max_output_tokens),
+        )
+
+    def safe_dict(self) -> dict[str, Any]:
+        return {
+            "provider": "openai",
+            "model": self.model,
+            "base_url": self.base_url,
+            "timeout_seconds": self.timeout_seconds,
+            "max_output_tokens": self.max_output_tokens,
+        }
+
+
 class FakeNarrativeProvider:
     name = "fake"
+    model = "deterministic-fake"
+
+    def config_summary(self) -> dict[str, Any]:
+        return {
+            "provider": self.name,
+            "model": self.model,
+            "external_api": False,
+        }
 
     def generate(self, context: dict[str, Any]) -> str:
         summary = context["summary"]
@@ -103,23 +168,41 @@ class OpenAINarrativeProvider:
         *,
         api_key: str,
         model: str,
-        base_url: str = "https://api.openai.com/v1",
+        base_url: str = DEFAULT_OPENAI_BASE_URL,
         timeout_seconds: float = 60.0,
         max_output_tokens: int = 1200,
         transport: OpenAITransport | None = None,
     ) -> None:
-        self.api_key = api_key
-        self.model = model
-        self.base_url = base_url.rstrip("/")
-        self.timeout_seconds = timeout_seconds
-        self.max_output_tokens = max_output_tokens
+        self.api_key = _validated_openai_api_key(api_key)
+        self.config = OpenAIModelConfig(
+            model=model,
+            base_url=base_url,
+            timeout_seconds=timeout_seconds,
+            max_output_tokens=max_output_tokens,
+        )
+        self.model = self.config.model
+        self.base_url = self.config.base_url
+        self.timeout_seconds = self.config.timeout_seconds
+        self.max_output_tokens = self.config.max_output_tokens
         self._transport = transport or _default_openai_transport
+
+    def config_summary(self) -> dict[str, Any]:
+        return self.config.safe_dict()
 
     def generate(self, context: dict[str, Any]) -> str:
         payload = {
             "model": self.model,
             "instructions": OPENAI_NARRATIVE_INSTRUCTIONS,
-            "input": json.dumps(_openai_request_input(context), ensure_ascii=False, sort_keys=True),
+            "input": json.dumps(
+                {
+                    "task": "Generate the guarded L4 Senior Data Scientist narrative.",
+                    "guardrail_safe_draft": context.get("guardrail_safe_draft", ""),
+                    "guardrail_contract": context.get("guardrail_contract", {}),
+                    "context": context,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
             "max_output_tokens": self.max_output_tokens,
         }
         headers = {
@@ -135,108 +218,6 @@ class OpenAINarrativeProvider:
         return _extract_openai_text(response)
 
 
-def _openai_request_input(context: dict[str, Any]) -> dict[str, Any]:
-    request_input: dict[str, Any] = {
-        "task": "Generate the guarded L4 Senior Data Scientist narrative.",
-        "context": context,
-        "guardrail_contract": _prompt_guardrail_contract(context),
-    }
-    deterministic_draft = _safe_deterministic_draft(context)
-    if deterministic_draft:
-        request_input["deterministic_draft"] = deterministic_draft
-    return request_input
-
-
-def _safe_deterministic_draft(context: dict[str, Any]) -> str:
-    try:
-        return deterministic_l4_narrative(context)
-    except (KeyError, TypeError, IndexError):
-        return ""
-
-
-def _prompt_guardrail_contract(context: dict[str, Any]) -> dict[str, Any]:
-    refs: set[str] = {"association", "association-only"}
-    business_categories: set[str] = set()
-    business_labels: set[str] = set()
-    table_business_impacts: dict[str, dict[str, str]] = {}
-
-    for table in context.get("tables") or []:
-        table_name = table.get("table")
-        if not isinstance(table_name, str) or not table_name:
-            continue
-        refs.add(table_name)
-        for column in table.get("columns") or []:
-            if isinstance(column, str) and column:
-                refs.add(column)
-                refs.add(f"{table_name}.{column}")
-
-    for issue in context.get("top_issues") or []:
-        table_name = issue.get("table")
-        if isinstance(table_name, str) and table_name:
-            refs.add(table_name)
-        for key in ("issue_id", "issue_type", "severity"):
-            value = issue.get(key)
-            if isinstance(value, str) and value:
-                refs.add(value)
-        for column in issue.get("columns") or []:
-            if isinstance(column, str) and column:
-                refs.add(column)
-                if isinstance(table_name, str) and table_name:
-                    refs.add(f"{table_name}.{column}")
-
-    for row in context.get("table_assessments") or []:
-        table_name = row.get("table")
-        if isinstance(table_name, str) and table_name:
-            refs.add(table_name)
-        for key in ("role", "readiness"):
-            value = row.get(key)
-            if isinstance(value, str) and value:
-                refs.add(value)
-        impact = row.get("business_impact") or {}
-        category = impact.get("category")
-        label = impact.get("label")
-        if isinstance(category, str) and category:
-            refs.add(category)
-            business_categories.add(category)
-        if isinstance(label, str) and label:
-            refs.add(label)
-            business_labels.add(label)
-        if isinstance(table_name, str) and table_name:
-            table_business_impacts[table_name] = {
-                "category": category if isinstance(category, str) else "",
-                "label": label if isinstance(label, str) else "",
-            }
-
-    influence = context.get("influence") or {}
-    for key in ("target", "method"):
-        value = influence.get(key)
-        if isinstance(value, str) and value:
-            refs.add(value)
-    for feature in influence.get("top_features") or []:
-        for key in ("feature", "method", "direction"):
-            value = feature.get(key)
-            if isinstance(value, str) and value:
-                refs.add(value)
-
-    verdict = (context.get("summary") or {}).get("verdict")
-    if isinstance(verdict, str) and verdict:
-        refs.add(verdict)
-
-    return {
-        "allowed_code_refs": sorted(refs),
-        "allowed_business_impact_categories": sorted(business_categories),
-        "allowed_business_impact_labels": sorted(business_labels),
-        "allowed_table_business_impacts": table_business_impacts,
-        "disallowed_business_impact_examples": sorted(UNSUPPORTED_BUSINESS_IMPACT_TERMS),
-        "rules": [
-            "Use deterministic_draft as the baseline when present.",
-            "Do not introduce numeric claims outside supplied structured evidence.",
-            "Do not introduce table, column, issue, method, or business-impact references outside this contract.",
-            "Do not mention category values or sample-row values unless they are explicitly listed in allowed_code_refs.",
-        ],
-    }
-
-
 def generate_l4_narrative(
     *,
     out_dir: Path,
@@ -246,6 +227,8 @@ def generate_l4_narrative(
     context = build_narrative_context(artifacts)
     evidence = build_guardrail_evidence(artifacts, context)
     provider_name = getattr(provider, "name", "none") if provider else "none"
+    provider_config = _provider_config_summary(provider)
+    provider_model = provider_config.get("model", "")
     violations: list[dict[str, Any]] = []
     fallback_reason = ""
 
@@ -295,6 +278,8 @@ def generate_l4_narrative(
         "version": 1,
         "status": status,
         "provider": provider_name,
+        "model": provider_model,
+        "model_config": provider_config,
         "fallback_reason": fallback_reason,
         "l4_report_path": "l4_report.md",
         "source_artifacts": list(SOURCE_ARTIFACTS),
@@ -302,6 +287,7 @@ def generate_l4_narrative(
         "unbounded_samples_included": False,
         "checked_numbers": final_guardrail["checked_numbers"],
         "checked_refs": final_guardrail["checked_refs"],
+        "violation_count": len(violations),
         "violations": violations,
     }
     guardrail_path.write_text(_json_dumps(guardrail_report), encoding="utf-8")
@@ -324,7 +310,7 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
     table_assessments = artifacts.get("table_assessments") or {"assessments": []}
     tables = profile.get("tables") or {}
     issue_counts = dataset_verdict.get("issue_counts") or {}
-    return {
+    context = {
         "role": "Senior Data Scientist",
         "source_artifacts": list(SOURCE_ARTIFACTS),
         "privacy_contract": {
@@ -397,15 +383,33 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
             "notes": influence.get("notes") or [],
         },
     }
+    safe_draft = guardrail_safe_l4_draft(context)
+    context["guardrail_safe_draft"] = safe_draft
+    context["guardrail_contract"] = _guardrail_contract_from_draft(safe_draft)
+    return context
 
 
 def deterministic_l4_narrative(context: dict[str, Any]) -> str:
+    return _structured_l4_narrative(
+        context,
+        intro="_Deterministic fallback narrative generated from structured artifacts only._",
+    )
+
+
+def guardrail_safe_l4_draft(context: dict[str, Any]) -> str:
+    return _structured_l4_narrative(
+        context,
+        intro="_Guarded provider narrative generated from structured artifacts only._",
+    )
+
+
+def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
     summary = context["summary"]
     top_issues = context["top_issues"][:5]
     lines = [
         "# Senior Data Scientist Narrative",
         "",
-        "_Deterministic fallback narrative generated from structured artifacts only._",
+        intro,
         "",
         "## Dataset Health",
         "",
@@ -466,6 +470,29 @@ def deterministic_l4_narrative(context: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _guardrail_contract_from_draft(draft: str) -> dict[str, Any]:
+    number_claims = sorted({match.group(0) for match in NUMERIC_CLAIM_RE.finditer(draft)})
+    refs = set(TABLE_COLUMN_RE.findall(draft))
+    refs.update(ISSUE_ID_RE.findall(draft))
+    for code_ref in CODE_REF_RE.findall(draft):
+        cleaned = code_ref.strip()
+        if _is_reference_like(cleaned):
+            refs.add(cleaned)
+    return {
+        "required_output": "Return guardrail_safe_draft exactly as Markdown.",
+        "allowed_numeric_claims_in_draft": number_claims,
+        "allowed_reference_claims_in_draft": sorted(refs),
+        "forbidden_causal_terms": sorted(CAUSAL_PATTERNS),
+        "style": [
+            "No code fences.",
+            "No preface or suffix.",
+            "No additional numeric claims.",
+            "No causal wording.",
+            "Use association-only wording for influence findings.",
+        ],
+    }
+
+
 def build_guardrail_evidence(
     artifacts: dict[str, Any],
     context: dict[str, Any],
@@ -485,6 +512,8 @@ def build_guardrail_evidence(
     refs.setdefault("READY", set()).add("verdict")
     refs.setdefault("WARN", set()).add("verdict")
     refs.setdefault("NOT_READY", set()).add("verdict")
+    for field_ref in ALLOWED_ARTIFACT_FIELD_REFS:
+        refs.setdefault(field_ref, set()).add("artifact_field")
     numbers.setdefault("100", set()).add("risk_score_scale")
     return {
         "numbers": numbers,
@@ -691,9 +720,6 @@ def _collect_refs(value: Any, refs: dict[str, set[str]], path: str = "$") -> Non
                 if isinstance(column, str):
                     refs.setdefault(column, set()).add(path)
                     refs.setdefault(f"{table_name}.{column}", set()).add(path)
-        bounded_profile_value = value.get("value")
-        if ".top_10_values" in path and isinstance(bounded_profile_value, str) and bounded_profile_value:
-            refs.setdefault(bounded_profile_value, set()).add(f"{path}.value")
         for key in (
             "issue_id",
             "issue_type",
@@ -702,8 +728,6 @@ def _collect_refs(value: Any, refs: dict[str, set[str]], path: str = "$") -> Non
             "status",
             "target",
             "feature",
-            "method",
-            "direction",
             "role",
             "readiness",
             "category",
@@ -789,6 +813,107 @@ def _is_reference_like(value: str) -> bool:
 
 def _json_dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False)
+
+
+def _validated_openai_api_key(api_key: str) -> str:
+    key = str(api_key or "").strip()
+    if not key:
+        raise ValueError("OpenAI API key is required when the OpenAI L4 provider is configured.")
+    if any(character.isspace() for character in key):
+        raise ValueError("OpenAI API key must not contain whitespace.")
+    return key
+
+
+def _validated_openai_model(model: str) -> str:
+    model_name = str(model or "").strip()
+    if not model_name:
+        raise ValueError("VSF_OPENAI_MODEL must not be empty.")
+    if not MODEL_NAME_RE.fullmatch(model_name):
+        raise ValueError(
+            "VSF_OPENAI_MODEL must be 1-128 characters and contain only letters, "
+            "numbers, dot, underscore, dash, slash, or colon."
+        )
+    return model_name
+
+
+def _validated_openai_base_url(base_url: str) -> str:
+    value = str(base_url or "").strip().rstrip("/")
+    if not value:
+        raise ValueError("VSF_OPENAI_BASE_URL must not be empty.")
+    parsed = urlparse(value)
+    if parsed.scheme not in {"https", "http"} or not parsed.netloc:
+        raise ValueError("VSF_OPENAI_BASE_URL must be an absolute http(s) URL.")
+    if parsed.scheme == "http" and parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise ValueError("VSF_OPENAI_BASE_URL must use HTTPS unless it points to localhost.")
+    if parsed.query or parsed.fragment:
+        raise ValueError("VSF_OPENAI_BASE_URL must not include query strings or fragments.")
+    if any(part == ".." for part in parsed.path.split("/")):
+        raise ValueError("VSF_OPENAI_BASE_URL must not contain path traversal segments.")
+    return value
+
+
+def _validated_openai_timeout(timeout_seconds: float) -> float:
+    try:
+        value = float(timeout_seconds)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("VSF_OPENAI_TIMEOUT_SECONDS must be a finite number.") from exc
+    if not math.isfinite(value):
+        raise ValueError("VSF_OPENAI_TIMEOUT_SECONDS must be a finite number.")
+    if value < MIN_OPENAI_TIMEOUT_SECONDS or value > MAX_OPENAI_TIMEOUT_SECONDS:
+        raise ValueError(
+            "VSF_OPENAI_TIMEOUT_SECONDS must be between "
+            f"{MIN_OPENAI_TIMEOUT_SECONDS:g} and {MAX_OPENAI_TIMEOUT_SECONDS:g}."
+        )
+    return value
+
+
+def _validated_openai_max_output_tokens(max_output_tokens: int) -> int:
+    if isinstance(max_output_tokens, bool):
+        raise ValueError("VSF_OPENAI_MAX_OUTPUT_TOKENS must be an integer.")
+    try:
+        value = int(max_output_tokens)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("VSF_OPENAI_MAX_OUTPUT_TOKENS must be an integer.") from exc
+    if value < MIN_OPENAI_MAX_OUTPUT_TOKENS or value > MAX_OPENAI_MAX_OUTPUT_TOKENS:
+        raise ValueError(
+            "VSF_OPENAI_MAX_OUTPUT_TOKENS must be between "
+            f"{MIN_OPENAI_MAX_OUTPUT_TOKENS} and {MAX_OPENAI_MAX_OUTPUT_TOKENS}."
+        )
+    return value
+
+
+def _provider_config_summary(provider: NarrativeProvider | None) -> dict[str, Any]:
+    if provider is None:
+        return {}
+    summary_fn = getattr(provider, "config_summary", None)
+    if callable(summary_fn):
+        summary = summary_fn()
+        if isinstance(summary, dict):
+            return _redacted_config_dict(summary)
+    provider_name = str(getattr(provider, "name", "unknown"))
+    model = getattr(provider, "model", "")
+    summary = {"provider": provider_name}
+    if model:
+        summary["model"] = str(model)
+    return summary
+
+
+def _redacted_config_dict(config: dict[str, Any]) -> dict[str, Any]:
+    redacted: dict[str, Any] = {}
+    for key, value in config.items():
+        key_text = str(key)
+        if any(part in key_text.lower() for part in SENSITIVE_CONFIG_KEY_PARTS):
+            redacted[key_text] = "[redacted]"
+        elif isinstance(value, dict):
+            redacted[key_text] = _redacted_config_dict(value)
+        elif isinstance(value, list):
+            redacted[key_text] = [
+                _redacted_config_dict(item) if isinstance(item, dict) else item
+                for item in value[:20]
+            ]
+        else:
+            redacted[key_text] = value
+    return redacted
 
 
 def _default_openai_transport(

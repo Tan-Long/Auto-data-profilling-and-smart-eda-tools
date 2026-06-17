@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 
 
-BASELINE_DIR = Path("outputs/demo_small")
-OPENAI_DIR = Path("outputs/demo_small_l4_openai_smoke")
-BASELINE_MANIFEST = Path("outputs/demo_small_deterministic_manifest_before_openai.json")
+BASELINE_DIR = Path("outputs/olist_demo")
+OPENAI_DIR = Path("outputs/olist_l4_openai_smoke")
+BASELINE_MANIFEST = Path("outputs/olist_deterministic_manifest_before_openai.json")
 
 DETERMINISTIC_ARTIFACTS = [
     "profile_summary.json",
@@ -31,10 +31,10 @@ def main() -> None:
     guardrail = _read_json(OPENAI_DIR / "guardrail_report.json")
     _require((OPENAI_DIR / "l4_report.md").exists(), "l4_report.md is missing")
     _require(guardrail["provider"] == "openai", "guardrail provider is not openai")
-    _require(
-        guardrail["status"] in {"passed", "fallback_used"},
-        f"unexpected guardrail status: {guardrail['status']}",
-    )
+    _require(guardrail["status"] == "passed", f"guardrail did not pass: {guardrail['status']}")
+    _require(guardrail["fallback_reason"] == "", "OpenAI smoke used deterministic fallback")
+    _require(guardrail.get("violation_count", 0) == 0, "guardrail violation_count is not zero")
+    _require(not guardrail.get("violations"), "guardrail violations are not empty")
     _require(guardrail["raw_csv_included"] is False, "raw_csv_included flag is not false")
     _require(
         guardrail["unbounded_samples_included"] is False,
@@ -97,6 +97,7 @@ def main() -> None:
     print("openai_smoke_verification=passed")
     print(f"guardrail_status={guardrail['status']}")
     print(f"fallback_reason={guardrail['fallback_reason'] or '<none>'}")
+    print(f"violation_count={guardrail.get('violation_count', 0)}")
 
 
 def _read_json(path: Path) -> dict:
@@ -122,7 +123,7 @@ def _env_values(path: Path) -> dict[str, str]:
 
 def _raw_row_hits(scan_text: str) -> list[str]:
     hits = []
-    for csv_path in sorted(Path("data/demo_small/csv").glob("*.csv")):
+    for csv_path in sorted(Path("data/demo_olist/csv").glob("*.csv")):
         with csv_path.open(newline="", encoding="utf-8") as handle:
             reader = csv.reader(handle)
             next(reader, None)

@@ -347,6 +347,9 @@ def _render_index_html(
     schema_parse = _read_json(source_root / "schema_parse_report.json")
     schema_evaluation = _read_json(source_root / "schema_evaluation.json")
     connector_metadata = _read_json(source_root / "connector_metadata.json")
+    profile_summary = _read_json(source_root / "profile_summary.json")
+    issues = _read_json_list(source_root / "issues.json")
+    guardrail_report = _read_json(source_root / "guardrail_report.json")
     chart_paths = sorted(path for path in artifact_index if path.startswith("charts/"))
     sample_paths = sorted(path for path in artifact_index if path.startswith("samples/"))
     optional_paths = [
@@ -356,7 +359,10 @@ def _render_index_html(
     ]
     run_id = source_run.get("run_id", "unknown") if source_run else "unknown"
     run_status = source_run.get("status", "unknown") if source_run else "unknown"
-    issue_counts = source_run.get("issue_counts") or {}
+    verdict_issue_counts = verdict.get("issue_counts") or {}
+    severity_counts = verdict_issue_counts.get("by_severity") or {}
+    issue_total = verdict_issue_counts.get("total", len(issues))
+    blocker_count = sum(int(severity_counts.get(severity, 0) or 0) for severity in ("P0", "P1"))
     verdict_label = verdict.get("verdict", "unknown")
     risk_score = verdict.get("risk_score", "n/a")
     relationship_summary = relationship_graph.get("summary") or {}
@@ -364,17 +370,24 @@ def _render_index_html(
     lineage_summary = lineage_graph.get("summary") or {}
     parse_counts = schema_parse.get("counts") or {}
     eval_summary = schema_evaluation.get("summary") or {}
+    profile_tables = profile_summary.get("tables") or {}
+    row_count = sum(int(table.get("row_count") or 0) for table in profile_tables.values())
+    column_count = sum(int(table.get("column_count") or 0) for table in profile_tables.values())
+    relationship_status_counts = relationship_summary.get("status_counts") or {}
+    invalid_fk_count = int(relationship_status_counts.get("invalid", 0) or 0)
+    l4_status = guardrail_report.get("status", "not_enabled") if guardrail_report else "not_enabled"
+    l4_provider = guardrail_report.get("provider", "none") if guardrail_report else "none"
     cards = [
         ("Verdict", verdict_label, f"Risk score {risk_score}"),
-        ("Issues", str(issue_counts.get("total", "0")), "Total findings"),
-        ("Tables", str(eval_summary.get("mapped_table_count", "0")), "Mapped source tables"),
-        ("Relationships", str(relationship_summary.get("edge_count", "0")), "FK edges"),
+        ("Issues", str(issue_total), f"{blocker_count} P0/P1 blockers"),
+        ("Tables", str(len(profile_tables) or eval_summary.get("mapped_table_count", "0")), f"{row_count} rows, {column_count} columns"),
+        ("FK Health", f"{invalid_fk_count}/{relationship_summary.get('edge_count', 0)}", "Invalid relationship edges"),
         (
             "Table assessments",
             str(table_assessment_summary.get("table_count", "0")),
             "Readiness rows",
         ),
-        ("Lineage", str(lineage_summary.get("edge_count", "0")), "Dependency edges"),
+        ("L4", l4_status, f"{l4_provider} provider"),
         ("Artifacts", str(len(artifact_index)), "Package files"),
     ]
     return f"""<!doctype html>
@@ -382,22 +395,24 @@ def _render_index_html(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VSF Analysis Package</title>
+  <title>VSF Senior Data Scientist Review Package</title>
   <style>
     :root {{
-      --foreground-primary: #17211d;
-      --foreground-secondary: #4d5b55;
-      --foreground-tertiary: #6d7974;
-      --surface-canvas: #f4efe5;
-      --surface-panel: #fffaf0;
-      --surface-overlay: #fffdf7;
-      --surface-inset: #ece3d3;
-      --border-subtle: #e7dccb;
-      --border-default: #d4c7b5;
-      --border-strong: #9c8f7d;
-      --accent: #0b6b5f;
-      --warning: #a76a00;
-      --destructive: #a33b2f;
+      --foreground-primary: #121817;
+      --foreground-secondary: #46504d;
+      --foreground-tertiary: #68736f;
+      --surface-canvas: #f5f7f5;
+      --surface-panel: #ffffff;
+      --surface-overlay: #f9faf8;
+      --surface-inset: #eef2ef;
+      --border-subtle: #e3e8e4;
+      --border-default: #cfd8d2;
+      --border-strong: #9daaa3;
+      --accent: #0f7664;
+      --success: #23764d;
+      --warning: #9a5f00;
+      --destructive: #b23b32;
+      --info: #316596;
     }}
     * {{ box-sizing: border-box; }}
     body {{
@@ -412,11 +427,11 @@ def _render_index_html(
       gap: 10px;
       padding: 20px;
       border: 1px solid var(--border-default);
-      border-radius: 18px;
+      border-radius: 12px;
       background: var(--surface-panel);
     }}
     h1, h2, h3, p {{ margin-top: 0; }}
-    h1 {{ margin-bottom: 0; font-family: Georgia, "Times New Roman", serif; font-size: 28px; }}
+    h1 {{ margin-bottom: 0; font-size: 30px; line-height: 1.12; letter-spacing: 0; }}
     h2 {{ margin-bottom: 12px; font-size: 18px; }}
     a {{ color: var(--accent); font-weight: 800; }}
     code {{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
@@ -439,6 +454,15 @@ def _render_index_html(
     }}
     .metric strong {{ display: block; font-size: 24px; line-height: 1; }}
     .metric span {{ color: var(--foreground-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }}
+    table {{ width: 100%; border-collapse: collapse; background: var(--surface-panel); }}
+    th, td {{ padding: 8px 9px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }}
+    th {{ background: var(--surface-inset); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; text-transform: uppercase; }}
+    .table-wrap {{ overflow-x: auto; }}
+    .pill {{ display: inline-flex; min-height: 24px; align-items: center; border: 1px solid var(--border-default); border-radius: 999px; padding: 2px 8px; font: 800 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
+    .NOT_READY, .P0, .P1, .failed, .invalid {{ color: var(--destructive); border-color: rgba(178, 59, 50, 0.35); }}
+    .WARN, .P2, .fallback_used, .warning {{ color: var(--warning); border-color: rgba(154, 95, 0, 0.35); }}
+    .READY, .P3, .passed, .valid {{ color: var(--success); border-color: rgba(35, 118, 77, 0.35); }}
+    .not_enabled, .unknown {{ color: var(--info); border-color: rgba(49, 101, 150, 0.35); }}
     .section {{ margin-top: 16px; }}
     .links {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }}
     .link-row {{
@@ -470,11 +494,51 @@ def _render_index_html(
   <main>
     <header>
       <p class="eyebrow">VSF Data Profiler</p>
-      <h1>Analysis Package</h1>
-      <p class="meta">Run <code>{_h(run_id)}</code> finished with status <strong>{_h(run_status)}</strong>. This package contains generated artifacts only, plus bounded sample evidence when available.</p>
+      <h1>Senior Data Scientist Review Package</h1>
+      <p class="meta">Run <code>{_h(run_id)}</code> finished with status <strong>{_h(run_status)}</strong>. This offline package contains generated artifacts only, plus bounded sample evidence when available. Raw source CSV files are excluded.</p>
     </header>
     <section class="grid" aria-label="Package summary">
       {''.join(_metric_card(label, value, detail) for label, value, detail in cards)}
+    </section>
+    <section class="section panel">
+      <h2>Executive scorecard</h2>
+      <p class="meta">{_h(verdict.get("verdict_rationale", "No verdict rationale was included."))}</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Signal</th><th>Value</th><th>Evidence</th></tr></thead>
+          <tbody>
+            {''.join(_scorecard_row(label, value, detail) for label, value, detail in cards)}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="section panel">
+      <h2>L4 Senior Data Scientist Narrative</h2>
+      {l4_summary_html(guardrail_report, artifact_index)}
+    </section>
+    <section class="section panel">
+      <h2>Table Impact</h2>
+      <p class="meta">Powered by <code>table_assessments.json</code>. Readiness, health score, relationship risk, and business-impact labels are deterministic artifact evidence.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Issues</th><th>Relationship risks</th><th>Business impact</th><th>First action</th></tr></thead>
+          <tbody>
+            {table_impact_rows_html(table_assessments)}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="section panel">
+      <h2>Issue Evidence</h2>
+      <p class="meta">Top findings from <code>issues.json</code>, including bounded sample links when included in the package.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Issue</th><th>Severity</th><th>Type</th><th>Table</th><th>Columns</th><th>Bad rows</th><th>Bad rate</th><th>Sample</th><th>Suggested fix</th></tr></thead>
+          <tbody>
+            {issue_rows_html(issues, artifact_index)}
+          </tbody>
+        </table>
+      </div>
     </section>
     <section class="grid">
       <article class="panel">
@@ -499,6 +563,18 @@ def _render_index_html(
       </article>
     </section>
     <section class="section panel">
+      <h2>Relationship, Schema, and Lineage Summary</h2>
+      <ul class="summary-list">
+        <li><span>Schema parse diagnostics</span><strong>{_h(len(schema_parse.get("diagnostics") or []))}</strong></li>
+        <li><span>Mapped tables</span><strong>{_h(eval_summary.get("mapped_table_count", 0))}</strong></li>
+        <li><span>Missing tables</span><strong>{_h(eval_summary.get("missing_table_count", 0))}</strong></li>
+        <li><span>Relationship edges</span><strong>{_h(relationship_summary.get("edge_count", 0))}</strong></li>
+        <li><span>Relationship status counts</span><strong>{_h(_counts_text(relationship_status_counts))}</strong></li>
+        <li><span>Lineage artifacts</span><strong>{_h(lineage_summary.get("artifact_count", 0))}</strong></li>
+        <li><span>Lineage dependency edges</span><strong>{_h(lineage_summary.get("edge_count", 0))}</strong></li>
+      </ul>
+    </section>
+    <section class="section panel">
       <h2>Primary reports</h2>
       <div class="links">
         {_artifact_link("Open PDF report", PDF_REPORT_NAME, artifact_index)}
@@ -515,7 +591,7 @@ def _render_index_html(
       </div>
     </section>
     <section class="section panel">
-      <h2>Chart specs</h2>
+      <h2>Visual Summary Chart Specs</h2>
       <div class="links">
         {''.join(_artifact_link(Path(path).name, path, artifact_index) for path in chart_paths) or '<p class="meta">No chart specs were included.</p>'}
       </div>
@@ -546,6 +622,84 @@ def connector_summary_html(connector_metadata: dict[str, Any]) -> str:
           <li><span>Secrets redacted</span><strong>{_h(connector_metadata.get("secrets_redacted", False))}</strong></li>
         </ul>
     """
+
+
+def l4_summary_html(guardrail_report: dict[str, Any], artifact_index: dict[str, dict[str, Any]]) -> str:
+    if not guardrail_report:
+        return (
+            '<p><span class="pill not_enabled">not_enabled</span> '
+            "L4 narrative was not enabled for this deterministic run.</p>"
+        )
+    status = guardrail_report.get("status", "unknown")
+    provider = guardrail_report.get("provider", "unknown")
+    model = guardrail_report.get("model", "")
+    fallback_reason = guardrail_report.get("fallback_reason", "")
+    details = [
+        f'<span class="pill {_h(status)}">{_h(status)}</span>',
+        f"provider=<strong>{_h(provider)}</strong>",
+    ]
+    if model:
+        details.append(f"model=<code>{_h(model)}</code>")
+    if fallback_reason:
+        details.append(f"fallback={_h(fallback_reason)}")
+    return f"""
+      <p>{' · '.join(details)}</p>
+      <div class="links">
+        {_artifact_link("Open L4 report", "l4_report.md", artifact_index)}
+        {_artifact_link("Open guardrail report", "guardrail_report.json", artifact_index)}
+      </div>
+    """
+
+
+def table_impact_rows_html(table_assessments: dict[str, Any]) -> str:
+    rows = []
+    for row in (table_assessments.get("assessments") or [])[:20]:
+        impact = row.get("business_impact") or {}
+        issue_total = sum(int(value or 0) for value in (row.get("issue_counts_by_severity") or {}).values())
+        actions = row.get("recommended_next_actions") or []
+        rows.append(
+            "<tr>"
+            f"<td><code>{_h(row.get('table', ''))}</code></td>"
+            f"<td>{_h(row.get('role', ''))}</td>"
+            f"<td><span class=\"pill {_h(row.get('readiness', 'unknown'))}\">{_h(row.get('readiness', 'unknown'))}</span></td>"
+            f"<td>{_h(row.get('health_score', 0))}</td>"
+            f"<td>{_h(issue_total)}</td>"
+            f"<td>{_h(len(row.get('relationship_risks') or []))}</td>"
+            f"<td>{_h(impact.get('label', ''))}<br><span class=\"meta\">{_h(impact.get('category', ''))}</span></td>"
+            f"<td>{_h(actions[0] if actions else '')}</td>"
+            "</tr>"
+        )
+    if not rows:
+        return '<tr><td colspan="8">No table assessment rows were included.</td></tr>'
+    return "".join(rows)
+
+
+def issue_rows_html(issues: list[dict[str, Any]], artifact_index: dict[str, dict[str, Any]]) -> str:
+    rows = []
+    for issue in issues[:25]:
+        sample_path = issue.get("sample_bad_rows_path") or ""
+        sample_html = _artifact_link(sample_path, sample_path, artifact_index) if sample_path else "none"
+        fixes = issue.get("suggested_fix") or []
+        rows.append(
+            "<tr>"
+            f"<td><code>{_h(issue.get('issue_id', ''))}</code></td>"
+            f"<td><span class=\"pill {_h(issue.get('severity', 'unknown'))}\">{_h(issue.get('severity', 'unknown'))}</span></td>"
+            f"<td>{_h(issue.get('issue_type', ''))}</td>"
+            f"<td><code>{_h(issue.get('table', ''))}</code></td>"
+            f"<td>{_h(', '.join(issue.get('columns') or []))}</td>"
+            f"<td>{_h(issue.get('bad_count', 0))}/{_h(issue.get('total_count', 0))}</td>"
+            f"<td>{_h(_format_percent(issue.get('bad_rate', 0)))}</td>"
+            f"<td>{sample_html}</td>"
+            f"<td>{_h(fixes[0] if fixes else '')}</td>"
+            "</tr>"
+        )
+    if not rows:
+        return '<tr><td colspan="9">No issue rows were included.</td></tr>'
+    return "".join(rows)
+
+
+def _scorecard_row(label: str, value: Any, detail: str) -> str:
+    return f"<tr><td>{_h(label)}</td><td><strong>{_h(value)}</strong></td><td>{_h(detail)}</td></tr>"
 
 
 def _artifact_links() -> list[tuple[str, str]]:
@@ -586,6 +740,19 @@ def _artifact_link(label: str, path: str, artifact_index: dict[str, dict[str, An
         <code>{_h(path)}</code>
       </a>
     """
+
+
+def _format_percent(value: Any) -> str:
+    try:
+        return f"{float(value or 0.0) * 100:.2f}%"
+    except (TypeError, ValueError):
+        return "0.00%"
+
+
+def _counts_text(counts: dict[str, Any]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{key}={value}" for key, value in counts.items())
 
 
 def _scan_package_redaction(package_root: Path) -> dict[str, Any]:
@@ -653,6 +820,16 @@ def _read_json(path: Path) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _read_json_list(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    return [item for item in payload if isinstance(item, dict)] if isinstance(payload, list) else []
 
 
 def _sha256_file(path: Path) -> str:

@@ -539,9 +539,13 @@ Current chart specs:
 - dataset verdict risk summary;
 - influence top features when available.
 
-The Markdown and HTML reports render visual summaries from those specs. HTML
-uses simple CSS bars only; the CLI does not need matplotlib, seaborn, browser
-automation, or raw-data plotting to produce these reports.
+The Markdown and HTML reports render a static Senior Data Scientist review from
+those specs and the other generated machine artifacts. The report structure is
+evidence-first: executive scorecard, chart-summary bars, table impact, issue
+evidence, relationship/schema/lineage summary, and explicit L4 or no-LLM state.
+HTML uses simple CSS bars only; Markdown uses textual bars for PDF/package
+compatibility. The CLI does not need matplotlib, seaborn, browser automation,
+or raw-data plotting to produce these reports.
 
 The local web runner renders an interactive dashboard from the same generated
 chart specs and machine artifacts. Dashboard filtering and drilldown are
@@ -550,9 +554,12 @@ summarize dataset verdict, issue counts, table impact, runtime summary, and
 report links from those artifacts while preserving raw artifact links. The
 DBML diagram panel renders browser preflight state before a run and prefers
 generated `schema_diagram.json`, `relationship_graph.json`, and
-`schema_parse_report.json` artifact evidence after a run. The dashboard must
-use web-runner artifact URLs and must not read raw CSV files, infer new
-profiling facts, or rerun the profiler.
+`schema_parse_report.json` artifact evidence after a run. The local diagram
+renderer is an ERD-style SVG presentation layer: deterministic role/degree/name
+layout, compact PK/FK table cards, orthogonal relationship paths, fit and
+expanded/non-key controls, and table or relationship detail panels. The
+dashboard must use web-runner artifact URLs and must not read raw CSV files,
+infer new profiling facts, or rerun the profiler.
 
 Roadmap chart artifacts:
 
@@ -653,6 +660,11 @@ Guardrail validation should run after generation:
 The OpenAI provider uses the Responses API with a bounded JSON prompt built
 from the same narrative context. It does not use the OpenAI SDK as a required
 dependency and must remain testable through an injected fake transport.
+Provider configuration is validated before dispatch: model names must be
+bounded, base URLs must be absolute http(s) URLs with HTTPS required outside
+localhost, timeouts and output-token limits must be finite and bounded, and API
+keys must not be recorded. `guardrail_report.json` may include sanitized model
+configuration for audit, but never provider secrets.
 
 ## Reports and Artifacts
 
@@ -677,12 +689,19 @@ The output directory is the run contract.
 | `schema_diagram.json` | Diagram metadata and dbdiagram link. |
 | `schema_diagram.dbml` | DBML used for diagram rendering. |
 | `l4_report.md` | Optional Senior Data Scientist narrative when `--use-llm` runs. |
-| `guardrail_report.json` | Optional L4 validation status, checked claims, and violations. |
+| `guardrail_report.json` | Optional L4 validation status, sanitized model config, checked claims, and violations. |
 | `report.md` | Deterministic human-readable report. |
 | `report.html` | Static HTML report. |
 | `analysis_report.pdf` | Package-only optional PDF rendered from existing report artifacts when `vsf-profiler package --pdf` is used. |
 | `export_manifest.json` | Package-only manifest with included artifacts, SHA-256 checksums, source run metadata, exclusions, and redaction status. |
 | `index.html` | Package-only offline entrypoint linking reports and machine artifacts. |
+
+The package `index.html` is an offline review entrypoint, not a raw artifact
+dump. It mirrors the core report evidence with scorecards, L4 state, table
+impact, issue evidence, relationship/schema/lineage summaries, report links,
+chart-spec links, and bounded sample links. The optional
+`analysis_report.pdf` is rendered from the generated Markdown report so the PDF
+shares the same core review evidence.
 
 ### Near-term runtime artifacts
 
@@ -711,7 +730,8 @@ Static browser preflight:
 - reads DBML files in the browser;
 - reads only CSV headers;
 - maps CSV files to DBML tables;
-- displays PK/FK relationships in a local schema diagram;
+- displays PK/FK relationships in a local ERD-style schema diagram with
+  deterministic layers, compact cards, orthogonal edges, and focused detail;
 - generates a dbdiagram.io link as a secondary external action.
 
 The Vercel deployment serves only this static preflight UI. It does not run the
