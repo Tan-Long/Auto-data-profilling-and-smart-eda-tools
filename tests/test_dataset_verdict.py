@@ -102,7 +102,8 @@ def test_dataset_verdict_not_ready_for_blockers_and_invalid_relationships():
     assert verdict["affected_tables"][0]["table"] == "orders"
     assert verdict["affected_tables"][0]["max_severity"] == "P0"
     assert verdict["recommended_next_actions"][0].startswith("Resolve P0/P1")
-    assert "Fix invalid foreign-key relationships" in verdict["recommended_next_actions"][2]
+    assert "Fix foreign-key data-quality issues" in verdict["recommended_next_actions"][2]
+    assert "FK data-quality issue(s)" in verdict["verdict_rationale"]
 
 
 def _issue(

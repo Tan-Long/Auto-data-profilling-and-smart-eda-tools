@@ -68,6 +68,7 @@ def test_table_assessments_score_roles_and_business_impact():
     )
     assert payments["relationship_risks"][0]["status"] == "invalid"
     assert any(ref["artifact"] == "table_assessments.json" for ref in payments["evidence_artifacts"])
+    assert "Fix FK data-quality issues" in payments["recommended_next_actions"][1]
 
     reviews = by_table["order_reviews"]
     assert reviews["role"] == "event"

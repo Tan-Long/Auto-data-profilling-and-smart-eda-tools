@@ -64,6 +64,7 @@ def _template_env() -> Environment:
         lstrip_blocks=True,
     )
     env.filters["pct"] = lambda value: f"{float(value) * 100:.2f}%"
+    env.filters["relationship_status_label"] = _relationship_status_label
     return env
 
 
@@ -247,7 +248,7 @@ def _relationship_graph_context(relationship_graph: dict[str, Any] | None) -> di
         "node_count": summary.get("node_count", 0),
         "edge_count": summary.get("edge_count", 0),
         "status_counts": status_counts,
-        "status_counts_text": _format_counts(status_counts),
+        "status_counts_text": _format_counts(status_counts, key_formatter=_relationship_status_label),
         "cardinality_counts": cardinality_counts,
         "cardinality_counts_text": _format_counts(cardinality_counts),
         "junction_table_count": summary.get("junction_table_count", 0),
@@ -256,6 +257,7 @@ def _relationship_graph_context(relationship_graph: dict[str, Any] | None) -> di
             {
                 "id": edge.get("id", ""),
                 "status": edge.get("status", ""),
+                "status_label": _relationship_status_label(edge.get("status", "")),
                 "declared_cardinality": edge.get("declared_cardinality", edge.get("cardinality", "")),
                 "cardinality": edge.get("cardinality", ""),
                 "observed_cardinality": edge.get("observed_cardinality", ""),
@@ -303,10 +305,23 @@ def _table_assessments_context(table_assessments: dict[str, Any] | None) -> dict
     }
 
 
-def _format_counts(counts: dict[str, Any]) -> str:
+def _format_counts(counts: dict[str, Any], *, key_formatter: Any | None = None) -> str:
     if not counts:
         return "none"
-    return ", ".join(f"{key}={value}" for key, value in counts.items())
+    return ", ".join(f"{key_formatter(key) if key_formatter else key}={value}" for key, value in counts.items())
+
+
+def _relationship_status_label(value: Any) -> str:
+    normalized = str(value or "").lower()
+    if normalized == "invalid":
+        return "FK issue"
+    if normalized == "warning":
+        return "FK warning"
+    if normalized == "valid":
+        return "Healthy FK"
+    if normalized == "skipped":
+        return "Not checked"
+    return str(value or "unknown")
 
 
 def _format_endpoint(table: str, columns: Any) -> str:

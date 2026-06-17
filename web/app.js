@@ -526,6 +526,10 @@ els.dashboardDrilldown.addEventListener("click", (event) => {
   handleArtifactNavigationClick(event);
 });
 
+els.artifactPreview.addEventListener("click", (event) => {
+  handleArtifactNavigationClick(event);
+});
+
 els.diagramInspector.addEventListener("click", (event) => {
   handleArtifactNavigationClick(event);
 });
@@ -3108,8 +3112,15 @@ function renderRelationshipHealthPanel() {
     ? countBy(edges, (edge) => edge.status || "unknown")
     : new Map((spec?.data || []).map((row) => [row.status || "unknown", Number(row.count || 0)]));
   const rows = [...statusCounts.entries()]
-    .map(([label, value]) => ({ label, value, kind: "relationship_status" }))
-    .sort((a, b) => relationshipStatusOrder(a.label) - relationshipStatusOrder(b.label));
+    .map(([status, value]) => ({
+      label: relationshipStatusDisplayLabel(status),
+      rawLabel: status,
+      tone: status,
+      value,
+      kind: "relationship_status",
+      detail: relationshipStatusDisplayDetail(status),
+    }))
+    .sort((a, b) => relationshipStatusOrder(a.rawLabel) - relationshipStatusOrder(b.rawLabel));
   return dashboardPanel(
     "Relationship FK health",
     dashboardChartPaths.relationship,
@@ -3177,10 +3188,12 @@ function renderDashboardBars(rows, options = {}) {
         const width = Math.max(2, Math.round(Math.abs(value) / maxValue * 100));
         const displayValue = options.rawValue ? row.rawValue : value;
         const formatter = options.valueFormatter || integerText;
+        const selectionValue = row.valueKey || row.rawLabel || row.label;
+        const toneLabel = row.tone || row.rawLabel || row.label;
         return `
-          <button class="dashboard-bar-row" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.label)}" data-dashboard-label="${escapeHtml(row.label)}">
+          <button class="dashboard-bar-row" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(selectionValue)}" data-dashboard-label="${escapeHtml(row.label)}">
             <span class="dashboard-bar-label">${escapeHtml(row.label)}</span>
-            <span class="dashboard-bar-track"><span class="dashboard-bar-fill ${dashboardTone(row.label)}" style="width: ${width}%"></span></span>
+            <span class="dashboard-bar-track"><span class="dashboard-bar-fill ${dashboardTone(toneLabel)}" style="width: ${width}%"></span></span>
             <span class="dashboard-bar-value">${escapeHtml(formatter(displayValue))}${row.detail ? `<small>${escapeHtml(row.detail)}</small>` : ""}</span>
           </button>
         `;
@@ -3669,12 +3682,12 @@ function renderRelationshipGraphArtifactReview(path, artifact) {
   return artifactReviewShell(
     "Relationship review",
     path,
-    "FK health, cardinality, and table-level relationship evidence.",
+    "FK data-quality health, cardinality, and table-level relationship evidence.",
     `
       ${artifactReviewKpis([
         ["tables", summary.node_count ?? nodes.length],
         ["relationships", summary.edge_count ?? edges.length],
-        ["invalid", summary.status_counts?.invalid ?? edges.filter((edge) => edge.status === "invalid").length],
+        ["FK issues", summary.status_counts?.invalid ?? edges.filter((edge) => edge.status === "invalid").length],
         ["junctions", summary.junction_table_count ?? 0],
         ["many-to-many", summary.many_to_many_relationship_count ?? 0],
       ])}
@@ -3689,7 +3702,7 @@ function renderRelationshipGraphArtifactReview(path, artifact) {
               <article class="artifact-review-row">
                 <div class="artifact-review-row-header">
                   <strong><code>${escapeHtml(edge.source_table)}.${escapeHtml(sourceColumns)}</code> -> <code>${escapeHtml(edge.target_table)}.${escapeHtml(targetColumns)}</code></strong>
-                  ${artifactReviewPill(edge.status || "unknown")}
+                  ${artifactReviewPill(relationshipStatusDisplayLabel(edge.status), edge.status || "unknown")}
                 </div>
                 <p>${escapeHtml(edge.status_reason || edge.cardinality || edge.declared_cardinality || "Relationship evidence")}</p>
                 <div class="artifact-review-meta">
@@ -4069,7 +4082,7 @@ function renderChartSpecArtifactReview(path, artifact) {
   return artifactReviewShell(
     artifact?.title || "Chart spec review",
     path,
-    `${escapeHtml(artifact?.chart_type || "chart")} spec rendered by the dashboard.`,
+    chartSpecReviewSubtitle(artifact),
     `
       ${artifactReviewKpis([
         ["chart id", artifact?.chart_id || "unknown"],
@@ -4097,6 +4110,14 @@ function renderChartSpecArtifactReview(path, artifact) {
       ` : `<p class="muted">No source artifacts listed.</p>`)}
     `,
   );
+}
+
+function chartSpecReviewSubtitle(artifact) {
+  const chartType = String(artifact?.chart_type || "chart");
+  if (artifact?.chart_id === "relationship_fk_health") {
+    return `${chartType} spec rendered by the dashboard. FK issue means the declared relationship exists, but data-quality checks found null, orphan, or duplicate key evidence.`;
+  }
+  return `${chartType} spec rendered by the dashboard.`;
 }
 
 function renderChartSpecPreview(artifact) {
@@ -4140,7 +4161,7 @@ function renderArtifactBarPreview(artifact) {
           <div class="artifact-chart-bar-row">
             <span class="artifact-chart-label">${escapeHtml(row.label)}</span>
             <span class="artifact-chart-track">
-              <span class="artifact-chart-fill ${dashboardTone(row.label)}" style="width: ${width}%"></span>
+              <span class="artifact-chart-fill ${dashboardTone(row.tone || row.label)}" style="width: ${width}%"></span>
             </span>
             <span class="artifact-chart-value">${escapeHtml(row.displayValue)}${row.detail ? `<small>${escapeHtml(row.detail)}</small>` : ""}</span>
           </div>
@@ -4153,16 +4174,23 @@ function renderArtifactBarPreview(artifact) {
 function chartPreviewRows(artifact) {
   const data = Array.isArray(artifact?.data) ? artifact.data : [];
   const chartType = String(artifact?.chart_type || "").toLowerCase();
+  const isRelationshipHealth = artifact?.chart_id === "relationship_fk_health";
   return data.map((row, index) => {
     const normalized = objectOrEmpty(row);
-    const label = chartPreviewLabel(normalized, index + 1);
+    const rawStatus = normalized.status === undefined ? "" : String(normalized.status);
+    const label = isRelationshipHealth && rawStatus
+      ? relationshipStatusDisplayLabel(rawStatus)
+      : chartPreviewLabel(normalized, index + 1);
     const valueKey = chartPreviewValueKey(normalized);
     const numericValue = Number(normalized[valueKey] ?? 0);
     return {
       label,
+      tone: isRelationshipHealth && rawStatus ? rawStatus : label,
       value: Number.isFinite(numericValue) ? numericValue : 0,
       displayValue: chartPreviewDisplayValue(normalized[valueKey], valueKey, chartType),
-      detail: chartPreviewDetail(normalized),
+      detail: isRelationshipHealth && rawStatus
+        ? relationshipStatusDisplayDetail(rawStatus)
+        : chartPreviewDetail(normalized),
     };
   });
 }
@@ -4276,8 +4304,8 @@ function artifactReviewSection(title, body) {
   `;
 }
 
-function artifactReviewPill(value) {
-  return `<span class="artifact-review-pill ${escapeHtml(artifactReviewTone(value))}">${escapeHtml(value || "unknown")}</span>`;
+function artifactReviewPill(value, toneValue = value) {
+  return `<span class="artifact-review-pill ${escapeHtml(artifactReviewTone(toneValue))}">${escapeHtml(value || "unknown")}</span>`;
 }
 
 function artifactReviewTone(value) {
@@ -4296,6 +4324,9 @@ function artifactReviewTone(value) {
 
 function renderIssueReviewRow(issue) {
   const columns = arrayOfStrings(issue.columns).join(", ") || "n/a";
+  const sampleUrl = issue.sample_bad_rows_path ? artifactUrlFor(issue.sample_bad_rows_path) : "";
+  const causes = arrayOfStrings(issue.probable_causes);
+  const fixes = arrayOfStrings(issue.suggested_fix);
   return `
     <article class="artifact-review-row">
       <div class="artifact-review-row-header">
@@ -4308,6 +4339,9 @@ function renderIssueReviewRow(issue) {
         <span>${percentText(issue.bad_rate)} bad rate</span>
         ${issue.sample_bad_rows_path ? `<span>${escapeHtml(issue.sample_bad_rows_path)}</span>` : ""}
       </div>
+      ${causes.length ? `<p><strong>Likely cause:</strong> ${escapeHtml(causes[0])}</p>` : ""}
+      ${fixes.length ? `<p><strong>Suggested fix:</strong> ${escapeHtml(fixes[0])}</p>` : ""}
+      ${renderIssueSampleButton(issue, sampleUrl)}
     </article>
   `;
 }
@@ -4646,6 +4680,40 @@ function countBy(items, keyFn) {
 
 function relationshipStatusOrder(status) {
   return { invalid: 0, warning: 1, skipped: 2, valid: 3 }[status] ?? 99;
+}
+
+function relationshipStatusDisplayLabel(status, fallback = "FK status") {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized === "invalid") {
+    return "FK issue";
+  }
+  if (normalized === "warning") {
+    return "FK warning";
+  }
+  if (normalized === "valid") {
+    return "Healthy FK";
+  }
+  if (normalized === "skipped") {
+    return "Not checked";
+  }
+  return fallback;
+}
+
+function relationshipStatusDisplayDetail(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized === "invalid") {
+    return "data-quality evidence";
+  }
+  if (normalized === "warning") {
+    return "review recommended";
+  }
+  if (normalized === "valid") {
+    return "checks passed";
+  }
+  if (normalized === "skipped") {
+    return "check skipped";
+  }
+  return "";
 }
 
 function uniqueSorted(values, preferredOrder = []) {

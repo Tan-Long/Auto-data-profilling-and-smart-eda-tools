@@ -137,6 +137,8 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     )
     assert "DBML Diagram and CSV Mapping" in report_html
     assert "Executive Summary" in report_html
+    assert "FK issue means the declared relationship exists" in report_html
+    assert "FK issue" in report_md
     assert "Schema Parse Diagnostics" in report_md
     assert "Schema Parse Diagnostics" in report_html
     assert "schema_parse_report.json" in report_md

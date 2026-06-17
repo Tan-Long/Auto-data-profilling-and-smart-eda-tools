@@ -26,7 +26,7 @@
 - Risk score: {{ dataset_verdict.risk_score }}/100
 - Rationale: {{ dataset_verdict.verdict_rationale }}
 - Issue counts: total={{ dataset_verdict.issue_total }}{% for severity, count in dataset_verdict.severity_counts.items() %}, {{ severity }}={{ count }}{% endfor %}
-- Relationship status counts: {% for status, count in dataset_verdict.relationship_status_counts.items() %}{{ status }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
+- Relationship status counts: {% for status, count in dataset_verdict.relationship_status_counts.items() %}{{ status | relationship_status_label }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
 - Schema inputs: missing tables={{ dataset_verdict.schema_summary.missing_table_count or 0 }}, extra CSV files={{ dataset_verdict.schema_summary.extra_csv_count or 0 }}, schema issue refs={{ dataset_verdict.schema_summary.schema_issue_count or 0 }}
 
 ### Top Blockers
@@ -131,10 +131,12 @@ Table assessment metadata was not provided for this report.
 
 ### Relationship FK Health
 
+FK issue means the declared relationship exists, but data-quality checks found null, orphan, or duplicate key evidence.
+
 | Status | Count |
 | --- | ---: |
 {% for row in chart_specs.relationship_health.data -%}
-| {{ row.status }} | {{ row.count }} |
+| {{ row.status | relationship_status_label }} | {{ row.count }} |
 {% else -%}
 | none | 0 |
 {% endfor %}
@@ -268,7 +270,7 @@ Lineage graph metadata was not provided for this report.
 | Source | Target | Declared Cardinality | Observed Cardinality | Status | Reason |
 | --- | --- | --- | --- | --- | --- |
 {% for edge in relationship_graph.edges -%}
-| {{ edge.source }} | {{ edge.target }} | {{ edge.declared_cardinality }} | {{ edge.observed_cardinality }} | {{ edge.status }} | {{ edge.reason }} |
+| {{ edge.source }} | {{ edge.target }} | {{ edge.declared_cardinality }} | {{ edge.observed_cardinality }} | {{ edge.status_label }} | {{ edge.reason }} |
 {% else -%}
 | none | none | none | none | none | none |
 {% endfor %}

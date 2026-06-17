@@ -191,7 +191,7 @@ def _verdict_rationale(
         if blocker_count:
             parts.append(f"{blocker_count} P0/P1 blocker issue(s)")
         if relationship_status_counts.get("invalid", 0):
-            parts.append(f"{relationship_status_counts['invalid']} invalid relationship edge(s)")
+            parts.append(f"{relationship_status_counts['invalid']} FK data-quality issue(s)")
         if schema_summary.get("missing_table_count", 0):
             parts.append(f"{schema_summary['missing_table_count']} missing DBML table CSV(s)")
         return "; ".join(parts) + " make the dataset not ready for use."
@@ -310,7 +310,7 @@ def _recommended_next_actions(
     if schema_summary.get("missing_table_count", 0):
         _add_action(actions, seen, "Regenerate the extract so every DBML table has a CSV file.")
     if relationship_status_counts.get("invalid", 0):
-        _add_action(actions, seen, "Fix invalid foreign-key relationships before cross-table use.")
+        _add_action(actions, seen, "Fix foreign-key data-quality issues before cross-table use.")
 
     for row in sorted(
         issue_rows,

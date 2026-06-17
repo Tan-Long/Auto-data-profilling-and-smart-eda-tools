@@ -278,8 +278,29 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#artifactPreviewMeta")).toContainText("relationship_graph.json");
   await expect(page.locator("#artifactPreview")).toContainText("Relationship review");
   await expect(page.locator("#artifactPreview")).toContainText("Relationship health");
+  await expect(page.locator("#artifactPreview")).toContainText("FK issue");
   await expect(page.locator("#artifactPreview")).toContainText("Tables in relationship graph");
   await expect(page.locator("#artifactPreview")).not.toContainText("Object(9)");
+  await page
+    .locator('#dashboardArtifactLinks .artifact-json-link[data-artifact-path="charts/relationship_fk_health.json"]')
+    .first()
+    .click();
+  await expect(page.locator("#artifactPreview")).toContainText("Relationship FK Health");
+  await expect(page.locator("#artifactPreview")).toContainText("data-quality checks");
+  await expect(page.locator("#artifactPreview .artifact-chart-label").first()).toContainText("FK issue");
+  await page
+    .locator('#dashboardArtifactLinks [data-artifact-path="issues.json"]')
+    .first()
+    .click();
+  await expect(page.locator("#artifactPreview")).toContainText("Issue review");
+  await expect(page.locator("#artifactPreview")).toContainText("Top issues");
+  await expect(page.locator("#artifactPreview")).toContainText("Suggested fix");
+  await expect(page.locator("#artifactPreview")).toContainText("Preview row evidence");
+  await page.locator('#artifactPreview [data-artifact-action="preview-issue-sample"]').first().click();
+  await expect(page.locator("#artifactPreviewMeta")).toContainText(".csv");
+  await expect(page.locator("#artifactPreview")).toContainText("Issue row evidence");
+  await expect(page.locator("#artifactPreview")).toContainText("Sample row 1");
+  await expect(page.locator("#artifactPreview .issue-column-highlight").first()).toBeVisible();
   const stageListBox = await page.locator("#stageList").boundingBox();
   const generatedResultsBox = await page.locator("#artifactList").boundingBox();
   const drilldownBox = await page.locator("#dashboardDrilldown").boundingBox();

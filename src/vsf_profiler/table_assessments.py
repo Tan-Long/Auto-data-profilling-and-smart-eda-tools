@@ -341,7 +341,7 @@ def _recommended_next_actions(
     if readiness == "NOT_READY":
         _add_action(actions, seen, f"Resolve blocker issues for `{table_name}` before cross-table analytics.")
     if any(risk["status"] == "invalid" for risk in relationship_risks):
-        _add_action(actions, seen, f"Fix invalid relationship checks involving `{table_name}`.")
+        _add_action(actions, seen, f"Fix FK data-quality issues involving `{table_name}`.")
     if affected_columns:
         _add_action(
             actions,

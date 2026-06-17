@@ -396,10 +396,11 @@
       </div>
 
       <h3>Relationship FK Health</h3>
+      <p>FK issue means the declared relationship exists, but data-quality checks found null, orphan, or duplicate key evidence.</p>
       <div class="bar-list">
         {% for row in chart_specs.relationship_health.data %}
         <div class="bar-row">
-          <div class="bar-label">{{ row.status }}</div>
+          <div class="bar-label">{{ row.status | relationship_status_label }}</div>
           <div class="bar-track"><div class="bar-fill {% if row.status == 'invalid' %}danger{% elif row.status in ['warning', 'skipped'] %}warn{% endif %}" style="width: {{ row.bar_width_pct }}%;"></div></div>
           <div class="bar-value">{{ row.count }}</div>
         </div>
@@ -536,7 +537,7 @@
         <thead><tr><th>Status</th><th>Count</th></tr></thead>
         <tbody>
           {% for status, count in relationship_graph.status_counts.items() %}
-          <tr><td>{{ status }}</td><td>{{ count }}</td></tr>
+          <tr><td>{{ status | relationship_status_label }}</td><td>{{ count }}</td></tr>
           {% else %}
           <tr><td>none</td><td>0</td></tr>
           {% endfor %}
@@ -563,7 +564,7 @@
             <td><code>{{ edge.target }}</code></td>
             <td>{{ edge.declared_cardinality }}</td>
             <td>{{ edge.observed_cardinality }}</td>
-            <td><span class="pill {% if edge.status == 'invalid' %}P1{% elif edge.status == 'warning' %}P2{% endif %}">{{ edge.status }}</span></td>
+            <td><span class="pill {% if edge.status == 'invalid' %}P1{% elif edge.status == 'warning' %}P2{% endif %}">{{ edge.status_label }}</span></td>
             <td>{{ edge.reason }}</td>
           </tr>
           {% else %}

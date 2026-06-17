@@ -149,6 +149,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderIssueSampleContext",
         "renderIssueLocationSummary",
         "handleArtifactNavigationClick",
+        "els.artifactPreview.addEventListener",
         "previewArtifact",
         "renderJsonArtifactPreview",
         "renderRelationshipGraphArtifactReview",
@@ -184,6 +185,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "handleDiagramSelectionEvent",
         "clearDiagramSelection",
         "diagramRelationshipStatusLabel",
+        "relationshipStatusDisplayLabel",
+        "relationshipStatusDisplayDetail",
         "renderDiagramInspector",
         "diagramSelectionContext",
         "localDiagramLimits",
@@ -249,6 +252,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "diagramFrame.src =" not in js
     assert "window.open" not in js
     assert "Review chart" in js
+    assert "Likely cause:" in js
+    assert "Suggested fix:" in js
+    assert "FK issue means the declared relationship exists" in js
+    assert "data-quality evidence" in js
     assert 'target="_blank"' not in js
 
 
