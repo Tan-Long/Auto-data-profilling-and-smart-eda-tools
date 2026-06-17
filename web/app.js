@@ -544,7 +544,13 @@ els.dashboardGraphSvg.addEventListener("keydown", (event) => {
 });
 
 els.diagramSvg.addEventListener("click", (event) => {
-  handleDiagramSelectionEvent(event);
+  if (handleDiagramSelectionEvent(event)) {
+    event.stopPropagation();
+    return;
+  }
+  if (clearDiagramSelection()) {
+    event.stopPropagation();
+  }
 });
 
 els.diagramSvg.addEventListener("keydown", (event) => {
@@ -553,6 +559,24 @@ els.diagramSvg.addEventListener("keydown", (event) => {
   }
   if (handleDiagramSelectionEvent(event)) {
     event.preventDefault();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (
+    state.diagramSelection &&
+    !event.target.closest("#localDiagram") &&
+    !event.target.closest(".diagram-toolbar") &&
+    !event.target.closest("#diagramWarnings") &&
+    !event.target.closest("#dbdiagramLink")
+  ) {
+    clearDiagramSelection();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.diagramSelection) {
+    clearDiagramSelection();
   }
 });
 
@@ -4605,7 +4629,7 @@ function buildArtifactDiagramModel(schemaDiagram, relationshipGraph, parseReport
       parentColumns: arrayOfStrings(edge.target_columns).length ? arrayOfStrings(edge.target_columns) : arrayOfStrings([edge.target_column]),
       status: edge.status || "",
       statusReason: edge.status_reason || "",
-      label: edge.status || edge.cardinality || "FK",
+      label: diagramRelationshipStatusLabel(edge.status, edge.cardinality || edge.observed_cardinality || edge.declared_cardinality || "FK"),
       cardinality: edge.cardinality || edge.observed_cardinality || edge.declared_cardinality || "",
       declaredCardinality: edge.declared_cardinality || "",
       relationshipType: edge.relationship_type || "",
@@ -4620,7 +4644,7 @@ function buildArtifactDiagramModel(schemaDiagram, relationshipGraph, parseReport
       parentTable: rel.parent_table || rel.parentTable || "",
       parentColumns: arrayOfStrings(rel.parent_columns || [rel.parent_column || rel.parentColumn]),
       status: "",
-      label: rel.declared_cardinality || rel.relationship_type || "FK",
+      label: diagramRelationshipStatusLabel(rel.status, rel.declared_cardinality || rel.relationship_type || "FK"),
       cardinality: rel.declared_cardinality || "",
       declaredCardinality: rel.declared_cardinality || "",
       relationshipType: rel.relationship_type || "",
@@ -5102,6 +5126,15 @@ function handleDiagramSelectionEvent(event) {
   return false;
 }
 
+function clearDiagramSelection() {
+  if (!state.diagramSelection) {
+    return false;
+  }
+  state.diagramSelection = null;
+  renderDiagram();
+  return true;
+}
+
 function diagramSelectionContext(model) {
   const selected = state.diagramSelection;
   const tableNames = new Set(model.tables.map((table) => table.name));
@@ -5258,7 +5291,7 @@ function renderDiagramRelationshipInspector(rel) {
     <div class="diagram-inspector-heading">
       <p class="eyebrow">Relationship</p>
       <h4><code>${escapeHtml(rel.childTable)}</code> -> <code>${escapeHtml(rel.parentTable)}</code></h4>
-      <span>${escapeHtml(rel.status || "declared")}</span>
+      <span>${escapeHtml(diagramRelationshipStatusLabel(rel.status, "declared"))}</span>
     </div>
     <dl class="diagram-detail-grid">
       <div><dt>Child columns</dt><dd>${escapeHtml((rel.childColumns || []).join(", ") || "n/a")}</dd></div>
@@ -5295,10 +5328,27 @@ function renderDiagramRelationshipList(relationships, tableName) {
       ${relationships.map((rel) => {
         const direction = rel.childTable === tableName ? "to parent" : "from child";
         const otherTable = rel.childTable === tableName ? rel.parentTable : rel.childTable;
-        return `<li><span>${escapeHtml(direction)}</span> <code>${escapeHtml(otherTable)}</code> <span>${escapeHtml(rel.status || rel.cardinality || "FK")}</span></li>`;
+        return `<li><span>${escapeHtml(direction)}</span> <code>${escapeHtml(otherTable)}</code> <span>${escapeHtml(diagramRelationshipStatusLabel(rel.status, rel.cardinality || "FK"))}</span></li>`;
       }).join("")}
     </ul>
   `;
+}
+
+function diagramRelationshipStatusLabel(status, fallback = "FK") {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized === "invalid") {
+    return "FK issue";
+  }
+  if (normalized === "warning") {
+    return "FK warning";
+  }
+  if (normalized === "valid") {
+    return "FK valid";
+  }
+  if (normalized === "skipped") {
+    return "FK skipped";
+  }
+  return fallback || "FK";
 }
 
 function renderDiagramRelationshipMetrics(metrics = {}) {

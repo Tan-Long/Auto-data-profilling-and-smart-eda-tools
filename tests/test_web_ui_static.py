@@ -176,6 +176,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "diagramVisibleColumns",
         "diagramColumnRowSvg",
         "handleDiagramSelectionEvent",
+        "clearDiagramSelection",
+        "diagramRelationshipStatusLabel",
         "renderDiagramInspector",
         "diagramSelectionContext",
         "localDiagramLimits",

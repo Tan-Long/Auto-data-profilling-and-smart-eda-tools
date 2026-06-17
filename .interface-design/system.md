@@ -173,6 +173,11 @@ Data style: monospace with tabular numbers.
   density, non-key column visibility, and reset selection.
 - Selection highlights the chosen table or relationship plus direct neighbors,
   while the detail panel shows artifact-backed table/edge evidence and links.
+- Selection is temporary. Clicking blank diagram space, clicking outside the
+  local ERD, or pressing Escape clears the selected table/relationship.
+- Relationship health labels should explain data-quality meaning. Use terms
+  like `FK issue` instead of raw `invalid`, so users do not confuse DQ evidence
+  with an invalid DBML diagram.
 
 ### Dashboard Progressive Graph
 
@@ -206,3 +211,4 @@ Data style: monospace with tabular numbers.
 | Render JSON artifacts as reviews, not object dumps | Demo reviewers need relationship/table/verdict evidence in product language; `Object(...)` tree views are too raw for the main artifact surface | 2026-06-17 |
 | Highlight issue sample rows and columns | Quality issues should be inspectable at table, row-sample, and affected-column level without forcing users to interpret raw CSV files | 2026-06-17 |
 | Show runtime stage results inline | After each pipeline stage, reviewers should see the concrete counts and artifacts produced without expanding a hidden panel or opening raw runtime JSON | 2026-06-17 |
+| Clear ERD selection on outside intent | Diagram focus should behave like normal evidence selection: click table to inspect, click blank/outside or Escape to return to overview | 2026-06-17 |

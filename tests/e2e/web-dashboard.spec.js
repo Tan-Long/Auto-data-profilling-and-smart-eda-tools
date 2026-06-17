@@ -33,6 +33,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
   await expect(page.locator("#diagramInspector")).toContainText("orders");
   await expect(page.locator("#diagramInspector")).toContainText("Fact/event");
+  await page.locator("#diagramSvg").click({ position: { x: 4, y: 4 } });
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
   const mapping = page.locator("#mappingBody");
   await expect(mapping).toContainText("customers.csv");
   await expect(mapping).toContainText("orders.csv");
@@ -48,7 +50,6 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramColumnsToggle")).toContainText("Key columns only");
   await expect(page.locator("#diagramSvg")).not.toContainText("order_status");
-  await page.locator("#diagramResetSelection").click();
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
   await expect(page.locator("#dbdiagramLink")).toHaveAttribute(
     "href",
@@ -86,8 +87,22 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#diagramSvg")).toContainText("varchar");
   await expect(page.locator("#diagramSvg")).toContainText("timestamp");
-  await expect(page.locator("#diagramSvg")).toContainText("invalid");
+  await expect(page.locator("#diagramSvg")).toContainText("FK issue");
   await expect(page.locator('#diagramSvg [data-diagram-table="order_payments"]')).toHaveCount(1);
+  const dbdiagramUrl = await page.locator("#dbdiagramLink").getAttribute("href");
+  const dbdiagramDbml = await page.evaluate((href) => {
+    const encoded = new URL(href).searchParams.get("c") || "";
+    return decodeURIComponent(escape(atob(encoded)));
+  }, dbdiagramUrl);
+  const orderItemsDbmlBlock = dbdiagramDbml.split("Table order_items {")[1].split("\n}")[0];
+  expect(orderItemsDbmlBlock).toContain("(order_id, order_item_id) [pk]");
+  expect(orderItemsDbmlBlock).not.toContain("order_id varchar [pk");
+  expect(orderItemsDbmlBlock).not.toContain("order_item_id int [pk");
+  await page.locator('#diagramSvg [data-diagram-table="orders"]').click();
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
+  await expect(page.locator("#diagramInspector")).toContainText("FK issue");
+  await page.locator("#dashboardSummaryStrip").click();
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
   const customerRelationship = page.locator(
     '#diagramSvg [data-diagram-relationship="orders.customer_id->customers.customer_id"]',
   );
