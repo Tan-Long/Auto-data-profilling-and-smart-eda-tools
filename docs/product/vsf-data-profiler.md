@@ -141,9 +141,10 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 - Show CSV-file-to-DBML-table mapping, primary keys, foreign keys, and
   relationships in the report.
 - Provide a local-first web UI for uploading DBML/CSV files, rendering a local
-  DBML diagram with table nodes, PK/FK columns, CSV mapping status, and
-  relationship edges, and linking uploaded CSV files with DBML tables before
-  running profiling.
+  ERD-style DBML diagram with deterministic table layers, compact PK/FK-focused
+  table cards, CSV mapping status, orthogonal relationship edges, fit/expanded
+  controls, and selected table or relationship detail, then linking uploaded
+  CSV files with DBML tables before running profiling.
 - Provide a local-only browser runner with separate upload mode and local path
   mode. Upload mode handles demo/small-medium DBML, CSV, and optional rules
   files. Local path mode validates browser-entered DBML, CSV directory, optional
@@ -161,15 +162,21 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   those generated artifacts while preserving raw artifact links. It also
   switches the DBML diagram panel from browser preflight state to generated
   `schema_diagram.json`, `relationship_graph.json`, and
-  `schema_parse_report.json` artifact evidence after a run, and renders a
-  dedicated Table Impact section from
+  `schema_parse_report.json` artifact evidence after a run. The diagram
+  renderer remains local-only and presentation-only: it does not add backend
+  routes, rename artifacts, fetch raw CSV rows, or infer new profiler facts. It
+  also renders a dedicated Table Impact section from
   `table_assessments.json`, including table readiness, health score, role,
   affected-column count, relationship-risk count, and deterministic
   business-impact category.
 - Provide interactive lineage and relationship graph views in the web-runner
   dashboard from `lineage_graph.json` and `relationship_graph.json`. The graph
-  views support table, column, relationship, and runtime/artifact scopes plus
-  node drilldown with metadata, matching issues, and evidence artifact links.
+  views default to a low-noise source/schema/table/artifact-summary overview,
+  then reveal Focus and Full detail modes plus opt-in columns,
+  runtime/artifact fan-out, and invalid/warning relationship filtering. Node
+  selection highlights direct neighbors, fades unrelated graph elements, and
+  shows direct evidence, matching issues, and selected-table columns in the
+  graph drilldown without reading raw CSV rows.
 - Package existing run output directories into self-contained offline analysis
   packages. Packages must include canonical generated artifacts, chart specs,
   relationship and lineage graphs, reports, runtime traces, bounded sample

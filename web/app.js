@@ -18,8 +18,16 @@ const state = {
   },
   dashboardSelection: null,
   dashboardGraphMode: "lineage",
+  dashboardGraphDisplay: "overview",
   dashboardGraphScope: "table",
+  dashboardGraphShowColumns: false,
+  dashboardGraphShowRuntime: false,
+  dashboardGraphInvalidOnly: false,
   dashboardGraphSelection: null,
+  diagramSelection: null,
+  diagramExpanded: false,
+  diagramShowNonKey: false,
+  diagramFit: true,
   tables: [],
   relationships: [],
   csvFiles: [],
@@ -74,7 +82,14 @@ const els = {
   dashboardPanelGrid: document.querySelector("#dashboardPanelGrid"),
   dashboardGraphModeLineage: document.querySelector("#dashboardGraphModeLineage"),
   dashboardGraphModeRelationship: document.querySelector("#dashboardGraphModeRelationship"),
+  dashboardGraphDisplayOverview: document.querySelector("#dashboardGraphDisplayOverview"),
+  dashboardGraphDisplayFocus: document.querySelector("#dashboardGraphDisplayFocus"),
+  dashboardGraphDisplayFull: document.querySelector("#dashboardGraphDisplayFull"),
   dashboardGraphScope: document.querySelector("#dashboardGraphScope"),
+  dashboardGraphColumnsToggle: document.querySelector("#dashboardGraphColumnsToggle"),
+  dashboardGraphRuntimeToggle: document.querySelector("#dashboardGraphRuntimeToggle"),
+  dashboardGraphInvalidOnlyToggle: document.querySelector("#dashboardGraphInvalidOnlyToggle"),
+  dashboardGraphResetView: document.querySelector("#dashboardGraphResetView"),
   dashboardGraphStatus: document.querySelector("#dashboardGraphStatus"),
   dashboardGraphSvg: document.querySelector("#dashboardGraphSvg"),
   dashboardGraphLegend: document.querySelector("#dashboardGraphLegend"),
@@ -95,7 +110,13 @@ const els = {
   diagramSourceBadge: document.querySelector("#diagramSourceBadge"),
   diagramWarnings: document.querySelector("#diagramWarnings"),
   localDiagram: document.querySelector("#localDiagram"),
+  diagramCanvas: document.querySelector("#diagramCanvas"),
   diagramSvg: document.querySelector("#diagramSvg"),
+  diagramInspector: document.querySelector("#diagramInspector"),
+  diagramFitButton: document.querySelector("#diagramFitButton"),
+  diagramDensityToggle: document.querySelector("#diagramDensityToggle"),
+  diagramColumnsToggle: document.querySelector("#diagramColumnsToggle"),
+  diagramResetSelection: document.querySelector("#diagramResetSelection"),
   mappedMetric: document.querySelector("#mappedMetric"),
   missingMetric: document.querySelector("#missingMetric"),
   extraMetric: document.querySelector("#extraMetric"),
@@ -187,6 +208,12 @@ const graphScopeLabels = {
   runtime: "Runtime + artifacts",
 };
 
+const graphDisplayLabels = {
+  overview: "Overview",
+  focus: "Focus",
+  full: "Full",
+};
+
 const lineageTypeToCategory = {
   source_system: "source",
   schema: "schema",
@@ -245,6 +272,27 @@ els.rulesInput.addEventListener("change", (event) => {
 });
 
 els.visualizeButton.addEventListener("click", () => {
+  renderDiagram();
+});
+
+els.diagramFitButton.addEventListener("click", () => {
+  state.diagramFit = !state.diagramFit;
+  renderDiagram();
+  els.diagramCanvas.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+});
+
+els.diagramDensityToggle.addEventListener("click", () => {
+  state.diagramExpanded = !state.diagramExpanded;
+  renderDiagram();
+});
+
+els.diagramColumnsToggle.addEventListener("click", () => {
+  state.diagramShowNonKey = !state.diagramShowNonKey;
+  renderDiagram();
+});
+
+els.diagramResetSelection.addEventListener("click", () => {
+  state.diagramSelection = null;
   renderDiagram();
 });
 
@@ -339,9 +387,43 @@ els.dashboardGraphModeRelationship.addEventListener("click", () => {
   setDashboardGraphMode("relationship");
 });
 
+els.dashboardGraphDisplayOverview.addEventListener("click", () => {
+  setDashboardGraphDisplay("overview");
+});
+
+els.dashboardGraphDisplayFocus.addEventListener("click", () => {
+  setDashboardGraphDisplay("focus");
+});
+
+els.dashboardGraphDisplayFull.addEventListener("click", () => {
+  setDashboardGraphDisplay("full");
+});
+
+els.dashboardGraphColumnsToggle.addEventListener("change", () => {
+  state.dashboardGraphShowColumns = els.dashboardGraphColumnsToggle.checked;
+  syncDashboardGraphScopeFromControls();
+  renderDashboardGraph();
+});
+
+els.dashboardGraphRuntimeToggle.addEventListener("change", () => {
+  state.dashboardGraphShowRuntime = els.dashboardGraphRuntimeToggle.checked;
+  syncDashboardGraphScopeFromControls();
+  renderDashboardGraph();
+});
+
+els.dashboardGraphInvalidOnlyToggle.addEventListener("change", () => {
+  state.dashboardGraphInvalidOnly = els.dashboardGraphInvalidOnlyToggle.checked;
+  renderDashboardGraph();
+});
+
+els.dashboardGraphResetView.addEventListener("click", () => {
+  resetDashboardGraphView();
+});
+
 els.dashboardGraphScope.addEventListener("change", () => {
   state.dashboardGraphScope = els.dashboardGraphScope.value;
   state.dashboardGraphSelection = null;
+  syncDashboardGraphControlsFromScope();
   renderDashboardGraph();
 });
 
@@ -365,6 +447,19 @@ els.dashboardGraphSvg.addEventListener("keydown", (event) => {
   event.preventDefault();
   state.dashboardGraphSelection = { id: target.dataset.graphNodeId };
   renderDashboardGraph();
+});
+
+els.diagramSvg.addEventListener("click", (event) => {
+  handleDiagramSelectionEvent(event);
+});
+
+els.diagramSvg.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  if (handleDiagramSelectionEvent(event)) {
+    event.preventDefault();
+  }
 });
 
 setupDropzone(els.dbmlDropzone, async (files) => {
@@ -640,6 +735,7 @@ function parseDbmlState() {
   const parsed = parseDbml(state.dbmlText);
   state.tables = parsed.tables;
   state.relationships = parsed.relationships;
+  state.diagramSelection = null;
 }
 
 function parseDbml(text) {
@@ -1250,6 +1346,7 @@ function resetDashboardState() {
   state.dashboardGraphMode = "lineage";
   state.dashboardGraphScope = "table";
   state.dashboardGraphSelection = null;
+  state.diagramSelection = null;
   renderDashboard();
 }
 
@@ -1474,6 +1571,28 @@ function setDashboardGraphMode(mode) {
   renderDashboardGraph();
 }
 
+function setDashboardGraphDisplay(display) {
+  state.dashboardGraphDisplay = display;
+  if (display === "overview") {
+    state.dashboardGraphScope = "table";
+  }
+  if (display === "full") {
+    state.dashboardGraphScope = state.dashboardGraphMode === "relationship" ? "relationships" : "runtime";
+  }
+  syncDashboardGraphControlsFromScope();
+  renderDashboardGraph();
+}
+
+function resetDashboardGraphView() {
+  state.dashboardGraphDisplay = "overview";
+  state.dashboardGraphScope = "table";
+  state.dashboardGraphShowColumns = false;
+  state.dashboardGraphShowRuntime = false;
+  state.dashboardGraphInvalidOnly = false;
+  state.dashboardGraphSelection = null;
+  renderDashboardGraph();
+}
+
 function renderDashboardGraph() {
   updateGraphControls();
   const loaded = Boolean(state.dashboardArtifactIndex);
@@ -1485,9 +1604,10 @@ function renderDashboardGraph() {
     return;
   }
 
-  const graph = state.dashboardGraphMode === "relationship"
-    ? buildRelationshipGraphView(state.dashboardGraphScope)
-    : buildLineageGraphView(state.dashboardGraphScope);
+  const options = dashboardGraphOptions();
+  let graph = state.dashboardGraphMode === "relationship"
+    ? buildRelationshipGraphView(options)
+    : buildLineageGraphView(options);
 
   if (!graph.nodes.length) {
     renderEmptyGraph(graph.emptyMessage || "No graph nodes are available for this scope.");
@@ -1498,6 +1618,7 @@ function renderDashboardGraph() {
   if (!selectedVisible) {
     state.dashboardGraphSelection = null;
   }
+  graph = applyDashboardGraphFocus(graph);
   drawDashboardGraph(graph);
   renderGraphLegend(graph);
   renderGraphDrilldown(graph);
@@ -1508,28 +1629,92 @@ function updateGraphControls() {
   els.dashboardGraphModeRelationship.classList.toggle("active", state.dashboardGraphMode === "relationship");
   els.dashboardGraphModeLineage.setAttribute("aria-selected", String(state.dashboardGraphMode === "lineage"));
   els.dashboardGraphModeRelationship.setAttribute("aria-selected", String(state.dashboardGraphMode === "relationship"));
+  updateGraphDisplayButton(els.dashboardGraphDisplayOverview, "overview");
+  updateGraphDisplayButton(els.dashboardGraphDisplayFocus, "focus");
+  updateGraphDisplayButton(els.dashboardGraphDisplayFull, "full");
+  els.dashboardGraphColumnsToggle.checked = state.dashboardGraphShowColumns;
+  els.dashboardGraphRuntimeToggle.checked = state.dashboardGraphShowRuntime;
+  els.dashboardGraphInvalidOnlyToggle.checked = state.dashboardGraphInvalidOnly;
   if (els.dashboardGraphScope.value !== state.dashboardGraphScope) {
     els.dashboardGraphScope.value = state.dashboardGraphScope;
   }
 }
 
-function buildLineageGraphView(scope) {
+function updateGraphDisplayButton(button, display) {
+  const active = state.dashboardGraphDisplay === display;
+  button.classList.toggle("active", active);
+  button.setAttribute("aria-pressed", String(active));
+}
+
+function dashboardGraphOptions() {
+  const full = state.dashboardGraphDisplay === "full";
+  return {
+    display: state.dashboardGraphDisplay,
+    scope: state.dashboardGraphScope,
+    showColumns: full || state.dashboardGraphShowColumns || state.dashboardGraphScope === "columns",
+    showRuntime: full || state.dashboardGraphShowRuntime || state.dashboardGraphScope === "runtime",
+    showRelationships: full || state.dashboardGraphScope === "relationships",
+    invalidOnly: state.dashboardGraphInvalidOnly,
+  };
+}
+
+function syncDashboardGraphScopeFromControls() {
+  if (state.dashboardGraphDisplay === "full") {
+    state.dashboardGraphScope = state.dashboardGraphMode === "relationship" ? "relationships" : "runtime";
+    return;
+  }
+  if (state.dashboardGraphShowRuntime) {
+    state.dashboardGraphScope = "runtime";
+    return;
+  }
+  if (state.dashboardGraphShowColumns) {
+    state.dashboardGraphScope = "columns";
+    return;
+  }
+  state.dashboardGraphScope = "table";
+}
+
+function syncDashboardGraphControlsFromScope() {
+  if (state.dashboardGraphScope === "table") {
+    state.dashboardGraphShowColumns = false;
+    state.dashboardGraphShowRuntime = false;
+    if (state.dashboardGraphDisplay === "full") {
+      state.dashboardGraphDisplay = "overview";
+    }
+    return;
+  }
+  if (state.dashboardGraphScope === "columns") {
+    state.dashboardGraphShowColumns = true;
+    state.dashboardGraphShowRuntime = false;
+  }
+  if (state.dashboardGraphScope === "relationships") {
+    state.dashboardGraphDisplay = "full";
+    state.dashboardGraphShowColumns = true;
+    state.dashboardGraphShowRuntime = false;
+  }
+  if (state.dashboardGraphScope === "runtime") {
+    state.dashboardGraphShowRuntime = true;
+  }
+}
+
+function buildLineageGraphView(options) {
   const artifact = state.dashboardArtifacts["lineage_graph.json"];
   if (!artifact) {
     return emptyGraphModel("Lineage graph", "lineage_graph.json", "lineage_graph.json is not available.");
   }
 
-  const categories = new Set(lineageCategoriesForScope(scope));
+  const categories = new Set(lineageCategoriesForOptions(options));
   const rawNodes = Array.isArray(artifact.nodes) ? artifact.nodes : [];
-  const nodes = rawNodes
+  let nodes = rawNodes
     .map((node) => normalizeLineageNode(node))
     .filter((node) => categories.has(node.category));
+  nodes = addLineageArtifactSummaryNode(nodes, rawNodes, options);
   const nodeIds = new Set(nodes.map((node) => node.id));
   let edges = (Array.isArray(artifact.edges) ? artifact.edges : [])
     .map((edge) => normalizeGraphEdge(edge, "lineage_graph.json"))
     .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
 
-  if (scope === "relationships") {
+  if (!options.showRuntime && options.showRelationships) {
     edges = edges.filter((edge) => [
       "defines_relationship",
       "uses_child_table",
@@ -1537,6 +1722,33 @@ function buildLineageGraphView(scope) {
       "uses_child_column",
       "uses_parent_column",
     ].includes(edge.type));
+  } else if (!options.showRuntime) {
+    edges = edges.filter((edge) => [
+      "provides_schema",
+      "defines_table",
+      "provides_table",
+      "summarized_by",
+    ].includes(edge.type));
+  }
+
+  if (hasArtifactSummaryNode(nodes)) {
+    edges = [
+      ...edges,
+      ...lineageArtifactSummaryEdges(nodes),
+    ];
+  }
+
+  if (options.invalidOnly) {
+    const warningRelationshipIds = warningRelationshipNodeIds(rawNodes);
+    if (warningRelationshipIds.size) {
+      const included = new Set(
+        nodes
+          .filter((node) => node.category !== "relationship" || warningRelationshipIds.has(node.id))
+          .map((node) => node.id),
+      );
+      nodes = nodes.filter((node) => included.has(node.id));
+      edges = edges.filter((edge) => included.has(edge.source) && included.has(edge.target));
+    }
   }
 
   return filterGraphModelByTable({
@@ -1550,17 +1762,18 @@ function buildLineageGraphView(scope) {
   });
 }
 
-function lineageCategoriesForScope(scope) {
-  if (scope === "columns") {
-    return ["source", "schema", "table", "column", "relationship"];
+function lineageCategoriesForOptions(options) {
+  const categories = ["source", "schema", "table"];
+  if (options.showColumns) {
+    categories.push("column");
   }
-  if (scope === "relationships") {
-    return ["schema", "table", "column", "relationship"];
+  if (options.showRelationships) {
+    categories.push("relationship");
   }
-  if (scope === "runtime") {
-    return ["source", "schema", "table", "relationship", "stage", "artifact"];
+  if (options.showRuntime) {
+    categories.push("stage", "artifact");
   }
-  return ["source", "schema", "table", "relationship"];
+  return categories;
 }
 
 function normalizeLineageNode(node) {
@@ -1581,7 +1794,65 @@ function normalizeLineageNode(node) {
   };
 }
 
-function buildRelationshipGraphView(scope) {
+function addLineageArtifactSummaryNode(nodes, rawNodes, options) {
+  if (options.showRuntime || options.showRelationships) {
+    return nodes;
+  }
+  const artifactCount = rawNodes.filter((node) => lineageTypeToCategory[node.type] === "artifact").length;
+  if (!artifactCount) {
+    return nodes;
+  }
+  return [
+    ...nodes,
+    {
+      id: "artifact-summary:generated",
+      label: `${artifactCount} generated artifacts`,
+      type: "artifact_summary",
+      category: "artifact",
+      data: {
+        artifact_count: artifactCount,
+        summary: "Individual artifact and runtime-stage nodes are hidden in overview.",
+      },
+      evidence: ["run_summary.json", "lineage_graph.json"],
+      table: "",
+      column: "",
+      artifactPath: "run_summary.json",
+      sourceArtifact: "lineage_graph.json",
+    },
+  ];
+}
+
+function hasArtifactSummaryNode(nodes) {
+  return nodes.some((node) => node.id === "artifact-summary:generated");
+}
+
+function lineageArtifactSummaryEdges(nodes) {
+  if (!hasArtifactSummaryNode(nodes)) {
+    return [];
+  }
+  return nodes
+    .filter((node) => node.category === "table")
+    .map((node) => ({
+      source: node.id,
+      target: "artifact-summary:generated",
+      type: "summarized_by",
+      label: "artifact summary",
+      status: "",
+      evidence: ["run_summary.json", "lineage_graph.json"],
+      data: { table: node.table || node.label },
+      sourceArtifact: "lineage_graph.json",
+    }));
+}
+
+function warningRelationshipNodeIds(rawNodes) {
+  return new Set(
+    rawNodes
+      .filter((node) => lineageTypeToCategory[node.type] === "relationship" && isWarningGraphStatus(node.data?.status))
+      .map((node) => String(node.id || "")),
+  );
+}
+
+function buildRelationshipGraphView(options) {
   const artifact = state.dashboardArtifacts["relationship_graph.json"];
   if (!artifact) {
     return emptyGraphModel("Relationship graph", "relationship_graph.json", "relationship_graph.json is not available.");
@@ -1592,13 +1863,27 @@ function buildRelationshipGraphView(scope) {
   const tableIds = new Map();
   const columnIds = new Map();
   const relationshipIds = new Map();
-  const includeColumns = scope === "columns" || scope === "relationships";
-  const includeRelationships = scope === "relationships" || scope === "runtime";
-  const includeArtifact = scope === "runtime";
+  const includeColumns = options.showColumns;
+  const includeRelationships = options.showRelationships;
+  const includeArtifact = options.showRuntime;
+  const relationshipEdges = (Array.isArray(artifact.edges) ? artifact.edges : [])
+    .filter((edge) => !options.invalidOnly || isWarningGraphStatus(edge.status));
+  const relationshipTableNames = new Set();
+  relationshipEdges.forEach((edge) => {
+    if (edge.source_table) {
+      relationshipTableNames.add(String(edge.source_table));
+    }
+    if (edge.target_table) {
+      relationshipTableNames.add(String(edge.target_table));
+    }
+  });
 
   (Array.isArray(artifact.nodes) ? artifact.nodes : []).forEach((tableNode) => {
     const tableName = String(tableNode.table || "");
     if (!tableName) {
+      return;
+    }
+    if (options.invalidOnly && !relationshipTableNames.has(tableName)) {
       return;
     }
     const nodeId = `relationship-table:${tableName}`;
@@ -1625,7 +1910,7 @@ function buildRelationshipGraphView(scope) {
     }
   });
 
-  (Array.isArray(artifact.edges) ? artifact.edges : []).forEach((edge) => {
+  relationshipEdges.forEach((edge) => {
     const sourceTable = String(edge.source_table || "");
     const targetTable = String(edge.target_table || "");
     const sourceTableId = tableIds.get(sourceTable);
@@ -1879,6 +2164,26 @@ function filterGraphModelByTable(model) {
   return { ...model, nodes, edges };
 }
 
+function applyDashboardGraphFocus(graph) {
+  if (state.dashboardGraphDisplay !== "focus" || !state.dashboardGraphSelection?.id) {
+    return graph;
+  }
+  const selectedId = state.dashboardGraphSelection.id;
+  const included = new Set([selectedId]);
+  graph.edges.forEach((edge) => {
+    if (edge.source === selectedId) {
+      included.add(edge.target);
+    }
+    if (edge.target === selectedId) {
+      included.add(edge.source);
+    }
+  });
+  const nodes = graph.nodes.filter((node) => included.has(node.id));
+  const visibleIds = new Set(nodes.map((node) => node.id));
+  const edges = graph.edges.filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target));
+  return { ...graph, nodes, edges };
+}
+
 function graphNodeMatchesTable(node, table) {
   if (!table || table === "all") {
     return true;
@@ -1899,9 +2204,12 @@ function graphNodeMatchesTable(node, table) {
 
 function drawDashboardGraph(graph) {
   const layout = layoutDashboardGraph(graph);
-  const selectedId = state.dashboardGraphSelection?.id || "";
-  els.dashboardGraphStatus.textContent = `${graph.title} · ${graphScopeLabels[state.dashboardGraphScope]} · ${graph.nodes.length} nodes · ${graph.edges.length} edges`;
+  const selection = graphSelectionContext(graph);
+  const display = graphDisplayLabels[state.dashboardGraphDisplay] || "Overview";
+  const invalidLabel = state.dashboardGraphInvalidOnly ? " · invalid/warning only" : "";
+  els.dashboardGraphStatus.textContent = `${graph.title} · ${display} · ${graphScopeLabels[state.dashboardGraphScope]} · ${graph.nodes.length} nodes · ${graph.edges.length} edges${invalidLabel}`;
   els.dashboardGraphSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+  els.dashboardGraphSvg.style.minWidth = `${layout.width}px`;
   els.dashboardGraphSvg.innerHTML = `
     <defs>
       <marker id="graph-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -1909,20 +2217,21 @@ function drawDashboardGraph(graph) {
       </marker>
     </defs>
     <g class="graph-edges">
-      ${graph.edges.map((edge) => graphEdgeSvg(edge, layout.positions)).join("")}
+      ${graph.edges.map((edge) => graphEdgeSvg(edge, layout.positions, selection)).join("")}
     </g>
     <g class="graph-nodes">
-      ${graph.nodes.map((node) => graphNodeSvg(node, layout.positions.get(node.id), selectedId === node.id)).join("")}
+      ${graph.nodes.map((node) => graphNodeSvg(node, layout.positions.get(node.id), selection)).join("")}
     </g>
   `;
 }
 
 function layoutDashboardGraph(graph) {
-  const nodeWidth = 176;
+  const compact = state.dashboardGraphDisplay === "overview" && graph.nodes.length <= 18;
+  const nodeWidth = compact ? 136 : 176;
   const nodeHeight = 46;
-  const xGap = 76;
+  const xGap = compact ? 26 : 76;
   const yGap = 12;
-  const margin = 28;
+  const margin = compact ? 16 : 28;
   const categoryOrder = graph.categoryOrder || lineageCategoryOrder;
   const groups = categoryOrder
     .map((category) => ({
@@ -1933,7 +2242,7 @@ function layoutDashboardGraph(graph) {
     }))
     .filter((group) => group.nodes.length);
   const maxRows = Math.max(...groups.map((group) => group.nodes.length), 1);
-  const width = Math.max(760, margin * 2 + groups.length * nodeWidth + Math.max(groups.length - 1, 0) * xGap);
+  const width = Math.max(compact ? 620 : 760, margin * 2 + groups.length * nodeWidth + Math.max(groups.length - 1, 0) * xGap);
   const height = Math.max(340, margin * 2 + maxRows * nodeHeight + Math.max(maxRows - 1, 0) * yGap);
   const positions = new Map();
 
@@ -1947,7 +2256,28 @@ function layoutDashboardGraph(graph) {
   return { width, height, positions };
 }
 
-function graphEdgeSvg(edge, positions) {
+function graphSelectionContext(graph) {
+  const selectedId = state.dashboardGraphSelection?.id || "";
+  const neighborIds = new Set();
+  const activeEdgeKeys = new Set();
+  if (!selectedId) {
+    return { selectedId, neighborIds, activeEdgeKeys, hasSelection: false };
+  }
+  graph.edges.forEach((edge) => {
+    if (edge.source === selectedId || edge.target === selectedId) {
+      neighborIds.add(edge.source);
+      neighborIds.add(edge.target);
+      activeEdgeKeys.add(graphEdgeKey(edge));
+    }
+  });
+  return { selectedId, neighborIds, activeEdgeKeys, hasSelection: true };
+}
+
+function graphEdgeKey(edge) {
+  return `${edge.source}::${edge.target}::${edge.type}::${edge.label || ""}`;
+}
+
+function graphEdgeSvg(edge, positions, selection) {
   const source = positions.get(edge.source);
   const target = positions.get(edge.target);
   if (!source || !target) {
@@ -1963,20 +2293,42 @@ function graphEdgeSvg(edge, positions) {
     ? `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`
     : `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`;
   const tone = graphStatusTone(edge.status);
+  const active = selection.activeEdgeKeys.has(graphEdgeKey(edge));
+  const dimmed = selection.hasSelection && !active;
+  const edgeClass = [
+    "graph-edge-wrap",
+    tone,
+    active ? "selected" : "",
+    dimmed ? "dimmed" : "",
+  ].filter(Boolean).join(" ");
+  const labelX = sameColumn ? mid + 6 : Math.min(x1, x2) + Math.abs(x2 - x1) / 2;
+  const labelY = Math.min(y1, y2) + Math.abs(y2 - y1) / 2 - 6;
   return `
-    <path class="graph-edge ${escapeHtml(tone)}" d="${path}" marker-end="url(#graph-arrow)">
-      <title>${escapeHtml(edge.label || edge.type)}</title>
-    </path>
+    <g class="${escapeHtml(edgeClass)}">
+      <path class="graph-edge ${escapeHtml(tone)}" d="${path}" marker-end="url(#graph-arrow)">
+        <title>${escapeHtml(edge.label || edge.type)}</title>
+      </path>
+      <text class="graph-edge-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateMiddle(edge.label || edge.type, 22))}</text>
+    </g>
   `;
 }
 
-function graphNodeSvg(node, position, selected) {
+function graphNodeSvg(node, position, selection) {
   if (!position) {
     return "";
   }
-  const label = truncateMiddle(node.label, 28);
+  const label = truncateMiddle(node.label, position.width < 150 ? 20 : 28);
   const category = graphCategoryLabels[node.category] || node.category;
-  const nodeClass = `graph-node graph-node-${node.category}${selected ? " selected" : ""}`;
+  const selected = selection.selectedId === node.id;
+  const neighbor = selection.neighborIds.has(node.id) && !selected;
+  const dimmed = selection.hasSelection && !selected && !neighbor;
+  const nodeClass = [
+    "graph-node",
+    `graph-node-${node.category}`,
+    selected ? "selected" : "",
+    neighbor ? "neighbor" : "",
+    dimmed ? "dimmed" : "",
+  ].filter(Boolean).join(" ");
   return `
     <g class="${escapeHtml(nodeClass)}" role="button" tabindex="0" data-graph-node-id="${escapeHtml(node.id)}" aria-label="${escapeHtml(`${category}: ${node.label}`)}" transform="translate(${position.x} ${position.y})">
       <title>${escapeHtml(`${category}: ${node.label}`)}</title>
@@ -1991,6 +2343,7 @@ function renderEmptyGraph(message) {
   els.dashboardGraphStatus.textContent = message;
   els.dashboardGraphLegend.innerHTML = `<span>No graph loaded</span>`;
   els.dashboardGraphSvg.setAttribute("viewBox", "0 0 760 240");
+  els.dashboardGraphSvg.style.minWidth = "760px";
   els.dashboardGraphSvg.innerHTML = `
     <text class="graph-empty-text" x="380" y="120" text-anchor="middle">${escapeHtml(message)}</text>
   `;
@@ -2024,8 +2377,9 @@ function renderGraphDrilldown(graph) {
     return;
   }
 
-  const issues = graphIssuesForNode(node);
-  const artifacts = graphArtifactsForNode(node, graph);
+  const connections = graphDirectConnections(graph, node.id);
+  const issues = graphIssuesForNode(node, connections.edges);
+  const artifacts = graphArtifactsForNode(node, graph, connections.edges);
   els.dashboardGraphDrilldownMeta.textContent = truncateMiddle(node.label, 36);
   els.dashboardGraphDrilldown.innerHTML = `
     <div class="graph-node-detail">
@@ -2034,12 +2388,78 @@ function renderGraphDrilldown(graph) {
       <span class="pill-status ${graphNodePillClass(node)}">${escapeHtml(graphCategoryLabels[node.category] || node.category)}</span>
     </div>
     ${renderGraphMetadata(node)}
+    ${renderGraphDirectConnections(connections)}
+    ${renderGraphTableColumns(node)}
     ${renderIssueRows(issues)}
     ${renderDrilldownArtifacts(artifacts)}
   `;
 }
 
-function graphIssuesForNode(node) {
+function graphDirectConnections(graph, nodeId) {
+  const nodesById = new Map(graph.nodes.map((candidate) => [candidate.id, candidate]));
+  const edges = graph.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+  const nodes = edges
+    .map((edge) => nodesById.get(edge.source === nodeId ? edge.target : edge.source))
+    .filter(Boolean);
+  return { edges, nodes };
+}
+
+function renderGraphDirectConnections(connections) {
+  if (!connections.edges.length) {
+    return `<p class="muted">No direct graph neighbors in the current view.</p>`;
+  }
+  return `
+    <div class="graph-direct-evidence">
+      <strong>Direct neighbors</strong>
+      ${connections.edges.slice(0, 8).map((edge, index) => {
+        const neighbor = connections.nodes[index];
+        const status = edge.status ? ` · ${edge.status}` : "";
+        return `
+          <div>
+            <span>${escapeHtml(edge.type || "edge")}${escapeHtml(status)}</span>
+            <code>${escapeHtml(neighbor?.label || edge.target || edge.source)}</code>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderGraphTableColumns(node) {
+  if (node.category !== "table") {
+    return "";
+  }
+  const tableName = node.table || node.data?.table || node.label;
+  const columns = tableColumnsForGraphNode(tableName);
+  if (!columns.length) {
+    return "";
+  }
+  return `
+    <div class="graph-column-inspector">
+      <strong>Columns in inspector</strong>
+      <div>
+        ${columns.slice(0, 12).map((column) => `
+          <span><code>${escapeHtml(column.name)}</code>${column.kind ? `<small>${escapeHtml(column.kind)}</small>` : ""}</span>
+        `).join("")}
+        ${columns.length > 12 ? `<span><code>+${integerText(columns.length - 12)} more</code></span>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function tableColumnsForGraphNode(tableName) {
+  const profile = state.dashboardArtifacts["profile_summary.json"];
+  const table = profile?.tables?.[tableName];
+  const columns = objectOrEmpty(table?.columns);
+  return Object.entries(columns)
+    .map(([name, detail]) => ({
+      name,
+      kind: detail?.expected_type_from_dbml || detail?.inferred_type || "",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function graphIssuesForNode(node, directEdges = []) {
   const issues = getFilteredDashboardIssues();
   const data = node.data || {};
   const evidenceIssueIds = new Set(
@@ -2047,6 +2467,12 @@ function graphIssuesForNode(node) {
       .map((link) => link.issue_id)
       .filter(Boolean),
   );
+  directEdges.forEach((edge) => {
+    (Array.isArray(edge.data?.evidence_links) ? edge.data.evidence_links : [])
+      .map((link) => link.issue_id)
+      .filter(Boolean)
+      .forEach((issueId) => evidenceIssueIds.add(issueId));
+  });
   if (evidenceIssueIds.size) {
     return issues.filter((issue) => evidenceIssueIds.has(issue.issue_id));
   }
@@ -2075,7 +2501,7 @@ function graphIssuesForNode(node) {
   return [];
 }
 
-function graphArtifactsForNode(node, graph) {
+function graphArtifactsForNode(node, graph, directEdges = []) {
   const paths = new Set([graph.sourceArtifact]);
   arrayOfStrings(node.evidence).forEach((path) => paths.add(path));
   if (node.artifactPath) {
@@ -2086,6 +2512,15 @@ function graphArtifactsForNode(node, graph) {
     if (link.sample_bad_rows_path) {
       paths.add(link.sample_bad_rows_path);
     }
+  });
+  directEdges.forEach((edge) => {
+    arrayOfStrings(edge.evidence).forEach((path) => paths.add(path));
+    const edgeEvidenceLinks = Array.isArray(edge.data?.evidence_links) ? edge.data.evidence_links : [];
+    edgeEvidenceLinks.forEach((link) => {
+      if (link.sample_bad_rows_path) {
+        paths.add(link.sample_bad_rows_path);
+      }
+    });
   });
   return [...paths].filter((path) => artifactUrlFor(path));
 }
@@ -2185,13 +2620,17 @@ function graphNodePillClass(node) {
 }
 
 function graphStatusTone(status) {
-  if (["invalid", "failed"].includes(status)) {
+  if (["invalid", "failed", "error"].includes(status)) {
     return "danger";
   }
   if (["warning", "skipped"].includes(status)) {
     return "warn";
   }
   return "";
+}
+
+function isWarningGraphStatus(status) {
+  return ["invalid", "failed", "error", "warning", "skipped"].includes(String(status || ""));
 }
 
 function objectOrEmpty(value) {
@@ -2699,6 +3138,7 @@ function renderDiagram() {
   const model = buildDiagramModel();
   updateDbdiagramLink(model.externalUrl);
   renderDiagramDiagnostics(model.parseReport);
+  updateDiagramControls(model);
 
   els.diagramFrame.hidden = true;
   els.diagramFrame.removeAttribute("src");
@@ -2743,7 +3183,19 @@ function renderDiagram() {
   els.diagramMessage.textContent = `${model.sourceLabel} · ${integerText(model.tables.length)} tables · ${integerText(model.relationships.length)} relationships`;
   els.diagramMessage.dataset.status = model.source === "artifact" ? "success" : "idle";
   els.diagramSourceBadge.textContent = model.sourceBadge;
-  drawLocalDiagram(model);
+  const layout = layoutLocalDiagram(model);
+  normalizeDiagramSelection(layout);
+  drawLocalDiagram(model, layout);
+  renderDiagramInspector(model, layout);
+}
+
+function updateDiagramControls(model) {
+  els.diagramFitButton.setAttribute("aria-pressed", state.diagramFit ? "true" : "false");
+  els.diagramDensityToggle.setAttribute("aria-pressed", state.diagramExpanded ? "true" : "false");
+  els.diagramColumnsToggle.setAttribute("aria-pressed", state.diagramShowNonKey ? "true" : "false");
+  els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "Hide non-key columns" : "Show non-key columns";
+  els.diagramResetSelection.disabled = !state.diagramSelection;
+  els.diagramFitButton.disabled = !model.hasInput || Boolean(model.error);
 }
 
 function buildDiagramModel() {
@@ -2801,9 +3253,13 @@ function buildArtifactDiagramModel(schemaDiagram, relationshipGraph, parseReport
   const graphNodes = Array.isArray(relationshipGraph.nodes) ? relationshipGraph.nodes : [];
   const graphEdges = Array.isArray(relationshipGraph.edges) ? relationshipGraph.edges : [];
   const graphNodeByTable = new Map(graphNodes.map((node) => [String(node.table || ""), node]));
+  const parseTableByName = new Map(
+    (parseReport?.objects?.tables || []).map((table) => [String(table.name || ""), table]),
+  );
   const tableNames = uniqueSorted([
     ...schemaTables.map((table) => table.table).filter(Boolean),
     ...graphNodes.map((node) => node.table).filter(Boolean),
+    ...[...parseTableByName.keys()].filter(Boolean),
   ]);
   const relationships = graphEdges.length
     ? graphEdges.map((edge) => ({
@@ -2813,7 +3269,14 @@ function buildArtifactDiagramModel(schemaDiagram, relationshipGraph, parseReport
       parentTable: edge.target_table || "",
       parentColumns: arrayOfStrings(edge.target_columns).length ? arrayOfStrings(edge.target_columns) : arrayOfStrings([edge.target_column]),
       status: edge.status || "",
+      statusReason: edge.status_reason || "",
       label: edge.status || edge.cardinality || "FK",
+      cardinality: edge.cardinality || edge.observed_cardinality || edge.declared_cardinality || "",
+      declaredCardinality: edge.declared_cardinality || "",
+      relationshipType: edge.relationship_type || "",
+      role: edge.role || "",
+      metrics: edge.metrics || {},
+      evidenceLinks: Array.isArray(edge.evidence_links) ? edge.evidence_links : [],
     }))
     : (Array.isArray(schemaDiagram.relationships) ? schemaDiagram.relationships : []).map((rel) => ({
       id: `${rel.child_table || rel.childTable}.${rel.child_column || rel.childColumn}->${rel.parent_table || rel.parentTable}.${rel.parent_column || rel.parentColumn}`,
@@ -2823,6 +3286,12 @@ function buildArtifactDiagramModel(schemaDiagram, relationshipGraph, parseReport
       parentColumns: arrayOfStrings(rel.parent_columns || [rel.parent_column || rel.parentColumn]),
       status: "",
       label: rel.declared_cardinality || rel.relationship_type || "FK",
+      cardinality: rel.declared_cardinality || "",
+      declaredCardinality: rel.declared_cardinality || "",
+      relationshipType: rel.relationship_type || "",
+      statusReason: "",
+      metrics: {},
+      evidenceLinks: [],
     }));
   const schemaTableByName = new Map(schemaTables.map((table) => [String(table.table || ""), table]));
   return {
@@ -2836,20 +3305,22 @@ function buildArtifactDiagramModel(schemaDiagram, relationshipGraph, parseReport
     tables: tableNames.map((tableName) => {
       const schemaTable = schemaTableByName.get(tableName) || {};
       const graphNode = graphNodeByTable.get(tableName) || {};
+      const parsedTable = parseTableByName.get(tableName) || {};
       return {
         name: tableName,
         status: graphNode.status || schemaTable.status || "mapped",
         csvPath: graphNode.csv_path || schemaTable.csv_path || "",
         rowCount: graphNode.row_count ?? null,
         columnCount: graphNode.column_count ?? schemaTable.column_count ?? 0,
-        columns: diagramColumnsFromArtifacts(schemaTable, graphNode),
+        primaryKey: arrayOfStrings(graphNode.primary_key || schemaTable.primary_key || parsedTable.primary_key),
+        columns: diagramColumnsFromArtifacts(schemaTable, graphNode, parsedTable),
       };
     }),
     relationships: relationships.filter((rel) => rel.childTable && rel.parentTable),
   };
 }
 
-function diagramColumnsFromArtifacts(schemaTable, graphNode) {
+function diagramColumnsFromArtifacts(schemaTable, graphNode, parsedTable = {}) {
   const byName = new Map();
   function ensureColumn(name) {
     if (!name) {
@@ -2860,6 +3331,9 @@ function diagramColumnsFromArtifacts(schemaTable, graphNode) {
     }
     return byName.get(name);
   }
+  arrayOfStrings(parsedTable.columns).forEach((columnName) => {
+    ensureColumn(columnName);
+  });
   arrayOfStrings(graphNode.primary_key || schemaTable.primary_key).forEach((columnName) => {
     const column = ensureColumn(columnName);
     if (column) {
@@ -2937,100 +3411,216 @@ function renderDiagramState(kind, title, message, model) {
   els.diagramMessage.dataset.status = kind === "error" ? "error" : "idle";
   els.diagramSourceBadge.textContent = model.sourceBadge || "Local preview";
   els.diagramSvg.innerHTML = "";
+  els.diagramInspector.innerHTML = "";
 }
 
-function drawLocalDiagram(model) {
-  const layout = layoutLocalDiagram(model);
+function drawLocalDiagram(model, layout) {
   els.diagramSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+  els.diagramSvg.classList.toggle("fit", state.diagramFit);
+  els.localDiagram.classList.toggle("fit", state.diagramFit);
+  els.diagramSvg.style.width = state.diagramFit ? "100%" : `${layout.width}px`;
+  els.diagramSvg.style.height = state.diagramFit ? "100%" : `${layout.height}px`;
   els.diagramSvg.innerHTML = `
-    <defs>
-      <marker id="diagram-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-        <path d="M 0 0 L 10 5 L 0 10 z"></path>
-      </marker>
-    </defs>
     <g class="diagram-edges">
-      ${model.relationships.map((rel) => diagramRelationshipSvg(rel, layout.positions)).join("")}
+      ${model.relationships.map((rel, index) => diagramRelationshipSvg(rel, layout, index)).join("")}
     </g>
     <g class="diagram-tables">
-      ${model.tables.map((table) => diagramTableSvg(table, layout.positions.get(table.name))).join("")}
+      ${layout.tableRecords.map((record) => diagramTableSvg(record, layout.positions.get(record.table.name), layout.selection)).join("")}
     </g>
   `;
 }
 
 function layoutLocalDiagram(model) {
-  const nodeWidth = 232;
-  const nodeHeight = 154;
-  const xGap = 92;
-  const yGap = 42;
-  const margin = 28;
-  const tableCount = Math.max(model.tables.length, 1);
-  const columnCount = tableCount <= 3 ? tableCount : tableCount <= 8 ? 2 : 3;
-  const rowCount = Math.ceil(tableCount / columnCount);
-  const width = Math.max(720, margin * 2 + columnCount * nodeWidth + Math.max(columnCount - 1, 0) * xGap);
-  const height = Math.max(360, margin * 2 + rowCount * nodeHeight + Math.max(rowCount - 1, 0) * yGap);
+  const graph = buildDiagramGraph(model);
+  const nodeWidth = state.diagramExpanded ? 276 : 252;
+  const xGap = 126;
+  const yGap = 34;
+  const margin = 32;
+  const topMargin = 76;
+  const tableRecords = model.tables.map((table) => {
+    const role = diagramTableRole(table, graph);
+    const columnSet = diagramVisibleColumns(table);
+    const rowCount = Math.max(columnSet.visible.length, columnSet.hiddenCount ? columnSet.visible.length + 1 : columnSet.visible.length, 1);
+    return {
+      table,
+      role,
+      degree: role.degree,
+      visibleColumns: columnSet.visible,
+      hiddenCount: columnSet.hiddenCount,
+      totalColumns: columnSet.totalColumns,
+      width: nodeWidth,
+      height: Math.max(state.diagramExpanded ? 156 : 134, 74 + rowCount * 22 + 18),
+    };
+  });
+  const originalLayers = [...new Set(tableRecords.map((record) => record.role.layer))].sort((a, b) => a - b);
+  const layerIndexByOriginal = new Map(originalLayers.map((layer, index) => [layer, index]));
+  tableRecords.forEach((record) => {
+    record.layer = layerIndexByOriginal.get(record.role.layer) || 0;
+  });
+  const layers = new Map();
+  tableRecords.forEach((record) => {
+    const layer = layers.get(record.layer) || [];
+    layer.push(record);
+    layers.set(record.layer, layer);
+  });
+  [...layers.values()].forEach((records) => {
+    records.sort((a, b) => b.degree - a.degree || a.table.name.localeCompare(b.table.name));
+  });
+  const layerCount = Math.max(layers.size, 1);
+  const layerHeights = [...layers.values()].map((records) => records.reduce((total, record) => total + record.height, 0) + Math.max(records.length - 1, 0) * yGap);
+  const maxLayerHeight = Math.max(360, ...layerHeights);
+  const width = Math.max(860, margin * 2 + layerCount * nodeWidth + Math.max(layerCount - 1, 0) * xGap);
+  const height = Math.max(460, topMargin + margin + maxLayerHeight);
   const positions = new Map();
-  model.tables
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((table, index) => {
-      const column = index % columnCount;
-      const row = Math.floor(index / columnCount);
-      positions.set(table.name, {
-        x: margin + column * (nodeWidth + xGap),
-        y: margin + row * (nodeHeight + yGap),
-        width: nodeWidth,
-        height: nodeHeight,
+  [...layers.entries()].forEach(([layer, records]) => {
+    const layerHeight = records.reduce((total, record) => total + record.height, 0) + Math.max(records.length - 1, 0) * yGap;
+    let y = topMargin + (maxLayerHeight - layerHeight) / 2;
+    records.forEach((record) => {
+      const columnY = new Map();
+      record.visibleColumns.forEach((column, index) => {
+        columnY.set(column.name, y + 79 + index * 22);
       });
+      positions.set(record.table.name, {
+        x: margin + layer * (nodeWidth + xGap),
+        y,
+        width: record.width,
+        height: record.height,
+        layer,
+        columnY,
+      });
+      y += record.height + yGap;
     });
-  return { width, height, positions };
+  });
+  const selection = diagramSelectionContext(model);
+  return { width, height, positions, tableRecords, graph, selection, topMargin };
 }
 
-function diagramRelationshipSvg(rel, positions) {
+function buildDiagramGraph(model) {
+  const incoming = new Map();
+  const outgoing = new Map();
+  model.tables.forEach((table) => {
+    incoming.set(table.name, []);
+    outgoing.set(table.name, []);
+  });
+  model.relationships.forEach((rel) => {
+    if (!incoming.has(rel.parentTable)) {
+      incoming.set(rel.parentTable, []);
+    }
+    if (!outgoing.has(rel.childTable)) {
+      outgoing.set(rel.childTable, []);
+    }
+    incoming.get(rel.parentTable).push(rel);
+    outgoing.get(rel.childTable).push(rel);
+  });
+  return { incoming, outgoing };
+}
+
+function diagramTableRole(table, graph) {
+  const incoming = graph.incoming.get(table.name) || [];
+  const outgoing = graph.outgoing.get(table.name) || [];
+  const degree = incoming.length + outgoing.length;
+  const name = table.name.toLowerCase();
+  const hasReferenceName = /(customer|product|seller|category|type|state|status|lookup|reference|dimension|dim_|ref_)/.test(name);
+  const hasBridgeName = /(bridge|junction|link|map|xref|assoc|association|item|items|line)/.test(name);
+  const hasFactName = /(order|event|transaction|payment|review|fact|activity|log|history)/.test(name);
+  const keyColumns = (table.columns || []).filter((column) => column.isPk || column.isFk);
+  const fkKeyCount = keyColumns.filter((column) => column.isFk).length;
+  if (outgoing.length >= 2 || (hasBridgeName && outgoing.length > 0) || (fkKeyCount >= 2 && incoming.length <= 1)) {
+    return { name: "bridge", label: "Bridge", layer: 1, degree, incoming: incoming.length, outgoing: outgoing.length };
+  }
+  if ((outgoing.length === 0 && incoming.length > 0) || (hasReferenceName && outgoing.length <= 1 && incoming.length >= 0)) {
+    return { name: "reference", label: "Reference", layer: 0, degree, incoming: incoming.length, outgoing: outgoing.length };
+  }
+  if (incoming.length >= 2 || (hasFactName && incoming.length > 0)) {
+    return { name: "hub", label: "Fact/event", layer: 2, degree, incoming: incoming.length, outgoing: outgoing.length };
+  }
+  if (outgoing.length > 0) {
+    return { name: "child", label: "Child/detail", layer: 3, degree, incoming: incoming.length, outgoing: outgoing.length };
+  }
+  return { name: "isolated", label: "Schema table", layer: 1, degree, incoming: incoming.length, outgoing: outgoing.length };
+}
+
+function diagramVisibleColumns(table) {
+  const allColumns = (table.columns || []).filter((column) => !column.summary);
+  const totalColumns = Number(table.columnCount || allColumns.length || 0);
+  const keyColumns = allColumns.filter((column) => column.isPk || column.isFk || column.isUnique);
+  const candidates = state.diagramShowNonKey ? allColumns : keyColumns;
+  const limit = state.diagramExpanded ? (state.diagramShowNonKey ? 12 : 8) : (state.diagramShowNonKey ? 7 : 5);
+  const visible = candidates.slice(0, limit);
+  const hiddenCount = Math.max(totalColumns - visible.length, 0);
+  return { visible, hiddenCount, totalColumns };
+}
+
+function diagramRelationshipSvg(rel, layout, index) {
+  const positions = layout.positions;
   const source = positions.get(rel.childTable);
   const target = positions.get(rel.parentTable);
   if (!source || !target) {
     return "";
   }
-  const x1 = source.x + source.width;
-  const y1 = source.y + 58;
-  const x2 = target.x;
-  const y2 = target.y + 58;
-  const sameColumn = Math.abs(source.x - target.x) < 4;
-  const mid = sameColumn ? x1 + 52 : x1 + (x2 - x1) / 2;
-  const path = sameColumn
-    ? `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2 + target.width} ${y2}`
-    : `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`;
-  const labelX = sameColumn ? mid : (x1 + x2) / 2;
-  const labelY = (y1 + y2) / 2 - 6;
+  const sameLayer = source.layer === target.layer;
+  const sourceColumn = (rel.childColumns || [])[0] || "";
+  const targetColumn = (rel.parentColumns || [])[0] || "";
+  const y1 = source.columnY.get(sourceColumn) || source.y + 80;
+  const y2 = target.columnY.get(targetColumn) || target.y + 80;
+  const sourceIsLeft = source.x < target.x;
+  const x1 = sameLayer ? source.x + source.width : sourceIsLeft ? source.x + source.width : source.x;
+  const x2 = sameLayer ? target.x + target.width : sourceIsLeft ? target.x : target.x + target.width;
+  const laneY = 22 + (index % 4) * 13;
+  const offset = 42 + (index % 3) * 9;
+  const direction = x2 >= x1 ? 1 : -1;
+  let path;
+  let labelX;
+  let labelY;
+  if (sameLayer) {
+    const routeX = Math.max(source.x + source.width, target.x + target.width) + offset;
+    path = `M ${x1} ${y1} L ${routeX} ${y1} L ${routeX} ${y2} L ${x2} ${y2}`;
+    labelX = routeX + 8;
+    labelY = (y1 + y2) / 2 - 6;
+  } else {
+    const exitX = x1 + direction * offset;
+    const entryX = x2 - direction * offset;
+    path = `M ${x1} ${y1} L ${exitX} ${y1} L ${exitX} ${laneY} L ${entryX} ${laneY} L ${entryX} ${y2} L ${x2} ${y2}`;
+    labelX = (exitX + entryX) / 2;
+    labelY = laneY - 5;
+  }
   const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
+  const selectionClass = diagramRelationshipSelectionClass(rel, layout.selection);
   return `
-    <path class="diagram-edge ${escapeHtml(diagramStatusTone(rel.status))}" d="${path}" marker-end="url(#diagram-arrow)">
+    <g class="diagram-relationship diagram-relationship-${escapeHtml(diagramStatusTone(rel.status))} ${selectionClass}" data-diagram-relationship="${escapeHtml(rel.id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
       <title>${escapeHtml(label)}</title>
-    </path>
-    <text class="diagram-edge-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateMiddle(rel.label || "FK", 18))}</text>
+      <path class="diagram-edge-hit" d="${path}"></path>
+      <path class="diagram-edge" d="${path}"></path>
+      <circle class="diagram-port-dot" cx="${x1}" cy="${y1}" r="3"></circle>
+      <circle class="diagram-port-dot" cx="${x2}" cy="${y2}" r="3"></circle>
+      <text class="diagram-edge-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateMiddle(rel.label || rel.cardinality || "FK", 22))}</text>
+    </g>
   `;
 }
 
-function diagramTableSvg(table, position) {
+function diagramTableSvg(record, position, selection) {
+  const table = record.table;
   if (!position) {
     return "";
   }
-  const columns = table.columns.slice(0, 5);
-  const overflow = Math.max(table.columns.length - columns.length, 0);
-  const lines = columns.map((column, index) => diagramColumnTspan(column, 70 + index * 16)).join("");
-  const overflowLine = overflow ? `<text class="diagram-column overflow" x="14" y="${70 + columns.length * 16}">+${integerText(overflow)} more key columns</text>` : "";
+  const columns = record.visibleColumns;
+  const lines = columns.map((column, index) => diagramColumnTspan(column, 74 + index * 22)).join("");
+  const overflowLine = record.hiddenCount ? `<text class="diagram-column overflow" x="14" y="${74 + columns.length * 22}">+${integerText(record.hiddenCount)} columns</text>` : "";
   const meta = [
     table.status === "mapped" ? "mapped CSV" : table.status === "missing_csv" ? "missing CSV" : table.status || "schema",
-    table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(table.columnCount)} columns`,
+    table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(record.totalColumns)} columns`,
   ].filter(Boolean).join(" · ");
+  const selectionClass = diagramTableSelectionClass(table.name, selection);
   return `
-    <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))}" data-diagram-table="${escapeHtml(table.name)}" transform="translate(${position.x} ${position.y})">
-      <title>${escapeHtml(`${table.name} · ${meta}`)}</title>
+    <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))} diagram-role-${escapeHtml(record.role.name)} ${selectionClass}" data-diagram-table="${escapeHtml(table.name)}" transform="translate(${position.x} ${position.y})" tabindex="0" role="button" aria-label="${escapeHtml(`${table.name} table`)}">
+      <title>${escapeHtml(`${table.name} · ${record.role.label} · ${meta}`)}</title>
       <rect class="diagram-table-box" width="${position.width}" height="${position.height}" rx="8"></rect>
-      <rect class="diagram-table-header" width="${position.width}" height="48" rx="8"></rect>
+      <rect class="diagram-table-header" width="${position.width}" height="52" rx="8"></rect>
       <text class="diagram-table-name" x="14" y="22">${escapeHtml(truncateMiddle(table.name, 26))}</text>
-      <text class="diagram-table-meta" x="14" y="40">${escapeHtml(truncateMiddle(meta, 34))}</text>
-      ${lines || `<text class="diagram-column" x="14" y="72">${integerText(table.columnCount)} columns</text>`}
+      <text class="diagram-table-meta" x="14" y="42">${escapeHtml(truncateMiddle(`${record.role.label} · ${meta}`, 38))}</text>
+      <rect class="diagram-status-chip" x="${position.width - 78}" y="14" width="62" height="22" rx="11"></rect>
+      <text class="diagram-status-text" x="${position.width - 47}" y="29" text-anchor="middle">${escapeHtml(table.status === "missing_csv" ? "missing" : table.status || "schema")}</text>
+      ${lines || `<text class="diagram-column empty" x="14" y="74">No key columns</text>`}
       ${overflowLine}
     </g>
   `;
@@ -3039,7 +3629,7 @@ function diagramTableSvg(table, position) {
 function diagramColumnTspan(column, y) {
   const role = column.isPk && column.isFk ? "PK/FK" : column.isPk ? "PK" : column.isFk ? "FK" : "COL";
   const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
-  return `<text class="diagram-column ${column.isPk ? "pk" : ""} ${column.isFk ? "fk" : ""}" x="14" y="${y}"><tspan class="diagram-column-role">${escapeHtml(role)}</tspan> ${escapeHtml(truncateMiddle(`${column.name}${target}`, 32))}</text>`;
+  return `<text class="diagram-column ${column.isPk ? "pk" : ""} ${column.isFk ? "fk" : ""} ${!column.isPk && !column.isFk ? "non-key" : ""}" x="14" y="${y}" data-diagram-column="${escapeHtml(column.name)}"><tspan class="diagram-column-role">${escapeHtml(role)}</tspan> ${escapeHtml(truncateMiddle(`${column.name}${target}`, 34))}</text>`;
 }
 
 function diagramStatusTone(status) {
@@ -3050,6 +3640,273 @@ function diagramStatusTone(status) {
     return "warn";
   }
   return "mapped";
+}
+
+function handleDiagramSelectionEvent(event) {
+  const relationshipTarget = event.target.closest("[data-diagram-relationship]");
+  if (relationshipTarget) {
+    state.diagramSelection = {
+      kind: "relationship",
+      id: relationshipTarget.dataset.diagramRelationship || "",
+    };
+    renderDiagram();
+    return true;
+  }
+  const tableTarget = event.target.closest("[data-diagram-table]");
+  if (tableTarget) {
+    state.diagramSelection = {
+      kind: "table",
+      id: tableTarget.dataset.diagramTable || "",
+    };
+    renderDiagram();
+    return true;
+  }
+  return false;
+}
+
+function diagramSelectionContext(model) {
+  const selected = state.diagramSelection;
+  const tableNames = new Set(model.tables.map((table) => table.name));
+  const relationshipIds = new Set(model.relationships.map((rel) => rel.id));
+  const selectedTables = new Set();
+  const neighborTables = new Set();
+  const selectedRelationships = new Set();
+  if (!selected) {
+    return { selected: null, selectedTables, neighborTables, selectedRelationships };
+  }
+  if (selected.kind === "table" && tableNames.has(selected.id)) {
+    selectedTables.add(selected.id);
+    model.relationships.forEach((rel) => {
+      if (rel.childTable === selected.id || rel.parentTable === selected.id) {
+        selectedRelationships.add(rel.id);
+        neighborTables.add(rel.childTable);
+        neighborTables.add(rel.parentTable);
+      }
+    });
+    neighborTables.delete(selected.id);
+    return { selected, selectedTables, neighborTables, selectedRelationships };
+  }
+  if (selected.kind === "relationship" && relationshipIds.has(selected.id)) {
+    const rel = model.relationships.find((item) => item.id === selected.id);
+    if (rel) {
+      selectedRelationships.add(rel.id);
+      selectedTables.add(rel.childTable);
+      selectedTables.add(rel.parentTable);
+    }
+    return { selected, selectedTables, neighborTables, selectedRelationships };
+  }
+  return { selected: null, selectedTables, neighborTables, selectedRelationships };
+}
+
+function normalizeDiagramSelection(layout) {
+  if (!state.diagramSelection || layout.selection.selected) {
+    return;
+  }
+  state.diagramSelection = null;
+  layout.selection = diagramSelectionContext({
+    tables: layout.tableRecords.map((record) => record.table),
+    relationships: [],
+  });
+}
+
+function diagramTableSelectionClass(tableName, selection) {
+  if (!selection.selected) {
+    return "";
+  }
+  if (selection.selectedTables.has(tableName)) {
+    return "selected";
+  }
+  if (selection.neighborTables.has(tableName)) {
+    return "neighbor";
+  }
+  return "dimmed";
+}
+
+function diagramRelationshipSelectionClass(rel, selection) {
+  if (!selection.selected) {
+    return "";
+  }
+  if (selection.selectedRelationships.has(rel.id)) {
+    return "selected";
+  }
+  if (selection.selectedTables.has(rel.childTable) || selection.selectedTables.has(rel.parentTable)) {
+    return "neighbor";
+  }
+  return "dimmed";
+}
+
+function renderDiagramInspector(model, layout) {
+  const selected = layout.selection.selected;
+  if (!selected) {
+    els.diagramInspector.innerHTML = renderDiagramOverview(model, layout);
+    return;
+  }
+  if (selected.kind === "table") {
+    const record = layout.tableRecords.find((item) => item.table.name === selected.id);
+    els.diagramInspector.innerHTML = record
+      ? renderDiagramTableInspector(record, layout)
+      : renderDiagramOverview(model, layout);
+    return;
+  }
+  const rel = model.relationships.find((item) => item.id === selected.id);
+  els.diagramInspector.innerHTML = rel
+    ? renderDiagramRelationshipInspector(rel)
+    : renderDiagramOverview(model, layout);
+}
+
+function renderDiagramOverview(model, layout) {
+  const roleCounts = layout.tableRecords.reduce((counts, record) => {
+    counts[record.role.label] = (counts[record.role.label] || 0) + 1;
+    return counts;
+  }, {});
+  return `
+    <div class="diagram-inspector-heading">
+      <p class="eyebrow">ERD overview</p>
+      <h4>${integerText(model.tables.length)} tables</h4>
+      <span>${integerText(model.relationships.length)} relationships</span>
+    </div>
+    <dl class="diagram-detail-grid">
+      <div><dt>Source</dt><dd>${escapeHtml(model.sourceBadge)}</dd></div>
+      <div><dt>Layers</dt><dd>${integerText(new Set(layout.tableRecords.map((record) => record.layer)).size)}</dd></div>
+      <div><dt>Columns</dt><dd>${state.diagramShowNonKey ? "key + non-key" : "key only"}</dd></div>
+      <div><dt>Density</dt><dd>${state.diagramExpanded ? "expanded" : "compact"}</dd></div>
+    </dl>
+    <div class="diagram-detail-section">
+      <strong>Layer roles</strong>
+      <div class="diagram-chip-list">
+        ${Object.entries(roleCounts).map(([label, count]) => `<span>${escapeHtml(label)} ${integerText(count)}</span>`).join("")}
+      </div>
+    </div>
+    ${diagramArtifactLinks(["schema_diagram.json", "relationship_graph.json", "schema_parse_report.json"])}
+  `;
+}
+
+function renderDiagramTableInspector(record, layout) {
+  const table = record.table;
+  const incoming = layout.graph.incoming.get(table.name) || [];
+  const outgoing = layout.graph.outgoing.get(table.name) || [];
+  const columns = (table.columns || []).filter((column) => !column.summary);
+  const keyColumns = columns.filter((column) => column.isPk || column.isFk);
+  return `
+    <div class="diagram-inspector-heading">
+      <p class="eyebrow">${escapeHtml(record.role.label)}</p>
+      <h4><code>${escapeHtml(table.name)}</code></h4>
+      <span>${escapeHtml(table.status || "schema")}</span>
+    </div>
+    <dl class="diagram-detail-grid">
+      <div><dt>Rows</dt><dd>${table.rowCount === null || table.rowCount === undefined ? "n/a" : integerText(table.rowCount)}</dd></div>
+      <div><dt>Columns</dt><dd>${integerText(record.totalColumns)}</dd></div>
+      <div><dt>Incoming</dt><dd>${integerText(incoming.length)}</dd></div>
+      <div><dt>Outgoing</dt><dd>${integerText(outgoing.length)}</dd></div>
+    </dl>
+    <div class="diagram-detail-section">
+      <strong>CSV mapping</strong>
+      <p>${table.csvPath ? `<code>${escapeHtml(table.csvPath)}</code>` : "No CSV mapped"}</p>
+    </div>
+    <div class="diagram-detail-section">
+      <strong>Key columns</strong>
+      ${keyColumns.length ? `<ul>${keyColumns.map((column) => `<li><code>${escapeHtml(column.name)}</code> ${escapeHtml(diagramColumnRole(column))}${column.fkTarget ? ` -> <code>${escapeHtml(column.fkTarget)}</code>` : ""}</li>`).join("")}</ul>` : `<p class="muted">No PK/FK columns in current evidence.</p>`}
+    </div>
+    <div class="diagram-detail-section">
+      <strong>Relationships</strong>
+      ${renderDiagramRelationshipList([...incoming, ...outgoing], table.name)}
+    </div>
+    ${diagramArtifactLinks(["schema_diagram.json", "relationship_graph.json", "schema_parse_report.json"])}
+  `;
+}
+
+function renderDiagramRelationshipInspector(rel) {
+  return `
+    <div class="diagram-inspector-heading">
+      <p class="eyebrow">Relationship</p>
+      <h4><code>${escapeHtml(rel.childTable)}</code> -> <code>${escapeHtml(rel.parentTable)}</code></h4>
+      <span>${escapeHtml(rel.status || "declared")}</span>
+    </div>
+    <dl class="diagram-detail-grid">
+      <div><dt>Child columns</dt><dd>${escapeHtml((rel.childColumns || []).join(", ") || "n/a")}</dd></div>
+      <div><dt>Parent columns</dt><dd>${escapeHtml((rel.parentColumns || []).join(", ") || "n/a")}</dd></div>
+      <div><dt>Cardinality</dt><dd>${escapeHtml(rel.cardinality || rel.declaredCardinality || "unknown")}</dd></div>
+      <div><dt>Type</dt><dd>${escapeHtml(rel.relationshipType || "FK")}</dd></div>
+    </dl>
+    ${rel.statusReason ? `<div class="diagram-detail-section"><strong>Status reason</strong><p>${escapeHtml(rel.statusReason)}</p></div>` : ""}
+    ${renderDiagramRelationshipMetrics(rel.metrics)}
+    ${renderDiagramEvidenceLinks(rel.evidenceLinks)}
+    ${diagramArtifactLinks(["relationship_graph.json", "schema_diagram.json"])}
+  `;
+}
+
+function diagramColumnRole(column) {
+  if (column.isPk && column.isFk) {
+    return "PK/FK";
+  }
+  if (column.isPk) {
+    return "PK";
+  }
+  if (column.isFk) {
+    return "FK";
+  }
+  return "COL";
+}
+
+function renderDiagramRelationshipList(relationships, tableName) {
+  if (!relationships.length) {
+    return `<p class="muted">No relationships in current evidence.</p>`;
+  }
+  return `
+    <ul>
+      ${relationships.map((rel) => {
+        const direction = rel.childTable === tableName ? "to parent" : "from child";
+        const otherTable = rel.childTable === tableName ? rel.parentTable : rel.childTable;
+        return `<li><span>${escapeHtml(direction)}</span> <code>${escapeHtml(otherTable)}</code> <span>${escapeHtml(rel.status || rel.cardinality || "FK")}</span></li>`;
+      }).join("")}
+    </ul>
+  `;
+}
+
+function renderDiagramRelationshipMetrics(metrics = {}) {
+  const entries = Object.entries(metrics).filter(([, value]) => value !== null && value !== undefined);
+  if (!entries.length) {
+    return "";
+  }
+  return `
+    <div class="diagram-detail-section">
+      <strong>Metrics</strong>
+      <div class="diagram-chip-list">
+        ${entries.slice(0, 6).map(([key, value]) => `<span><code>${escapeHtml(key)}</code> ${escapeHtml(typeof value === "number" ? scoreOrIntegerText(value) : value)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderDiagramEvidenceLinks(evidenceLinks = []) {
+  if (!evidenceLinks.length) {
+    return "";
+  }
+  return `
+    <div class="diagram-detail-section">
+      <strong>Evidence</strong>
+      <ul>
+        ${evidenceLinks.slice(0, 6).map((link) => {
+          const sampleUrl = artifactUrlFromArtifacts(link.sample_bad_rows_path || "");
+          return `<li><code>${escapeHtml(link.issue_id || "issue")}</code> ${escapeHtml(link.issue_type || "")} ${escapeHtml(link.severity || "")} · ${integerText(link.bad_count)} rows${sampleUrl ? ` · <a href="${escapeHtml(sampleUrl)}" target="_blank" rel="noopener">sample</a>` : ""}</li>`;
+        }).join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function diagramArtifactLinks(paths) {
+  const links = paths.map((path) => {
+    const url = artifactUrlFromArtifacts(path);
+    return url
+      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><code>${escapeHtml(path)}</code></a>`
+      : `<code>${escapeHtml(path)}</code>`;
+  }).join("");
+  return `<div class="diagram-artifact-links"><strong>Artifacts</strong><div>${links}</div></div>`;
+}
+
+function scoreOrIntegerText(value) {
+  return Number.isInteger(value) ? integerText(value) : Number(value).toFixed(3);
 }
 
 function buildDbdiagramUrl(dbml) {

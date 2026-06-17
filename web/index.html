@@ -222,12 +222,38 @@
                 <span id="dashboardGraphStatus">Waiting for artifacts</span>
               </div>
               <div class="dashboard-graph-toolbar">
-                <div class="runner-mode-switch dashboard-graph-mode" role="tablist" aria-label="Graph artifact">
-                  <button class="mode-button active" id="dashboardGraphModeLineage" type="button" role="tab" aria-selected="true">Lineage</button>
-                  <button class="mode-button" id="dashboardGraphModeRelationship" type="button" role="tab" aria-selected="false">Relationships</button>
+                <div class="graph-control-group">
+                  <span>Artifact</span>
+                  <div class="runner-mode-switch dashboard-graph-mode" role="tablist" aria-label="Graph artifact">
+                    <button class="mode-button active" id="dashboardGraphModeLineage" type="button" role="tab" aria-selected="true">Lineage</button>
+                    <button class="mode-button" id="dashboardGraphModeRelationship" type="button" role="tab" aria-selected="false">Relationships</button>
+                  </div>
+                </div>
+                <div class="graph-control-group">
+                  <span>View</span>
+                  <div class="runner-mode-switch dashboard-graph-mode" role="group" aria-label="Graph detail level">
+                    <button class="mode-button active" id="dashboardGraphDisplayOverview" type="button" aria-pressed="true">Overview</button>
+                    <button class="mode-button" id="dashboardGraphDisplayFocus" type="button" aria-pressed="false">Focus</button>
+                    <button class="mode-button" id="dashboardGraphDisplayFull" type="button" aria-pressed="false">Full</button>
+                  </div>
+                </div>
+                <div class="graph-toggle-row" aria-label="Graph detail toggles">
+                  <label class="toggle-label">
+                    <input id="dashboardGraphColumnsToggle" type="checkbox">
+                    <span>Show columns</span>
+                  </label>
+                  <label class="toggle-label">
+                    <input id="dashboardGraphRuntimeToggle" type="checkbox">
+                    <span>Show runtime/artifacts</span>
+                  </label>
+                  <label class="toggle-label">
+                    <input id="dashboardGraphInvalidOnlyToggle" type="checkbox">
+                    <span>Invalid/warning only</span>
+                  </label>
+                  <button class="ghost-button graph-reset-button" id="dashboardGraphResetView" type="button">Reset graph view</button>
                 </div>
                 <label class="field-label graph-scope-label" for="dashboardGraphScope">
-                  Scope
+                  Detail scope
                   <select id="dashboardGraphScope">
                     <option value="table">Tables</option>
                     <option value="columns">Columns</option>
@@ -335,6 +361,12 @@
             <p class="form-message" id="diagramMessage" role="status">Local diagram preview renders from browser DBML state.</p>
             <span class="badge" id="diagramSourceBadge">Local preview</span>
           </div>
+          <div class="diagram-toolbar" role="toolbar" aria-label="Local diagram controls">
+            <button class="button secondary" id="diagramFitButton" type="button">Fit view</button>
+            <button class="button secondary" id="diagramDensityToggle" type="button" aria-pressed="false">Expanded cards</button>
+            <button class="button secondary" id="diagramColumnsToggle" type="button" aria-pressed="false">Show non-key columns</button>
+            <button class="button ghost" id="diagramResetSelection" type="button">Reset selection</button>
+          </div>
           <div class="diagram-warnings" id="diagramWarnings" hidden></div>
           <div class="diagram-empty" id="diagramEmpty">
             <div class="diagram-glyph" aria-hidden="true"></div>
@@ -342,7 +374,10 @@
             <p>The demo contract loads automatically. Upload your own DBML/CSV files to replace it.</p>
           </div>
           <div class="local-diagram" id="localDiagram" hidden>
-            <svg id="diagramSvg" class="diagram-svg" role="img" aria-label="Local DBML schema diagram"></svg>
+            <div class="diagram-canvas" id="diagramCanvas">
+              <svg id="diagramSvg" class="diagram-svg" role="img" aria-label="Local DBML schema diagram"></svg>
+            </div>
+            <aside class="diagram-inspector" id="diagramInspector" aria-live="polite"></aside>
           </div>
           <iframe id="diagramFrame" class="diagram-frame" title="External dbdiagram preview" hidden aria-hidden="true"></iframe>
         </article>

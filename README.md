@@ -45,8 +45,8 @@ Node/Playwright tooling is installed. See
 [docs/releases/v0.2-rc.md](docs/releases/v0.2-rc.md).
 
 Latest public prerelease:
-[VSF Data Profiler v0.2.0-rc3](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc3),
-with release notes in [docs/releases/v0.2.0-rc3.md](docs/releases/v0.2.0-rc3.md).
+[VSF Data Profiler v0.2.0-rc5](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc5),
+with release notes in [docs/releases/v0.2.0-rc5.md](docs/releases/v0.2.0-rc5.md).
 
 Expected artifacts:
 

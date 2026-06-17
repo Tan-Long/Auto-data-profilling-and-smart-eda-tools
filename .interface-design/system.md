@@ -132,6 +132,40 @@ Data style: monospace with tabular numbers.
 - Selecting a table impact row populates drilldown with matching issues,
   assessment detail, and artifact links.
 
+### Local ERD Diagram
+
+- DBML preview uses deterministic ERD layering over existing browser DBML state
+  and generated artifacts: reference/dimension tables first, bridge tables
+  between their related entities, fact/event hubs next, and child/detail tables
+  last.
+- Table cards are compact by default with monospace table names, status pills,
+  PK/FK/key rows, and a `+N columns` indicator for hidden columns.
+- Relationship edges are orthogonal elbow paths. Default edges are muted;
+  amber/red appears only for warning or invalid relationship evidence.
+- Edge labels stay hidden until hover/focus/selection so the diagram reads as
+  structure first and diagnostics second.
+- Diagram controls are compact evidence-tool controls: Fit view, expanded card
+  density, non-key column visibility, and reset selection.
+- Selection highlights the chosen table or relationship plus direct neighbors,
+  while the detail panel shows artifact-backed table/edge evidence and links.
+
+### Dashboard Progressive Graph
+
+- The dashboard graph opens in a low-noise overview: table-level structure
+  first, with column, runtime, and artifact fan-out hidden until explicit user
+  intent.
+- Graph controls use compact segmented modes for Overview, Focus, and Full,
+  plus toggles for columns, runtime/artifacts, invalid/warning relationships,
+  and reset.
+- Relationship mode defaults to table-to-table FK edges. Relationship detail
+  belongs in the drilldown and in Full mode nodes, not persistent edge labels.
+- Lineage mode defaults to source -> table -> artifact-summary lanes. Runtime
+  stages and individual artifact fan-out are opt-in.
+- Selected nodes and direct neighbors are emphasized; unrelated graph elements
+  fade instead of disappearing, preserving orientation without clutter.
+- Edge color is mostly neutral. Amber/red is reserved for warning or invalid
+  evidence, and labels appear only on hover/focus or active selection.
+
 ## Decisions
 
 | Decision | Rationale | Date |
@@ -139,3 +173,5 @@ Data style: monospace with tabular numbers.
 | Use a restrained local data-quality console for US-056 | The demo goal is to run the profiler and inspect generated evidence, not present a decorative upload workspace | 2026-06-16 |
 | Keep the dashboard as the primary post-run surface | The strongest demo moment is verdict, table impact, graph evidence, and artifacts after the Python/DuckDB run completes | 2026-06-16 |
 | Preserve artifact names and routes in UI copy and controls | The web runner is a local presenter over canonical artifacts, not a new profiling engine | 2026-06-16 |
+| Use an ERD-style local DBML diagram pattern for US-061 | The local preview must be demo-readable without relying on the external dbdiagram.io iframe | 2026-06-17 |
+| Default dashboard graphs to progressive disclosure for US-062 | Demo reviewers need readable topology first and artifact-level evidence only on selection or explicit toggles | 2026-06-17 |

@@ -22,6 +22,20 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("PK order_id");
   await expect(page.locator("#diagramSvg")).toContainText("FK customer_id");
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveCount(1);
+  await expect(page.locator("#diagramFitButton")).toBeVisible();
+  await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="order_items"]')).toHaveCount(1);
+  await page.locator('#diagramSvg [data-diagram-table="orders"]').click();
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
+  await expect(page.locator("#diagramInspector")).toContainText("orders");
+  await expect(page.locator("#diagramInspector")).toContainText("Fact/event");
+  await page.locator("#diagramColumnsToggle").click();
+  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramSvg")).toContainText("order_status");
+  await page.locator("#diagramResetSelection").click();
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
   await expect(page.locator("#dbdiagramLink")).toHaveAttribute(
     "href",
     /https:\/\/dbdiagram\.io\/embed\?c=/,
@@ -58,6 +72,18 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#diagramSvg")).toContainText("invalid");
   await expect(page.locator('#diagramSvg [data-diagram-table="order_payments"]')).toHaveCount(1);
+  const customerRelationship = page.locator(
+    '#diagramSvg [data-diagram-relationship="orders.customer_id->customers.customer_id"]',
+  );
+  await expect(customerRelationship).toHaveCount(1);
+  await customerRelationship.focus();
+  await customerRelationship.press("Enter");
+  await expect(customerRelationship).toHaveClass(/selected/);
+  await expect(page.locator("#diagramInspector")).toContainText("Relationship");
+  await expect(page.locator("#diagramInspector")).toContainText("FOREIGN_KEY_NULL");
+  await expect(page.locator("#diagramInspector")).toContainText("relationship_graph.json");
+  await page.locator("#diagramDensityToggle").click();
+  await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "true");
 
   await expect(page.getByText("Generated results")).toBeVisible();
   const generatedResults = page.locator("#artifactList");
@@ -98,10 +124,14 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("table_assessments.json");
 
   await expect(page.locator("#dashboardGraphStatus")).toContainText("Lineage graph");
+  await expect(page.locator("#dashboardGraphStatus")).toContainText("Overview");
   await expect
     .poll(async () => page.locator("#dashboardGraphSvg [data-graph-node-id]").count())
     .toBeGreaterThan(0);
   await expect(page.locator("#dashboardGraphLegend")).toContainText("Table");
+  await expect(page.locator('#dashboardGraphSvg [data-graph-node-id^="column:"]')).toHaveCount(0);
+  await expect(page.locator('#dashboardGraphSvg [data-graph-node-id^="stage:"]')).toHaveCount(0);
+  await expect(page.locator('#dashboardGraphSvg [data-graph-node-id^="artifact:"]')).toHaveCount(0);
 
   await page
     .locator("#dashboardGraphSvg [data-graph-node-id]")
@@ -112,12 +142,34 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardGraphDrilldown")).toContainText(
     "lineage_graph.json",
   );
+  await expect(page.locator("#dashboardGraphDrilldown")).toContainText("Direct neighbors");
+  await expect(page.locator("#dashboardGraphDrilldown")).toContainText("Columns in inspector");
+  await expect(page.locator("#dashboardGraphSvg .graph-node.dimmed").first()).toBeVisible();
+
+  await page.locator("#dashboardGraphDisplayFocus").click();
+  await expect(page.locator("#dashboardGraphStatus")).toContainText("Focus");
+  await expect(page.locator("#dashboardGraphSvg .graph-node.selected")).toHaveCount(1);
+  await page.locator("#dashboardGraphResetView").click();
+  await expect(page.locator("#dashboardGraphStatus")).toContainText("Overview");
+  await expect(page.locator("#dashboardGraphDisplayOverview")).toHaveAttribute("aria-pressed", "true");
+  fs.mkdirSync("outputs/graph_progressive_screenshots", { recursive: true });
+  await page.locator(".dashboard-graph").screenshot({
+    path: "outputs/graph_progressive_screenshots/lineage-overview.png",
+  });
 
   await page.locator("#dashboardGraphModeRelationship").click();
   await expect(page.locator("#dashboardGraphStatus")).toContainText(
     "Relationship graph",
   );
-  await page.locator("#dashboardGraphScope").selectOption("relationships");
+  await expect(page.locator("#dashboardGraphStatus")).toContainText("Overview");
+  await expect(
+    page.locator('#dashboardGraphSvg [data-graph-node-id^="relationship-edge:"]'),
+  ).toHaveCount(0);
+  await page.locator("#dashboardGraphInvalidOnlyToggle").check();
+  await expect(page.locator("#dashboardGraphStatus")).toContainText(
+    "invalid/warning only",
+  );
+  await page.locator("#dashboardGraphDisplayFull").click();
   await expect(page.locator("#dashboardGraphStatus")).toContainText(
     "Relationships",
   );
@@ -136,6 +188,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardGraphDrilldown")).toContainText(
     /ORPHAN_FOREIGN_KEY|FOREIGN_KEY_NULL|PARENT_KEY_DUPLICATE|CHILD_RELATIONSHIP_DUPLICATE/,
   );
+  await page.locator(".dashboard-graph").screenshot({
+    path: "outputs/graph_progressive_screenshots/relationship-full.png",
+  });
 
   await expect(page.locator("#dashboardArtifactCount")).toContainText(/1[6-7] files/);
   await expect(page.locator("#dashboardArtifactLinks")).toContainText(
