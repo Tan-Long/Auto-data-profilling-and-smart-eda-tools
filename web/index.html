@@ -271,7 +271,7 @@
             </section>
 
             <div class="dashboard-detail-grid">
-              <section class="dashboard-detail" aria-live="polite">
+              <section class="dashboard-detail dashboard-detail-primary" aria-live="polite">
                 <div class="runtime-heading">
                   <strong>Drilldown</strong>
                   <span id="dashboardDrilldownMeta">No selection</span>
@@ -280,7 +280,7 @@
                   <p class="muted">Select a chart item to inspect matching issues and artifact links.</p>
                 </div>
               </section>
-              <section class="dashboard-detail" aria-live="polite">
+              <section class="dashboard-detail dashboard-detail-secondary" aria-live="polite">
                 <div class="runtime-heading">
                   <strong>Graph drilldown</strong>
                   <span id="dashboardGraphDrilldownMeta">No node</span>
@@ -289,13 +289,22 @@
                   <p class="muted">Select a graph node to inspect metadata and evidence artifacts.</p>
                 </div>
               </section>
-              <section class="dashboard-detail" id="artifacts">
+              <section class="dashboard-detail dashboard-detail-secondary dashboard-artifact-sources" id="artifacts">
                 <div class="runtime-heading">
                   <strong>Artifact sources</strong>
                   <span id="dashboardArtifactCount">0 files</span>
                 </div>
                 <div class="artifact-list compact" id="dashboardArtifactLinks">
                   <p class="muted">Dashboard sources are listed after artifact discovery.</p>
+                </div>
+              </section>
+              <section class="dashboard-detail dashboard-detail-primary artifact-preview-section" aria-live="polite">
+                <div class="runtime-heading">
+                  <strong>Artifact preview</strong>
+                  <span id="artifactPreviewMeta">No artifact</span>
+                </div>
+                <div class="artifact-preview" id="artifactPreview" tabindex="-1">
+                  <p class="muted">Select a report, artifact, or sample file to preview it here.</p>
                 </div>
               </section>
             </div>

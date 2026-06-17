@@ -122,6 +122,9 @@ Data style: monospace with tabular numbers.
   identifiers.
 - Rows expose status, count, rate, or health score directly; hover/focus changes
   border and background without layout shift.
+- Generated reports, machine artifacts, and sample CSVs preview inside the
+  dashboard Artifact preview panel by default. Opening raw JSON/Markdown in a
+  separate browser tab is not the primary interaction.
 
 ### Table Impact
 
@@ -142,6 +145,9 @@ Data style: monospace with tabular numbers.
   PK/FK/key rows, and a `+N columns` indicator for hidden columns.
 - Relationship edges are orthogonal elbow paths. Default edges are muted;
   amber/red appears only for warning or invalid relationship evidence.
+- Edges must route through clear table-to-table corridors. Non-adjacent
+  relationships use a two-corridor bus above or below intermediate table boxes;
+  lines should not pass through table cards or jump to a global top rail.
 - Edge labels stay hidden until hover/focus/selection so the diagram reads as
   structure first and diagnostics second.
 - Diagram controls are compact evidence-tool controls: Fit view, expanded card
@@ -175,3 +181,5 @@ Data style: monospace with tabular numbers.
 | Preserve artifact names and routes in UI copy and controls | The web runner is a local presenter over canonical artifacts, not a new profiling engine | 2026-06-16 |
 | Use an ERD-style local DBML diagram pattern for US-061 | The local preview must be demo-readable without relying on the external dbdiagram.io iframe | 2026-06-17 |
 | Default dashboard graphs to progressive disclosure for US-062 | Demo reviewers need readable topology first and artifact-level evidence only on selection or explicit toggles | 2026-06-17 |
+| Route local ERD edges through corridors instead of a global top rail | DBML relationships should read like a database diagram: table boxes first, orthogonal connectors second, and no lines cutting through intermediate cards | 2026-06-17 |
+| Preview generated artifacts inline | Demo reviewers should inspect reports, JSON artifacts, and sample CSVs in the web console instead of being sent to raw browser-rendered files | 2026-06-17 |

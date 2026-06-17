@@ -645,11 +645,11 @@ h3 {
 
 .diagram-edge {
   fill: none;
-  stroke: rgba(104, 115, 111, 0.5);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.76;
+  stroke: rgba(70, 80, 77, 0.54);
+  stroke-width: 1.45;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  opacity: 0.82;
 }
 
 .diagram-relationship-danger .diagram-edge {
@@ -1813,8 +1813,17 @@ h3 {
 
 .dashboard-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 0.7fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.dashboard-detail-primary {
+  border-color: var(--border-default);
+  background: var(--surface-panel);
+}
+
+.dashboard-detail-secondary {
+  background: var(--surface-overlay);
 }
 
 .dashboard-issue-list,
@@ -1822,6 +1831,12 @@ h3 {
   display: grid;
   gap: 8px;
   margin-top: 10px;
+}
+
+.dashboard-issue-list {
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .table-assessment-detail {
@@ -1867,10 +1882,26 @@ h3 {
 
 .dashboard-issue-row a,
 .drilldown-artifacts a,
+.inline-preview-button,
 .artifact-json-link {
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 800;
+}
+
+.inline-preview-button {
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  cursor: pointer;
+}
+
+.inline-preview-button:hover,
+.inline-preview-button:focus-visible {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .issue-counts {
@@ -1916,12 +1947,12 @@ h3 {
 }
 
 .artifact-list.compact {
-  max-height: 430px;
+  max-height: 300px;
 }
 
 .runner-grid {
   display: grid;
-  grid-template-columns: minmax(300px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -1929,6 +1960,7 @@ h3 {
   display: grid;
   align-content: start;
   gap: 12px;
+  max-width: 960px;
 }
 
 .runner-mode-switch {
@@ -2027,7 +2059,7 @@ h3 {
 
 .runtime-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.72fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -2156,6 +2188,11 @@ button.artifact-link {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-panel);
+  color: var(--accent-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -2301,12 +2338,16 @@ button.artifact-link {
 .generated-report-link {
   display: grid;
   gap: 4px;
+  justify-items: start;
   min-height: 48px;
   padding: 10px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: #f6fbf8;
   color: var(--foreground-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   text-decoration: none;
 }
 
@@ -2322,6 +2363,12 @@ button.artifact-link {
   font-size: 11px;
 }
 
+.generated-report-link span {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .generated-links-block {
   display: grid;
   gap: 8px;
@@ -2335,6 +2382,162 @@ button.artifact-link {
 .artifact-link-list {
   display: grid;
   gap: 8px;
+  max-height: 300px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.artifact-preview-section {
+  min-height: 420px;
+}
+
+.artifact-preview {
+  min-height: 340px;
+  max-height: 680px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.artifact-preview:focus {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.artifact-preview-embed {
+  display: grid;
+  gap: 10px;
+}
+
+.artifact-preview-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+}
+
+.artifact-preview-banner code,
+.json-key,
+.json-node code,
+.artifact-preview-table th,
+.artifact-preview-table td,
+.artifact-preview-text pre,
+.artifact-preview-markdown pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.artifact-preview-frame {
+  width: 100%;
+  min-height: 620px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.artifact-preview-json,
+.artifact-preview-markdown,
+.artifact-preview-text {
+  display: grid;
+  gap: 10px;
+}
+
+.json-node {
+  display: grid;
+  gap: 6px;
+}
+
+.json-node summary {
+  cursor: pointer;
+  color: var(--foreground-primary);
+  font-weight: 900;
+}
+
+.json-children {
+  display: grid;
+  gap: 5px;
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.json-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.25fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.json-key {
+  color: var(--foreground-tertiary);
+  font-size: 12px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.json-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+}
+
+.artifact-preview-markdown h3,
+.artifact-preview-markdown h4,
+.artifact-preview-markdown h5,
+.artifact-preview-markdown h6 {
+  margin: 12px 0 4px;
+}
+
+.artifact-preview-markdown p,
+.artifact-preview-markdown li {
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.artifact-preview-markdown pre,
+.artifact-preview-text pre {
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--foreground-secondary);
+  font-size: 12px;
+}
+
+.artifact-preview-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.artifact-preview-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  background: var(--surface-panel);
+}
+
+.artifact-preview-table th,
+.artifact-preview-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  font-size: 12px;
+}
+
+.artifact-preview-table th {
+  background: var(--surface-inset);
+  color: var(--foreground-secondary);
+  font-weight: 900;
 }
 
 .mapping-table-wrap {

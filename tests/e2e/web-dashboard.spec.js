@@ -110,8 +110,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(generatedResults).toContainText("report.html");
   await expect(generatedResults).toContainText("Report Markdown");
   await expect(generatedResults).toContainText("report.md");
-  await expect(generatedResults).toContainText("Raw artifact links");
+  await expect(generatedResults).toContainText("Generated artifacts");
   await expect(generatedResults).toContainText("dataset_verdict.json");
+  await expect(page.locator("#artifactPreview")).toContainText("Select a report");
+  await generatedResults.locator('.generated-report-link[data-artifact-path="report.md"]').click();
+  await expect(page.locator("#artifactPreview")).toBeFocused();
+  await expect(page.locator("#artifactPreviewMeta")).toContainText("report.md");
+  await expect(page.locator("#artifactPreview")).toContainText("VSF");
 
   const dashboard = page.locator("#dashboardPanelGrid");
   await expect(dashboard).toContainText("Dataset verdict");
@@ -219,6 +224,14 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardArtifactLinks")).toContainText(
     "lineage_graph.json",
   );
+  const stageListBox = await page.locator("#stageList").boundingBox();
+  const generatedResultsBox = await page.locator("#artifactList").boundingBox();
+  const drilldownBox = await page.locator("#dashboardDrilldown").boundingBox();
+  const graphDrilldownBox = await page.locator("#dashboardGraphDrilldown").boundingBox();
+  const artifactSourcesBox = await page.locator("#dashboardArtifactLinks").boundingBox();
+  expect(generatedResultsBox.y).toBeGreaterThan(stageListBox.y);
+  expect(graphDrilldownBox.y).toBeGreaterThan(drilldownBox.y);
+  expect(artifactSourcesBox.y).toBeGreaterThan(graphDrilldownBox.y);
   const severityChartSource = page
     .locator('#dashboardArtifactLinks [data-artifact-path="charts/issue_counts_by_severity.json"]')
     .first();
@@ -240,7 +253,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toBeFocused();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");
   await expect(page.locator("#dashboardDrilldown")).toContainText("matching issues");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("sample CSV");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Preview sample");
+  await page.locator('#dashboardDrilldown [data-artifact-path$=".csv"]').first().click();
+  await expect(page.locator("#artifactPreview")).toBeFocused();
+  await expect(page.locator("#artifactPreviewMeta")).toContainText(".csv");
+  await expect(page.locator("#artifactPreview table")).toBeVisible();
 
   const rawCsvArtifactRequests = artifactRequests.filter(
     (url) => url.endsWith(".csv") && !url.includes("/samples/"),

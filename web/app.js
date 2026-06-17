@@ -17,6 +17,7 @@ const state = {
     table: "all",
   },
   dashboardSelection: null,
+  artifactPreviewRequestId: 0,
   dashboardGraphMode: "lineage",
   dashboardGraphDisplay: "overview",
   dashboardGraphScope: "table",
@@ -99,6 +100,8 @@ const els = {
   dashboardDrilldownMeta: document.querySelector("#dashboardDrilldownMeta"),
   dashboardArtifactCount: document.querySelector("#dashboardArtifactCount"),
   dashboardArtifactLinks: document.querySelector("#dashboardArtifactLinks"),
+  artifactPreview: document.querySelector("#artifactPreview"),
+  artifactPreviewMeta: document.querySelector("#artifactPreviewMeta"),
   csvList: document.querySelector("#csvList"),
   csvTemplate: document.querySelector("#csvItemTemplate"),
   visualizeButton: document.querySelector("#visualizeButton"),
@@ -425,6 +428,10 @@ els.dashboardDrilldown.addEventListener("click", (event) => {
   handleArtifactNavigationClick(event);
 });
 
+els.diagramInspector.addEventListener("click", (event) => {
+  handleArtifactNavigationClick(event);
+});
+
 function handleArtifactNavigationClick(event) {
   const target = event.target.closest("[data-artifact-action]");
   if (!target) {
@@ -432,6 +439,12 @@ function handleArtifactNavigationClick(event) {
   }
   const action = target.dataset.artifactAction;
   const artifactPath = target.dataset.artifactPath || "";
+  const artifactUrl = target.dataset.artifactUrl || "";
+  if (action === "preview-artifact") {
+    event.preventDefault();
+    previewArtifact(artifactPath, artifactUrl);
+    return;
+  }
   if (action === "focus-dashboard-artifact" && focusDashboardArtifact(artifactPath)) {
     event.preventDefault();
   }
@@ -1230,7 +1243,7 @@ function renderGeneratedResults(artifacts) {
       ${renderGeneratedReportLinks(artifacts)}
       <div class="generated-links-block">
         <div class="runtime-heading compact">
-          <strong>Raw artifact links</strong>
+          <strong>Generated artifacts</strong>
           <span>${integerText(artifacts.length)} files</span>
         </div>
         <div class="artifact-link-list">
@@ -1363,7 +1376,7 @@ function renderGeneratedReportLinks(artifacts) {
     .map(([path, label]) => {
       const url = artifactUrlFromArtifacts(path, artifacts);
       return url
-        ? `<a class="generated-report-link" href="${escapeHtml(url)}" target="_blank" rel="noopener"><strong>${escapeHtml(label)}</strong><code>${escapeHtml(path)}</code></a>`
+        ? `<button class="generated-report-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}"><strong>${escapeHtml(label)}</strong><code>${escapeHtml(path)}</code><span>Preview report</span></button>`
         : "";
     })
     .filter(Boolean)
@@ -1398,10 +1411,11 @@ function renderRawArtifactLink(artifact) {
     return renderArtifactNavigationCard(artifact.path, artifact.url, artifact.label);
   }
   return `
-    <a class="artifact-link" href="${escapeHtml(artifact.url)}" target="_blank" rel="noopener">
+    <button class="artifact-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(artifact.path)}" data-artifact-url="${escapeHtml(artifact.url)}">
       <strong>${escapeHtml(artifact.label)}</strong>
       <code>${escapeHtml(artifact.path)}</code>
-    </a>
+      <span>Preview</span>
+    </button>
   `;
 }
 
@@ -2992,7 +3006,7 @@ function renderIssueRows(issues) {
               <span>${integerText(issue.bad_count)} rows</span>
               <span>${percentText(issue.bad_rate)}</span>
             </div>
-            ${sampleUrl ? `<a href="${escapeHtml(sampleUrl)}" target="_blank" rel="noopener">sample CSV</a>` : `<span class="muted">no sample</span>`}
+            ${sampleUrl ? `<button class="inline-preview-button" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(issue.sample_bad_rows_path)}" data-artifact-url="${escapeHtml(sampleUrl)}">Preview sample</button>` : `<span class="muted">no sample</span>`}
           </article>
         `;
       }).join("")}
@@ -3063,10 +3077,11 @@ function renderDashboardArtifacts() {
   els.dashboardArtifactLinks.innerHTML = paths.map((path) => `
     ${isDashboardChartArtifact(path)
       ? renderArtifactNavigationCard(path, artifactIndex.artifact_urls[path], artifactLabel(path))
-      : `<a class="artifact-link" href="${escapeHtml(artifactIndex.artifact_urls[path])}" target="_blank" rel="noopener">
+      : `<button class="artifact-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(artifactIndex.artifact_urls[path])}">
           <strong>${escapeHtml(artifactLabel(path))}</strong>
           <code>${escapeHtml(path)}</code>
-        </a>`}
+          <span>Preview</span>
+        </button>`}
   `).join("");
 }
 
@@ -3116,7 +3131,12 @@ function isDashboardChartArtifact(path) {
 
 function renderArtifactReference(path, url) {
   if (!isDashboardChartArtifact(path)) {
-    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><code>${escapeHtml(path)}</code></a>`;
+    return `
+      <button class="artifact-focus-button" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}">
+        <code>${escapeHtml(path)}</code>
+        <span>Preview</span>
+      </button>
+    `;
   }
   return `
     <span class="artifact-reference">
@@ -3124,7 +3144,7 @@ function renderArtifactReference(path, url) {
         <code>${escapeHtml(path)}</code>
         <span>View chart</span>
       </button>
-      <a class="artifact-json-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">JSON</a>
+      <button class="artifact-json-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}">Preview spec</button>
     </span>
   `;
 }
@@ -3137,7 +3157,7 @@ function renderArtifactNavigationCard(path, url, label) {
         <code>${escapeHtml(path)}</code>
         <span>View chart</span>
       </button>
-      <a class="artifact-json-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">Open JSON</a>
+      <button class="artifact-json-link" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(path)}" data-artifact-url="${escapeHtml(url)}">Preview spec</button>
     </div>
   `;
 }
@@ -3161,6 +3181,267 @@ function focusDashboardDrilldown() {
   requestAnimationFrame(() => {
     els.dashboardDrilldown.scrollIntoView({ behavior: "smooth", block: "start" });
     els.dashboardDrilldown.focus({ preventScroll: true });
+  });
+}
+
+async function previewArtifact(artifactPath, artifactUrl = "") {
+  if (!artifactPath) {
+    return;
+  }
+  const requestId = ++state.artifactPreviewRequestId;
+  const url = artifactUrl || resolveArtifactUrl(artifactPath);
+  els.artifactPreviewMeta.textContent = artifactPath;
+  els.artifactPreview.innerHTML = `<p class="muted">Loading <code>${escapeHtml(artifactPath)}</code>...</p>`;
+  focusArtifactPreview();
+  if (!url) {
+    els.artifactPreview.innerHTML = `<p class="muted">No artifact URL is available for <code>${escapeHtml(artifactPath)}</code>.</p>`;
+    return;
+  }
+
+  const kind = artifactPreviewKind(artifactPath);
+  if (kind === "html" || kind === "pdf") {
+    els.artifactPreview.innerHTML = renderEmbeddedArtifactPreview(artifactPath, url, kind);
+    return;
+  }
+
+  try {
+    const cached = state.dashboardArtifacts[artifactPath];
+    if (kind === "json" && cached !== undefined) {
+      els.artifactPreview.innerHTML = renderJsonArtifactPreview(cached);
+      return;
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const text = await response.text();
+    if (requestId !== state.artifactPreviewRequestId) {
+      return;
+    }
+    els.artifactPreview.innerHTML = renderArtifactPreviewContent(artifactPath, text, kind);
+  } catch (error) {
+    if (requestId !== state.artifactPreviewRequestId) {
+      return;
+    }
+    els.artifactPreview.innerHTML = `
+      <p class="muted">Unable to preview <code>${escapeHtml(artifactPath)}</code>: ${escapeHtml(error.message || "unknown error")}</p>
+    `;
+  }
+}
+
+function resolveArtifactUrl(path) {
+  return artifactUrlFor(path) || artifactUrlFromArtifacts(path, state.currentJob?.artifacts || []);
+}
+
+function artifactPreviewKind(path) {
+  const lower = String(path || "").toLowerCase();
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) {
+    return "html";
+  }
+  if (lower.endsWith(".pdf")) {
+    return "pdf";
+  }
+  if (lower.endsWith(".md") || lower.endsWith(".markdown")) {
+    return "markdown";
+  }
+  if (lower.endsWith(".json") || lower.endsWith(".jsonl")) {
+    return "json";
+  }
+  if (lower.endsWith(".csv")) {
+    return "csv";
+  }
+  return "text";
+}
+
+function renderEmbeddedArtifactPreview(path, url, kind) {
+  return `
+    <div class="artifact-preview-embed">
+      <div class="artifact-preview-banner">
+        <strong>${escapeHtml(kind === "pdf" ? "PDF preview" : "HTML report preview")}</strong>
+        <code>${escapeHtml(path)}</code>
+      </div>
+      <iframe class="artifact-preview-frame" title="${escapeHtml(path)}" src="${escapeHtml(url)}"></iframe>
+    </div>
+  `;
+}
+
+function renderArtifactPreviewContent(path, text, kind) {
+  if (kind === "json") {
+    try {
+      return renderJsonArtifactPreview(JSON.parse(text));
+    } catch {
+      return renderTextArtifactPreview(text, "Invalid JSON shown as text");
+    }
+  }
+  if (kind === "markdown") {
+    return renderMarkdownArtifactPreview(text);
+  }
+  if (kind === "csv") {
+    return renderCsvArtifactPreview(text);
+  }
+  return renderTextArtifactPreview(text, artifactLabel(path));
+}
+
+function renderJsonArtifactPreview(value) {
+  return `
+    <div class="artifact-preview-json">
+      ${jsonPreviewNode(value, 0)}
+    </div>
+  `;
+}
+
+function jsonPreviewNode(value, depth) {
+  if (value === null || typeof value !== "object") {
+    return `<code>${escapeHtml(JSON.stringify(value))}</code>`;
+  }
+  const entries = Array.isArray(value)
+    ? value.map((item, index) => [String(index), item])
+    : Object.entries(value);
+  const summary = Array.isArray(value)
+    ? `Array(${entries.length})`
+    : `Object(${entries.length})`;
+  return `
+    <details class="json-node" ${depth < 2 ? "open" : ""}>
+      <summary><code>${escapeHtml(summary)}</code></summary>
+      <div class="json-children">
+        ${entries.map(([key, item]) => `
+          <div class="json-row">
+            <span class="json-key">${escapeHtml(key)}</span>
+            <span class="json-value">${jsonPreviewNode(item, depth + 1)}</span>
+          </div>
+        `).join("")}
+      </div>
+    </details>
+  `;
+}
+
+function renderMarkdownArtifactPreview(markdown) {
+  const lines = String(markdown || "").split(/\r?\n/);
+  let html = "";
+  let inCode = false;
+  let codeLines = [];
+  let inList = false;
+  function closeList() {
+    if (inList) {
+      html += "</ul>";
+      inList = false;
+    }
+  }
+  lines.forEach((line) => {
+    if (line.trim().startsWith("```")) {
+      if (inCode) {
+        html += `<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`;
+        codeLines = [];
+      } else {
+        closeList();
+      }
+      inCode = !inCode;
+      return;
+    }
+    if (inCode) {
+      codeLines.push(line);
+      return;
+    }
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      closeList();
+      const level = Math.min(heading[1].length + 2, 6);
+      html += `<h${level}>${escapeHtml(heading[2])}</h${level}>`;
+      return;
+    }
+    const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+    if (bullet) {
+      if (!inList) {
+        html += "<ul>";
+        inList = true;
+      }
+      html += `<li>${escapeHtml(bullet[1])}</li>`;
+      return;
+    }
+    closeList();
+    if (line.trim()) {
+      html += `<p>${escapeHtml(line)}</p>`;
+    }
+  });
+  closeList();
+  if (inCode) {
+    html += `<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`;
+  }
+  return `<div class="artifact-preview-markdown">${html || "<p class=\"muted\">Empty Markdown artifact.</p>"}</div>`;
+}
+
+function renderCsvArtifactPreview(text) {
+  const rows = parseCsvRows(text);
+  if (!rows.length) {
+    return `<p class="muted">Empty CSV artifact.</p>`;
+  }
+  const [header, ...body] = rows;
+  const shownRows = body.slice(0, 200);
+  const truncated = body.length > shownRows.length;
+  return `
+    <div class="artifact-preview-table-wrap">
+      <table class="artifact-preview-table">
+        <thead><tr>${header.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("")}</tr></thead>
+        <tbody>
+          ${shownRows.map((row) => `<tr>${header.map((_, index) => `<td>${escapeHtml(row[index] || "")}</td>`).join("")}</tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    ${truncated ? `<p class="muted">Showing first ${integerText(shownRows.length)} of ${integerText(body.length)} rows.</p>` : ""}
+  `;
+}
+
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const input = String(text || "");
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    const next = input[index + 1];
+    if (char === "\"") {
+      if (quoted && next === "\"") {
+        cell += "\"";
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") {
+        index += 1;
+      }
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((items) => items.some((item) => item !== ""));
+}
+
+function renderTextArtifactPreview(text, label) {
+  return `
+    <div class="artifact-preview-text">
+      <strong>${escapeHtml(label || "Text artifact")}</strong>
+      <pre><code>${escapeHtml(String(text || ""))}</code></pre>
+    </div>
+  `;
+}
+
+function focusArtifactPreview() {
+  requestAnimationFrame(() => {
+    els.artifactPreview.scrollIntoView({ behavior: "smooth", block: "start" });
+    els.artifactPreview.focus({ preventScroll: true });
   });
 }
 
@@ -3655,22 +3936,34 @@ function diagramTableRole(table, graph) {
   const name = table.name.toLowerCase();
   const hasReferenceName = /(customer|product|seller|category|type|state|status|lookup|reference|dimension|dim_|ref_)/.test(name);
   const hasBridgeName = /(bridge|junction|link|map|xref|assoc|association|item|items|line)/.test(name);
-  const hasFactName = /(order|event|transaction|payment|review|fact|activity|log|history)/.test(name);
+  const hasFactName = diagramNameLooksFact(name);
+  const dependsOnFact = outgoing.some((rel) => diagramNameLooksFact(rel.parentTable));
   const keyColumns = (table.columns || []).filter((column) => column.isPk || column.isFk);
   const fkKeyCount = keyColumns.filter((column) => column.isFk).length;
   if (outgoing.length >= 2 || (hasBridgeName && outgoing.length > 0) || (fkKeyCount >= 2 && incoming.length <= 1)) {
-    return { name: "bridge", label: "Bridge", layer: 1, degree, incoming: incoming.length, outgoing: outgoing.length };
+    return {
+      name: "bridge",
+      label: dependsOnFact ? "Detail/line" : "Bridge",
+      layer: dependsOnFact ? 2 : 1,
+      degree,
+      incoming: incoming.length,
+      outgoing: outgoing.length,
+    };
   }
   if ((outgoing.length === 0 && incoming.length > 0) || (hasReferenceName && outgoing.length <= 1 && incoming.length >= 0)) {
     return { name: "reference", label: "Reference", layer: 0, degree, incoming: incoming.length, outgoing: outgoing.length };
   }
   if (incoming.length >= 2 || (hasFactName && incoming.length > 0)) {
-    return { name: "hub", label: "Fact/event", layer: 2, degree, incoming: incoming.length, outgoing: outgoing.length };
+    return { name: "hub", label: "Fact/event", layer: 1, degree, incoming: incoming.length, outgoing: outgoing.length };
   }
   if (outgoing.length > 0) {
-    return { name: "child", label: "Child/detail", layer: 3, degree, incoming: incoming.length, outgoing: outgoing.length };
+    return { name: "child", label: "Child/detail", layer: 2, degree, incoming: incoming.length, outgoing: outgoing.length };
   }
   return { name: "isolated", label: "Schema table", layer: 1, degree, incoming: incoming.length, outgoing: outgoing.length };
+}
+
+function diagramNameLooksFact(name) {
+  return /(order|event|transaction|payment|review|fact|activity|log|history)/.test(String(name || "").toLowerCase());
 }
 
 function diagramVisibleColumns(table) {
@@ -3696,26 +3989,48 @@ function diagramRelationshipSvg(rel, layout, index) {
   const targetColumn = (rel.parentColumns || [])[0] || "";
   const y1 = source.columnY.get(sourceColumn) || source.y + 80;
   const y2 = target.columnY.get(targetColumn) || target.y + 80;
-  const sourceIsLeft = source.x < target.x;
-  const x1 = sameLayer ? source.x + source.width : sourceIsLeft ? source.x + source.width : source.x;
-  const x2 = sameLayer ? target.x + target.width : sourceIsLeft ? target.x : target.x + target.width;
-  const laneY = 22 + (index % 4) * 13;
-  const offset = 42 + (index % 3) * 9;
-  const direction = x2 >= x1 ? 1 : -1;
+  const sourceCenter = source.x + source.width / 2;
+  const targetCenter = target.x + target.width / 2;
+  const sourceIsLeft = sourceCenter < targetCenter;
+  const x1 = sourceIsLeft ? source.x + source.width : source.x;
+  const x2 = sourceIsLeft ? target.x : target.x + target.width;
+  const direction = sourceIsLeft ? 1 : -1;
+  const laneOffset = diagramLaneOffset(index);
+  const sourceCorridor = sourceIsLeft
+    ? source.x + source.width + 48 + laneOffset
+    : source.x - 48 - laneOffset;
   let path;
   let labelX;
   let labelY;
   if (sameLayer) {
-    const routeX = Math.max(source.x + source.width, target.x + target.width) + offset;
+    const routeX = sourceIsLeft
+      ? Math.max(source.x + source.width, target.x + target.width) + 44 + laneOffset
+      : Math.min(source.x, target.x) - 44 - laneOffset;
     path = `M ${x1} ${y1} L ${routeX} ${y1} L ${routeX} ${y2} L ${x2} ${y2}`;
-    labelX = routeX + 8;
+    labelX = routeX + direction * 8;
     labelY = (y1 + y2) / 2 - 6;
   } else {
-    const exitX = x1 + direction * offset;
-    const entryX = x2 - direction * offset;
-    path = `M ${x1} ${y1} L ${exitX} ${y1} L ${exitX} ${laneY} L ${entryX} ${laneY} L ${entryX} ${y2} L ${x2} ${y2}`;
-    labelX = (exitX + entryX) / 2;
-    labelY = laneY - 5;
+    const layerDistance = Math.abs(source.layer - target.layer);
+    if (layerDistance > 1) {
+      const targetCorridor = sourceIsLeft
+        ? target.x - 48 - laneOffset
+        : target.x + target.width + 48 + laneOffset;
+      const busY = diagramNonAdjacentBusY(source, target, layout, y1, y2, laneOffset);
+      path = [
+        `M ${x1} ${y1}`,
+        `L ${sourceCorridor} ${y1}`,
+        `L ${sourceCorridor} ${busY}`,
+        `L ${targetCorridor} ${busY}`,
+        `L ${targetCorridor} ${y2}`,
+        `L ${x2} ${y2}`,
+      ].join(" ");
+      labelX = (sourceCorridor + targetCorridor) / 2;
+      labelY = busY - 6;
+    } else {
+      path = `M ${x1} ${y1} L ${sourceCorridor} ${y1} L ${sourceCorridor} ${y2} L ${x2} ${y2}`;
+      labelX = sourceCorridor + direction * 8;
+      labelY = (y1 + y2) / 2 - 6;
+    }
   }
   const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
   const selectionClass = diagramRelationshipSelectionClass(rel, layout.selection);
@@ -3729,6 +4044,31 @@ function diagramRelationshipSvg(rel, layout, index) {
       <text class="diagram-edge-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateMiddle(rel.label || rel.cardinality || "FK", 22))}</text>
     </g>
   `;
+}
+
+function diagramLaneOffset(index) {
+  const lanes = [0, -12, 12, -24, 24, -36, 36];
+  return lanes[index % lanes.length];
+}
+
+function diagramNonAdjacentBusY(source, target, layout, y1, y2, laneOffset) {
+  const minLayer = Math.min(source.layer, target.layer);
+  const maxLayer = Math.max(source.layer, target.layer);
+  const blockers = layout.tableRecords
+    .map((record) => layout.positions.get(record.table.name))
+    .filter((position) => position && position.layer > minLayer && position.layer < maxLayer);
+  if (!blockers.length) {
+    return (y1 + y2) / 2;
+  }
+  const blockerTop = Math.min(...blockers.map((position) => position.y));
+  const blockerBottom = Math.max(...blockers.map((position) => position.y + position.height));
+  const desired = (y1 + y2) / 2;
+  const topBus = Math.max(30, blockerTop - 34 - Math.abs(laneOffset) / 2);
+  const bottomBus = Math.min(layout.height - 30, blockerBottom + 34 + Math.abs(laneOffset) / 2);
+  if (desired < blockerTop - 20 || desired > blockerBottom + 20) {
+    return desired;
+  }
+  return Math.abs(desired - topBus) <= Math.abs(desired - bottomBus) ? topBus : bottomBus;
 }
 
 function diagramTableSvg(record, position, selection) {
@@ -4021,7 +4361,7 @@ function renderDiagramEvidenceLinks(evidenceLinks = []) {
       <ul>
         ${evidenceLinks.slice(0, 6).map((link) => {
           const sampleUrl = artifactUrlFromArtifacts(link.sample_bad_rows_path || "");
-          return `<li><code>${escapeHtml(link.issue_id || "issue")}</code> ${escapeHtml(link.issue_type || "")} ${escapeHtml(link.severity || "")} · ${integerText(link.bad_count)} rows${sampleUrl ? ` · <a href="${escapeHtml(sampleUrl)}" target="_blank" rel="noopener">sample</a>` : ""}</li>`;
+          return `<li><code>${escapeHtml(link.issue_id || "issue")}</code> ${escapeHtml(link.issue_type || "")} ${escapeHtml(link.severity || "")} · ${integerText(link.bad_count)} rows${sampleUrl ? ` · <button class="inline-preview-button" type="button" data-artifact-action="preview-artifact" data-artifact-path="${escapeHtml(link.sample_bad_rows_path)}" data-artifact-url="${escapeHtml(sampleUrl)}">Preview sample</button>` : ""}</li>`;
         }).join("")}
       </ul>
     </div>
@@ -4032,7 +4372,7 @@ function diagramArtifactLinks(paths) {
   const links = paths.map((path) => {
     const url = artifactUrlFromArtifacts(path);
     return url
-      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><code>${escapeHtml(path)}</code></a>`
+      ? renderArtifactReference(path, url)
       : `<code>${escapeHtml(path)}</code>`;
   }).join("");
   return `<div class="diagram-artifact-links"><strong>Artifacts</strong><div>${links}</div></div>`;
