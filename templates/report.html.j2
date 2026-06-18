@@ -355,6 +355,9 @@
         <article class="chart-card">
           <div class="chart-heading"><strong>Dataset Risk</strong><a href="{{ chart_specs.risk_summary.path }}">{{ chart_specs.risk_summary.path }}</a></div>
           <p><span class="pill {{ chart_specs.risk_summary.verdict }}">{{ chart_specs.risk_summary.verdict }}</span> <strong>{{ chart_specs.risk_summary.risk_score }}/100</strong> risk across {{ chart_specs.risk_summary.issue_count }} issues.</p>
+          {% if dataset_verdict.risk_score_model %}
+          <p class="muted">{{ dataset_verdict.risk_score_model.description }} Formula: <code>{{ dataset_verdict.risk_score_model.formula }}</code></p>
+          {% endif %}
           <div class="bar-row">
             <span class="bar-label">Risk score</span>
             <span class="bar-track"><span class="bar-fill danger" style="width: {{ chart_specs.risk_summary.bar_width_pct }}%;"></span></span>
@@ -399,7 +402,7 @@
           </div>
         </article>
         <article class="chart-card">
-          <div class="chart-heading"><strong>Relationship FK Health</strong><a href="{{ chart_specs.relationship_health.path }}">{{ chart_specs.relationship_health.path }}</a></div>
+          <div class="chart-heading"><strong>Relationship FK Status</strong><a href="{{ chart_specs.relationship_health.path }}">{{ chart_specs.relationship_health.path }}</a></div>
           <div class="bar-list">
             {% for row in chart_specs.relationship_health.data %}
             <div class="bar-row">
@@ -433,23 +436,27 @@
     </section>
 
     <section>
-      <h2>Table Impact and Per-Table Assessment</h2>
+      <h2>Table Review Scores and Per-Table Assessment</h2>
       {% if table_assessments.available %}
       <div class="summary-grid">
         <article class="metric-card info"><span class="metric-label">Tables assessed</span><strong class="metric-value">{{ table_assessments.table_count }}</strong><p class="metric-detail">{{ table_assessments.path }}</p></article>
-        <article class="metric-card {% if table_assessments.average_health_score < 70 %}warn{% else %}ok{% endif %}"><span class="metric-label">Average health</span><strong class="metric-value">{{ table_assessments.average_health_score }}/100</strong><p class="metric-detail">readiness weighted by issue and relationship risk</p></article>
+        <article class="metric-card {% if table_assessments.average_review_score < 70 %}warn{% else %}ok{% endif %}"><span class="metric-label">Average review score</span><strong class="metric-value">{{ table_assessments.average_review_score }}/100</strong><p class="metric-detail">heuristic, not a statistical health model</p></article>
         <article class="metric-card danger"><span class="metric-label">Not ready</span><strong class="metric-value">{{ table_assessments.readiness_counts.NOT_READY or 0 }}</strong><p class="metric-detail">tables requiring remediation</p></article>
       </div>
+      {% if table_assessments.score_model %}
+      <p class="muted">{{ table_assessments.score_model.description }} Formula: <code>{{ table_assessments.score_model.formula }}</code></p>
+      {% endif %}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Issues</th><th>Relationship Risks</th><th>Business Impact</th><th>Affected Columns</th><th>First Action</th></tr></thead>
+          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Review Score</th><th>Penalty</th><th>Issues</th><th>Relationship Risks</th><th>Business Impact</th><th>Affected Columns</th><th>First Action</th></tr></thead>
           <tbody>
             {% for row in table_assessments.assessments %}
             <tr>
               <td><code>{{ row.table }}</code></td>
               <td>{{ row.role }}</td>
               <td><span class="pill {{ row.readiness }}">{{ row.readiness }}</span></td>
-              <td>{{ row.health_score }}</td>
+              <td>{{ row.review_score }}</td>
+              <td>{{ row.score_penalty }}</td>
               <td>{{ row.issue_total }}</td>
               <td>{{ row.relationship_risk_count }}</td>
               <td>{{ row.business_impact_label }}<br><span class="muted">{{ row.business_impact_category }}</span></td>
@@ -457,7 +464,7 @@
               <td>{{ row.recommended_next_actions[0] if row.recommended_next_actions else "" }}</td>
             </tr>
             {% else %}
-            <tr><td>none</td><td>none</td><td>none</td><td>0</td><td>0</td><td>0</td><td>none</td><td>none</td><td>none</td></tr>
+            <tr><td>none</td><td>none</td><td>none</td><td>0</td><td>0</td><td>0</td><td>0</td><td>none</td><td>none</td><td>none</td></tr>
             {% endfor %}
           </tbody>
         </table>

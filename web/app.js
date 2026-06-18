@@ -44,6 +44,10 @@ const els = {
   csvStatus: document.querySelector("#csvStatus"),
   mappingStatus: document.querySelector("#mappingStatus"),
   runnerStatus: document.querySelector("#runnerStatus"),
+  dbmlStatusCard: document.querySelector("#dbmlStatusCard"),
+  csvStatusCard: document.querySelector("#csvStatusCard"),
+  mappingStatusCard: document.querySelector("#mappingStatusCard"),
+  runnerStatusCard: document.querySelector("#runnerStatusCard"),
   tableCountBadge: document.querySelector("#tableCountBadge"),
   csvCountBadge: document.querySelector("#csvCountBadge"),
   dbmlFileCard: document.querySelector("#dbmlFileCard"),
@@ -1131,6 +1135,16 @@ function renderStatus() {
     ? `${mapped}/${state.tables.length} tables mapped, ${missing} missing, ${extra} extra`
     : "Run auto-link after upload";
   els.runnerStatus.textContent = runnerStatusText();
+  setWorkflowCardState(els.dbmlStatusCard, state.tables.length ? "ready" : "pending");
+  setWorkflowCardState(els.csvStatusCard, state.csvFiles.length ? "ready" : "pending");
+  setWorkflowCardState(
+    els.mappingStatusCard,
+    !state.tables.length ? "pending" : missing || extra ? "warning" : "ready",
+  );
+  setWorkflowCardState(
+    els.runnerStatusCard,
+    state.runnerAvailable ? (state.currentJob?.status === "failed" ? "error" : "ready") : "warning",
+  );
   els.tableCountBadge.textContent = `${state.tables.length} tables`;
   els.csvCountBadge.textContent = `${state.csvFiles.length} CSV`;
   els.mappedMetric.textContent = mapped;
@@ -1143,6 +1157,16 @@ function renderStatus() {
   } else {
     els.dbmlFileCard.hidden = true;
   }
+}
+
+function setWorkflowCardState(element, stateName) {
+  if (!element) {
+    return;
+  }
+  element.dataset.state = stateName;
+  element.classList.toggle("complete", stateName === "ready");
+  element.classList.toggle("warning", stateName === "warning");
+  element.classList.toggle("error", stateName === "error");
 }
 
 function runnerStatusText() {
@@ -1481,7 +1505,7 @@ function stageResultSummary(stageName) {
     catalog_csv_files: "Matched CSV files to DBML tables",
     profile_csv_tables: "Streamed profile statistics",
     data_quality_checks: "Detected row and column quality issues",
-    relationship_checks: "Validated PK/FK relationship health",
+    relationship_checks: "Validated PK/FK relationship status",
     influence_analysis: "Computed bounded target influence",
     write_machine_artifacts: "Wrote machine-readable outputs",
     render_reports: "Rendered human-readable reports",
@@ -1624,13 +1648,13 @@ function renderGeneratedTableImpactPreview(artifacts) {
   const assessments = getDashboardTableAssessments();
   const summary = assessmentArtifact.summary || {};
   const tableCount = summary.table_count ?? assessments.length;
-  const averageHealth = summary.average_health_score;
+  const averageReviewScore = summary.average_review_score ?? summary.average_health_score;
   const notReady = summary.readiness_counts?.NOT_READY ?? assessments.filter((row) => row.readiness === "NOT_READY").length;
   const topTables = assessments
     .slice()
     .sort((a, b) => (
       readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
-      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      Number(a.review_score ?? a.health_score ?? 0) - Number(b.review_score ?? b.health_score ?? 0) ||
       String(a.table || "").localeCompare(String(b.table || ""))
     ))
     .slice(0, 3)
@@ -1642,7 +1666,7 @@ function renderGeneratedTableImpactPreview(artifacts) {
         <strong>${integerText(tableCount)}</strong>
         <span>tables</span>
       </div>
-      <p>${integerText(notReady)} not ready · ${averageHealth === undefined ? "--" : integerText(averageHealth)} avg health</p>
+      <p>${integerText(notReady)} not ready · ${averageReviewScore === undefined ? "--" : integerText(averageReviewScore)} avg review score</p>
       ${topTables ? `<div class="generated-mini-list">${topTables}</div>` : ""}
     `
     : `<p class="muted">Waiting for <code>table_assessments.json</code>.</p>`;
@@ -1878,7 +1902,7 @@ function renderTableImpactSection() {
     .filter((assessment) => filterMatchesTable(assessment.table))
     .sort((a, b) => (
       readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
-      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      Number(a.review_score ?? a.health_score ?? 0) - Number(b.review_score ?? b.health_score ?? 0) ||
       String(a.table || "").localeCompare(String(b.table || ""))
     ));
 
@@ -1910,7 +1934,7 @@ function renderTableImpactSection() {
           <code>${escapeHtml(assessment.table)}</code>
           <small>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</small>
         </span>
-        <span class="table-impact-score">${integerText(assessment.health_score)}<small>health</small></span>
+        <span class="table-impact-score">${integerText(assessment.review_score ?? assessment.health_score)}<small>review score</small></span>
         <span class="pill-status ${readinessPillClass(readiness)}">${escapeHtml(readiness)}</span>
         <span class="table-impact-meta">
           <span>${escapeHtml(impact.category || "general_analytics")}</span>
@@ -3135,7 +3159,7 @@ function renderRelationshipHealthPanel() {
     }))
     .sort((a, b) => relationshipStatusOrder(a.rawLabel) - relationshipStatusOrder(b.rawLabel));
   return dashboardPanel(
-    "Relationship FK health",
+    "Relationship FK status",
     dashboardChartPaths.relationship,
     renderDashboardBars(rows, { empty: "No relationship rows match the current table filter.", valueFormatter: integerText }),
   );
@@ -3340,7 +3364,7 @@ function renderTableAssessmentDetails(selection) {
       </div>
       <span class="pill-status ${readinessPillClass(assessment.readiness)}">${escapeHtml(assessment.readiness || "unknown")}</span>
       <dl class="graph-metadata">
-        <div><dt>health_score</dt><dd>${integerText(assessment.health_score)}/100</dd></div>
+        <div><dt>review_score</dt><dd>${integerText(assessment.review_score ?? assessment.health_score)}/100</dd></div>
         <div><dt>business_impact</dt><dd>${escapeHtml(impact.category || "general_analytics")}</dd></div>
         <div><dt>impact_evidence</dt><dd>${escapeHtml(impact.rationale || "")}</dd></div>
         <div><dt>affected_columns</dt><dd>${escapeHtml(columns.length ? columns.join(", ") : "none")}</dd></div>
@@ -3750,7 +3774,7 @@ function renderRelationshipGraphArtifactReview(path, artifact) {
   return artifactReviewShell(
     "Relationship review",
     path,
-    "FK data-quality health, cardinality, and table-level relationship evidence.",
+    "FK data-quality status, cardinality, and table-level relationship evidence.",
     `
       ${artifactReviewKpis([
         ["tables", summary.node_count ?? nodes.length],
@@ -3759,7 +3783,7 @@ function renderRelationshipGraphArtifactReview(path, artifact) {
         ["junctions", summary.junction_table_count ?? 0],
         ["many-to-many", summary.many_to_many_relationship_count ?? 0],
       ])}
-      ${artifactReviewSection("Relationship health", issueEdges.length ? `
+      ${artifactReviewSection("Relationship status", issueEdges.length ? `
         <div class="artifact-review-rows">
           ${issueEdges.map((edge) => {
             const metrics = objectOrEmpty(edge.metrics);
@@ -3857,10 +3881,11 @@ function renderDatasetVerdictArtifactReview(path, artifact) {
   const counts = objectOrEmpty(artifact?.issue_counts);
   const bySeverity = objectOrEmpty(counts.by_severity);
   const blockers = Array.isArray(artifact?.top_blockers) ? artifact.top_blockers : [];
+  const scoreModel = objectOrEmpty(artifact?.risk_score_model);
   return artifactReviewShell(
     "Dataset verdict review",
     path,
-    "Release readiness, blocker issues, and recommended next actions.",
+    "EDA readiness, blocker issues, and deterministic review risk.",
     `
       ${artifactReviewKpis([
         ["verdict", artifact?.verdict || "unknown"],
@@ -3869,6 +3894,10 @@ function renderDatasetVerdictArtifactReview(path, artifact) {
         ["P0", bySeverity.P0 ?? 0],
         ["P1", bySeverity.P1 ?? 0],
       ])}
+      ${artifactReviewSection("Scoring model", `
+        <p>${escapeHtml(scoreModel.description || "Risk score is a deterministic EDA review heuristic, not a statistical health model.")}</p>
+        <p><code>${escapeHtml(scoreModel.formula || "Weighted severity, relationship, and schema findings capped at 100.")}</code></p>
+      `)}
       ${artifactReviewSection("Top blockers", blockers.length ? `
         <div class="artifact-review-rows">
           ${blockers.slice(0, 8).map((issue) => renderIssueReviewRow(issue)).join("")}
@@ -3883,25 +3912,30 @@ function renderDatasetVerdictArtifactReview(path, artifact) {
 
 function renderTableAssessmentsArtifactReview(path, artifact) {
   const summary = objectOrEmpty(artifact?.summary);
+  const scoreModel = objectOrEmpty(summary.score_model);
   const assessments = Array.isArray(artifact?.assessments) ? artifact.assessments : [];
   const sorted = assessments
     .slice()
     .sort((a, b) => (
       readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
-      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      Number(a.review_score ?? a.health_score ?? 0) - Number(b.review_score ?? b.health_score ?? 0) ||
       String(a.table || "").localeCompare(String(b.table || ""))
     ));
   return artifactReviewShell(
     "Table impact review",
     path,
-    "Per-table readiness, health score, business impact, and relationship risk.",
+    "Per-table readiness, review score, business impact, and relationship risk.",
     `
       ${artifactReviewKpis([
         ["tables", summary.table_count ?? assessments.length],
-        ["avg health", summary.average_health_score ?? "--"],
+        ["avg review", summary.average_review_score ?? summary.average_health_score ?? "--"],
         ["not ready", summary.readiness_counts?.NOT_READY ?? sorted.filter((item) => item.readiness === "NOT_READY").length],
         ["business areas", Object.keys(objectOrEmpty(summary.business_impact_counts)).length],
       ])}
+      ${artifactReviewSection("Scoring model", `
+        <p>${escapeHtml(scoreModel.description || "Review score is a deterministic EDA prioritization heuristic, not a statistical health model.")}</p>
+        <p><code>${escapeHtml(scoreModel.formula || "100 minus weighted issue and relationship penalties.")}</code></p>
+      `)}
       ${artifactReviewSection("Highest-risk tables", sorted.length ? `
         <div class="artifact-review-rows">
           ${sorted.slice(0, 8).map((assessment) => {
@@ -3915,7 +3949,7 @@ function renderTableAssessmentsArtifactReview(path, artifact) {
                 </div>
                 <p>${escapeHtml(impact.label || "General analytics")} · ${escapeHtml(assessment.role || "unknown role")}</p>
                 <div class="artifact-review-meta">
-                  <span>${integerText(assessment.health_score)} health</span>
+                  <span>${integerText(assessment.review_score ?? assessment.health_score)} review score</span>
                   <span>${integerText(assessment.row_count)} rows</span>
                   <span>${integerText(assessment.column_count)} columns</span>
                   <span>${integerText(risks.length)} relationship risks</span>
@@ -5135,11 +5169,11 @@ function drawLocalDiagram(model, layout) {
 
 function layoutLocalDiagram(model) {
   const graph = buildDiagramGraph(model);
-  const nodeWidth = state.diagramExpanded ? 276 : 252;
-  const xGap = 126;
-  const yGap = 34;
-  const margin = 32;
-  const topMargin = 76;
+  const nodeWidth = state.diagramExpanded ? 360 : 320;
+  const xGap = 160;
+  const yGap = 42;
+  const margin = 40;
+  const topMargin = 92;
   const tableRecords = model.tables.map((table) => {
     const role = diagramTableRole(table, graph);
     const columnSet = diagramVisibleColumns(table);
@@ -5155,7 +5189,7 @@ function layoutLocalDiagram(model) {
       hiddenCount: columnSet.hiddenCount,
       totalColumns: columnSet.totalColumns,
       width: nodeWidth,
-      height: Math.max(state.diagramExpanded ? 168 : 146, 62 + rowCount * 26 + 14),
+      height: Math.max(state.diagramExpanded ? 220 : 190, 72 + rowCount * 32 + 18),
     };
   });
   const originalLayers = [...new Set(tableRecords.map((record) => record.role.layer))].sort((a, b) => a - b);
@@ -5184,7 +5218,7 @@ function layoutLocalDiagram(model) {
     records.forEach((record) => {
       const columnY = new Map();
       record.visibleColumns.forEach((column, index) => {
-        columnY.set(column.name, y + 62 + index * 26 + 12);
+        columnY.set(column.name, y + 72 + index * 32 + 15);
       });
       positions.set(record.table.name, {
         x: margin + layer * (nodeWidth + xGap),
@@ -5368,10 +5402,10 @@ function diagramTableSvg(record, position, selection) {
   }
   const columns = record.visibleColumns;
   const lines = columns
-    .map((column, index) => diagramColumnRowSvg(column, 62 + index * 26, position.width))
+    .map((column, index) => diagramColumnRowSvg(column, 72 + index * 32, position.width))
     .join("");
   const overflowLine = record.hiddenCount
-    ? diagramHiddenColumnRowSvg(record.hiddenCount, 62 + columns.length * 26, position.width)
+    ? diagramHiddenColumnRowSvg(record.hiddenCount, 72 + columns.length * 32, position.width)
     : "";
   const meta = [
     table.status === "mapped" ? "mapped CSV" : table.status === "missing_csv" ? "missing CSV" : table.status || "schema",
@@ -5382,11 +5416,11 @@ function diagramTableSvg(record, position, selection) {
     <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))} diagram-role-${escapeHtml(record.role.name)} ${selectionClass}" data-diagram-table="${escapeHtml(table.name)}" transform="translate(${position.x} ${position.y})" tabindex="0" role="button" aria-label="${escapeHtml(`${table.name} table`)}">
       <title>${escapeHtml(`${table.name} · ${record.role.label} · ${meta}`)}</title>
       <rect class="diagram-table-box" width="${position.width}" height="${position.height}" rx="8"></rect>
-      <rect class="diagram-table-header" width="${position.width}" height="52" rx="8"></rect>
-      <text class="diagram-table-name" x="14" y="22">${escapeHtml(truncateMiddle(table.name, 26))}</text>
-      <text class="diagram-table-meta" x="14" y="42">${escapeHtml(truncateMiddle(`${record.role.label} · ${meta}`, 38))}</text>
-      <rect class="diagram-status-chip" x="${position.width - 78}" y="14" width="62" height="22" rx="11"></rect>
-      <text class="diagram-status-text" x="${position.width - 47}" y="29" text-anchor="middle">${escapeHtml(table.status === "missing_csv" ? "missing" : table.status || "schema")}</text>
+      <rect class="diagram-table-header" width="${position.width}" height="60" rx="8"></rect>
+      <text class="diagram-table-name" x="16" y="25">${escapeHtml(truncateMiddle(table.name, 24))}</text>
+      <text class="diagram-table-meta" x="16" y="48">${escapeHtml(truncateMiddle(`${record.role.label} · ${meta}`, 48))}</text>
+      <rect class="diagram-status-chip" x="${position.width - 92}" y="17" width="74" height="24" rx="12"></rect>
+      <text class="diagram-status-text" x="${position.width - 55}" y="33" text-anchor="middle">${escapeHtml(table.status === "missing_csv" ? "missing" : table.status || "schema")}</text>
       ${lines || `<text class="diagram-column empty" x="14" y="78">No columns</text>`}
       ${overflowLine}
     </g>
@@ -5396,8 +5430,8 @@ function diagramTableSvg(record, position, selection) {
 function diagramColumnRowSvg(column, y, width) {
   const role = column.isPk && column.isFk ? "PK/FK" : column.isPk ? "PK" : column.isFk ? "FK" : "COL";
   const type = column.type || "";
-  const badgeWidth = role === "PK/FK" ? 38 : 28;
-  const nameLimit = type ? 20 : 30;
+  const badgeWidth = role === "PK/FK" ? 44 : 32;
+  const nameLimit = type ? 28 : 40;
   const rowClass = [
     "diagram-column-row",
     column.isPk ? "pk" : "",
@@ -5407,11 +5441,11 @@ function diagramColumnRowSvg(column, y, width) {
   return `
     <g class="${rowClass}" data-diagram-column="${escapeHtml(column.name)}">
       <title>${escapeHtml(`${role} ${column.name}${type ? ` ${type}` : ""}${column.fkTarget ? ` -> ${column.fkTarget}` : ""}`)}</title>
-      <rect class="diagram-column-row-bg" x="8" y="${y}" width="${width - 16}" height="24" rx="4"></rect>
-      <rect class="diagram-column-badge" x="14" y="${y + 5}" width="${badgeWidth}" height="14" rx="4"></rect>
-      <text class="diagram-column-role" x="${14 + badgeWidth / 2}" y="${y + 16}" text-anchor="middle">${escapeHtml(role)}</text>
-      <text class="diagram-column-name" x="${24 + badgeWidth}" y="${y + 16}">${escapeHtml(truncateMiddle(column.name, nameLimit))}</text>
-      ${type ? `<text class="diagram-column-type" x="${width - 14}" y="${y + 16}" text-anchor="end">${escapeHtml(truncateMiddle(type, 13))}</text>` : ""}
+      <rect class="diagram-column-row-bg" x="10" y="${y}" width="${width - 20}" height="30" rx="5"></rect>
+      <rect class="diagram-column-badge" x="16" y="${y + 7}" width="${badgeWidth}" height="16" rx="4"></rect>
+      <text class="diagram-column-role" x="${16 + badgeWidth / 2}" y="${y + 19}" text-anchor="middle">${escapeHtml(role)}</text>
+      <text class="diagram-column-name" x="${28 + badgeWidth}" y="${y + 20}">${escapeHtml(truncateMiddle(column.name, nameLimit))}</text>
+      ${type ? `<text class="diagram-column-type" x="${width - 16}" y="${y + 20}" text-anchor="end">${escapeHtml(truncateMiddle(type, 15))}</text>` : ""}
     </g>
   `;
 }
@@ -5419,8 +5453,8 @@ function diagramColumnRowSvg(column, y, width) {
 function diagramHiddenColumnRowSvg(hiddenCount, y, width) {
   return `
     <g class="diagram-column-row overflow">
-      <rect class="diagram-column-row-bg" x="8" y="${y}" width="${width - 16}" height="24" rx="4"></rect>
-      <text class="diagram-column-name" x="14" y="${y + 16}">+${integerText(hiddenCount)} hidden columns</text>
+      <rect class="diagram-column-row-bg" x="10" y="${y}" width="${width - 20}" height="30" rx="5"></rect>
+      <text class="diagram-column-name" x="16" y="${y + 20}">+${integerText(hiddenCount)} hidden columns</text>
     </g>
   `;
 }

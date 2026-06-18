@@ -84,6 +84,7 @@ ALLOWED_ARTIFACT_FIELD_REFS = {
     "readiness",
     "recommended_next_actions",
     "relationship_risk_count",
+    "review_score",
     "risk_score",
     "row_count",
     "severity",
@@ -148,7 +149,7 @@ class FakeNarrativeProvider:
             top_ref = f"`{top_issue['table']}.{top_issue['columns'][0]}`"
         return (
             "# Senior Data Scientist Narrative\n\n"
-            "## Dataset Health\n\n"
+            "## Dataset Review\n\n"
             f"The deterministic artifacts show {summary['table_count']} tables, "
             f"{summary['row_count']} rows, {summary['issue_count']} issues, and a "
             f"risk score of {summary['risk_score']}.\n\n"
@@ -362,6 +363,7 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
                 "table": row.get("table"),
                 "role": row.get("role"),
                 "health_score": row.get("health_score"),
+                "review_score": row.get("review_score", row.get("health_score")),
                 "readiness": row.get("readiness"),
                 "issue_counts_by_severity": row.get("issue_counts_by_severity") or {},
                 "affected_columns": row.get("affected_columns") or [],
@@ -411,7 +413,7 @@ def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
         "",
         intro,
         "",
-        "## Dataset Health",
+        "## Dataset Review",
         "",
         (
             f"The run reviewed {summary['table_count']} tables, {summary['column_count']} columns, "
@@ -440,8 +442,9 @@ def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
         impact = row.get("business_impact") or {}
         category = impact.get("category") or "general_analytics"
         lines.append(
-            f"- `{row['table']}` is `{row['readiness']}` with health score "
-            f"{row['health_score']}, role `{row['role']}`, and impact category `{category}`."
+            f"- `{row['table']}` is `{row['readiness']}` with review score "
+            f"{row.get('review_score', row.get('health_score'))}, role `{row['role']}`, "
+            f"and impact category `{category}`."
         )
     lines.extend(
         [

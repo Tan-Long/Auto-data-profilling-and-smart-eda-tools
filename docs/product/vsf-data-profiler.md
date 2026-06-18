@@ -129,14 +129,16 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   observed cardinality, runtime FK metrics, statuses, junction-table detection,
   and issue/sample evidence links.
 - Generate a deterministic dataset verdict artifact with normalized severity
-  counts, risk score, top blockers, affected tables, and recommended next
-  actions.
+  counts, review-risk score, scoring formula metadata, top blockers, affected
+  tables, and recommended next actions.
 - Generate a deterministic per-table assessment artifact with one row per
-  profiled table, including role, health score, readiness, issue counts,
-  affected columns, relationship risks, name-token business impact category,
-  evidence artifact references, and recommended next actions.
+  profiled table, including role, review score, scoring formula metadata,
+  readiness, issue counts, affected columns, relationship risks, name-token
+  business impact category, evidence artifact references, and recommended next
+  actions. The review score is a deterministic EDA prioritization heuristic,
+  not a statistical health model.
 - Generate deterministic chart-spec artifacts from aggregate outputs for issue
-  counts, missingness, relationship FK health, dataset risk, and influence top
+  counts, missingness, relationship FK status, dataset risk, and influence top
   features when available.
 - Generate DBML diagram artifacts, including a stateless dbdiagram.io embed
   link when the encoded DBML fits safely in a URL.
@@ -168,7 +170,7 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   renderer remains local-only and presentation-only: it does not add backend
   routes, rename artifacts, fetch raw CSV rows, or infer new profiler facts. It
   also renders a dedicated Table Impact section from
-  `table_assessments.json`, including table readiness, health score, role,
+  `table_assessments.json`, including table readiness, review score, role,
   affected-column count, relationship-risk count, and deterministic
   business-impact category.
 - Provide interactive lineage and relationship graph views in the web-runner

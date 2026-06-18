@@ -169,7 +169,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(dashboard).toContainText("Issue counts by severity");
   await expect(dashboard).toContainText("Issue counts by type");
   await expect(dashboard).toContainText("Missingness by table");
-  await expect(dashboard).toContainText("Relationship FK health");
+  await expect(dashboard).toContainText("Relationship FK status");
   await expect(dashboard).toContainText("Influence top features");
 
   await expect(page.locator("#tableImpact")).toContainText("Table Impact");
@@ -277,7 +277,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#artifactPreview")).toBeFocused();
   await expect(page.locator("#artifactPreviewMeta")).toContainText("relationship_graph.json");
   await expect(page.locator("#artifactPreview")).toContainText("Relationship review");
-  await expect(page.locator("#artifactPreview")).toContainText("Relationship health");
+  await expect(page.locator("#artifactPreview")).toContainText("Relationship status");
   await expect(page.locator("#artifactPreview")).toContainText("FK issue");
   await expect(page.locator("#artifactPreview")).toContainText("Tables in relationship graph");
   await expect(page.locator("#artifactPreview")).not.toContainText("Object(9)");
@@ -285,7 +285,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
     .locator('#dashboardArtifactLinks .artifact-json-link[data-artifact-path="charts/relationship_fk_health.json"]')
     .first()
     .click();
-  await expect(page.locator("#artifactPreview")).toContainText("Relationship FK Health");
+  await expect(page.locator("#artifactPreview")).toContainText("Relationship FK Status");
   await expect(page.locator("#artifactPreview")).toContainText("data-quality checks");
   await expect(page.locator("#artifactPreview .artifact-chart-label").first()).toContainText("FK issue");
   await page

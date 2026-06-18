@@ -115,6 +115,25 @@ Data style: monospace with tabular numbers.
 - Background: `--surface-panel`
 - No large drop shadows. Use only border, background, and small inset shifts.
 
+### Section Station Chrome
+
+- Major sections use a 4px top signal rail inside the bordered panel.
+- Rail color encodes section role: run uses accent teal, dashboard uses info
+  blue, diagram uses warning amber, mapping uses strong accent, and preflight
+  uses destructive red only as a risk/evidence signal.
+- Section headings include a terse product-specific support line when the
+  action surface would otherwise feel generic.
+- Use `--surface-panel-strong` and `--surface-band` for interior section
+  grouping instead of nested card shadows.
+
+### Workflow Status Cards
+
+- Four workflow cards represent schema, CSV inventory, mapping, and backend.
+- Each card has a 4px left state rail and uses the same `pending`, `ready`,
+  `warning`, and `error` vocabulary as runtime/job states.
+- Ready state uses success soft surface, warning uses amber soft surface, and
+  error uses destructive soft surface; text remains graphite for scanability.
+
 ### Dashboard Evidence Rows
 
 - Clickable chart and table-impact rows are full-width buttons.
@@ -161,6 +180,9 @@ Data style: monospace with tabular numbers.
   and generated artifacts: reference/dimension tables first, bridge tables
   between their related entities, fact/event hubs next, and child/detail tables
   last.
+- The local DBML preview should be the dominant setup surface: full-width in
+  the setup section, with a tall canvas around 760px minimum height and the
+  inspector below the diagram so table cards have maximum horizontal room.
 - Table cards show all parsed columns by default, with monospace table names,
   status pills, column type text, and compact PK/FK badges on each row. A
   key-only mode is optional; it is not the default.
@@ -217,3 +239,6 @@ Data style: monospace with tabular numbers.
 | Show runtime stage results inline | After each pipeline stage, reviewers should see the concrete counts and artifacts produced without expanding a hidden panel or opening raw runtime JSON | 2026-06-17 |
 | Clear ERD selection on outside intent | Diagram focus should behave like normal evidence selection: click table to inspect, click blank/outside or Escape to return to overview | 2026-06-17 |
 | Add soft drilldown severity chips | Drilldown should support quick P0/P1/P2/P3 narrowing in-place instead of forcing reviewers back to the global filter row or severity chart | 2026-06-17 |
+| Redesign all sections as evidence stations | Runner, dashboard, input setup, diagram, preflight, mapping, and artifact review should share the same station chrome, support copy, state rails, focus treatment, and surface hierarchy | 2026-06-18 |
+| Make local DBML preview full-width and readable | The schema graph is a primary inspection surface, so the canvas should be large by default, table cards should use larger row spacing, and the inspector should sit below the canvas instead of stealing horizontal space | 2026-06-18 |
+| Use transparent review-score language | Dataset/table scores are deterministic EDA heuristics, so user-facing labels should say review score or FK status and show the formula instead of implying an opaque health model | 2026-06-18 |

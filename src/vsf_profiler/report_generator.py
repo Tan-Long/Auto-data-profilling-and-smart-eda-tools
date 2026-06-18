@@ -256,6 +256,7 @@ def _dataset_verdict_context(dataset_verdict: dict[str, Any] | None) -> dict[str
         "path": "dataset_verdict.json",
         "verdict": dataset_verdict.get("verdict", ""),
         "risk_score": dataset_verdict.get("risk_score", 0),
+        "risk_score_model": dataset_verdict.get("risk_score_model") or {},
         "verdict_rationale": dataset_verdict.get("verdict_rationale", ""),
         "issue_total": issue_counts.get("total", 0),
         "severity_counts": {
@@ -390,6 +391,8 @@ def _table_assessments_context(table_assessments: dict[str, Any] | None) -> dict
                 "table": row.get("table", ""),
                 "role": row.get("role", ""),
                 "health_score": row.get("health_score", 0),
+                "review_score": row.get("review_score", row.get("health_score", 0)),
+                "score_penalty": (row.get("score_penalty_breakdown") or {}).get("total_penalty", 0),
                 "readiness": row.get("readiness", ""),
                 "issue_total": sum((row.get("issue_counts_by_severity") or {}).values()),
                 "affected_columns": row.get("affected_columns") or [],
@@ -405,6 +408,11 @@ def _table_assessments_context(table_assessments: dict[str, Any] | None) -> dict
         "path": "table_assessments.json",
         "table_count": summary.get("table_count", 0),
         "average_health_score": summary.get("average_health_score", 0),
+        "average_review_score": summary.get(
+            "average_review_score",
+            summary.get("average_health_score", 0),
+        ),
+        "score_model": summary.get("score_model") or {},
         "readiness_counts": summary.get("readiness_counts") or {},
         "role_counts": summary.get("role_counts") or {},
         "business_impact_counts": summary.get("business_impact_counts") or {},

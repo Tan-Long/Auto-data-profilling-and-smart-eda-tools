@@ -246,7 +246,7 @@ The domain should converge on these stable concepts:
 - `Issue`: normalized finding with type, severity, table, columns, bad count,
   affected percent, evidence SQL, sample artifact, suggested fix, and
   provenance.
-- `RelationshipCheck`: FK health, orphan count, null FK count, duplicate parent
+- `RelationshipCheck`: FK status, orphan count, null FK count, duplicate parent
   count, join coverage, cardinality, and confidence.
 - `DataGraph`: tables as nodes and relationships as edges, including edge type,
   cardinality, constraint source, and validation status.
@@ -255,11 +255,13 @@ The domain should converge on these stable concepts:
   existing evidence artifacts.
 - `InfluenceResult`: association metrics for a target column with explicit
   non-causality wording.
-- `DatasetVerdict`: overall readiness, risk score, top blockers, warnings, and
-  recommended next actions.
-- `TableAssessment`: per-profiled-table role, health score, readiness, issue
-  counts, affected columns, relationship risks, name-token business impact,
-  evidence artifact references, and recommended next actions.
+- `DatasetVerdict`: overall readiness, review-risk score, scoring formula
+  metadata, top blockers, warnings, and recommended next actions.
+- `TableAssessment`: per-profiled-table role, review score, scoring formula
+  metadata, readiness, issue counts, affected columns, relationship risks,
+  name-token business impact, evidence artifact references, and recommended
+  next actions. The review score is a deterministic EDA prioritization
+  heuristic, not a statistical health model.
 - `ChartSpec`: deterministic chart metadata and aggregate data with source
   artifact references.
 - `NarrativeReport`: optional LLM output plus guardrail validation status.
@@ -535,7 +537,7 @@ Current chart specs:
 
 - issue counts by severity and type;
 - missingness by table and top columns;
-- relationship FK health summary;
+- relationship FK status summary;
 - dataset verdict risk summary;
 - influence top features when available.
 
@@ -642,7 +644,7 @@ LLM input must not include:
 
 The narrative role is "Senior Data Scientist". The output should explain:
 
-- dataset health;
+- dataset review status;
 - important table and column findings;
 - relationship risks;
 - likely downstream modeling or analytics impact;
@@ -683,8 +685,8 @@ The output directory is the run contract.
 | `lineage_graph.json` | Local lineage graph connecting sources, schema entities, relationships, profiler stages, and generated artifacts. |
 | `schema_evaluation.json` | DBML-vs-CSV table/column conformance and schema issue references. |
 | `relationship_graph.json` | Table nodes, direct FK edges, FK metrics, status, and evidence links. |
-| `dataset_verdict.json` | Readiness verdict, risk score, blockers, and recommendations. |
-| `table_assessments.json` | One assessment per profiled table with role, health score, readiness, relationship risks, business-impact category, evidence refs, and actions. |
+| `dataset_verdict.json` | Readiness verdict, review-risk score, scoring model metadata, blockers, and recommendations. |
+| `table_assessments.json` | One assessment per profiled table with role, review score, scoring model metadata, readiness, relationship risks, business-impact category, evidence refs, and actions. |
 | `charts/` | Deterministic chart specs and report visual-summary data. |
 | `schema_diagram.json` | Diagram metadata and dbdiagram link. |
 | `schema_diagram.dbml` | DBML used for diagram rendering. |

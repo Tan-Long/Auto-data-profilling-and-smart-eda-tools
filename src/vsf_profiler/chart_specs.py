@@ -186,7 +186,7 @@ def _relationship_fk_health_spec(relationship_graph: dict[str, Any]) -> dict[str
     )
     return _base_spec(
         chart_id="relationship_fk_health",
-        title="Relationship FK Health",
+        title="Relationship FK Status",
         chart_type="status_bar",
         source_artifacts=["relationship_graph.json"],
         data=data,

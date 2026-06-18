@@ -19,6 +19,8 @@ def test_dataset_verdict_ready_for_clean_artifacts():
 
     assert verdict["verdict"] == "READY"
     assert verdict["risk_score"] == 0
+    assert verdict["risk_score_model"]["label"] == "Dataset review risk score"
+    assert "P0*30" in verdict["risk_score_model"]["formula"]
     assert verdict["issue_counts"]["total"] == 0
     assert verdict["issue_counts"]["by_severity"] == {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
     assert verdict["top_blockers"] == []

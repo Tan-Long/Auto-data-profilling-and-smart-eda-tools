@@ -86,10 +86,10 @@ open outputs/olist_demo_l4_openai_smoke/report.html
 | `connector_metadata.json` | Optional for connector runs. Records source type, tables scanned, row estimates, extraction status, warnings, and redaction status. |
 | `schema_parse_report.json` | DBML parsed object counts, warnings, unsupported constructs, and parser diagnostics. |
 | `schema_evaluation.json` | DBML-vs-CSV conformance summary, including missing/extra table or column evidence and schema issue references. |
-| `relationship_graph.json` | Graph of tables and DBML relationships with observed FK health, cardinality, junction-table detection, and relationship issue links. |
-| `dataset_verdict.json` | Deterministic readiness verdict, risk score, top blockers, affected tables, and recommended next actions. |
-| `table_assessments.json` | One deterministic assessment per profiled table with role, health score, readiness, relationship risks, name-token business impact, evidence refs, and next actions. |
-| `charts/*.json` | Deterministic chart specs for issue counts, missingness, relationship FK health, risk, and influence top features. |
+| `relationship_graph.json` | Graph of tables and DBML relationships with observed FK status, cardinality, junction-table detection, and relationship issue links. |
+| `dataset_verdict.json` | Deterministic readiness verdict, review-risk score, scoring formula, top blockers, affected tables, and recommended next actions. |
+| `table_assessments.json` | One deterministic assessment per profiled table with role, review score, scoring formula, readiness, relationship risks, name-token business impact, evidence refs, and next actions. |
+| `charts/*.json` | Deterministic chart specs for issue counts, missingness, relationship FK status, risk, and influence top features. |
 | `l4_report.md` | Optional Senior Data Scientist narrative generated only when `--use-llm` runs; may be provider output or deterministic fallback. |
 | `guardrail_report.json` | Audit record for L4 validation: status, provider, fallback reason, checked numbers, checked refs, violations, and raw-data flags. |
 

@@ -23,6 +23,8 @@
         <a class="nav-item" href="#tableImpact">Table impact</a>
         <a class="nav-item" href="#graphs">Graphs</a>
         <a class="nav-item" href="#artifacts">Artifacts</a>
+        <a class="nav-item" href="#diagram">DBML diagram</a>
+        <a class="nav-item" href="#mapping">Mapping</a>
         <a class="nav-item" href="#inputSetup">Input setup</a>
       </nav>
 
@@ -38,6 +40,11 @@
           <p class="eyebrow">DBML + CSV -> evidence artifacts</p>
           <h2>Run the profiler, inspect risk, review table impact, and open the generated evidence package.</h2>
           <p class="topbar-note">Full jobs use the local <code>127.0.0.1</code> runner. Hosted Vercel remains a static preflight surface.</p>
+          <div class="topbar-meta" aria-label="Console operating model">
+            <span><strong>01</strong> local run</span>
+            <span><strong>02</strong> artifact review</span>
+            <span><strong>03</strong> table evidence</span>
+          </div>
         </div>
         <div class="topbar-actions">
           <button class="button ghost" id="loadDemoButton" type="button">Reset demo</button>
@@ -46,28 +53,28 @@
       </header>
 
       <section class="status-strip" aria-label="Workflow status">
-        <article class="status-card complete">
+        <article class="status-card complete" id="dbmlStatusCard" data-state="pending">
           <span class="step-number">01</span>
           <div>
             <strong>Schema contract</strong>
             <p id="dbmlStatus">Waiting for DBML</p>
           </div>
         </article>
-        <article class="status-card">
+        <article class="status-card" id="csvStatusCard" data-state="pending">
           <span class="step-number">02</span>
           <div>
             <strong>CSV inventory</strong>
             <p id="csvStatus">No CSV files selected</p>
           </div>
         </article>
-        <article class="status-card">
+        <article class="status-card" id="mappingStatusCard" data-state="pending">
           <span class="step-number">03</span>
           <div>
-            <strong>Mapping health</strong>
+            <strong>Mapping status</strong>
             <p id="mappingStatus">Run auto-link after upload</p>
           </div>
         </article>
-        <article class="status-card">
+        <article class="status-card" id="runnerStatusCard" data-state="pending">
           <span class="step-number">04</span>
           <div>
             <strong>Local backend</strong>
@@ -81,6 +88,7 @@
           <div>
             <p class="eyebrow">Run profiler</p>
             <h3>Start a local Python/DuckDB run</h3>
+            <p class="section-copy">Choose browser uploads for quick checks or local paths for the full Olist demo dataset.</p>
           </div>
           <span class="badge" id="jobStatusBadge">No job</span>
         </div>
@@ -162,6 +170,7 @@
           <div>
             <p class="eyebrow">Post-run review</p>
             <h3>Dashboard</h3>
+            <p class="section-copy">Read the generated verdict, table readiness, graph topology, issue evidence, and artifact previews in one console.</p>
           </div>
           <span class="badge" id="dashboardStatusBadge">Waiting for run</span>
         </div>
@@ -313,8 +322,11 @@
       </section>
 
       <section class="section-label" id="inputSetup">
-        <p class="eyebrow">Input setup</p>
-        <h3>Upload preflight and DBML mapping</h3>
+        <div>
+          <p class="eyebrow">Input setup</p>
+          <h3>Upload preflight and DBML mapping</h3>
+          <p class="section-copy">Use these lower sections to inspect or replace the browser-side preflight inputs before a backend run.</p>
+        </div>
       </section>
 
       <section class="upload-grid" id="upload">
@@ -323,6 +335,7 @@
             <div>
               <p class="eyebrow">Contract</p>
               <h3>Upload DBML contract</h3>
+              <p class="section-copy">Parse schema structure locally before sending it to the backend runner.</p>
             </div>
             <span class="badge" id="tableCountBadge">Demo loading</span>
           </div>
@@ -345,6 +358,7 @@
             <div>
               <p class="eyebrow">CSV inventory</p>
               <h3>Upload related CSV files</h3>
+              <p class="section-copy">Check file stems, headers, and browser upload readiness against the DBML contract.</p>
             </div>
             <span class="badge" id="csvCountBadge">0 CSV</span>
           </div>
@@ -363,6 +377,7 @@
             <div>
               <p class="eyebrow">Live schema graph</p>
               <h3>DBML diagram preview</h3>
+              <p class="section-copy">Inspect parsed tables, columns, PK/FK edges, and generated relationship evidence.</p>
             </div>
             <a class="button secondary" id="dbdiagramLink" href="#" target="_blank" rel="noopener" aria-disabled="true">Open dbdiagram</a>
           </div>
@@ -395,7 +410,8 @@
           <div class="panel-heading compact">
             <div>
               <p class="eyebrow">Preflight</p>
-              <h3>Contract health</h3>
+              <h3>Contract status</h3>
+              <p class="section-copy">Track mapped tables, missing files, extra CSVs, and declared relationship shape.</p>
             </div>
           </div>
           <div class="metric-grid">
@@ -423,6 +439,7 @@
           <div>
             <p class="eyebrow">Mapping</p>
             <h3>CSV to DBML Table Mapping</h3>
+            <p class="section-copy">Confirm each DBML table has the intended CSV file and matching header coverage.</p>
           </div>
           <button class="button secondary" id="autoLinkButton" type="button" disabled>Auto-link by file stem</button>
         </div>

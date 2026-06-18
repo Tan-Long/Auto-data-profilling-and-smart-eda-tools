@@ -30,6 +30,22 @@ SEVERITY_ALIASES = {
 ISSUE_RISK_WEIGHTS = {"P0": 30, "P1": 15, "P2": 5, "P3": 1}
 RELATIONSHIP_RISK_WEIGHTS = {"invalid": 10, "warning": 4, "skipped": 2}
 SCHEMA_RISK_WEIGHTS = {"missing_table_count": 25, "extra_csv_count": 2}
+RISK_SCORE_MODEL = {
+    "label": "Dataset review risk score",
+    "description": (
+        "Deterministic review heuristic for prioritizing EDA follow-up. "
+        "It is not a statistical health model."
+    ),
+    "formula": (
+        "min(100, P0*30 + P1*15 + P2*5 + P3*1 + invalid_fk*10 + "
+        "warning_fk*4 + skipped_fk*2 + missing_table*25 + extra_csv*2)"
+    ),
+    "issue_weights": ISSUE_RISK_WEIGHTS,
+    "relationship_weights": RELATIONSHIP_RISK_WEIGHTS,
+    "schema_weights": SCHEMA_RISK_WEIGHTS,
+    "score_range": {"min": 0, "max": 100},
+    "interpretation": "Higher means more review risk; P3 findings are low-weight review signals.",
+}
 
 
 def build_dataset_verdict(
@@ -50,6 +66,7 @@ def build_dataset_verdict(
         "version": 1,
         "verdict": verdict,
         "risk_score": risk_score,
+        "risk_score_model": RISK_SCORE_MODEL,
         "verdict_rationale": _verdict_rationale(
             verdict,
             issue_counts,

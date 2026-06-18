@@ -375,13 +375,14 @@ def _render_index_html(
     column_count = sum(int(table.get("column_count") or 0) for table in profile_tables.values())
     relationship_status_counts = relationship_summary.get("status_counts") or {}
     invalid_fk_count = int(relationship_status_counts.get("invalid", 0) or 0)
+    table_score_model = table_assessment_summary.get("score_model") or {}
     l4_status = guardrail_report.get("status", "not_enabled") if guardrail_report else "not_enabled"
     l4_provider = guardrail_report.get("provider", "none") if guardrail_report else "none"
     cards = [
         ("Verdict", verdict_label, f"Risk score {risk_score}"),
         ("Issues", str(issue_total), f"{blocker_count} P0/P1 blockers"),
         ("Tables", str(len(profile_tables) or eval_summary.get("mapped_table_count", "0")), f"{row_count} rows, {column_count} columns"),
-        ("FK Health", f"{invalid_fk_count}/{relationship_summary.get('edge_count', 0)}", "Invalid relationship edges"),
+        ("FK Status", f"{invalid_fk_count}/{relationship_summary.get('edge_count', 0)}", "Invalid relationship edges"),
         (
             "Table assessments",
             str(table_assessment_summary.get("table_count", "0")),
@@ -518,10 +519,11 @@ def _render_index_html(
     </section>
     <section class="section panel">
       <h2>Table Impact</h2>
-      <p class="meta">Powered by <code>table_assessments.json</code>. Readiness, health score, relationship risk, and business-impact labels are deterministic artifact evidence.</p>
+      <p class="meta">Powered by <code>table_assessments.json</code>. Readiness, review score, relationship risk, and business-impact labels are deterministic artifact evidence.</p>
+      <p class="meta">{_h(table_score_model.get("description", "Review score is a deterministic EDA prioritization heuristic."))} Formula: <code>{_h(table_score_model.get("formula", "100 - weighted issue and relationship penalties"))}</code></p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Issues</th><th>Relationship risks</th><th>Business impact</th><th>First action</th></tr></thead>
+          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Review score</th><th>Penalty</th><th>Issues</th><th>Relationship risks</th><th>Business impact</th><th>First action</th></tr></thead>
           <tbody>
             {table_impact_rows_html(table_assessments)}
           </tbody>
@@ -662,7 +664,8 @@ def table_impact_rows_html(table_assessments: dict[str, Any]) -> str:
             f"<td><code>{_h(row.get('table', ''))}</code></td>"
             f"<td>{_h(row.get('role', ''))}</td>"
             f"<td><span class=\"pill {_h(row.get('readiness', 'unknown'))}\">{_h(row.get('readiness', 'unknown'))}</span></td>"
-            f"<td>{_h(row.get('health_score', 0))}</td>"
+            f"<td>{_h(row.get('review_score', row.get('health_score', 0)))}</td>"
+            f"<td>{_h((row.get('score_penalty_breakdown') or {}).get('total_penalty', 0))}</td>"
             f"<td>{_h(issue_total)}</td>"
             f"<td>{_h(len(row.get('relationship_risks') or []))}</td>"
             f"<td>{_h(impact.get('label', ''))}<br><span class=\"meta\">{_h(impact.get('category', ''))}</span></td>"
@@ -670,7 +673,7 @@ def table_impact_rows_html(table_assessments: dict[str, Any]) -> str:
             "</tr>"
         )
     if not rows:
-        return '<tr><td colspan="8">No table assessment rows were included.</td></tr>'
+        return '<tr><td colspan="9">No table assessment rows were included.</td></tr>'
     return "".join(rows)
 
 

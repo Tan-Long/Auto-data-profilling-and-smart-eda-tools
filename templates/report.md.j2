@@ -64,6 +64,10 @@ Dataset verdict metadata was not provided for this report.
 - Verdict: {{ chart_specs.risk_summary.verdict }}
 - Risk score: {{ chart_specs.risk_summary.risk_score }}/100
 - Issue count: {{ chart_specs.risk_summary.issue_count }}
+{% if dataset_verdict.risk_score_model -%}
+- Risk score model: {{ dataset_verdict.risk_score_model.description }}
+- Risk formula: `{{ dataset_verdict.risk_score_model.formula }}`
+{% endif %}
 {% else -%}
 - Dataset risk chart spec was not generated.
 {% endif %}
@@ -98,7 +102,7 @@ Dataset verdict metadata was not provided for this report.
 | none | 0 | 0.00% | `....................` |
 {% endfor %}
 
-### Relationship FK Health
+### Relationship FK Status
 
 | Status | Count | Visual |
 | --- | ---: | --- |
@@ -125,21 +129,25 @@ Method: {{ influence.method }}. This is association, not causation.
 Chart specs were not provided for this report.
 {% endif %}
 
-## 4. Table Impact and Per-Table Assessment
+## 4. Table Review Scores and Per-Table Assessment
 
 {% if table_assessments.available -%}
 - Assessment artifact: `{{ table_assessments.path }}`
 - Tables assessed: {{ table_assessments.table_count }}
-- Average health score: {{ table_assessments.average_health_score }}/100
+- Average review score: {{ table_assessments.average_review_score }}/100
+{% if table_assessments.score_model -%}
+- Review score model: {{ table_assessments.score_model.description }}
+- Review score formula: `{{ table_assessments.score_model.formula }}`
+{% endif %}
 - Readiness counts: {% for readiness, count in table_assessments.readiness_counts.items() %}{{ readiness }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
 - Business impact counts: {% for impact, count in table_assessments.business_impact_counts.items() %}{{ impact }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
 
-| Table | Role | Readiness | Health | Issues | Relationship Risks | Business Impact | Affected Columns | First Action |
-| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| Table | Role | Readiness | Review Score | Penalty | Issues | Relationship Risks | Business Impact | Affected Columns | First Action |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
 {% for row in table_assessments.assessments -%}
-| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.health_score }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.business_impact_label }} | {{ row.affected_columns | join(", ") if row.affected_columns else "none" }} | {{ row.recommended_next_actions[0] if row.recommended_next_actions else "" }} |
+| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.review_score }} | {{ row.score_penalty }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.business_impact_label }} | {{ row.affected_columns | join(", ") if row.affected_columns else "none" }} | {{ row.recommended_next_actions[0] if row.recommended_next_actions else "" }} |
 {% else -%}
-| none | none | none | 0 | 0 | 0 | none | none | none |
+| none | none | none | 0 | 0 | 0 | 0 | none | none | none |
 {% endfor %}
 {% else -%}
 Table assessment metadata was not provided for this report.
