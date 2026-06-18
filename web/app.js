@@ -18,6 +18,7 @@ const state = {
   },
   dashboardSelection: null,
   artifactPreviewRequestId: 0,
+  artifactPreviewPath: "",
   dashboardGraphMode: "lineage",
   dashboardGraphDisplay: "overview",
   dashboardGraphScope: "table",
@@ -1756,11 +1757,23 @@ function resetDashboardState() {
   state.dashboardArtifacts = {};
   state.dashboardFilters = { severity: "all", issueType: "all", table: "all" };
   state.dashboardSelection = null;
+  state.artifactPreviewPath = "";
   state.dashboardGraphMode = "lineage";
   state.dashboardGraphScope = "table";
   state.dashboardGraphSelection = null;
   state.diagramSelection = null;
   renderDashboard();
+}
+
+function previewDefaultReportArtifact() {
+  if (state.artifactPreviewPath) {
+    return;
+  }
+  const reportPath = ["report.html", "report.md"].find((path) => resolveArtifactUrl(path));
+  if (!reportPath) {
+    return;
+  }
+  previewArtifact(reportPath, resolveArtifactUrl(reportPath), { focus: false });
 }
 
 async function loadDashboard(jobId) {
@@ -1868,6 +1881,7 @@ function renderDashboard() {
   els.dashboardPanelGrid.innerHTML = panels.join("");
   renderDashboardGraph();
   renderDashboardDrilldown();
+  previewDefaultReportArtifact();
 
   if ((artifactIndex.missing_artifacts || []).length) {
     renderDashboardMessage(
@@ -1923,13 +1937,14 @@ function renderTableImpactSection() {
     return;
   }
 
-  els.tableImpactGrid.innerHTML = assessments.slice(0, 12).map((assessment) => {
+  els.tableImpactGrid.innerHTML = assessments.slice(0, 12).map((assessment, index) => {
     const impact = assessment.business_impact || {};
     const columns = Array.isArray(assessment.affected_columns) ? assessment.affected_columns : [];
     const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
     const readiness = assessment.readiness || "unknown";
     return `
       <button class="table-impact-card" type="button" data-dashboard-kind="table_assessment" data-dashboard-value="${escapeHtml(assessment.table)}" data-dashboard-label="${escapeHtml(assessment.table)}">
+        <span class="table-impact-rank">${String(index + 1).padStart(2, "0")}</span>
         <span>
           <code>${escapeHtml(assessment.table)}</code>
           <small>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</small>
@@ -3633,9 +3648,12 @@ async function previewArtifact(artifactPath, artifactUrl = "", context = {}) {
   }
   const requestId = ++state.artifactPreviewRequestId;
   const url = artifactUrl || resolveArtifactUrl(artifactPath);
+  state.artifactPreviewPath = artifactPath;
   els.artifactPreviewMeta.textContent = artifactPath;
   els.artifactPreview.innerHTML = `<p class="muted">Loading <code>${escapeHtml(artifactPath)}</code>...</p>`;
-  focusArtifactPreview();
+  if (context.focus !== false) {
+    focusArtifactPreview();
+  }
   if (!url) {
     els.artifactPreview.innerHTML = `<p class="muted">No artifact URL is available for <code>${escapeHtml(artifactPath)}</code>.</p>`;
     return;

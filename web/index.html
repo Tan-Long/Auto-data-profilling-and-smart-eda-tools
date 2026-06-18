@@ -176,33 +176,6 @@
         </div>
 
         <div class="dashboard-layout">
-          <aside class="dashboard-sidebar" aria-label="Dashboard filters">
-            <div class="runtime-heading">
-              <strong>Filters</strong>
-              <span id="dashboardIssueCount">0 issues</span>
-            </div>
-            <label class="field-label" for="dashboardSeverityFilter">
-              Severity
-              <select id="dashboardSeverityFilter">
-                <option value="all">All severities</option>
-              </select>
-            </label>
-            <label class="field-label" for="dashboardIssueTypeFilter">
-              Issue type
-              <select id="dashboardIssueTypeFilter">
-                <option value="all">All issue types</option>
-              </select>
-            </label>
-            <label class="field-label" for="dashboardTableFilter">
-              Table
-              <select id="dashboardTableFilter">
-                <option value="all">All tables</option>
-              </select>
-            </label>
-            <button class="button secondary" id="dashboardResetFilters" type="button">Reset filters</button>
-            <p class="form-message" id="dashboardMessage" role="status">Dashboard loads after a completed backend job.</p>
-          </aside>
-
           <div class="dashboard-main">
             <div class="dashboard-summary-strip" id="dashboardSummaryStrip" aria-label="Dashboard summary">
               <div><span>verdict</span><strong>Waiting</strong></div>
@@ -210,6 +183,43 @@
               <div><span>issues</span><strong>0</strong></div>
               <div><span>tables</span><strong>0</strong></div>
             </div>
+
+            <aside class="dashboard-sidebar" aria-label="Dashboard filters">
+              <div class="runtime-heading">
+                <strong>Review filters</strong>
+                <span id="dashboardIssueCount">0 issues</span>
+              </div>
+              <label class="field-label" for="dashboardSeverityFilter">
+                Severity
+                <select id="dashboardSeverityFilter">
+                  <option value="all">All severities</option>
+                </select>
+              </label>
+              <label class="field-label" for="dashboardIssueTypeFilter">
+                Issue type
+                <select id="dashboardIssueTypeFilter">
+                  <option value="all">All issue types</option>
+                </select>
+              </label>
+              <label class="field-label" for="dashboardTableFilter">
+                Table
+                <select id="dashboardTableFilter">
+                  <option value="all">All tables</option>
+                </select>
+              </label>
+              <button class="button secondary" id="dashboardResetFilters" type="button">Reset filters</button>
+              <p class="form-message" id="dashboardMessage" role="status">Dashboard loads after a completed backend job.</p>
+            </aside>
+
+            <section class="dashboard-detail dashboard-detail-primary artifact-preview-section dashboard-report-surface" aria-live="polite">
+              <div class="runtime-heading">
+                <strong>Artifact review</strong>
+                <span id="artifactPreviewMeta">No artifact</span>
+              </div>
+              <div id="artifactPreview" class="artifact-preview" tabindex="-1">
+                <p class="muted">Run a job to preview the generated HTML report here first, then inspect supporting artifacts and sample evidence.</p>
+              </div>
+            </section>
 
             <section class="dashboard-section table-impact-section" id="tableImpact" aria-labelledby="tableImpactTitle">
               <div class="runtime-heading">
@@ -305,15 +315,6 @@
                 </div>
                 <div class="artifact-list compact" id="dashboardArtifactLinks">
                   <p class="muted">Dashboard sources are listed after artifact discovery.</p>
-                </div>
-              </section>
-              <section class="dashboard-detail dashboard-detail-primary artifact-preview-section" aria-live="polite">
-                <div class="runtime-heading">
-                  <strong>Artifact review</strong>
-                  <span id="artifactPreviewMeta">No artifact</span>
-                </div>
-                <div class="artifact-preview" id="artifactPreview" tabindex="-1">
-                  <p class="muted">Select a report, artifact, or sample file to review it here.</p>
                 </div>
               </section>
             </div>

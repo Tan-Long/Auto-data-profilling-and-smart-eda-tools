@@ -1208,8 +1208,8 @@ h3 {
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 0.22fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 
 .dashboard-sidebar,
@@ -1223,11 +1223,32 @@ h3 {
 }
 
 .dashboard-sidebar {
-  position: sticky;
-  top: 18px;
   display: grid;
-  align-content: start;
-  gap: 12px;
+  grid-template-columns: minmax(130px, 0.7fr) repeat(3, minmax(150px, 1fr)) minmax(120px, auto) minmax(220px, 1.1fr);
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-panel);
+}
+
+.dashboard-sidebar .runtime-heading {
+  align-self: center;
+  margin: 0;
+}
+
+.dashboard-sidebar .field-label {
+  gap: 4px;
+}
+
+.dashboard-sidebar .button {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.dashboard-sidebar .form-message {
+  min-height: 38px;
+  margin: 0;
+  padding: 9px 10px;
 }
 
 .dashboard-main {
@@ -1284,29 +1305,45 @@ h3 {
 }
 
 .table-impact-section {
-  border-color: rgba(15, 118, 100, 0.24);
-  background: var(--accent-soft);
+  border-color: rgba(15, 118, 100, 0.28);
+  background: var(--surface-panel-strong);
 }
 
 .table-impact-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(280px, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 
 .table-impact-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: 36px minmax(220px, 1fr) minmax(86px, auto) minmax(116px, auto) minmax(280px, 0.8fr);
+  align-items: center;
+  gap: 12px;
   width: 100%;
-  min-height: 126px;
-  padding: 12px;
+  min-height: 72px;
+  padding: 10px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
   color: var(--foreground-primary);
   text-align: left;
   cursor: pointer;
+}
+
+.table-impact-rank {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  color: var(--foreground-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
 }
 
 .table-impact-card:hover,
@@ -1334,7 +1371,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .table-impact-meta span {
@@ -1366,11 +1403,11 @@ h3 {
 
 .dashboard-graph-toolbar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(180px, 0.9fr)) minmax(260px, 1.2fr) minmax(170px, 0.7fr);
+  gap: 10px;
   align-items: end;
   margin-bottom: 12px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
@@ -1459,8 +1496,8 @@ h3 {
 }
 
 .dashboard-graph-canvas {
-  min-height: 360px;
-  max-height: 560px;
+  min-height: 300px;
+  max-height: 440px;
   overflow: auto;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -1471,7 +1508,7 @@ h3 {
   display: block;
   min-width: 760px;
   width: 100%;
-  min-height: 360px;
+  min-height: 300px;
 }
 
 .graph-edge {
@@ -1781,7 +1818,7 @@ h3 {
   display: grid;
   align-content: start;
   gap: 12px;
-  min-height: 210px;
+  min-height: 176px;
   background: var(--surface-panel);
 }
 
@@ -2012,7 +2049,7 @@ h3 {
 
 .dashboard-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
   gap: 12px;
 }
 
@@ -2800,12 +2837,17 @@ button.artifact-link {
 }
 
 .artifact-preview-section {
-  min-height: 420px;
+  min-height: 520px;
+}
+
+.dashboard-report-surface {
+  border-color: rgba(49, 101, 150, 0.24);
+  background: var(--surface-panel);
 }
 
 .artifact-preview {
-  min-height: 340px;
-  max-height: 680px;
+  min-height: 448px;
+  max-height: 760px;
   overflow: auto;
   padding: 12px;
   border: 1px solid var(--border-subtle);
@@ -2846,7 +2888,7 @@ button.artifact-link {
 
 .artifact-preview-frame {
   width: 100%;
-  min-height: 620px;
+  min-height: 680px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
@@ -3404,21 +3446,25 @@ button.artifact-link {
   .content-grid,
   .upload-grid,
   .status-strip,
-  .dashboard-summary-strip,
-  .dashboard-layout,
-  .dashboard-panel-grid,
-  .generated-result-grid,
-  .generated-report-links,
-  .table-impact-grid,
-  .dashboard-detail-grid,
-  .runner-grid,
-  .runtime-panel {
-    grid-template-columns: 1fr;
-  }
+	  .dashboard-summary-strip,
+	  .dashboard-layout,
+	  .dashboard-sidebar,
+	  .dashboard-graph-toolbar,
+	  .dashboard-panel-grid,
+	  .generated-result-grid,
+	  .generated-report-links,
+	  .table-impact-grid,
+	  .table-impact-card,
+	  .dashboard-detail-grid,
+	  .runner-grid,
+	  .runtime-panel {
+	    grid-template-columns: 1fr;
+	  }
 
-  .dashboard-sidebar {
-    position: static;
-  }
+	  .dashboard-sidebar {
+	    position: static;
+	    align-items: stretch;
+	  }
 
   .local-diagram {
     grid-template-columns: 1fr;

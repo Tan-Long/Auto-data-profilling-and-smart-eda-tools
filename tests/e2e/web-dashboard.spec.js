@@ -147,7 +147,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(generatedResults).toContainText("report.md");
   await expect(generatedResults).toContainText("Generated artifacts");
   await expect(generatedResults).toContainText("dataset_verdict.json");
-  await expect(page.locator("#artifactPreview")).toContainText("Select a report");
+  await expect(page.locator("#artifactPreview")).toContainText("HTML report preview");
   await generatedResults.locator('.generated-report-link[data-artifact-path="report.md"]').click();
   await expect(page.locator("#artifactPreview")).toBeFocused();
   await expect(page.locator("#artifactPreviewMeta")).toContainText("report.md");

@@ -156,6 +156,22 @@ Data style: monospace with tabular numbers.
   dashboard severity select. The chip row belongs inside the drilldown evidence
   panel so reviewers can narrow issues without leaving the current context.
 
+### Dashboard Review Cockpit
+
+- The post-run dashboard prioritizes executive review over artifact browsing:
+  verdict/risk summary first, compact filters second, generated report preview
+  third, then table impact, charts, graph, drilldowns, and artifact sources.
+- Filters are a compact horizontal toolbar on desktop, not a sticky sidebar.
+  They should feel like review scoping controls, not the page's main content.
+- `report.html` is the default review handoff after a successful run. Keep raw
+  artifact previews available, but do not make users discover the report from a
+  long artifact list.
+- Table Impact uses ranked scan rows instead of large equal-weight cards. Each
+  row exposes rank, table, role/business area, review score, readiness,
+  affected-column count, and relationship-risk count.
+- Graphs are secondary evidence: visible and usable, but lower in the page than
+  verdict, report, and table-level remediation.
+
 ### Runtime Stages
 
 - Runtime stages should show immediate results, not only completed/running
@@ -242,3 +258,4 @@ Data style: monospace with tabular numbers.
 | Redesign all sections as evidence stations | Runner, dashboard, input setup, diagram, preflight, mapping, and artifact review should share the same station chrome, support copy, state rails, focus treatment, and surface hierarchy | 2026-06-18 |
 | Make local DBML preview full-width and readable | The schema graph is a primary inspection surface, so the canvas should be large by default, table cards should use larger row spacing, and the inspector should sit below the canvas instead of stealing horizontal space | 2026-06-18 |
 | Use transparent review-score language | Dataset/table scores are deterministic EDA heuristics, so user-facing labels should say review score or FK status and show the formula instead of implying an opaque health model | 2026-06-18 |
+| Promote dashboard to a review cockpit | Demo reviewers need a product-like first pass through verdict, report, blockers, and table remediation before graph/artifact deep dives | 2026-06-18 |
