@@ -4811,7 +4811,7 @@ function relationshipStatusDisplayLabel(status, fallback = "FK status") {
     return "FK warning";
   }
   if (normalized === "valid") {
-    return "Healthy FK";
+    return "FK OK";
   }
   if (normalized === "skipped") {
     return "Not checked";

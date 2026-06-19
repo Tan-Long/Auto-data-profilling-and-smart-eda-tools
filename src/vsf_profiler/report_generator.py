@@ -204,7 +204,7 @@ def _scorecard_context(
             "tone": "info",
         },
         {
-            "label": "FK Health",
+            "label": "FK Status",
             "value": f"{invalid_fk_count}/{total_fk_count}",
             "detail": "invalid relationship edges",
             "tone": "danger" if invalid_fk_count else "ok",
