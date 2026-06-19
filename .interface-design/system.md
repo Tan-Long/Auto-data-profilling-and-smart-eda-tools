@@ -94,8 +94,11 @@ Data style: monospace with tabular numbers.
 - Left rail uses dark graphite with compact navigation and local-run boundary
   status.
 - Main workspace uses a neutral canvas and white panels.
-- Primary sequence is run setup, runtime progress, dashboard, graph/artifact
-  evidence, then preflight setup details.
+- Primary sequence is run setup, DBML diagram, schema coverage, generated
+  results, generated report, then dashboard review. Schema coverage combines
+  contract summary, relationship evidence, and DBML-to-CSV table mapping so the
+  diagram remains the visual schema surface and coverage remains the audit
+  surface.
 
 ### Button
 
@@ -156,11 +159,26 @@ Data style: monospace with tabular numbers.
   dashboard severity select. The chip row belongs inside the drilldown evidence
   panel so reviewers can narrow issues without leaving the current context.
 
+### Report Review Surface
+
+- Generated results belong in a standalone full-width package panel immediately
+  before the report. It owns result cards, report links, and artifact entry
+  points; runtime remains focused on pipeline stages.
+- `report.html` is the primary human-readable handoff and belongs in its own
+  full-width report panel, not inside the dashboard.
+- After a successful run, the report panel opens `report.html` by default.
+  Artifact links may reuse the same preview surface, but the default state is
+  always the generated report.
+- The report panel also shows a non-interactive chart snapshot rendered from
+  generated chart specs. These rows prove the report is using the latest run
+  data; dashboard charts remain the interactive drilldown/filter surface.
+
 ### Dashboard Review Cockpit
 
 - The post-run dashboard prioritizes executive review over artifact browsing:
-  verdict/risk summary first, compact filters second, generated report preview
-  third, then table impact, charts, graph, drilldowns, and artifact sources.
+  verdict/risk summary first, compact filters second, then table impact, charts,
+  graph, drilldowns, and artifact sources. The generated report lives in the
+  dedicated report surface immediately before the dashboard.
 - Filters are a compact horizontal toolbar on desktop, not a sticky sidebar.
   They should feel like review scoping controls, not the page's main content.
 - `report.html` is the default review handoff after a successful run. Keep raw
@@ -180,6 +198,30 @@ Data style: monospace with tabular numbers.
 - Stage evidence is always visible after a run. Avoid hiding stage output behind
   accordions; the demo should read as a progressive pipeline with visible
   outcomes at every step.
+
+### Runner Path Controls
+
+- Local path mode is the default workflow for the full local Olist demo because
+  the Python/DuckDB runner owns large local datasets.
+- On desktop, the runner control surface uses one horizontal command row:
+  mode switch, DBML path, CSV directory, optional rules path, target column,
+  and the run button. On tablet/mobile the row wraps to one column.
+- Upload mode remains available for browser-selected demo files, but it should
+  not be the first visible path for the full local demo.
+- Upload mode owns its DBML/CSV file inputs inside the runner surface. Avoid a
+  separate input setup section that duplicates the primary run controls.
+
+### Generated Evidence Gating
+
+- DBML diagram and schema coverage are post-run evidence panels. Before a
+  backend run, they show empty/loading states rather than browser preflight
+  results.
+- After a run, these panels render from generated artifacts such as
+  `schema_diagram.json`, `schema_evaluation.json`, and `relationship_graph.json`
+  so the UI reflects the same evidence package as the dashboard.
+- Schema coverage owns the compact contract summary, relationship evidence,
+  and DBML-to-CSV mapping table. Default table view should show only coverage
+  issues; use a `Show all tables` control for the full mapping.
 
 ### Table Impact
 
@@ -259,3 +301,10 @@ Data style: monospace with tabular numbers.
 | Make local DBML preview full-width and readable | The schema graph is a primary inspection surface, so the canvas should be large by default, table cards should use larger row spacing, and the inspector should sit below the canvas instead of stealing horizontal space | 2026-06-18 |
 | Use transparent review-score language | Dataset/table scores are deterministic EDA heuristics, so user-facing labels should say review score or FK status and show the formula instead of implying an opaque health model | 2026-06-18 |
 | Promote dashboard to a review cockpit | Demo reviewers need a product-like first pass through verdict, report, blockers, and table remediation before graph/artifact deep dives | 2026-06-18 |
+| Default to horizontal local path run controls | The full demo path is local DBML/CSV/rules/target inputs, so those fields should read as one command row before runtime evidence | 2026-06-19 |
+| Gate schema evidence until generated artifacts exist | Diagram and schema coverage should not appear complete before the Python/DuckDB run has produced the authoritative artifacts | 2026-06-19 |
+| Place schema evidence before dashboard review | DBML diagram and schema coverage explain whether the submitted files formed a valid evidence package, so they belong directly after the run/upload controls and before executive dashboard review | 2026-06-19 |
+| Make report a standalone default-open surface | The human-readable `report.html` is the most important handoff, so it should be visible in its own section after mapping and auto-open after every successful run | 2026-06-19 |
+| Render report chart snapshots from chart specs | The report section must visibly refresh with current artifact data, so chart snapshots render from `charts/*.json` beside the default-open `report.html` iframe | 2026-06-19 |
+| Place generated results before report | Result cards and artifact/report entry points should be reviewed as the generated package summary before opening the full human-readable report | 2026-06-19 |
+| Merge contract status into schema coverage | Contract metrics and mapping rows answer the same audit question, so they should be one compact evidence station after the DBML diagram instead of two separate sections | 2026-06-19 |

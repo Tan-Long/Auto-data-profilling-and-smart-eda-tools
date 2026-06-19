@@ -453,14 +453,19 @@ h3 {
   background: var(--accent-strong);
 }
 
-.preflight-panel::before {
-  background: var(--destructive);
+.generated-results-panel::before {
+  background: var(--info);
+}
+
+.report-panel::before {
+  background: var(--info);
 }
 
 .upload-panel,
 .mapping-panel,
+.generated-results-panel,
 .diagram-panel,
-.preflight-panel,
+.report-panel,
 .runner-panel {
   padding: 22px 20px 20px;
 }
@@ -1123,7 +1128,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .metric-card {
@@ -1162,7 +1167,7 @@ h3 {
 .edge-list {
   display: grid;
   gap: 8px;
-  max-height: 376px;
+  max-height: 260px;
   overflow: auto;
 }
 
@@ -1178,6 +1183,49 @@ h3 {
 
 .mapping-panel {
   margin-bottom: 24px;
+}
+
+.schema-coverage-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.42fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.schema-coverage-grid .metric-grid {
+  align-content: start;
+}
+
+.relationship-evidence {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-panel-strong);
+}
+
+.mapping-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+}
+
+.mapping-toolbar strong {
+  display: block;
+}
+
+.mapping-toolbar .section-copy {
+  margin-top: 4px;
+}
+
+.generated-results-panel {
+  margin-bottom: 16px;
 }
 
 .runner-panel {
@@ -2272,14 +2320,15 @@ h3 {
 
 .runner-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.34fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
 
 .runner-controls {
   display: grid;
-  align-content: start;
+  grid-template-columns: minmax(180px, 0.22fr) minmax(0, 1fr);
+  align-items: end;
   gap: 12px;
   min-width: 0;
   padding: 14px;
@@ -2324,10 +2373,79 @@ h3 {
   display: grid;
   align-content: start;
   gap: 12px;
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
+}
+
+.upload-runner-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.upload-runner-block {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.upload-runner-form .dropzone {
+  min-height: 118px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+}
+
+.upload-runner-form .dropzone-title {
+  font-size: 15px;
+}
+
+.upload-runner-form .dropzone-copy {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.runner-upload-options {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(136px, auto);
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+}
+
+.runner-upload-options .button {
+  min-height: 42px;
+  align-self: end;
+  white-space: nowrap;
+}
+
+.path-runner-form {
+  grid-template-columns:
+    minmax(0, 1.2fr)
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    minmax(0, 1.25fr)
+    minmax(124px, auto);
+  align-items: end;
+  gap: 10px;
+}
+
+.path-runner-form .field-label {
+  min-width: 0;
+}
+
+.path-runner-form .button {
+  min-height: 42px;
+  align-self: end;
+  white-space: nowrap;
+}
+
+.runner-controls > .form-message {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .field-label {
@@ -2838,6 +2956,22 @@ button.artifact-link {
 
 .artifact-preview-section {
   min-height: 520px;
+}
+
+.report-panel {
+  margin-bottom: 16px;
+}
+
+.report-chart-preview {
+  margin-bottom: 12px;
+}
+
+.report-chart-preview .dashboard-card {
+  background: var(--surface-overlay);
+}
+
+.report-panel .artifact-preview {
+  min-height: 620px;
 }
 
 .dashboard-report-surface {
@@ -3457,9 +3591,19 @@ button.artifact-link {
 	  .table-impact-card,
 	  .dashboard-detail-grid,
 	  .runner-grid,
+	  .runner-controls,
+	  .schema-coverage-grid,
+	  .upload-runner-form,
+	  .runner-upload-options,
+	  .path-runner-form,
 	  .runtime-panel {
 	    grid-template-columns: 1fr;
 	  }
+
+  .mapping-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
 
 	  .dashboard-sidebar {
 	    position: static;

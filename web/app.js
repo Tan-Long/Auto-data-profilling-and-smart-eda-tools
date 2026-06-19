@@ -3,7 +3,7 @@ const state = {
   dbmlName: "",
   dbmlFile: null,
   rulesFile: null,
-  runnerMode: "upload",
+  runnerMode: "path",
   runnerAvailable: false,
   currentJob: null,
   runEvents: [],
@@ -30,6 +30,7 @@ const state = {
   diagramExpanded: false,
   diagramShowNonKey: true,
   diagramFit: true,
+  mappingShowAll: false,
   tables: [],
   relationships: [],
   csvFiles: [],
@@ -105,6 +106,7 @@ const els = {
   dashboardDrilldownMeta: document.querySelector("#dashboardDrilldownMeta"),
   dashboardArtifactCount: document.querySelector("#dashboardArtifactCount"),
   dashboardArtifactLinks: document.querySelector("#dashboardArtifactLinks"),
+  reportChartPreview: document.querySelector("#reportChartPreview"),
   artifactPreview: document.querySelector("#artifactPreview"),
   artifactPreviewMeta: document.querySelector("#artifactPreviewMeta"),
   csvList: document.querySelector("#csvList"),
@@ -128,6 +130,7 @@ const els = {
   mappedMetric: document.querySelector("#mappedMetric"),
   missingMetric: document.querySelector("#missingMetric"),
   extraMetric: document.querySelector("#extraMetric"),
+  mappingShowAllToggle: document.querySelector("#mappingShowAllToggle"),
   edgeList: document.querySelector("#edgeList"),
   mappingBody: document.querySelector("#mappingBody"),
   loadDemoButton: document.querySelector("#loadDemoButton"),
@@ -394,6 +397,12 @@ const localDiagramLimits = {
   relationships: 60,
 };
 const postRunDiagramArtifacts = ["schema_diagram.json", "schema_evaluation.json"];
+const defaultLocalPaths = {
+  dbmlPath: "data/demo_olist/schema.dbml",
+  csvDir: "data/demo_olist/csv",
+  rulesPath: "data/demo_olist/rules.yaml",
+  target: "olist_order_reviews_dataset.review_score",
+};
 
 els.dbmlInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -418,6 +427,7 @@ els.rulesInput.addEventListener("change", (event) => {
 
 els.visualizeButton.addEventListener("click", () => {
   renderDiagram();
+  document.querySelector("#diagram")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 els.diagramFitButton.addEventListener("click", () => {
@@ -446,8 +456,13 @@ els.autoLinkButton.addEventListener("click", () => {
   renderAll();
 });
 
+els.mappingShowAllToggle.addEventListener("change", () => {
+  state.mappingShowAll = els.mappingShowAllToggle.checked;
+  renderMapping();
+});
+
 els.loadDemoButton.addEventListener("click", () => {
-  loadDemoState();
+  resetLocalPathDefaults();
 });
 
 els.runnerModeUpload.addEventListener("click", () => {
@@ -504,6 +519,14 @@ els.dashboardResetFilters.addEventListener("click", () => {
 });
 
 els.dashboardPanelGrid.addEventListener("click", (event) => {
+  handleArtifactNavigationClick(event);
+  if (event.defaultPrevented) {
+    return;
+  }
+  handleDashboardSelectionClick(event);
+});
+
+els.reportChartPreview.addEventListener("click", (event) => {
   handleArtifactNavigationClick(event);
   if (event.defaultPrevented) {
     return;
@@ -828,6 +851,15 @@ function setRunnerMode(mode) {
   renderAll();
 }
 
+function resetLocalPathDefaults() {
+  els.dbmlPathInput.value = defaultLocalPaths.dbmlPath;
+  els.csvDirPathInput.value = defaultLocalPaths.csvDir;
+  els.rulesPathInput.value = defaultLocalPaths.rulesPath;
+  els.pathTargetInput.value = defaultLocalPaths.target;
+  renderRunnerMessage("Local path defaults restored. Run the profiler to generate evidence.", "idle");
+  renderAll();
+}
+
 function connectEventStream(eventsUrl) {
   if (state.eventSource) {
     state.eventSource.close();
@@ -1118,39 +1150,58 @@ function renderAll() {
   renderMapping();
   renderDiagram();
   renderRunner();
+  renderReportPanel();
   renderDashboard();
   renderControls();
 }
 
 function renderStatus() {
-  const mapped = mappedTables().length;
-  const missing = Math.max(state.tables.length - mapped, 0);
-  const extra = extraCsvs().length;
-  els.dbmlStatus.textContent = state.tables.length
-    ? `${state.dbmlName || "DBML"} parsed: ${state.tables.length} tables, ${state.relationships.length} relationships`
-    : "Waiting for DBML";
-  els.csvStatus.textContent = state.csvFiles.length
-    ? `${state.csvFiles.length} CSV files loaded`
-    : "No CSV files selected";
-  els.mappingStatus.textContent = state.tables.length
-    ? `${mapped}/${state.tables.length} tables mapped, ${missing} missing, ${extra} extra`
-    : "Run auto-link after upload";
+  const summary = generatedContractSummary();
+  const evidenceReady = hasGeneratedEvidence();
+  const evidenceLoading = isGeneratedEvidenceLoading();
+  const hasPathDbml = Boolean(els.dbmlPathInput.value.trim());
+  const hasPathCsvDir = Boolean(els.csvDirPathInput.value.trim());
+  const uploadedCsvCount = state.csvFiles.filter((file) => file.sourceFile).length;
+
+  els.dbmlStatus.textContent = evidenceReady
+    ? `${summary.totalTables} generated tables`
+    : state.runnerMode === "path" && hasPathDbml
+      ? "Local DBML path configured"
+      : state.dbmlFile
+        ? `${state.dbmlName || "DBML"} selected for upload`
+        : "Waiting for DBML";
+  els.csvStatus.textContent = evidenceReady
+    ? `${summary.mappedTables} mapped CSV tables`
+    : state.runnerMode === "path" && hasPathCsvDir
+      ? "Local CSV directory configured"
+      : uploadedCsvCount
+        ? `${uploadedCsvCount} upload CSV files selected`
+        : "No CSV files selected";
+  els.mappingStatus.textContent = evidenceLoading
+    ? "Loading generated mapping evidence"
+    : evidenceReady
+      ? `${summary.mappedTables}/${summary.totalTables} tables mapped, ${summary.missingTables} missing, ${summary.extraCsvs} extra`
+      : "Run profiler to generate mapping evidence";
   els.runnerStatus.textContent = runnerStatusText();
-  setWorkflowCardState(els.dbmlStatusCard, state.tables.length ? "ready" : "pending");
-  setWorkflowCardState(els.csvStatusCard, state.csvFiles.length ? "ready" : "pending");
+  setWorkflowCardState(els.dbmlStatusCard, evidenceReady || hasPathDbml || state.dbmlFile ? "ready" : "pending");
+  setWorkflowCardState(els.csvStatusCard, evidenceReady || hasPathCsvDir || uploadedCsvCount ? "ready" : "pending");
   setWorkflowCardState(
     els.mappingStatusCard,
-    !state.tables.length ? "pending" : missing || extra ? "warning" : "ready",
+    !evidenceReady ? (evidenceLoading ? "warning" : "pending") : summary.missingTables || summary.extraCsvs ? "warning" : "ready",
   );
   setWorkflowCardState(
     els.runnerStatusCard,
     state.runnerAvailable ? (state.currentJob?.status === "failed" ? "error" : "ready") : "warning",
   );
-  els.tableCountBadge.textContent = `${state.tables.length} tables`;
-  els.csvCountBadge.textContent = `${state.csvFiles.length} CSV`;
-  els.mappedMetric.textContent = mapped;
-  els.missingMetric.textContent = missing;
-  els.extraMetric.textContent = extra;
+  if (els.tableCountBadge) {
+    els.tableCountBadge.textContent = `${state.tables.length} tables`;
+  }
+  if (els.csvCountBadge) {
+    els.csvCountBadge.textContent = `${state.csvFiles.length} CSV`;
+  }
+  els.mappedMetric.textContent = evidenceReady ? summary.mappedTables : 0;
+  els.missingMetric.textContent = evidenceReady ? summary.missingTables : 0;
+  els.extraMetric.textContent = evidenceReady ? summary.extraCsvs : 0;
   if (state.dbmlText) {
     els.dbmlFileCard.hidden = false;
     els.dbmlFileName.textContent = state.dbmlName;
@@ -1192,68 +1243,95 @@ function renderCsvList() {
 
 function renderEdges() {
   els.edgeList.innerHTML = "";
-  if (!state.relationships.length) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "Relationships appear here after DBML parsing.";
-    els.edgeList.appendChild(empty);
+  if (isGeneratedEvidenceLoading()) {
+    els.edgeList.innerHTML = `<p class="muted">Loading generated relationship evidence...</p>`;
     return;
   }
-  state.relationships.forEach((rel) => {
+  if (!hasGeneratedEvidence()) {
+    els.edgeList.innerHTML = `<p class="muted">Run profiler to show generated relationship evidence.</p>`;
+    return;
+  }
+  const relationships = generatedRelationships();
+  if (!relationships.length) {
+    els.edgeList.innerHTML = `<p class="muted">No generated relationships found in the latest artifacts.</p>`;
+    return;
+  }
+  relationships.forEach((rel) => {
     const item = document.createElement("div");
     item.className = "edge-item";
-    item.textContent = `${rel.childTable}.${rel.childColumn} -> ${rel.parentTable}.${rel.parentColumn}`;
+    const childTable = rel.child_table || rel.childTable || rel.source_table || "";
+    const childColumn = rel.child_column || rel.childColumn || rel.source_column || arrayOfStrings(rel.child_columns || rel.source_columns)[0] || "";
+    const parentTable = rel.parent_table || rel.parentTable || rel.target_table || "";
+    const parentColumn = rel.parent_column || rel.parentColumn || rel.target_column || arrayOfStrings(rel.parent_columns || rel.target_columns)[0] || "";
+    const status = rel.status ? ` · ${diagramRelationshipStatusLabel(rel.status, "FK")}` : "";
+    item.textContent = `${childTable}.${childColumn} -> ${parentTable}.${parentColumn}${status}`;
     els.edgeList.appendChild(item);
   });
 }
 
 function renderMapping() {
+  els.mappingShowAllToggle.checked = state.mappingShowAll;
   els.mappingBody.innerHTML = "";
-  if (!state.tables.length) {
-    els.mappingBody.innerHTML = `<tr><td colspan="6" class="empty-row">Upload DBML to start mapping.</td></tr>`;
+  if (isGeneratedEvidenceLoading()) {
+    els.mappingBody.innerHTML = `<tr><td colspan="6" class="empty-row">Loading generated table mapping evidence...</td></tr>`;
+    return;
+  }
+  if (!hasGeneratedEvidence()) {
+    els.mappingBody.innerHTML = `<tr><td colspan="6" class="empty-row">Run profiler to load generated table mapping evidence.</td></tr>`;
     return;
   }
 
-  state.tables.forEach((table) => {
-    const csvStem = state.mapping.get(table.name) || "";
-    const csvFile = state.csvFiles.find((file) => file.stem === csvStem);
-    const header = csvFile ? headerMatch(table, csvFile) : { matched: 0, total: table.columns.length, ratio: 0 };
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${statusPill(csvFile ? "mapped" : "missing")}</td>
-      <td><code>${escapeHtml(table.name)}</code></td>
-      <td><code>${escapeHtml(table.primaryKey.join(", ") || "none")}</code></td>
-      <td>${foreignKeySummary(table)}</td>
-      <td>${csvSelect(table.name, csvStem)}</td>
-      <td>${headerMeter(header)}</td>
-    `;
-    els.mappingBody.appendChild(row);
+  const tables = generatedMappingTables();
+  const extraCsvs = generatedExtraCsvs();
+  if (!tables.length && !extraCsvs.length) {
+    els.mappingBody.innerHTML = `<tr><td colspan="6" class="empty-row">No table mapping rows were found in generated artifacts.</td></tr>`;
+    return;
+  }
+
+  const visibleTables = state.mappingShowAll ? tables : tables.filter(isSchemaCoverageIssue);
+  const visibleExtraCsvs = state.mappingShowAll || extraCsvs.length ? extraCsvs : [];
+
+  if (!state.mappingShowAll && !visibleTables.length && !visibleExtraCsvs.length) {
+    els.mappingBody.innerHTML = `<tr><td colspan="6" class="empty-row">No schema coverage issues found. Enable Show all tables to inspect the full mapping.</td></tr>`;
+    return;
+  }
+
+  visibleTables.forEach((table) => {
+    els.mappingBody.appendChild(mappingTableRow(table));
   });
 
-  extraCsvs().forEach((file) => {
+  visibleExtraCsvs.forEach((csvPath) => {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${statusPill("extra")}</td>
-      <td><code>${escapeHtml(file.stem)}</code></td>
+      <td><code>${escapeHtml(csvStemFromName(fileNameFromPath(csvPath)))}</code></td>
       <td>n/a</td>
       <td>n/a</td>
-      <td><code>${escapeHtml(file.name)}</code></td>
+      <td><code>${escapeHtml(fileNameFromPath(csvPath))}</code></td>
       <td><span class="muted">Not declared in DBML</span></td>
     `;
     els.mappingBody.appendChild(row);
   });
+}
 
-  els.mappingBody.querySelectorAll("select").forEach((select) => {
-    select.addEventListener("change", (event) => {
-      const tableName = event.target.dataset.table;
-      if (event.target.value) {
-        state.mapping.set(tableName, event.target.value);
-      } else {
-        state.mapping.delete(tableName);
-      }
-      renderAll();
-    });
-  });
+function mappingTableRow(table) {
+  const header = generatedHeaderMatch(table);
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td>${statusPill(generatedMappingStatus(table.status))}</td>
+    <td><code>${escapeHtml(table.table || table.name || "")}</code></td>
+    <td><code>${escapeHtml(arrayOfStrings(table.primary_key || table.primaryKey).join(", ") || "none")}</code></td>
+    <td>${generatedForeignKeySummary(table)}</td>
+    <td><code>${escapeHtml(fileNameFromPath(table.csv_path || table.csvPath || ""))}</code></td>
+    <td>${headerMeter(header)}</td>
+  `;
+  return row;
+}
+
+function isSchemaCoverageIssue(table) {
+  const status = generatedMappingStatus(table.status);
+  const header = generatedHeaderMatch(table);
+  return status !== "mapped" || header.ratio < 1;
 }
 
 function csvSelect(tableName, selectedStem) {
@@ -1302,14 +1380,137 @@ function headerMeter(header) {
   `;
 }
 
+function hasGeneratedEvidence() {
+  return Boolean(state.dashboardArtifactIndex || Object.keys(state.dashboardArtifacts).length);
+}
+
+function isGeneratedEvidenceLoading() {
+  return Boolean(state.dashboardLoadingJobId);
+}
+
+function generatedContractSummary() {
+  const evaluation = state.dashboardArtifacts["schema_evaluation.json"] || {};
+  const diagram = state.dashboardArtifacts["schema_diagram.json"] || {};
+  const summary = evaluation.summary || {};
+  const tables = generatedMappingTables();
+  const missingTables = Array.isArray(evaluation.missing_tables)
+    ? evaluation.missing_tables.length
+    : tables.filter((table) => generatedMappingStatus(table.status) === "missing").length;
+  const extraCsvs = generatedExtraCsvs().length;
+  return {
+    totalTables: numberOrFallback(
+      summary.dbml_table_count,
+      numberOrFallback(evaluation.schema_meta?.total_tables, tables.length),
+    ),
+    mappedTables: numberOrFallback(
+      summary.mapped_table_count,
+      tables.filter((table) => generatedMappingStatus(table.status) === "mapped").length,
+    ),
+    missingTables: numberOrFallback(summary.missing_table_count, missingTables),
+    extraCsvs: numberOrFallback(
+      summary.extra_csv_count,
+      numberOrFallback(Array.isArray(diagram.extra_csvs) ? diagram.extra_csvs.length : undefined, extraCsvs),
+    ),
+  };
+}
+
+function generatedMappingTables() {
+  const evaluation = state.dashboardArtifacts["schema_evaluation.json"] || {};
+  const diagram = state.dashboardArtifacts["schema_diagram.json"] || {};
+  if (Array.isArray(evaluation.tables) && evaluation.tables.length) {
+    return evaluation.tables;
+  }
+  if (Array.isArray(diagram.tables)) {
+    return diagram.tables;
+  }
+  return [];
+}
+
+function generatedRelationships() {
+  const evaluation = state.dashboardArtifacts["schema_evaluation.json"] || {};
+  const relationshipGraph = state.dashboardArtifacts["relationship_graph.json"] || {};
+  const diagram = state.dashboardArtifacts["schema_diagram.json"] || {};
+  if (Array.isArray(evaluation.relationships) && evaluation.relationships.length) {
+    return evaluation.relationships;
+  }
+  if (Array.isArray(relationshipGraph.edges) && relationshipGraph.edges.length) {
+    return relationshipGraph.edges;
+  }
+  if (Array.isArray(diagram.relationships)) {
+    return diagram.relationships;
+  }
+  return [];
+}
+
+function generatedExtraCsvs() {
+  const evaluation = state.dashboardArtifacts["schema_evaluation.json"] || {};
+  const diagram = state.dashboardArtifacts["schema_diagram.json"] || {};
+  const extraCsvs = Array.isArray(evaluation.extra_csvs) && evaluation.extra_csvs.length
+    ? evaluation.extra_csvs
+    : Array.isArray(diagram.extra_csvs)
+      ? diagram.extra_csvs
+      : [];
+  return extraCsvs.map((item) => (typeof item === "string" ? item : item.csv_path || item.path || item.name || ""));
+}
+
+function generatedMappingStatus(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized.includes("missing")) {
+    return "missing";
+  }
+  if (normalized.includes("extra")) {
+    return "extra";
+  }
+  return "mapped";
+}
+
+function generatedForeignKeySummary(table) {
+  const foreignKeys = Array.isArray(table.foreign_keys)
+    ? table.foreign_keys
+    : (Array.isArray(table.columns) ? table.columns.map((column) => column.foreign_key ? {
+      column: column.name,
+      parent_table: column.foreign_key.parent_table || column.foreign_key.parentTable,
+      parent_column: column.foreign_key.parent_column || column.foreign_key.parentColumn,
+    } : null).filter(Boolean) : []);
+  if (!foreignKeys.length) {
+    return "none";
+  }
+  return foreignKeys
+    .map((fk) => `<div><code>${escapeHtml(fk.column || fk.child_column || "")}</code> -> <code>${escapeHtml(fk.parent_table || fk.parentTable || "")}.${escapeHtml(fk.parent_column || fk.parentColumn || "")}</code></div>`)
+    .join("");
+}
+
+function generatedHeaderMatch(table) {
+  const columns = Array.isArray(table.columns) ? table.columns : [];
+  const total = numberOrFallback(
+    table.dbml_column_count ?? table.column_count,
+    columns.filter((column) => column.in_dbml !== false).length,
+  );
+  const matched = columns.length
+    ? columns.filter((column) => column.in_dbml !== false && column.in_csv !== false).length
+    : Math.max(total - arrayOfStrings(table.missing_columns).length, 0);
+  const safeTotal = Math.max(total, 1);
+  return { matched, total: safeTotal, ratio: matched / safeTotal };
+}
+
+function numberOrFallback(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function fileNameFromPath(path) {
+  const value = String(path || "");
+  return value.split(/[\\/]/).filter(Boolean).pop() || value || "none";
+}
+
 function renderControls() {
   const hasDbml = Boolean(state.dbmlText && state.tables.length);
   const hasUploadedDbml = Boolean(state.dbmlFile);
   const hasUploadedCsvs = state.csvFiles.some((file) => file.sourceFile);
   const hasPathInputs = Boolean(els.dbmlPathInput.value.trim() && els.csvDirPathInput.value.trim());
   const jobRunning = ["queued", "running"].includes(state.currentJob?.status);
-  els.visualizeButton.disabled = !hasDbml;
-  els.autoLinkButton.disabled = !hasDbml || !state.csvFiles.length;
+  els.visualizeButton.disabled = !hasGeneratedEvidence();
+  els.autoLinkButton.disabled = true;
   els.runProfilerButton.disabled = !state.runnerAvailable || !hasUploadedDbml || !hasUploadedCsvs || jobRunning;
   els.runPathProfilerButton.disabled = !state.runnerAvailable || !hasPathInputs || jobRunning;
   els.runnerModeUpload.classList.toggle("active", state.runnerMode === "upload");
@@ -1757,12 +1958,20 @@ function resetDashboardState() {
   state.dashboardArtifacts = {};
   state.dashboardFilters = { severity: "all", issueType: "all", table: "all" };
   state.dashboardSelection = null;
-  state.artifactPreviewPath = "";
+  resetReportPreview();
   state.dashboardGraphMode = "lineage";
   state.dashboardGraphScope = "table";
   state.dashboardGraphSelection = null;
   state.diagramSelection = null;
+  renderReportPanel();
   renderDashboard();
+}
+
+function resetReportPreview() {
+  state.artifactPreviewPath = "";
+  state.artifactPreviewRequestId += 1;
+  els.artifactPreviewMeta.textContent = "No report";
+  els.artifactPreview.innerHTML = `<p class="muted">Run a job to open <code>report.html</code> here automatically.</p>`;
 }
 
 function previewDefaultReportArtifact() {
@@ -1820,9 +2029,7 @@ async function loadDashboard(jobId) {
     state.dashboardLoadingJobId = "";
     renderDashboardMessage(error.message || "Unable to load dashboard artifacts.", "error");
   } finally {
-    renderDashboard();
-    renderJob();
-    renderDiagram();
+    renderAll();
   }
 }
 
@@ -1837,6 +2044,35 @@ async function fetchArtifactJson(artifactPath, artifactUrl) {
 function renderDashboardMessage(message, status) {
   els.dashboardMessage.textContent = message;
   els.dashboardMessage.dataset.status = status;
+}
+
+function renderReportPanel() {
+  const loading = Boolean(state.dashboardLoadingJobId);
+  const loaded = Boolean(state.dashboardArtifactIndex);
+
+  if (loading) {
+    els.reportChartPreview.innerHTML = `<p class="muted">Fetching report chart data from generated artifacts...</p>`;
+    return;
+  }
+
+  if (!loaded) {
+    els.reportChartPreview.innerHTML = `<p class="muted">Run a job to render report charts from generated artifact data.</p>`;
+    return;
+  }
+
+  const panels = [
+    renderReportRiskPanel(),
+    renderReportIssueSeverityPanel(),
+    renderReportIssueTypePanel(),
+    renderReportMissingnessPanel(),
+    renderReportRelationshipHealthPanel(),
+    renderReportInfluencePanel(),
+  ].filter(Boolean);
+
+  els.reportChartPreview.innerHTML = panels.length
+    ? panels.join("")
+    : `<p class="muted">No chart data was found in the generated report artifacts.</p>`;
+  previewDefaultReportArtifact();
 }
 
 function renderDashboard() {
@@ -1881,7 +2117,6 @@ function renderDashboard() {
   els.dashboardPanelGrid.innerHTML = panels.join("");
   renderDashboardGraph();
   renderDashboardDrilldown();
-  previewDefaultReportArtifact();
 
   if ((artifactIndex.missing_artifacts || []).length) {
     renderDashboardMessage(
@@ -3213,6 +3448,165 @@ function renderInfluencePanel() {
       rawValue: true,
     }),
   );
+}
+
+function renderReportRiskPanel() {
+  const spec = state.dashboardArtifacts[dashboardChartPaths.risk];
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const summary = spec?.summary || {};
+  const riskScore = clampNumber(summary.risk_score ?? verdict.risk_score, 0, 100);
+  const riskLabel = summary.verdict || verdict.verdict || "unknown";
+  const issueCount = summary.issue_count ?? verdict.issue_counts?.total ?? getDashboardIssues().length;
+  return reportPanel(
+    "Report: dataset risk",
+    dashboardChartPaths.risk,
+    `
+      <button class="risk-gauge-button" type="button" data-dashboard-kind="verdict" data-dashboard-value="${escapeHtml(riskLabel)}" data-dashboard-label="Dataset verdict ${escapeHtml(riskLabel)}">
+        ${riskGaugeSvg(riskScore)}
+        <span><strong>${escapeHtml(riskLabel)}</strong><small>${riskScore}/100 risk · ${issueCount} issues</small></span>
+      </button>
+    `,
+  );
+}
+
+function renderReportIssueSeverityPanel() {
+  const spec = state.dashboardArtifacts[dashboardChartPaths.severity];
+  const rows = (spec?.data || severityOrder.map((severity) => ({ severity, count: 0 })))
+    .map((row) => ({
+      label: row.severity || "unknown",
+      tone: row.severity || "",
+      value: Number(row.count || 0),
+      kind: "severity",
+    }));
+  return reportPanel(
+    "Report: issue severity",
+    dashboardChartPaths.severity,
+    renderReportBars(rows, { empty: "No severity chart rows were generated.", valueFormatter: integerText }),
+  );
+}
+
+function renderReportIssueTypePanel() {
+  const spec = state.dashboardArtifacts[dashboardChartPaths.type];
+  const rows = (spec?.data || [])
+    .slice(0, 10)
+    .map((row) => ({
+      label: row.issue_type || "unknown",
+      value: Number(row.count || 0),
+      kind: "issue_type",
+    }));
+  return reportPanel(
+    "Report: issue type",
+    dashboardChartPaths.type,
+    renderReportBars(rows, { empty: "No issue type chart rows were generated.", valueFormatter: integerText }),
+  );
+}
+
+function renderReportMissingnessPanel() {
+  const spec = state.dashboardArtifacts[dashboardChartPaths.missingTable];
+  const rows = (spec?.data || [])
+    .slice(0, 10)
+    .map((row) => ({
+      label: row.table || "unknown",
+      value: Number(row.null_rate || 0),
+      kind: "table",
+      detail: `${integerText(row.null_count)} nulls`,
+    }));
+  return reportPanel(
+    "Report: missingness",
+    dashboardChartPaths.missingTable,
+    renderReportBars(rows, {
+      empty: "No missingness chart rows were generated.",
+      valueFormatter: percentText,
+    }),
+  );
+}
+
+function renderReportRelationshipHealthPanel() {
+  const spec = state.dashboardArtifacts[dashboardChartPaths.relationship];
+  const rows = (spec?.data || [])
+    .map((row) => ({
+      label: relationshipStatusDisplayLabel(row.status || "unknown"),
+      rawLabel: row.status || "unknown",
+      tone: row.status || "unknown",
+      value: Number(row.count || 0),
+      kind: "relationship_status",
+      detail: relationshipStatusDisplayDetail(row.status || "unknown"),
+    }))
+    .sort((a, b) => relationshipStatusOrder(a.rawLabel) - relationshipStatusOrder(b.rawLabel));
+  return reportPanel(
+    "Report: FK status",
+    dashboardChartPaths.relationship,
+    renderReportBars(rows, { empty: "No relationship chart rows were generated.", valueFormatter: integerText }),
+  );
+}
+
+function renderReportInfluencePanel() {
+  const spec = state.dashboardArtifacts[dashboardChartPaths.influence];
+  if (!spec) {
+    const influence = state.dashboardArtifacts["influence.json"] || {};
+    const reason = influence.skipped_reason || influence.notes?.[0] || "No influence top features were generated.";
+    return reportPanel(
+      "Report: influence",
+      "influence.json",
+      `<p class="muted">${escapeHtml(reason)}</p>`,
+    );
+  }
+  const rows = (spec.data || [])
+    .slice(0, 10)
+    .map((row) => ({
+      label: row.feature || "unknown",
+      value: Math.abs(Number(row.score || 0)),
+      rawValue: Number(row.score || 0),
+      kind: "influence_feature",
+      detail: row.method || "",
+    }));
+  return reportPanel(
+    "Report: influence",
+    dashboardChartPaths.influence,
+    renderReportBars(rows, {
+      empty: "No influence chart rows were generated.",
+      valueFormatter: scoreText,
+      rawValue: true,
+    }),
+  );
+}
+
+function renderReportBars(rows, options = {}) {
+  if (!rows.length) {
+    return `<p class="muted">${escapeHtml(options.empty || "No rows available.")}</p>`;
+  }
+  const maxValue = Math.max(...rows.map((row) => Math.abs(Number(row.value || 0))), 1);
+  return `
+    <div class="dashboard-bars">
+      ${rows.map((row) => {
+        const value = Number(row.value || 0);
+        const width = Math.max(2, Math.round(Math.abs(value) / maxValue * 100));
+        const displayValue = options.rawValue ? row.rawValue : value;
+        const formatter = options.valueFormatter || integerText;
+        const toneLabel = row.tone || row.rawLabel || row.label;
+        return `
+          <div class="dashboard-bar-row report-bar-row">
+            <span class="dashboard-bar-label">${escapeHtml(row.label)}</span>
+            <span class="dashboard-bar-track"><span class="dashboard-bar-fill ${dashboardTone(toneLabel)}" style="width: ${width}%"></span></span>
+            <span class="dashboard-bar-value">${escapeHtml(formatter(displayValue))}${row.detail ? `<small>${escapeHtml(row.detail)}</small>` : ""}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function reportPanel(title, artifactPath, body) {
+  const artifactUrl = artifactUrlFor(artifactPath);
+  return `
+    <article class="dashboard-card" data-report-panel-path="${escapeHtml(artifactPath)}" tabindex="-1">
+      <div class="dashboard-card-heading">
+        <strong>${escapeHtml(title)}</strong>
+        ${artifactUrl ? renderArtifactReference(artifactPath, artifactUrl) : `<span>${escapeHtml(artifactPath)}</span>`}
+      </div>
+      ${body}
+    </article>
+  `;
 }
 
 function dashboardPanel(title, artifactPath, body) {
@@ -4884,8 +5278,8 @@ function renderDiagram() {
   if (!model.hasInput) {
     renderDiagramState(
       "empty",
-      "Preparing demo DBML diagram",
-      "The local preview renders here from browser DBML state. Upload DBML/CSV files or reset the demo.",
+      model.emptyTitle || "Run profiler to build the DBML diagram",
+      model.emptyMessage || "The preview renders from generated schema artifacts, not from browser preflight state.",
       model,
     );
     return;
@@ -4928,12 +5322,15 @@ function renderDiagram() {
 }
 
 function updateDiagramControls(model) {
+  const interactive = Boolean(model.hasInput && !model.error);
   els.diagramFitButton.setAttribute("aria-pressed", state.diagramFit ? "true" : "false");
   els.diagramDensityToggle.setAttribute("aria-pressed", state.diagramExpanded ? "true" : "false");
   els.diagramColumnsToggle.setAttribute("aria-pressed", state.diagramShowNonKey ? "true" : "false");
   els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "All columns" : "Key columns only";
   els.diagramResetSelection.disabled = !state.diagramSelection;
-  els.diagramFitButton.disabled = !model.hasInput || Boolean(model.error);
+  els.diagramFitButton.disabled = !interactive;
+  els.diagramDensityToggle.disabled = !interactive;
+  els.diagramColumnsToggle.disabled = !interactive;
 }
 
 function buildDiagramModel() {
@@ -4944,7 +5341,36 @@ function buildDiagramModel() {
   if (schemaDiagram || relationshipGraph) {
     return buildArtifactDiagramModel(schemaDiagram || {}, relationshipGraph || {}, parseReport || null, schemaEvaluation || null);
   }
-  return buildPreflightDiagramModel();
+  if (hasGeneratedEvidence()) {
+    return {
+      source: "artifact",
+      sourceLabel: "Generated artifacts",
+      sourceBadge: "Missing diagram artifact",
+      hasInput: true,
+      error: "The latest run did not expose schema_diagram.json or relationship_graph.json.",
+      externalUrl: "",
+      parseReport,
+      tables: [],
+      relationships: [],
+    };
+  }
+  return {
+    source: "waiting",
+    sourceLabel: isGeneratedEvidenceLoading()
+      ? "Loading generated artifacts"
+      : "Run a profiler job to render schema_diagram.json",
+    sourceBadge: isGeneratedEvidenceLoading() ? "Loading" : "Waiting for run",
+    hasInput: false,
+    error: "",
+    externalUrl: "",
+    parseReport: null,
+    tables: [],
+    relationships: [],
+    emptyTitle: isGeneratedEvidenceLoading() ? "Loading generated DBML diagram" : "Run profiler to build the DBML diagram",
+    emptyMessage: isGeneratedEvidenceLoading()
+      ? "The backend finished; schema artifacts are being fetched for preview."
+      : "The preview renders from generated schema artifacts, not from browser preflight state.",
+  };
 }
 
 function buildPreflightDiagramModel() {
@@ -5812,5 +6238,5 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-loadDemoState();
+resetLocalPathDefaults();
 checkRunnerHealth();

@@ -27,49 +27,35 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page.goto("/");
   await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
-  await expect(page.locator("#localDiagram")).toBeVisible();
+  await expect(page.locator("#localDiagram")).toBeHidden();
   await expect(page.locator("#diagramFrame")).toBeHidden();
-  await expect(page.locator("#diagramSourceBadge")).toContainText("Browser DBML");
-  await expect(page.locator("#diagramMessage")).toContainText("Local preflight");
-  await expect(page.locator("#diagramSvg")).toContainText("olist_orders_dataset");
-  await expect(page.locator("#diagramSvg")).toContainText("PK order_id");
-  await expect(page.locator("#diagramSvg")).toContainText("FK customer_id");
-  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).toHaveCount(1);
+  await expect(page.locator("#diagramSourceBadge")).toContainText("Waiting for run");
+  await expect(page.locator("#diagramMessage")).toContainText("Run a profiler job");
+  await expect(page.locator("#diagramEmpty")).toContainText("Run profiler to build the DBML diagram");
+  await expect(page.locator("#diagramSvg")).not.toContainText("olist_orders_dataset");
+  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).toHaveCount(0);
   await expect(page.locator("#diagramFitButton")).toBeVisible();
+  await expect(page.locator("#diagramFitButton")).toBeDisabled();
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramDensityToggle")).toBeDisabled();
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramColumnsToggle")).toBeDisabled();
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#diagramColumnsToggle")).toContainText("All columns");
-  await expect(page.locator("#diagramSvg")).toContainText("order_status");
-  await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="olist_order_items_dataset"]')).toHaveCount(1);
-  await page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]').click();
-  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).toHaveClass(/selected/);
-  await expect(page.locator("#diagramInspector")).toContainText("olist_orders_dataset");
-  await expect(page.locator("#diagramInspector")).toContainText("Fact/event");
-  await page.locator("#diagramSvg").click({ position: { x: 4, y: 4 } });
-  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).not.toHaveClass(/selected/);
   const mapping = page.locator("#mappingBody");
-  await expect(mapping).toContainText("olist_customers_dataset.csv");
-  await expect(mapping).toContainText("olist_orders_dataset.csv");
-  await expect(mapping).toContainText("olist_order_items_dataset.csv");
-  await expect(mapping).toContainText("olist_order_payments_dataset.csv");
-  await expect(mapping).toContainText("olist_order_reviews_dataset.csv");
-  await expect(mapping).toContainText("olist_products_dataset.csv");
-  await expect(mapping).toContainText("olist_sellers_dataset.csv");
-  await expect(mapping).toContainText("product_category_name_translation.csv");
-  await expect(mapping).toContainText("olist_geolocation_dataset.csv");
+  await expect(mapping).toContainText("Run profiler to load generated table mapping evidence");
+  await expect(mapping).not.toContainText("olist_customers_dataset.csv");
   await expect(mapping).not.toContainText("undefined");
   await expect(mapping).not.toContainText("missing CSV");
   await expect(mapping).not.toContainText("extra CSV");
-  await page.locator("#diagramColumnsToggle").click();
-  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("#diagramColumnsToggle")).toContainText("Key columns only");
-  await expect(page.locator("#diagramSvg")).not.toContainText("order_status");
-  await expect(page.locator('#diagramSvg [data-diagram-table="olist_orders_dataset"]')).not.toHaveClass(/selected/);
+  await expect(page.locator("#mappedMetric")).toHaveText("0");
+  await expect(page.locator("#missingMetric")).toHaveText("0");
+  await expect(page.locator("#extraMetric")).toHaveText("0");
   await expect(page.locator("#dbdiagramLink")).toHaveAttribute(
     "href",
-    /https:\/\/dbdiagram\.io\/embed\?c=/,
+    "#",
   );
+  await expect(page.locator("#dbdiagramLink")).toHaveAttribute("aria-disabled", "true");
 
   await page.locator("#runnerModePath").click();
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
@@ -104,6 +90,27 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("timestamp");
   await expect(page.locator("#diagramSvg")).toContainText("FK issue");
   await expect(page.locator('#diagramSvg [data-diagram-table="olist_order_payments_dataset"]')).toHaveCount(1);
+  await expect(page.locator("#mappedMetric")).toHaveText("9");
+  await expect(page.locator("#missingMetric")).toHaveText("0");
+  await expect(page.locator("#extraMetric")).toHaveText("0");
+  await expect(page.locator("#mapping")).toContainText("Schema coverage");
+  await expect(page.locator("#mapping")).toContainText("Relationship evidence");
+  await expect(page.locator("#mappingShowAllToggle")).not.toBeChecked();
+  await expect(mapping).toContainText("No schema coverage issues found");
+  await expect(mapping).not.toContainText("olist_customers_dataset.csv");
+  await page.locator("#mappingShowAllToggle").check();
+  await expect(mapping).toContainText("olist_customers_dataset.csv");
+  await expect(mapping).toContainText("olist_orders_dataset.csv");
+  await expect(mapping).toContainText("olist_order_items_dataset.csv");
+  await expect(mapping).toContainText("olist_order_payments_dataset.csv");
+  await expect(mapping).toContainText("olist_order_reviews_dataset.csv");
+  await expect(mapping).toContainText("olist_products_dataset.csv");
+  await expect(mapping).toContainText("olist_sellers_dataset.csv");
+  await expect(mapping).toContainText("product_category_name_translation.csv");
+  await expect(mapping).toContainText("olist_geolocation_dataset.csv");
+  await expect(mapping).not.toContainText("undefined");
+  await expect(mapping).not.toContainText("missing CSV");
+  await expect(mapping).not.toContainText("extra CSV");
   const dbdiagramUrl = await page.locator("#dbdiagramLink").getAttribute("href");
   const dbdiagramDbml = await page.evaluate((href) => {
     const encoded = new URL(href).searchParams.get("c") || "";
@@ -131,7 +138,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#diagramDensityToggle").click();
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "true");
 
-  await expect(page.getByText("Generated results")).toBeVisible();
+  await expect(page.locator("#generatedResults")).toContainText("Generated results");
   const generatedResults = page.locator("#artifactList");
   await expect(generatedResults).toContainText("Dataset verdict");
   await expect(generatedResults).toContainText("NOT_READY");
@@ -147,6 +154,17 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(generatedResults).toContainText("report.md");
   await expect(generatedResults).toContainText("Generated artifacts");
   await expect(generatedResults).toContainText("dataset_verdict.json");
+  await expect(page.locator("#report")).toContainText("Generated report");
+  await expect(page.locator("#reportChartPreview")).toContainText("Report: issue severity");
+  await expect(page.locator("#reportChartPreview")).toContainText("P1");
+  await expect(page.locator("#reportChartPreview")).toContainText("12");
+  await expect(page.locator("#reportChartPreview")).toContainText("Report: missingness");
+  await expect(page.locator("#reportChartPreview")).toContainText("olist_orders_dataset");
+  await expect(page.locator("#reportChartPreview")).toContainText("Report: FK status");
+  await expect(page.locator("#reportChartPreview")).toContainText("FK issue");
+  await expect(page.locator("#reportChartPreview")).toContainText("Report: influence");
+  await expect(page.locator("#reportChartPreview")).not.toContainText("No chart data");
+  await expect(page.locator("#artifactPreviewMeta")).toContainText("report.html");
   await expect(page.locator("#artifactPreview")).toContainText("HTML report preview");
   await generatedResults.locator('.generated-report-link[data-artifact-path="report.md"]').click();
   await expect(page.locator("#artifactPreview")).toBeFocused();
@@ -302,11 +320,16 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#artifactPreview")).toContainText("Sample row 1");
   await expect(page.locator("#artifactPreview .issue-column-highlight").first()).toBeVisible();
   const stageListBox = await page.locator("#stageList").boundingBox();
+  const mappingBox = await page.locator("#mapping").boundingBox();
+  const generatedResultsPanelBox = await page.locator("#generatedResults").boundingBox();
+  const reportBox = await page.locator("#report").boundingBox();
   const generatedResultsBox = await page.locator("#artifactList").boundingBox();
   const drilldownBox = await page.locator("#dashboardDrilldown").boundingBox();
   const graphDrilldownBox = await page.locator("#dashboardGraphDrilldown").boundingBox();
   const artifactSourcesBox = await page.locator("#dashboardArtifactLinks").boundingBox();
   expect(generatedResultsBox.y).toBeGreaterThan(stageListBox.y);
+  expect(generatedResultsPanelBox.y).toBeGreaterThan(mappingBox.y);
+  expect(reportBox.y).toBeGreaterThan(generatedResultsPanelBox.y);
   expect(graphDrilldownBox.y).toBeGreaterThan(drilldownBox.y);
   expect(artifactSourcesBox.y).toBeGreaterThan(graphDrilldownBox.y);
   const severityChartSource = page
