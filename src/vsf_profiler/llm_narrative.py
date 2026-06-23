@@ -36,12 +36,12 @@ MAX_OPENAI_MAX_OUTPUT_TOKENS = 8192
 MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 SENSITIVE_CONFIG_KEY_PARTS = ("api_key", "authorization", "token", "secret", "password", "credential")
 
-OPENAI_NARRATIVE_INSTRUCTIONS = """You are writing as a Senior Data Scientist.
+OPENAI_NARRATIVE_INSTRUCTIONS = """You are writing an optional guarded LLM data-quality summary.
 Use only the supplied JSON context, which is derived from deterministic structured artifacts.
 Do not use external facts, raw CSV data, row-level samples, or unbounded examples.
 Do not invent numeric claims; every number must appear in the supplied evidence.
-Reference tables, columns, issue ids, issue types, severities, and verdicts only when they appear in the supplied evidence.
-Reference table business-impact categories only when they appear in table_assessments.json for that table.
+Reference tables, columns, issue ids, issue types, severities, and readiness labels only when they appear in the supplied evidence.
+Reference table analysis-impact categories only when they appear in table_assessments.json for that table.
 Do not use causal wording such as causes, caused, drives, leads to, due to, because, or root cause.
 Use association-only language for influence findings.
 The supplied JSON includes guardrail_safe_draft. Return that Markdown exactly.
@@ -84,7 +84,6 @@ ALLOWED_ARTIFACT_FIELD_REFS = {
     "readiness",
     "recommended_next_actions",
     "relationship_risk_count",
-    "review_score",
     "risk_score",
     "row_count",
     "severity",
@@ -96,7 +95,7 @@ class NarrativeProvider(Protocol):
     name: str
 
     def generate(self, context: dict[str, Any]) -> str:
-        """Return a Markdown narrative using only the supplied context."""
+        """Return a Markdown summary using only the supplied context."""
 
 
 @dataclass(frozen=True)
@@ -142,14 +141,17 @@ class FakeNarrativeProvider:
         }
 
     def generate(self, context: dict[str, Any]) -> str:
+        safe_draft = context.get("guardrail_safe_draft")
+        if isinstance(safe_draft, str) and safe_draft.strip():
+            return safe_draft
         summary = context["summary"]
         top_issue = next(iter(context["top_issues"]), {})
         top_ref = ""
         if top_issue.get("table") and top_issue.get("columns"):
             top_ref = f"`{top_issue['table']}.{top_issue['columns'][0]}`"
         return (
-            "# Senior Data Scientist Narrative\n\n"
-            "## Dataset Review\n\n"
+            "# LLM Data-Quality Summary Artifact\n\n"
+            "## Data-Quality Readiness\n\n"
             f"The deterministic artifacts show {summary['table_count']} tables, "
             f"{summary['row_count']} rows, {summary['issue_count']} issues, and a "
             f"risk score of {summary['risk_score']}.\n\n"
@@ -157,7 +159,7 @@ class FakeNarrativeProvider:
             f"The highest-priority reviewed issue type is `{top_issue.get('issue_type', 'none')}` "
             f"on {top_ref or 'the mapped tables'}.\n\n"
             "## Modeling Caveat\n\n"
-            "Influence findings are association-only and should be validated before use in decisions.\n"
+            "Legacy association findings are association-only and should be validated before use in decisions.\n"
         )
 
 
@@ -196,7 +198,7 @@ class OpenAINarrativeProvider:
             "instructions": OPENAI_NARRATIVE_INSTRUCTIONS,
             "input": json.dumps(
                 {
-                    "task": "Generate the guarded L4 Senior Data Scientist narrative.",
+                    "task": "Generate the guarded LLM data-quality summary artifact.",
                     "guardrail_safe_draft": context.get("guardrail_safe_draft", ""),
                     "guardrail_contract": context.get("guardrail_contract", {}),
                     "context": context,
@@ -312,7 +314,7 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
     tables = profile.get("tables") or {}
     issue_counts = dataset_verdict.get("issue_counts") or {}
     context = {
-        "role": "Senior Data Scientist",
+        "role": "Data-quality reviewer",
         "source_artifacts": list(SOURCE_ARTIFACTS),
         "privacy_contract": {
             "raw_csv_included": False,
@@ -363,7 +365,6 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
                 "table": row.get("table"),
                 "role": row.get("role"),
                 "health_score": row.get("health_score"),
-                "review_score": row.get("review_score", row.get("health_score")),
                 "readiness": row.get("readiness"),
                 "issue_counts_by_severity": row.get("issue_counts_by_severity") or {},
                 "affected_columns": row.get("affected_columns") or [],
@@ -385,6 +386,15 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
             "notes": influence.get("notes") or [],
         },
     }
+    column_usability_rows = _column_usability_rows(profile, issues)
+    context["column_usability_summary"] = _column_usability_summary(column_usability_rows)
+    context["column_usability"] = column_usability_rows[:20]
+    context["table_health_reviews"] = _table_health_reviews(
+        profile,
+        context["table_assessments"],
+        issues,
+    )
+    context["column_issue_blocks"] = _column_issue_blocks(issues)
     safe_draft = guardrail_safe_l4_draft(context)
     context["guardrail_safe_draft"] = safe_draft
     context["guardrail_contract"] = _guardrail_contract_from_draft(safe_draft)
@@ -394,37 +404,56 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
 def deterministic_l4_narrative(context: dict[str, Any]) -> str:
     return _structured_l4_narrative(
         context,
-        intro="_Deterministic fallback narrative generated from structured artifacts only._",
+        intro="_Deterministic fallback summary generated from structured artifacts only._",
     )
 
 
 def guardrail_safe_l4_draft(context: dict[str, Any]) -> str:
     return _structured_l4_narrative(
         context,
-        intro="_Guarded provider narrative generated from structured artifacts only._",
+        intro="_Guarded provider summary generated from structured artifacts only._",
     )
 
 
 def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
     summary = context["summary"]
     top_issues = context["top_issues"][:5]
+    usability_summary = context.get("column_usability_summary") or {}
     lines = [
-        "# Senior Data Scientist Narrative",
+        "# LLM Data-Quality Summary Artifact",
         "",
         intro,
         "",
-        "## Dataset Review",
+        "## Data-Quality Readiness",
         "",
         (
             f"The run reviewed {summary['table_count']} tables, {summary['column_count']} columns, "
-            f"and {summary['row_count']} rows. The deterministic verdict is "
+            f"and {summary['row_count']} rows. The deterministic readiness label is "
             f"`{summary['verdict']}` with risk score {summary['risk_score']} and "
             f"{summary['issue_count']} issues."
         ),
         "",
-        "## Priority Findings",
+        "## Column Readiness Summary",
         "",
+        (
+            f"The column review classified {usability_summary.get('column_count', 0)} columns: "
+            f"{usability_summary.get('ready_count', 0)} ready, "
+            f"{usability_summary.get('needs_preparation_count', 0)} needing preparation, and "
+            f"{usability_summary.get('blocked_count', 0)} blocked for analysis."
+        ),
     ]
+    for row in (context.get("column_usability") or [])[:5]:
+        lines.append(
+            f"- `{row['field']}` is `{row['status_label']}` with severity `{row['severity']}`; "
+            f"evidence: {row['evidence']}."
+        )
+    lines.extend(
+        [
+            "",
+            "## Priority Findings",
+            "",
+        ]
+    )
     if not top_issues:
         lines.append("No issue records were present in `issues.json`.")
     for issue in top_issues:
@@ -434,22 +463,43 @@ def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
             f"- `{issue['issue_type']}` on {ref}: {issue['bad_count']} affected rows "
             f"with severity `{issue['severity']}`."
         )
-    lines.extend(["", "## Per-Table Assessment", ""])
-    table_rows = context.get("table_assessments") or []
+    lines.extend(["", "## Table-by-Table Health Review", ""])
+    table_rows = context.get("table_health_reviews") or []
     if not table_rows:
         lines.append("No table assessment rows were present in `table_assessments.json`.")
     for row in table_rows[:5]:
-        impact = row.get("business_impact") or {}
-        category = impact.get("category") or "general_analytics"
         lines.append(
-            f"- `{row['table']}` is `{row['readiness']}` with review score "
-            f"{row.get('review_score', row.get('health_score'))}, role `{row['role']}`, "
-            f"and impact category `{category}`."
+            f"- `{row['table']}` is `{row['readiness']}` with health score "
+            f"{row['health_score']}, role `{row['role']}`, {row['issue_total']} issues, "
+            f"and {row['relationship_risk_count']} relationship risks."
         )
+    lines.extend(["", "## Column Issue Blocks", ""])
+    issue_blocks = context.get("column_issue_blocks") or []
+    if not issue_blocks:
+        lines.append("No column issue blocks were present in `issues.json`.")
+    for block in issue_blocks[:5]:
+        lines.append(
+            f"- `{block['field']}` has `{block['issue_type']}` with severity "
+            f"`{block['severity']}`. Evidence: {block['evidence']}. "
+            f"Analysis consequence: {block['analysis_consequence']}"
+        )
+    relationship_summary = context.get("relationship_summary") or {}
+    schema_summary = context.get("schema_summary") or {}
     lines.extend(
         [
             "",
-            "## Recommended Next Actions",
+            "## Relationship and Schema Review",
+            "",
+            (
+                f"Relationship evidence includes {relationship_summary.get('edge_count', 0)} edges "
+                f"and schema mapping evidence includes {schema_summary.get('mapped_table_count', 0)} mapped tables."
+            ),
+        ]
+    )
+    lines.extend(
+        [
+            "",
+            "## Data Quality Next Steps",
             "",
         ]
     )
@@ -464,13 +514,199 @@ def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
             "## Modeling Caveat",
             "",
             (
-                "Influence findings are association-only. Validate important patterns with "
-                "domain review before operational use."
+                "Legacy association findings are association-only. Validate important patterns with "
+                "schema and data owner review before analysis use."
             ),
             "",
         ]
     )
     return "\n".join(lines)
+
+
+def _column_usability_rows(profile: dict[str, Any], issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    issue_map: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for issue in issues:
+        table = str(issue.get("table") or "")
+        for column in issue.get("columns") or [""]:
+            issue_map.setdefault((table, str(column)), []).append(issue)
+
+    rows: list[dict[str, Any]] = []
+    for table_name, table in sorted((profile.get("tables") or {}).items()):
+        for column_name, column in sorted((table.get("columns") or {}).items()):
+            column_issues = issue_map.get((table_name, column_name), [])
+            severity = _worst_severity(column_issues)
+            outliers = column.get("outliers") or {}
+            outlier_count = int(outliers.get("outlier_count") or 0)
+            status = _column_status(
+                severity=severity,
+                null_rate=float(column.get("null_rate") or 0),
+                invalid_cast_count=int(column.get("invalid_cast_count") or 0),
+                outlier_count=outlier_count,
+            )
+            rows.append(
+                {
+                    "field": f"{table_name}.{column_name}",
+                    "table": table_name,
+                    "column": column_name,
+                    "status": status,
+                    "status_label": _column_status_label(status),
+                    "severity": severity or "none",
+                    "issue_count": len(column_issues),
+                    "issue_types": sorted({str(issue.get("issue_type") or "") for issue in column_issues}),
+                    "null_rate": float(column.get("null_rate") or 0),
+                    "invalid_cast_count": int(column.get("invalid_cast_count") or 0),
+                    "outlier_count": outlier_count,
+                    "evidence": _column_evidence(column, column_issues, outlier_count),
+                }
+            )
+    rows.sort(
+        key=lambda row: (
+            {"blocked": 0, "needs_preparation": 1, "ready": 2}.get(str(row["status"]), 3),
+            _severity_rank(str(row["severity"])),
+            -int(row["issue_count"]),
+            str(row["field"]),
+        )
+    )
+    return rows
+
+
+def _column_usability_summary(rows: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        "column_count": len(rows),
+        "ready_count": sum(1 for row in rows if row.get("status") == "ready"),
+        "needs_preparation_count": sum(1 for row in rows if row.get("status") == "needs_preparation"),
+        "blocked_count": sum(1 for row in rows if row.get("status") == "blocked"),
+    }
+
+
+def _table_health_reviews(
+    profile: dict[str, Any],
+    table_assessments: list[dict[str, Any]],
+    issues: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    issues_by_table: dict[str, list[dict[str, Any]]] = {}
+    for issue in issues:
+        issues_by_table.setdefault(str(issue.get("table") or ""), []).append(issue)
+    reviews = []
+    profile_tables = profile.get("tables") or {}
+    for row in table_assessments[:10]:
+        table_name = str(row.get("table") or "")
+        table_profile = profile_tables.get(table_name) or {}
+        table_issues = issues_by_table.get(table_name, [])
+        impact = row.get("business_impact") or {}
+        reviews.append(
+            {
+                "table": table_name,
+                "role": row.get("role") or "",
+                "readiness": row.get("readiness") or "",
+                "health_score": row.get("health_score") or 0,
+                "row_count": table_profile.get("row_count") or 0,
+                "column_count": table_profile.get("column_count") or 0,
+                "issue_total": sum((row.get("issue_counts_by_severity") or {}).values()),
+                "relationship_risk_count": row.get("relationship_risk_count") or 0,
+                "affected_columns": row.get("affected_columns") or [],
+                "analysis_impact_category": impact.get("category") or "general_analytics",
+                "analysis_impact_label": impact.get("label") or "General analytics",
+                "top_issue_types": sorted({str(issue.get("issue_type") or "") for issue in table_issues})[:5],
+            }
+        )
+    return reviews
+
+
+def _column_issue_blocks(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    blocks = []
+    for issue in issues[:30]:
+        for column in issue.get("columns") or ["table_level"]:
+            table = str(issue.get("table") or "")
+            field = table if column == "table_level" else f"{table}.{column}"
+            blocks.append(
+                {
+                    "field": field,
+                    "issue_id": issue.get("issue_id") or "",
+                    "issue_type": issue.get("issue_type") or "",
+                    "severity": issue.get("severity") or "",
+                    "evidence": (
+                        f"{issue.get('bad_count', 0)}/{issue.get('total_count', 0)} rows; "
+                        f"bad rate {float(issue.get('bad_rate') or 0):.6f}"
+                    ),
+                    "analysis_consequence": _issue_analysis_consequence(str(issue.get("issue_type") or "")),
+                }
+            )
+    blocks.sort(
+        key=lambda block: (
+            _severity_rank(str(block["severity"])),
+            str(block["field"]),
+            str(block["issue_id"]),
+        )
+    )
+    return blocks[:20]
+
+
+def _column_status(
+    *,
+    severity: str,
+    null_rate: float,
+    invalid_cast_count: int,
+    outlier_count: int,
+) -> str:
+    if severity in {"P0", "P1"}:
+        return "blocked"
+    if severity in {"P2", "P3"} or null_rate > 0 or invalid_cast_count > 0 or outlier_count > 0:
+        return "needs_preparation"
+    return "ready"
+
+
+def _column_status_label(status: str) -> str:
+    return {
+        "blocked": "Blocked for analysis",
+        "needs_preparation": "Needs preparation",
+        "ready": "Ready",
+    }.get(status, status)
+
+
+def _column_evidence(
+    column: dict[str, Any],
+    issues: list[dict[str, Any]],
+    outlier_count: int,
+) -> str:
+    parts = [
+        f"null rate {float(column.get('null_rate') or 0):.6f}",
+        f"distinct={int(column.get('distinct_count') or 0)}",
+    ]
+    invalid_cast_count = int(column.get("invalid_cast_count") or 0)
+    if invalid_cast_count:
+        parts.append(f"invalid_casts={invalid_cast_count}")
+    if outlier_count:
+        parts.append(f"iqr_outliers={outlier_count}")
+    if issues:
+        parts.append(f"issues={len(issues)}")
+    return "; ".join(parts)
+
+
+def _worst_severity(issues: list[dict[str, Any]]) -> str:
+    if not issues:
+        return ""
+    return min((str(issue.get("severity") or "") for issue in issues), key=_severity_rank)
+
+
+def _severity_rank(severity: str) -> int:
+    return {"P0": 0, "P1": 1, "P2": 2, "P3": 3}.get(severity, 4)
+
+
+def _issue_analysis_consequence(issue_type: str) -> str:
+    if issue_type in {"PRIMARY_KEY_NULL", "DUPLICATE_PRIMARY_KEY", "UNIQUE_DUPLICATE"}:
+        return "Entity-level joins and splits may be unreliable until key evidence is fixed."
+    if issue_type in {"ORPHAN_FOREIGN_KEY", "PARENT_KEY_DUPLICATE", "FOREIGN_KEY_NULL", "CHILD_RELATIONSHIP_DUPLICATE"}:
+        return "Cross-table joins may drop, multiply, or misalign records during feature construction."
+    if issue_type in {"REQUIRED_FIELD_NULL", "EMPTY_STRING", "INVALID_PLACEHOLDER_TOKEN"}:
+        return "Missingness handling is required before aggregate analysis or model feature use."
+    if issue_type in {"VALUE_OUT_OF_RANGE", "NEGATIVE_VALUE_NOT_ALLOWED", "NUMERIC_OUTLIER"}:
+        return "Distribution-sensitive aggregates and models may need capping, transformation, or exclusion decisions."
+    if issue_type in {"TYPE_CAST_INVALID", "DATE_ORDER_INVALID", "REGEX_MISMATCH"}:
+        return "Typed, time-based, or pattern-derived features need normalization before analysis use."
+    if issue_type in {"TABLE_MISSING", "COLUMN_MISSING", "EXTRA_COLUMN"}:
+        return "Schema coverage should be confirmed before comparing tables or training models."
+    return "Dataset readiness is reduced until this evidence is reviewed."
 
 
 def _guardrail_contract_from_draft(draft: str) -> dict[str, Any]:
@@ -502,7 +738,7 @@ def build_guardrail_evidence(
 ) -> dict[str, Any]:
     numbers: dict[str, set[str]] = {}
     refs: dict[str, set[str]] = {}
-    _collect_numbers(context["summary"], "$.context.summary", numbers)
+    _collect_numbers(context, "$.context", numbers)
     _collect_numbers(artifacts, "$.artifacts", numbers)
     _collect_refs(artifacts, refs)
     _collect_refs(context, refs)
@@ -631,7 +867,7 @@ def _check_business_impact_claims(
                     {
                         "type": "business_impact",
                         "claim": sentence.strip(),
-                        "message": "Business-impact claim does not match table_assessments.json evidence.",
+                        "message": "Analysis-impact claim does not match table_assessments.json evidence.",
                     }
                 )
             continue
@@ -658,7 +894,7 @@ def _check_business_impact_claims(
                     {
                         "type": "business_impact",
                         "claim": term,
-                        "message": "Business-impact term is not present in table_assessments.json.",
+                        "message": "Analysis-impact term is not present in table_assessments.json.",
                     }
                 )
                 continue
@@ -678,7 +914,7 @@ def _check_business_impact_claims(
                             "type": "table_business_impact",
                             "table": table,
                             "claim": term,
-                            "message": "Table-specific business-impact claim does not match table_assessments.json.",
+                            "message": "Table-specific analysis-impact claim does not match table_assessments.json.",
                         }
                     )
     return checked, violations
@@ -693,7 +929,7 @@ def _check_causal_wording(markdown: str) -> list[dict[str, Any]]:
                     "type": "causal_wording",
                     "claim": match.group(0),
                     "pattern": label,
-                    "message": "Unsupported causal wording is not allowed in L4 narrative.",
+                    "message": "Unsupported causal wording is not allowed in the LLM summary artifact.",
                 }
             )
     return violations
@@ -786,7 +1022,13 @@ def _sentences(markdown: str) -> list[str]:
 
 
 def _looks_like_business_impact_claim(sentence: str) -> bool:
-    return bool(re.search(r"\b(business\s+impact|impact\s+category)\b", sentence, re.IGNORECASE))
+    return bool(
+        re.search(
+            r"\b(business\s+impact|analysis\s+impact|impact\s+category)\b",
+            sentence,
+            re.IGNORECASE,
+        )
+    )
 
 
 def _normalize_business_term(value: str) -> str:
@@ -821,7 +1063,7 @@ def _json_dumps(payload: dict[str, Any]) -> str:
 def _validated_openai_api_key(api_key: str) -> str:
     key = str(api_key or "").strip()
     if not key:
-        raise ValueError("OpenAI API key is required when the OpenAI L4 provider is configured.")
+        raise ValueError("OpenAI API key is required when the OpenAI LLM provider is configured.")
     if any(character.isspace() for character in key):
         raise ValueError("OpenAI API key must not contain whitespace.")
     return key

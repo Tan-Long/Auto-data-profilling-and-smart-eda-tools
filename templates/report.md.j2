@@ -1,315 +1,245 @@
-# VSF Senior Data Scientist Review
+# VSF Data Quality Report
 
-Deterministic evidence review generated from VSF Data Profiler artifacts. Influence findings are association-only, not causal.
+Deterministic CSV+DBML data-quality report generated from structured VSF artifacts.
 
-## 1. Executive Scorecard
+## Run Summary
 
-| Signal | Value | Evidence |
-| --- | --- | --- |
-{% for card in scorecard -%}
-| {{ card.label }} | {{ card.value }} | {{ card.detail }} |
-{% endfor %}
-
-{% if dataset_verdict.available -%}
-### Dataset Verdict
-
-**Verdict rationale:** {{ dataset_verdict.verdict_rationale }}
-{% else -%}
-Dataset verdict metadata was not provided for this report.
-{% endif %}
-
-### Recommended Actions
-
-{% for action in recommended_actions -%}
-- {{ action }}
-{% else -%}
-- No actions required.
-{% endfor %}
-
-## 2. L4 Senior Data Scientist Narrative
-
-{% if l4_report.available -%}
-- L4 report: `{{ l4_report.path }}`
-- Guardrail report: `{{ l4_report.guardrail_path }}`
-- L4 guardrail status: **{{ l4_report.status }}**
-- Provider: {{ l4_report.provider }}{{ " (`" ~ l4_report.model ~ "`)" if l4_report.model else "" }}
-- provider={{ l4_report.provider }}
-{% if l4_report.fallback_reason -%}
-- Fallback reason: {{ l4_report.fallback_reason }}
-{% endif %}
-
-### Narrative Preview
-
-{% for line in l4_report.preview_lines -%}
-- {{ line }}
-{% else -%}
-- Narrative preview unavailable; open `{{ l4_report.path }}`.
-{% endfor %}
-{% else -%}
-{{ l4_report.state_text }} The report below is the deterministic review from machine artifacts only.
-{% endif %}
-
-## 3. Visual Summary and Evidence
-
-{% if chart_specs.available -%}
-| Chart Spec | Sources |
+| Signal | Value |
 | --- | --- |
-{% for chart in chart_specs.paths -%}
-| `{{ chart.path }}` | {{ chart.source_artifacts | join(", ") }} |
-{% endfor %}
+| Run ID | `{{ fixed_report.run_summary.run_id or "unknown" }}` |
+| Run status | {{ fixed_report.run_summary.status }} |
+| Runtime seconds | {{ fixed_report.run_summary.duration_seconds or "unknown" }} |
+| Readiness | {{ fixed_report.run_summary.readiness }} |
+| Risk score | {{ fixed_report.run_summary.risk_score }} |
+| Tables | {{ fixed_report.run_summary.table_count }} |
+| Columns | {{ fixed_report.run_summary.column_count }} |
+| Rows | {{ fixed_report.run_summary.row_count }} |
+| Issues | {{ fixed_report.run_summary.issue_count }} |
+| P0/P1 blockers | {{ fixed_report.run_summary.p0_p1_count }} |
+| Preflight review | {{ fixed_report.run_summary.preflight_status }} |
 
-### Dataset Risk
+{% if fixed_report.run_summary.can_run_analysis %}
+**Can this dataset run analysis?** {{ fixed_report.run_summary.can_run_analysis.answer }} {{ fixed_report.run_summary.can_run_analysis.explanation }}
 
-{% if chart_specs.risk_summary.available -%}
-- Verdict: {{ chart_specs.risk_summary.verdict }}
-- Risk score: {{ chart_specs.risk_summary.risk_score }}/100
-- Issue count: {{ chart_specs.risk_summary.issue_count }}
-{% if dataset_verdict.risk_score_model -%}
-- Risk score model: {{ dataset_verdict.risk_score_model.description }}
-- Risk formula: `{{ dataset_verdict.risk_score_model.formula }}`
-{% endif %}
-{% else -%}
-- Dataset risk chart spec was not generated.
-{% endif %}
-
-### Issue Counts by Severity
-
-| Severity | Count | Visual |
-| --- | ---: | --- |
-{% for row in chart_specs.issue_severity.data -%}
-| {{ row.severity }} | {{ row.count }} | `{{ row.bar_text }}` |
-{% else -%}
-| none | 0 | `....................` |
-{% endfor %}
-
-### Issue Counts by Type
-
-| Issue Type | Count | Visual |
-| --- | ---: | --- |
-{% for row in chart_specs.issue_type.data -%}
-| {{ row.issue_type }} | {{ row.count }} | `{{ row.bar_text }}` |
-{% else -%}
-| none | 0 | `....................` |
-{% endfor %}
-
-### Top Missingness by Column
-
-| Field | Null Count | Null Rate | Visual |
-| --- | ---: | ---: | --- |
-{% for row in chart_specs.missingness_columns.data -%}
-| {{ row.field }} | {{ row.null_count }} | {{ row.null_rate | pct }} | `{{ row.bar_text }}` |
-{% else -%}
-| none | 0 | 0.00% | `....................` |
-{% endfor %}
-
-### Relationship FK Status
-
-| Status | Count | Visual |
-| --- | ---: | --- |
-{% for row in chart_specs.relationship_health.data -%}
-| {{ row.status }} | {{ row.count }} | `{{ row.bar_text }}` |
-{% else -%}
-| none | 0 | `....................` |
-{% endfor %}
-
-### Influence Top Features
-
-Target: `{{ influence.target or "none" }}`
-
-Method: {{ influence.method }}. This is association, not causation.
-
-| Rank | Feature | Score | Method | Interpretation | Visual |
-| ---: | --- | ---: | --- | --- | --- |
-{% for row in chart_specs.influence_top_features.data -%}
-| {{ row.rank }} | {{ row.feature }} | {{ "%.4f" | format(row.score) }} | {{ row.method }} | {{ row.interpretation }} | `{{ row.bar_text }}` |
-{% else -%}
-| 0 | none | 0 | none | No influence features were produced. | `....................` |
-{% endfor %}
-{% else -%}
-Chart specs were not provided for this report.
+**Can joins be trusted?** {{ fixed_report.run_summary.can_trust_joins.answer }} {{ fixed_report.run_summary.can_trust_joins.explanation }}
+{% else %}
+Run readiness answers are partial because quality gate evidence was not available.
 {% endif %}
 
-## 4. Table Review Scores and Per-Table Assessment
+{{ fixed_report.run_summary.preflight_message }}
 
-{% if table_assessments.available -%}
-- Assessment artifact: `{{ table_assessments.path }}`
-- Tables assessed: {{ table_assessments.table_count }}
-- Average review score: {{ table_assessments.average_review_score }}/100
-{% if table_assessments.score_model -%}
-- Review score model: {{ table_assessments.score_model.description }}
-- Review score formula: `{{ table_assessments.score_model.formula }}`
-{% endif %}
-- Readiness counts: {% for readiness, count in table_assessments.readiness_counts.items() %}{{ readiness }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
-- Business impact counts: {% for impact, count in table_assessments.business_impact_counts.items() %}{{ impact }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
+## Quality Gates
 
-| Table | Role | Readiness | Review Score | Penalty | Issues | Relationship Risks | Business Impact | Affected Columns | First Action |
-| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
-{% for row in table_assessments.assessments -%}
-| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.review_score }} | {{ row.score_penalty }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.business_impact_label }} | {{ row.affected_columns | join(", ") if row.affected_columns else "none" }} | {{ row.recommended_next_actions[0] if row.recommended_next_actions else "" }} |
-{% else -%}
-| none | none | none | 0 | 0 | 0 | 0 | none | none | none |
-{% endfor %}
-{% else -%}
-Table assessment metadata was not provided for this report.
-{% endif %}
+{% if fixed_report.quality_gates.available -%}
+Source: deterministic. Gate count: {{ fixed_report.quality_gates.summary.gate_count or fixed_report.quality_gates.gates|length }}. Blocked: {{ fixed_report.quality_gates.summary.blocked_count or 0 }}.
 
-## 5. Issue Evidence
-
-| Issue | Severity | Type | Table | Columns | Bad Rows | Bad Rate | Sample | Probable Cause | Suggested Fix |
-| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |
-{% for issue in issue_evidence -%}
-| {{ issue.issue_id }} | {{ issue.severity }} | {{ issue.issue_type }} | {{ issue.table }} | {{ issue.columns_text }} | {{ issue.bad_count }}/{{ issue.total_count }} | {{ issue.bad_rate | pct }} | {{ issue.sample_bad_rows_path or "none" }} | {{ issue.probable_cause }} | {{ issue.suggested_fix }} |
-{% else -%}
-| none | none | none | none | none | 0 | 0.00% | none | none | none |
+| Gate | Status | Answer | Explanation | Next action |
+| --- | --- | --- | --- | --- |
+{% for gate in fixed_report.quality_gates.gates -%}
+| {{ gate.label }} | {{ gate.status }} | {{ fixed_report.quality_gates.answers[gate.gate_id].answer }} | {{ gate.explanation }} | {{ gate.recommended_next_action.label if gate.recommended_next_action else "" }} |
 {% endfor %}
 
-## 6. Relationship, Schema, and Lineage Summary
+### Gate Evidence Values
 
-{% if relationship_graph.available -%}
-- Relationship graph: `{{ relationship_graph.path }}`
-- Nodes: {{ relationship_graph.node_count }}
-- Edges: {{ relationship_graph.edge_count }}
-- Edge status counts: {{ relationship_graph.status_counts_text }}
-- Cardinality counts: {{ relationship_graph.cardinality_counts_text }}
-- Junction tables: {{ relationship_graph.junction_table_count }}
-- Inferred many-to-many relationships: {{ relationship_graph.many_to_many_relationship_count }}
+{% for gate in fixed_report.quality_gates.gates %}
+#### {{ gate.label }}
 
-| Source | Target | Declared Cardinality | Observed Cardinality | Status | Reason |
-| --- | --- | --- | --- | --- | --- |
-{% for edge in relationship_graph.edges -%}
-| {{ edge.source }} | {{ edge.target }} | {{ edge.declared_cardinality }} | {{ edge.observed_cardinality }} | {{ edge.status }} | {{ edge.reason }} |
+| Label | Raw value | Meaning |
+| --- | --- | --- |
+{% for value in gate.evidence_values -%}
+| {{ value.label }} | {{ value.raw_value }} | {{ value.meaning }} |
 {% else -%}
-| none | none | none | none | none | none |
+| none | none | No evidence values were present for this gate. |
+{% endfor %}
 {% endfor %}
 {% else -%}
-Relationship graph artifact was not provided.
+{{ fixed_report.quality_gates.message }}
 {% endif %}
 
-{% if schema_parse_report.available -%}
-### Schema Parse Diagnostics
+## Table Overview
 
-- Schema parse report: `{{ schema_parse_report.path }}`
-- Parse status: {{ schema_parse_report.status }}
-- Parsed objects: tables={{ schema_parse_report.table_count }}, columns={{ schema_parse_report.column_count }}, relationships={{ schema_parse_report.relationship_count }}
-- Parser diagnostics: warnings={{ schema_parse_report.warning_count }}, unsupported={{ schema_parse_report.unsupported_count }}
+{% if fixed_report.table_overview.available -%}
+Tables: {{ fixed_report.table_overview.summary.table_count }}. Not ready: {{ fixed_report.table_overview.summary.not_ready_count }}. Warnings: {{ fixed_report.table_overview.summary.warn_count }}. Ready: {{ fixed_report.table_overview.summary.ready_count }}.
 
-| Severity | Code | Line | Message |
-| --- | --- | ---: | --- |
-{% for diagnostic in schema_parse_report.diagnostics -%}
-| {{ diagnostic.severity }} | {{ diagnostic.code }} | {{ diagnostic.line or "" }} | {{ diagnostic.message }} |
-{% else -%}
-| info | none |  | No parser diagnostics. |
+| Table | Role | Readiness | Health | Rows | Columns | Issues | Relationship risks | Affected columns | First fix step |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
+{% for row in fixed_report.table_overview.rows -%}
+| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.health_score }} | {{ row.row_count }} | {{ row.column_count }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.affected_columns_text }} | {{ row.next_step }} |
 {% endfor %}
+{% else -%}
+Table overview is unavailable because table profile evidence was missing.
 {% endif %}
 
-{% if schema_evaluation.available -%}
-- Schema evaluation: `{{ schema_evaluation.path }}`
-- Mapped tables: {{ schema_evaluation.mapped_table_count }}
-- Missing tables: {{ schema_evaluation.missing_table_count }}
-- Extra CSV files: {{ schema_evaluation.extra_csv_count }}
-- Schema issue references: {{ schema_evaluation.schema_issue_count }}
+## Column Issue Matrix
+
+{% if fixed_report.column_issue_matrix.rows -%}
+| Field | Status | Issue | Severity | Bad rows | Meaning | What should be fixed? |
+| --- | --- | --- | --- | ---: | --- | --- |
+{% for row in fixed_report.column_issue_matrix.rows -%}
+| {{ row.field }} | {{ row.status }} | {{ row.issue_id }} {{ row.issue_type }} | {{ row.severity }} | {{ row.bad_rows }} | {{ row.meaning }} | {{ row.fix }} |
+{% endfor %}
+{% else -%}
+No column or table issues were generated for this run.
 {% endif %}
+
+## Issue Action Plans
+
+{% if fixed_report.issue_action_plans.available and fixed_report.issue_action_plans.summary_rows -%}
+Plans: {{ fixed_report.issue_action_plans.summary.plan_count }}. Human review required: {{ fixed_report.issue_action_plans.summary.human_review_count }}. Average actionability: {{ fixed_report.issue_action_plans.summary.average_actionability_score }}/100.
+
+Main report expands the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans. Full deterministic action-plan evidence remains in `{{ fixed_report.issue_action_plans.path }}`.
+
+| Issue | Priority | Table | Columns | First fix | First verification | Metrics |
+| --- | --- | --- | --- | --- | --- | --- |
+{% for row in fixed_report.issue_action_plans.summary_rows -%}
+| {{ row.issue_id }} {{ row.issue_type }} | {{ row.priority }} | {{ row.table }} | {{ row.columns }} | {{ row.first_fix }} | {{ row.first_verify }} | coverage {{ row.evidence_coverage }}/100; actionability {{ row.actionability }}/100 |
+{% endfor %}
+
+{% if fixed_report.issue_action_plans.remaining_count > 0 -%}
+{{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in `{{ fixed_report.issue_action_plans.path }}` and the todo exports.
+{% endif %}
+
+### Expanded action plans
+
+{% for plan in fixed_report.issue_action_plans.display_plans %}
+#### {{ plan.issue_id }} {{ plan.issue_type }}
+
+- Priority: {{ plan.priority }}
+- Source: {{ plan.source }}
+- Table: {{ plan.table }}
+- Columns: {{ plan.columns | join(", ") if plan.columns else "table-level" }}
+- Finding: {{ plan.finding_summary }}
+- Human review: {{ "required" if plan.human_review_required else "not required" }}{% if plan.human_review_reason %} ({{ plan.human_review_reason }}){% endif %}
+
+##### Finding Values
+
+| Label | Raw value | Meaning |
+| --- | --- | --- |
+{% for value in plan.evidence_values -%}
+| {{ value.label }} | {{ value.raw_value }} | {{ value.meaning }} |
+{% else -%}
+| none | none | No finding values were available. |
+{% endfor %}
+{% if plan.hidden_evidence_value_count > 0 -%}
+
+{{ plan.hidden_evidence_value_count }} additional finding values are available in `{{ fixed_report.issue_action_plans.path }}`.
+{% endif %}
+
+##### Fix data checklist
+
+{% for item in plan.fix_data_checklist -%}
+- {{ item }}
+{% else -%}
+- No deterministic fix checklist was generated.
+{% endfor %}
+
+##### Verify after fix checklist
+
+{% for item in plan.verify_after_fix_checklist -%}
+- {{ item }}
+{% else -%}
+- No deterministic verification checklist was generated.
+{% endfor %}
+
+##### Guidelines
+
+{% for item in plan.guidelines -%}
+- {{ item }}
+{% else -%}
+- No deterministic guidelines were generated.
+{% endfor %}
+
+##### Metrics
+
+| Metric | Value | Explanation |
+| --- | --- | --- |
+| Evidence coverage | {{ plan.evidence_coverage.score }}/100 | {{ plan.evidence_coverage.explanation }} |
+| Actionability | {{ plan.actionability_score.score }}/100 | {{ plan.actionability_score.explanation }} |
+{% endfor %}
+{% else -%}
+{{ fixed_report.issue_action_plans.message }}
+{% endif %}
+
+## Todos
+
+{% if fixed_report.todos.available -%}
+Todo groups: {{ fixed_report.todos.summary.todo_group_count }}. Fix data: {{ fixed_report.todos.summary.fix_data_group_count }}. Verify after fix: {{ fixed_report.todos.summary.verify_after_fix_group_count }}.
+
+This report shows the first {{ fixed_report.todos.display_limit }} todo groups per type. Full grouped todos remain in `{{ fixed_report.todos.path }}`.
+
+### Fix data
+
+{% for group in fixed_report.todos.fix_display_groups -%}
+- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}; priorities: {{ group.priorities | join(", ") }})
+{% else -%}
+- No Fix data todos were generated.
+{% endfor %}
+{% if fixed_report.todos.fix_remaining_count > 0 -%}
+- {{ fixed_report.todos.fix_remaining_count }} additional Fix data groups are available in `{{ fixed_report.todos.path }}`.
+{% endif %}
+
+### Verify after fix
+
+{% for group in fixed_report.todos.verify_display_groups -%}
+- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}; priorities: {{ group.priorities | join(", ") }})
+{% else -%}
+- No Verify after fix todos were generated.
+{% endfor %}
+{% if fixed_report.todos.verify_remaining_count > 0 -%}
+- {{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups are available in `{{ fixed_report.todos.path }}`.
+{% endif %}
+{% else -%}
+{{ fixed_report.todos.message }}
+{% endif %}
+
+## Developer Artifacts
+
+Raw JSON and runtime artifacts are listed here for debugging and package compatibility. Normal report reading should use the sections above.
+
+{% if connector_metadata.available or lineage_graph.available or schema_evaluation.available or relationship_graph.available or execution_flow.available -%}
+### Developer Evidence Summary
 
 {% if connector_metadata.available -%}
-### Connector Metadata
-
-- Connector metadata: `{{ connector_metadata.path }}`
-- Source type: {{ connector_metadata.source_type }}
-- Introspection status: {{ connector_metadata.introspection_status }}
-- Extraction status: {{ connector_metadata.extraction_status }}
-- Tables scanned: {{ connector_metadata.table_count }}
-- Raw extracts persisted: {{ connector_metadata.raw_extracts_persisted }}
-- Secrets redacted: {{ connector_metadata.secrets_redacted }}
-{% endif %}
-
+- **Connector Metadata**: {{ connector_metadata.source_type }} source; tables={{ connector_metadata.table_count }}; raw_extracts_persisted={{ connector_metadata.raw_extracts_persisted }}; secrets_redacted={{ connector_metadata.secrets_redacted }} (`{{ connector_metadata.path }}`)
+{% endif -%}
 {% if lineage_graph.available -%}
-### Lineage Graph
-
-- Lineage graph: `{{ lineage_graph.path }}`
-- Source systems: {{ lineage_graph.source_system_count }}
-- Schemas: {{ lineage_graph.schema_count }}
-- Tables: {{ lineage_graph.table_count }}
-- Columns: {{ lineage_graph.column_count }}
-- Relationships: {{ lineage_graph.relationship_count }}
-- Profiler stages: {{ lineage_graph.stage_count }}
-- Artifacts: {{ lineage_graph.artifact_count }}
-- Dependency edges: {{ lineage_graph.edge_count }}
-- Evidence artifacts: {{ lineage_graph.evidence_artifacts | join(", ") }}
+- **Developer Runtime Context**: {{ lineage_graph.artifact_count }} artifacts, {{ lineage_graph.stage_count }} stages, {{ lineage_graph.edge_count }} edges (`{{ lineage_graph.path }}`)
+{% endif -%}
+{% if schema_evaluation.available -%}
+- **Schema Mapping Summary**: mapped={{ schema_evaluation.mapped_table_count }}, missing={{ schema_evaluation.missing_table_count }}, methods={{ schema_evaluation.mapping_method_counts_text }} (`{{ schema_evaluation.path }}`)
+{% endif -%}
+{% if relationship_graph.available -%}
+- **Relationship Cardinality Summary**: {{ relationship_graph.cardinality_counts_text }}; junction tables={{ relationship_graph.junction_tables_text }} (`{{ relationship_graph.path }}`)
+{% endif -%}
+{% if execution_flow.available -%}
+- **Execution Flow**: {{ execution_flow.stages|length }} stages; status={{ execution_flow.status }} (`run_summary.json`, `run_events.jsonl`)
 {% endif %}
 
-## 7. Dataset Overview
+{% endif -%}
+{% if l4_report.available -%}
+### Compatibility LLM Guardrail Artifact
 
-| Table | Rows | Columns | File Size MB |
-| --- | ---: | ---: | ---: |
-{% for table in profile.tables.values() -%}
-| {{ table.table }} | {{ table.row_count }} | {{ table.column_count }} | {{ table.file_size_mb }} |
-{% endfor %}
+LLM guardrail status: **{{ l4_report.status }}** (provider={{ l4_report.provider }}{% if l4_report.model %}, model={{ l4_report.model }}{% endif %}{% if l4_report.fallback_reason %}, fallback={{ l4_report.fallback_reason }}{% endif %}).
 
-## 8. Runtime Execution Flow and Artifact Index
-
-{% if execution_flow.available -%}
-- Run ID: `{{ execution_flow.run_id }}`
-- Status: {{ execution_flow.status }}
-- Duration seconds: {{ execution_flow.duration_seconds }}
-- Output directory: `{{ execution_flow.output_dir }}`
-
-| Stage | Status | Duration Seconds | Details |
-| --- | --- | ---: | --- |
-{% for stage in execution_flow.stages -%}
-| {{ stage.name }} | {{ stage.status }} | {{ stage.duration_seconds }} | {{ stage.details }}{% if stage.error %}; error={{ stage.error }}{% endif %} |
-{% endfor %}
+Optional compatibility LLM report artifacts: `{{ l4_report.path }}`{% if l4_report.guardrail_path %}, `{{ l4_report.guardrail_path }}`{% endif %}.
+{% endif %}
 
 | Artifact | Path |
 | --- | --- |
-{% for artifact in execution_flow.artifacts -%}
+{% for artifact in fixed_report.developer_artifacts.artifacts -%}
 | {{ artifact.name }} | `{{ artifact.path }}` |
-{% endfor %}
 {% else -%}
-Runtime execution metadata was not provided for this report.
-{% endif %}
-
-## 9. DBML Diagram and CSV Mapping
-
-- Generated DBML: `{{ schema_diagram.dbml_path }}`
-- dbdiagram.io link: {% if schema_diagram.dbdiagram_url_available %}{{ schema_diagram.dbdiagram_url }}{% else %}unavailable because the schema is too large for a safe URL{% endif %}
-- Note: {{ schema_diagram.dbdiagram_note }}
-
-| Status | DBML Table | CSV File | Primary Key | Foreign Keys |
-| --- | --- | --- | --- | --- |
-{% for table in schema_diagram.tables -%}
-| {{ table.status }} | {{ table.table }} | {{ table.csv_path or "missing" }} | {{ table.primary_key | join(", ") if table.primary_key else "none" }} | {% for fk in table.foreign_keys %}{{ fk.column }} -> {{ fk.parent_table }}.{{ fk.parent_column }}{% if not loop.last %}; {% endif %}{% else %}none{% endfor %} |
-{% endfor -%}
-{% for extra in schema_diagram.extra_csvs -%}
-| {{ extra.status }} | {{ extra.table }} | {{ extra.csv_path }} | n/a | n/a |
+| none | No developer artifacts were listed. |
 {% endfor %}
 
-## 10. Table Profiles
+## Evaluation Summary
 
-{% for table in profile.tables.values() %}
-### {{ table.table }}
+{% if fixed_report.evaluation_summary.available -%}
+Evaluation status: {{ fixed_report.evaluation_summary.status }}
 
-| Column | Expected Type | Inferred Type | Null Rate | Distinct | Invalid Casts |
-| --- | --- | --- | ---: | ---: | ---: |
-{% for column in table.columns.values() -%}
-| {{ column.name }} | {{ column.expected_type_from_dbml or "" }} | {{ column.inferred_type }} | {{ column.null_rate | pct }} | {{ column.distinct_count }} | {{ column.invalid_cast_count }} |
-{% endfor %}
-{% endfor %}
-
-## 11. Appendix: Evidence SQL and Sample Paths
-
-{% for issue in issues %}
-### {{ issue.issue_id }} {{ issue.issue_type }}
-
-- Severity: {{ issue.severity }}
-- Table: {{ issue.table }}
-- Columns: {{ issue.columns | join(", ") }}
-- Bad count: {{ issue.bad_count }}
-- Bad rate: {{ issue.bad_rate | pct }}
-- Sample: {{ issue.sample_bad_rows_path or "none" }}
-- Probable cause: {{ issue.probable_causes | join("; ") }}
-- Suggested fix: {{ issue.suggested_fix | join("; ") }}
-
-```sql
-{{ issue.evidence_sql }}
+```json
+{{ fixed_report.evaluation_summary.summary }}
 ```
-{% endfor %}
+{% else -%}
+{{ fixed_report.evaluation_summary.message }}
+{% endif %}

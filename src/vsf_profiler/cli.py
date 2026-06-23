@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 import typer
 
+from vsf_profiler.action_plans import build_issue_action_plans
 from vsf_profiler.chart_specs import build_chart_specs
 from vsf_profiler.connectors import (
     DEFAULT_MYSQL_CHUNK_ROWS,
@@ -20,10 +21,10 @@ from vsf_profiler.connectors import (
     TabularSourceConnector,
     cleanup_connector_extracts,
 )
-from vsf_profiler.csv_catalog import build_catalog
+from vsf_profiler.csv_catalog import build_catalog, load_mapping_overrides
 from vsf_profiler.dataset_verdict import build_dataset_verdict
 from vsf_profiler.dbml_parser import parse_dbml_with_report
-from vsf_profiler.demo_data import create_olist_sample, create_small_demo, download_olist
+from vsf_profiler.demo_data import create_small_demo, download_olist
 from vsf_profiler.doctor import (
     build_doctor_report,
     format_doctor_report,
@@ -47,6 +48,7 @@ from vsf_profiler.llm_narrative import (
     generate_l4_narrative,
 )
 from vsf_profiler.profiler import profile_dataset
+from vsf_profiler.quality_gates import build_quality_gates
 from vsf_profiler.quality_rules import run_quality_checks
 from vsf_profiler.relationship_checker import run_relationship_checks
 from vsf_profiler.relationship_graph import build_relationship_graph
@@ -55,6 +57,7 @@ from vsf_profiler.runtime import RuntimeRecorder
 from vsf_profiler.schema_diagram import build_schema_diagram
 from vsf_profiler.schema_evaluation import build_schema_evaluation
 from vsf_profiler.table_assessments import build_table_assessments
+from vsf_profiler.todos import build_issue_todos
 
 
 app = typer.Typer(help="VSF Data Profiler CLI")
@@ -67,6 +70,11 @@ def run(
     dbml_arg: Optional[Path] = typer.Argument(None, help="Optional positional DBML path."),
     dbml: Optional[Path] = typer.Option(None, "--dbml", help="DBML schema path."),
     csv_dir: Optional[Path] = typer.Option(None, "--csv-dir", help="Directory containing CSV files."),
+    mapping: Optional[Path] = typer.Option(
+        None,
+        "--mapping",
+        help="Optional YAML/JSON table-to-CSV mapping override file.",
+    ),
     rules: Optional[Path] = typer.Option(None, "--rules", help="Optional YAML rules file."),
     target: Optional[str] = typer.Option(None, "--target", help="Target column as table.column."),
     out: Path = typer.Option(..., "--out", help="Output directory."),
@@ -126,22 +134,22 @@ def run(
         MAX_ANALYSIS_ROWS,
         "--max-analysis-rows",
         min=1,
-        help="Maximum rows materialized for bounded influence analysis.",
+        help="Maximum rows materialized for legacy bounded association analysis.",
     ),
     max_feature_columns: int = typer.Option(
         MAX_FEATURE_COLUMNS,
         "--max-feature-columns",
         min=1,
-        help="Maximum feature columns materialized for bounded influence analysis.",
+        help="Maximum feature columns materialized for legacy bounded association analysis.",
     ),
-    use_llm: bool = typer.Option(False, "--use-llm", help="Generate optional L4 narrative."),
+    use_llm: bool = typer.Option(False, "--use-llm", help="Generate optional guarded LLM summary artifact."),
     llm_provider: Optional[str] = typer.Option(
         None,
         "--llm-provider",
-        help="Optional narrative provider: 'fake' for local validation or 'openai'.",
+        help="Optional LLM summary provider: 'fake' for local validation or 'openai'.",
     ),
 ) -> None:
-    """Run profiling, validation, influence analysis, and report generation."""
+    """Run CSV+DBML profiling, validation, legacy association analysis, and report generation."""
     dbml_path = dbml or dbml_arg
     if llm_provider and not use_llm:
         raise typer.BadParameter("--llm-provider requires --use-llm.")
@@ -163,10 +171,13 @@ def run(
             raise typer.BadParameter("Provide a DBML path with --dbml or as the first argument.")
         if csv_dir is None:
             raise typer.BadParameter("--csv-dir is required for CSV mode.")
+    elif mapping is not None:
+        raise typer.BadParameter("--mapping is only supported for CSV mode.")
 
     result = run_pipeline(
         dbml_path=dbml_path,
         csv_dir=csv_dir,
+        mapping_path=mapping,
         rules_path=rules,
         target=target,
         out_dir=out,
@@ -179,7 +190,7 @@ def run(
     typer.echo(f"Wrote report: {result['report_html']}")
     typer.echo(f"Issues found: {result['issue_count']}")
     if result.get("l4_report"):
-        typer.echo(f"Wrote L4 report: {result['l4_report']}")
+        typer.echo(f"Wrote LLM summary artifact: {result['l4_report']}")
 
 
 @demo_app.command("create-small")
@@ -189,15 +200,6 @@ def demo_create_small(
     """Create a small local demo dataset with known injected defects."""
     root = create_small_demo(out)
     typer.echo(f"Created small demo dataset: {root}")
-
-
-@demo_app.command("create-olist-sample")
-def demo_create_olist_sample(
-    out: Path = typer.Option(Path("data/demo_olist"), "--out", help="Output directory."),
-) -> None:
-    """Create the bundled Olist-shaped demo dataset with known injected defects."""
-    root = create_olist_sample(out)
-    typer.echo(f"Created Olist sample demo dataset: {root}")
 
 
 @demo_app.command("download-olist")
@@ -315,6 +317,8 @@ def run_pipeline(
     *,
     dbml_path: Path | None,
     csv_dir: Path | None,
+    mapping_path: Path | None = None,
+    mapping_overrides: dict[str, str] | None = None,
     rules_path: Path | None,
     target: str | None,
     out_dir: Path,
@@ -336,10 +340,16 @@ def run_pipeline(
             "source_type": "csv",
             "dbml_path": str(dbml_path),
             "csv_dir": str(csv_dir),
+            "mapping_path": str(mapping_path) if mapping_path else None,
             "rules_path": str(rules_path) if rules_path else None,
             "target": target,
         }
+        resolved_mapping_overrides = dict(mapping_overrides or {})
+        if mapping_path is not None:
+            resolved_mapping_overrides.update(load_mapping_overrides(mapping_path))
     else:
+        if mapping_path is not None or mapping_overrides:
+            raise ValueError("CSV mapping overrides are only supported for CSV mode.")
         runtime_inputs = {
             **source_connector.runtime_inputs(),
             "dbml_path": str(dbml_path) if dbml_path else None,
@@ -386,7 +396,11 @@ def run_pipeline(
             if source_connector is None:
                 if csv_dir is None:
                     raise ValueError("csv_dir is required for CSV mode.")
-                catalog = build_catalog(csv_dir, schema)
+                catalog = build_catalog(
+                    csv_dir,
+                    schema,
+                    mapping_overrides=resolved_mapping_overrides,
+                )
             else:
                 catalog, connector_metadata, connector_cleanup_paths = source_connector.build_catalog(
                     schema=schema,
@@ -486,6 +500,19 @@ def run_pipeline(
                 issues=issue_catalog.issues,
                 relationship_graph=relationship_graph,
             )
+            issue_action_plans = build_issue_action_plans(
+                issue_catalog.issues,
+                table_assessments=table_assessments,
+            )
+            issue_todos = build_issue_todos(issue_action_plans)
+            quality_gates = build_quality_gates(
+                preflight_review=_read_json_if_exists(out_dir / "preflight_review.json"),
+                issues=issues_payload,
+                table_assessments=table_assessments,
+                issue_action_plans=issue_action_plans,
+                issue_todos=issue_todos,
+                dataset_verdict=dataset_verdict,
+            )
             chart_specs = build_chart_specs(
                 profile_summary=profile_summary_payload,
                 issues=issues_payload,
@@ -559,6 +586,24 @@ def run_pipeline(
                 runtime=runtime,
                 key="table_assessments",
             )
+            _write_json(
+                out_dir / "issue_action_plans.json",
+                issue_action_plans,
+                runtime=runtime,
+                key="issue_action_plans",
+            )
+            _write_json(
+                out_dir / "issue_todos.json",
+                issue_todos,
+                runtime=runtime,
+                key="issue_todos",
+            )
+            _write_json(
+                out_dir / "quality_gates.json",
+                quality_gates,
+                runtime=runtime,
+                key="quality_gates",
+            )
             _write_chart_specs(out_dir / "charts", chart_specs, runtime=runtime)
             runtime.set_issue_counts(issue_catalog.issues)
             stage.add_detail("artifact_count", len(runtime.report_context()["artifact_paths"]))
@@ -567,10 +612,22 @@ def run_pipeline(
                 "table_assessment_count",
                 table_assessments["summary"]["table_count"],
             )
+            stage.add_detail(
+                "issue_action_plan_count",
+                issue_action_plans["summary"]["plan_count"],
+            )
+            stage.add_detail(
+                "issue_todo_group_count",
+                issue_todos["summary"]["todo_group_count"],
+            )
+            stage.add_detail(
+                "quality_gate_blocked_count",
+                quality_gates["summary"]["blocked_count"],
+            )
 
         l4_report_path: Path | None = None
         if use_llm:
-            with runtime.stage("llm_narrative", "Generate optional L4 narrative") as stage:
+            with runtime.stage("llm_narrative", "Generate optional LLM summary artifact") as stage:
                 narrative_result = generate_l4_narrative(
                     out_dir=out_dir,
                     artifacts={
@@ -594,10 +651,20 @@ def run_pipeline(
                     details={
                         "status": narrative_result["guardrail_report"]["status"],
                         "provider": narrative_result["guardrail_report"]["provider"],
+                        "model": narrative_result["guardrail_report"].get("model", ""),
+                        "fallback_reason": narrative_result["guardrail_report"].get(
+                            "fallback_reason",
+                            "",
+                        ),
                     },
                 )
-                stage.add_detail("provider", narrative_result["guardrail_report"]["provider"])
-                stage.add_detail("guardrail_status", narrative_result["guardrail_report"]["status"])
+                guardrail_report = narrative_result["guardrail_report"]
+                stage.add_detail("provider", guardrail_report["provider"])
+                stage.add_detail("guardrail_status", guardrail_report["status"])
+                if guardrail_report.get("model"):
+                    stage.add_detail("model", guardrail_report["model"])
+                if guardrail_report.get("fallback_reason"):
+                    stage.add_detail("fallback_reason", guardrail_report["fallback_reason"])
                 stage.add_detail("l4_report_path", "l4_report.md")
 
         with runtime.stage("render_reports", "Render Markdown and HTML reports") as stage:
@@ -688,6 +755,16 @@ def _write_json(
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
     if runtime is not None:
         runtime.artifact_written(path, key=key, kind="json")
+
+
+def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _write_chart_specs(
@@ -786,7 +863,7 @@ def _llm_provider_from_config(name: str | None) -> NarrativeProvider | None:
                 max_output_tokens=_env_int("VSF_OPENAI_MAX_OUTPUT_TOKENS", 1200),
             )
         except ValueError as exc:
-            raise typer.BadParameter(f"Invalid OpenAI L4 provider config: {exc}") from exc
+            raise typer.BadParameter(f"Invalid OpenAI LLM provider config: {exc}") from exc
     raise typer.BadParameter(
         f"Unsupported LLM provider '{provider_name}'. Supported providers: fake, openai."
     )

@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from vsf_profiler.connectors import DEFAULT_MYSQL_URL_ENV, DEFAULT_POSTGRES_URL_ENV
@@ -284,8 +285,9 @@ def _optional_node_checks() -> list[DoctorCheck]:
 
 
 def _optional_openai_checks() -> list[DoctorCheck]:
-    key_present = bool(os.environ.get("OPENAI_API_KEY", "").strip())
-    provider = os.environ.get("VSF_PROFILER_LLM_PROVIDER", "").strip()
+    env_file_values = _dotenv_values()
+    key_present = bool(_env_or_dotenv("OPENAI_API_KEY", env_file_values))
+    provider = _env_or_dotenv("VSF_PROFILER_LLM_PROVIDER", env_file_values)
     checks = [
         DoctorCheck(
             name="openai env",
@@ -306,6 +308,23 @@ def _optional_openai_checks() -> list[DoctorCheck]:
             )
         )
     return checks
+
+
+def _env_or_dotenv(name: str, dotenv_values: dict[str, str]) -> str:
+    return os.environ.get(name, "").strip() or dotenv_values.get(name, "").strip()
+
+
+def _dotenv_values(path: Path = Path(".env")) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    values: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
 
 
 def _playwright_command() -> list[str] | None:

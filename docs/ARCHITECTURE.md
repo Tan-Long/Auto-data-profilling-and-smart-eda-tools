@@ -1,9 +1,10 @@
 # Architecture
 
-VSF Data Profiler is a local-first data profiling system for many CSV tables
-that are described by a DBML schema contract. The architecture is optimized for
-large company-style datasets where loading every CSV into pandas is not
-acceptable.
+VSF Data Profiler is a local-first guided data-quality profiler for related
+CSV tables that are described by a DBML/schema contract. The product workflow
+is optimized for users who need schema-aware issue evidence, table/column
+readiness, and deterministic cleanup guidance without loading every CSV into
+pandas.
 
 The core rule is: raw data is scanned through an external-memory engine, while
 the application keeps only schema metadata, aggregate statistics, issue
@@ -11,38 +12,48 @@ evidence, bounded samples, and report artifacts in memory.
 
 ## Architecture Status
 
-This document separates **current v0.2 local RC architecture**, **near-term hardening**,
-and **target architecture**. That split matters because several desirable
-enterprise features are valuable roadmap items but should not become blockers
-for the local release candidate.
+This document separates **core product architecture**, **compatibility and
+developer surfaces**, **near-term hardening**, and **target architecture**.
+That split matters because several implemented advanced capabilities are useful
+for validation, but they should not redefine the product away from guided CSV
+plus DBML data-quality profiling.
 
-Current v0.2 local RC scope:
+Core product scope:
 
 - local CLI run over DBML plus CSV directory;
-- optional local Postgres or MySQL/MariaDB connector for selected tables;
 - DBML/CSV cataloging;
 - explicit DBML parse diagnostics;
 - DuckDB-based profiling and validation;
-- issue catalog with bounded samples and suggested fixes;
+- issue catalog with bounded samples and data-quality next steps;
 - direct relationship checks from DBML foreign keys;
-- bounded association analysis for an optional target column;
 - guarded DuckDB-to-pandas materialization for bounded analysis frames;
 - schema evaluation and relationship graph artifacts;
-- additive lineage graph artifact from existing structured evidence;
-- deterministic dataset verdict and risk scoring artifact;
-- deterministic per-table assessment and name-token business impact artifact;
+- deterministic data-quality readiness artifact;
+- deterministic per-table readiness and analysis-impact artifact;
+- deterministic issue action-plan artifact with fix and verify checklists;
+- deterministic grouped todo artifact derived from issue action plans;
+- deterministic post-run quality gates derived from structured readiness,
+  issue, action-plan, todo, and verdict artifacts;
+- built-in evaluation comparison artifacts for curated faulty datasets;
 - deterministic chart-spec artifacts from aggregate outputs;
 - schema diagram artifacts;
 - runtime trace artifacts;
-- deterministic Markdown/HTML reports;
-- optional Senior Data Scientist narrative with guardrail validation from
+- deterministic Markdown/HTML data-quality reports.
+
+Compatibility and developer surfaces:
+
+- local Postgres or MySQL/MariaDB connector for selected tables;
+- additive lineage and influence artifacts from existing structured evidence;
+- optional guarded compatibility LLM summary artifacts with validation from
   structured artifacts only;
-- static local-first DBML/CSV mapping web preflight surface, including the
-  Vercel static deployment;
+- optional selected-issue LLM enrichment artifacts generated on demand from a
+  concrete issue, deterministic action plan, and bounded sample evidence;
+- historical static DBML/CSV mapping preview;
 - local-only web runner with upload mode for demo/small-medium files and local
-  path mode for larger local datasets;
-- interactive local web-runner dashboard rendered from generated artifacts,
-  including chart panels plus lineage and relationship graph views;
+  path mode for larger local datasets, plus developer database source mode over
+  the existing connector boundary;
+- interactive local web-runner review surface rendered from generated
+  artifacts, including chart panels plus developer schema/relationship context;
 - exportable self-contained analysis packages generated from existing output
   directories without copying raw source CSV files;
 - release-candidate doctor, demo, and artifact audit commands that compose
@@ -60,7 +71,7 @@ Near-term hardening scope:
 Target roadmap scope:
 
 - richer graph validation;
-- richer configurable verdict thresholds;
+- richer configurable readiness thresholds;
 - rendered chart images and richer chart types;
 - additional external LLM provider adapters beyond the OpenAI provider;
 - job retention controls for larger local web-runner output directories.
@@ -71,14 +82,14 @@ Target roadmap scope:
 - Use DBML tables, primary keys, foreign keys, and relationship declarations to
   build a dataset graph.
 - Profile each table and column without full pandas loads.
-- Validate schema, data quality rules, and cross-table relationships.
+- Validate schema constraints and cross-table relationships.
 - Produce normalized, machine-readable findings that identify table, column,
-  bad count, sample artifact, evidence SQL, severity, and suggested fix.
+  bad count, sample artifact, evidence SQL, severity, and data-quality next step.
 - Show the runtime execution flow while the profiler runs.
 - Generate reproducible JSON, Markdown, HTML, diagram, and bounded sample
   artifacts.
-- Optionally generate a Senior Data Scientist narrative from structured
-  evidence only.
+- Keep optional LLM summaries bounded, evidence-linked, and guardrailed when
+  compatibility runs enable them.
 - Keep all raw data local unless the user explicitly opts into an external LLM.
 - Keep database credentials out of logs, reports, run summaries, events, and
   artifact payloads.
@@ -91,8 +102,7 @@ Target roadmap scope:
 - Do not make causal-inference claims from profiling or association metrics.
 - Do not use pandas/ydata/PyOD full-data pipelines for large input files.
 - Do not build production database monitoring, backup validation, lock analysis,
-  security audit, or external enterprise lineage catalog publishing in the
-  v0.2 local RC.
+  security audit, or external lineage catalog publishing in the core MVP.
 
 ## Product Surfaces
 
@@ -100,11 +110,12 @@ Target roadmap scope:
 | --- | --- | --- |
 | CLI | Run the full profiler and write artifacts to an output directory. | v0.2 local RC. |
 | Static reports | Let users inspect findings without running an app server. | v0.2 local RC. |
-| Static web workspace | Upload DBML/CSV headers locally, map files to tables, and visualize DBML before a run. The Vercel deployment serves only this static preflight surface. | v0.2 static preflight. |
-| Local web runner | Run DBML/CSV/rules jobs through a `127.0.0.1` backend using either browser upload mode or local path mode, then expose canonical artifacts, chart panels, and lineage/relationship graph views in an interactive artifact dashboard. | v0.2 local runner. |
+| Static web workspace | Historical browser-only DBML/CSV mapping preview. It is retained for compatibility and is not the product-facing guided workflow. | Compatibility preview. |
+| Local web runner | Run CSV+DBML jobs through a `127.0.0.1` backend using browser upload mode or local path mode, then expose quality gates, issue evidence, deterministic action plans, todos, table readiness, report/export links, selected-issue LLM enrichment, developer artifact links, persistent run history, and per-run stage timelines. Legacy rule config, association fields, database source mode, compatibility LLM report artifacts, and graph artifacts remain compatibility controls. | Guided local runner. |
+| Evaluate tool | Run built-in faulty dataset comparisons against seeded ground truth and the available Great Expectations baseline state without accepting arbitrary uploads. | Local demo/release surface. |
 | Runtime trace files | Make each run debuggable through log, JSONL events, and summary metadata. | v0.2 hardening. |
-| Optional LLM report | Produce a guarded narrative from evidence JSON after deterministic checks finish. | Optional v0.2. |
-| Analysis package | Export an existing output directory into an offline package with manifest, index page, generated artifacts, checksums, optional PDF, and optional zip. | v0.2 handoff surface. |
+| Optional LLM artifacts | Produce guarded evidence summaries from artifact JSON after deterministic checks finish. | Compatibility surface. |
+| Analysis package | Export an existing output directory into an offline package with manifest, index page, generated artifacts, checksums, optional PDF, and optional zip. | Developer handoff surface. |
 | Release candidate commands | Diagnose local prerequisites, run the full demo/package/audit path, and reject artifact leakage before handoff. | v0.2 hardening. |
 | Benchmark guardrails | Generate deterministic larger local data, run the existing pipeline, and record row/runtime/memory/artifact/materialization evidence. | v0.2 hardening. |
 
@@ -113,40 +124,60 @@ Target roadmap scope:
 ### Current v0.2 run flow
 
 ```text
-DBML + CSV directory + optional YAML rules + optional target column
+DBML + CSV directory
   -> input boundary validation
   -> DBML catalog, parser diagnostics, and relationship graph
   -> CSV catalog and table mapping
   -> DuckDB external-memory scan layer
   -> table and column profiling
   -> DBML constraint checks
-  -> YAML business-rule checks
   -> direct relationship validation
-  -> bounded influence/correlation analysis when target is provided
   -> issue aggregation and recommended actions
-  -> deterministic dataset verdict
-  -> deterministic per-table assessment and business impact classification
+  -> deterministic data-quality readiness artifact
+  -> deterministic per-table assessment and analysis impact classification
+  -> deterministic issue action plans with fix and verify checklists
+  -> deterministic grouped todos for remediation and verification
+  -> deterministic quality gates for analysis, joins, cleanup, and outlier review
   -> deterministic chart specs from aggregate artifacts
-  -> optional LLM narrative with guardrail validation when --use-llm is set
-  -> local lineage graph from source, schema, runtime, and artifact evidence
   -> deterministic JSON, samples, schema diagrams, Markdown, and HTML reports
 ```
 
-### Near-term and target enrichment flow
+Legacy rule config, target-based association analysis, database source mode,
+lineage artifacts, and compatibility LLM report artifacts enter the same
+implementation flow when explicitly enabled, but they are compatibility or
+developer paths rather than the guided product workflow.
+
+### Selected-issue enrichment flow
 
 ```text
 v0.2 artifacts
-  -> runtime context and run id
-  -> run.log, run_events.jsonl, and run_summary.json
-  -> schema evaluation artifact
-  -> relationship graph artifact
-  -> rendered charts
-  -> optional LLM narrative with guardrail validation
+  -> user selects one issue/action plan
+  -> bounded selected-issue context from generated artifacts and samples/*.csv
+  -> fake or OpenAI provider
+  -> strict structured response validation
+  -> issue_llm_enrichments.json
+  -> visible human-review state in the drawer
 ```
 
-The deterministic pipeline owns all facts. The LLM layer is a presenter and must
-not invent numbers, references, root causes, or remediation actions that are not
-supported by evidence artifacts.
+The deterministic pipeline owns all facts. The LLM layer is a presenter and
+must not invent numbers, references, causal claims, or data-quality next steps
+that are not supported by evidence artifacts.
+
+### Evaluate tool flow
+
+```text
+built-in faulty dataset id
+  -> curated local DBML and CSV fixtures
+  -> normal VSF pipeline
+  -> ground_truth_issues.json
+  -> baseline_comparison.json
+  -> evaluation_summary.json
+  -> local web comparison summary
+```
+
+Great Expectations is optional for local acceptance. When it is unavailable,
+baseline rows are labeled `unavailable` or `not_covered`; this is not a failed
+default demo path.
 
 ## Runtime Stack
 
@@ -155,7 +186,7 @@ supported by evidence artifacts.
 | CLI | Typer | Small local command surface with typed options. |
 | Query engine | DuckDB | Reads CSV directly and can aggregate/join without loading full files into Python memory. |
 | Domain contracts | Pydantic | Stable JSON contracts and validation for reports. |
-| Rules config | YAML | Human-editable business rules. |
+| Rules config | YAML | Human-editable data-quality rules. |
 | Reports | Jinja2 Markdown/HTML templates | Deterministic, testable output. |
 | Runtime logging | Python logging + JSONL events; optional Rich console | Near-term hardening for human-readable progress and machine-readable run trace. |
 | Web workspace | Plain HTML/CSS/JavaScript plus Python stdlib local runner | Static DBML/CSV mapping without a build step; full profiling only through the local `127.0.0.1` backend. |
@@ -173,7 +204,7 @@ application
   optional LLM dispatch
 
 domain
-  schema catalog, table catalog, profiles, issues, graph, verdict, report and
+  schema catalog, table catalog, profiles, issues, graph, readiness, report and
   runtime models
 
 infrastructure
@@ -194,23 +225,28 @@ runner can share the same implementation.
 | Module | Responsibility | Architecture role |
 | --- | --- | --- |
 | `src/vsf_profiler/cli.py` | CLI options, command entrypoints, and current pipeline orchestration. | Interface and application. |
-| `src/vsf_profiler/models.py` | Pydantic contracts for schemas, catalogs, profiles, issues, and influence results. | Domain. |
+| `src/vsf_profiler/models.py` | Pydantic contracts for schemas, catalogs, profiles, issues, and compatibility association results. | Domain. |
 | `src/vsf_profiler/dbml_parser.py` | Practical DBML parsing plus explicit parse diagnostics. | Infrastructure adapter producing domain catalog data. |
 | `src/vsf_profiler/connectors.py` | Tabular connector abstraction and Postgres/MySQL introspection plus chunked extraction. | Infrastructure adapter. |
 | `src/vsf_profiler/csv_catalog.py` | CSV discovery and DBML table mapping. | Application/domain boundary. |
 | `src/vsf_profiler/duckdb_utils.py` | DuckDB connection, safe identifier quoting, and CSV relation creation. | Infrastructure. |
 | `src/vsf_profiler/profiler.py` | Table and column statistics through DuckDB SQL. | Application service. |
-| `src/vsf_profiler/quality_rules.py` | DBML and YAML rule checks. | Application service. |
+| `src/vsf_profiler/quality_rules.py` | DBML checks and legacy rule-config checks. | Application service. |
 | `src/vsf_profiler/relationship_checker.py` | FK, anti-join, parent duplicate, and join coverage checks. | Application service. |
-| `src/vsf_profiler/issue_catalog.py` | Normalized issue creation, severity defaults, evidence paths, and suggested fixes. | Domain/application service. |
-| `src/vsf_profiler/influence_analyzer.py` | Bounded association analysis for a target column. | Application service with strict memory guards. |
+| `src/vsf_profiler/issue_catalog.py` | Normalized issue creation, severity defaults, evidence paths, and data-quality next steps. | Domain/application service. |
+| `src/vsf_profiler/influence_analyzer.py` | Legacy bounded association analysis for an explicit association field. | Compatibility service with strict memory guards. |
 | `src/vsf_profiler/schema_evaluation.py` | DBML-vs-CSV conformance artifact generation. | Report artifact service. |
 | `src/vsf_profiler/relationship_graph.py` | Relationship graph artifact generation from DBML and DuckDB FK checks. | Report artifact service. |
-| `src/vsf_profiler/lineage_graph.py` | Lineage graph artifact generation from existing source, schema, runtime, and artifact evidence. | Report artifact service. |
-| `src/vsf_profiler/table_assessments.py` | Deterministic per-table readiness, role, relationship-risk, and name-token business-impact artifact generation from existing structured outputs. | Report artifact service. |
+| `src/vsf_profiler/lineage_graph.py` | Developer runtime-context artifact generation from existing source, schema, runtime, and artifact evidence. | Report artifact service. |
+| `src/vsf_profiler/table_assessments.py` | Deterministic per-table readiness, role, relationship-risk, and name-token analysis-impact artifact generation from existing structured outputs. | Report artifact service. |
+| `src/vsf_profiler/action_plans.py` | Deterministic issue action-plan artifact generation from existing issue and table-assessment evidence. | Report artifact service. |
+| `src/vsf_profiler/todos.py` | Deterministic grouped todo generation from issue action-plan fix and verify checklists. | Report artifact service. |
+| `src/vsf_profiler/quality_gates.py` | Deterministic post-run quality gate evaluation from preflight, issue, table-assessment, action-plan, todo, and dataset-verdict evidence. | Report artifact service. |
+| `src/vsf_profiler/evaluation_benchmark.py` | Built-in faulty dataset catalog, ground-truth comparison, Great Expectations availability/baseline state, and evaluation summary artifacts. | Demo/release validation service. |
 | `src/vsf_profiler/chart_specs.py` | Deterministic chart specs from aggregate machine artifacts. | Report artifact service. |
 | `src/vsf_profiler/schema_diagram.py` | DBML diagram payload and dbdiagram link generation. | Report artifact service. |
-| `src/vsf_profiler/llm_narrative.py` | Optional L4 narrative context building, fake and OpenAI provider adapters, deterministic fallback, and guardrail validation. | Application presenter / provider boundary. |
+| `src/vsf_profiler/llm_narrative.py` | Optional guarded LLM summary context building, fake and OpenAI provider adapters, deterministic fallback, and guardrail validation. | Application presenter / provider boundary. |
+| `src/vsf_profiler/llm_issue_enrichment.py` | Optional selected-issue LLM enrichment context building, fake/OpenAI providers, strict structured response validation, and append-only enrichment artifact writing. | Application presenter / provider boundary. |
 | `src/vsf_profiler/report_generator.py` | Deterministic Markdown and HTML reports. | Interface presenter. |
 | `src/vsf_profiler/export_package.py` | Offline analysis package creation, manifest/checksum generation, static package index rendering, optional PDF export, artifact allow-listing, and package redaction scanning. | Interface presenter / packaging service. |
 | `src/vsf_profiler/doctor.py` | Local environment diagnostics for required and optional release-candidate prerequisites, with redacted env reporting. | Interface / operational support. |
@@ -242,36 +278,47 @@ The domain should converge on these stable concepts:
 - `TableProfile`: row count, column count, duplicate key metrics, and scan
   metadata.
 - `ColumnProfile`: null count, distinct count, inferred semantic type, numeric
-  stats, string stats, date stats, top values, and quality flags.
+  stats, percentiles, IQR outlier evidence, string stats, date stats, top
+  values, and quality flags.
 - `Issue`: normalized finding with type, severity, table, columns, bad count,
-  affected percent, evidence SQL, sample artifact, suggested fix, and
+  affected percent, evidence SQL, sample artifact, data-quality next step, and
   provenance.
-- `RelationshipCheck`: FK status, orphan count, null FK count, duplicate parent
+- `RelationshipCheck`: FK health, orphan count, null FK count, duplicate parent
   count, join coverage, cardinality, and confidence.
 - `DataGraph`: tables as nodes and relationships as edges, including edge type,
   cardinality, constraint source, and validation status.
-- `LineageGraph`: source systems, schemas, tables, columns, relationships,
-  profiler stages, generated artifacts, and typed dependency edges derived from
-  existing evidence artifacts.
-- `InfluenceResult`: association metrics for a target column with explicit
-  non-causality wording.
-- `DatasetVerdict`: overall readiness, review-risk score, scoring formula
-  metadata, top blockers, warnings, and recommended next actions.
-- `TableAssessment`: per-profiled-table role, review score, scoring formula
-  metadata, readiness, issue counts, affected columns, relationship risks,
-  name-token business impact, evidence artifact references, and recommended
-  next actions. The review score is a deterministic EDA prioritization
-  heuristic, not a statistical health model.
+- `LineageGraph`: developer runtime-context artifact with source systems,
+  schemas, tables, columns, relationships, profiler stages, generated
+  artifacts, and typed dependency edges derived from existing evidence
+  artifacts.
+- `InfluenceResult`: legacy association metrics for an explicitly supplied
+  field with explicit non-causality wording.
+- `DatasetVerdict`: compatibility artifact for overall data-quality
+  readiness, risk score, top blockers, warnings, and data-quality next steps.
+- `TableAssessment`: per-profiled-table role, health score, readiness, issue
+  counts, affected columns, relationship risks, name-token analysis impact,
+  evidence artifact references, and data-quality next steps.
+- `QualityGate`: deterministic post-run gate with approved status label,
+  short explanation, evidence values, linked issue/table/column context, and a
+  next action pointing to Review Issues or Todos.
 - `ChartSpec`: deterministic chart metadata and aggregate data with source
   artifact references.
-- `NarrativeReport`: optional LLM output plus guardrail validation status.
+- `NarrativeReport`: optional LLM summary artifact plus guardrail validation
+  status.
+- `IssueLlmEnrichment`: optional selected-issue enrichment attempt with
+  provider, issue id, status, guardrail result, sanitized request summary,
+  structured response, error state, source artifacts, and human-review
+  requirement.
+- `EvaluationSummary`: built-in benchmark comparison summary with dataset
+  metadata, VSF caught/missed/extra rows, bad-count accuracy, action-plan
+  usefulness, evidence coverage, and baseline unavailable/not-covered states.
 
 `RunSummary` is the near-term runtime contract. `RunManifest` may be introduced
 later as a richer superset, but it should not replace current artifact names
 without a compatibility path.
 
 The legacy `tanlong` branch may contain useful ontology ideas for findings,
-schema evaluation, verdict, graph edges, issue clusters, and guardrail reports.
+schema evaluation, readiness, graph edges, issue clusters, and guardrail reports.
 Those concepts should be ported as contracts, not as pandas execution logic.
 
 ## Input Boundaries
@@ -282,16 +329,18 @@ All untrusted input is parsed at the boundary:
 - DBML text must be parsed into a `SchemaCatalog`.
 - CSV files must be cataloged before any scan.
 - CSV headers and DBML table names must be normalized consistently.
-- YAML rules must be validated into typed rule objects.
-- Target columns must use `table.column` format and must exist after mapping.
+- Legacy rule config must be validated into typed rule objects when supplied.
+- Legacy association fields must use `table.column` format and must exist after
+  mapping when supplied.
 - Database connection URLs must be accepted through CLI/env input only at the
   boundary and redacted before runtime/report surfaces.
 - LLM provider config must be optional and isolated from deterministic runs.
 
 The pipeline should fail fast for invalid control inputs such as unreadable
-DBML, malformed YAML, missing CSV directories, invalid target column names, or
-unwritable output directories. Data-quality failures inside valid input files
-should be reported as issues rather than crashing the run whenever possible.
+DBML, malformed legacy rule config, missing CSV directories, invalid legacy
+association field names, or unwritable output directories. Data-quality
+failures inside valid input files should be reported as issues rather than
+crashing the run whenever possible.
 
 Security-sensitive boundary rule: table names, column names, and file paths from
 DBML/CSV input are untrusted. SQL generation must quote identifiers through a
@@ -339,19 +388,28 @@ constraints with observed data checks:
 
 ## CSV Catalog and Mapping
 
-CSV files map to DBML tables by normalized file stem by default. The catalog
-also records:
+CSV files map to DBML tables by exact file stem first. If no exact CSV exists
+for a DBML table, the backend can infer a mapping from normalized filename
+similarity, DBML column overlap, primary-key column match, foreign-key column
+match, and an extra-column penalty. Inferred mappings are selected only when
+confidence is high and the best candidate is clearly separated from the next
+candidate. Ambiguous candidates stay unmapped until the user provides a manual
+override.
+
+The catalog also records:
 
 - missing CSV files for DBML tables;
 - extra CSV files not described in DBML;
-- duplicate candidate mappings;
+- candidate mapping scores and ambiguity evidence;
+- mapping method, selected CSV, confidence, matched/missing/extra columns;
 - headers read from each file;
 - header-to-column mismatches;
 - file size and modification metadata when available.
 
-The static web UI may let users override mappings manually. A future local web
-runner should pass those mappings to the CLI/backend as explicit run config
-rather than relying only on file stems.
+Manual mapping overrides are explicit run configuration. The CLI accepts a
+YAML/JSON mapping file, and the local web runner passes dropdown overrides to
+the backend for upload and local path jobs. Overrides force table-to-CSV
+selection only; they do not rename columns or repair data.
 
 ## External-Memory Data Access
 
@@ -381,8 +439,8 @@ Resource controls should be first-class run options:
 - DuckDB memory limit;
 - DuckDB temp directory;
 - max sample rows per issue;
-- max analysis rows for bounded influence analysis;
-- max feature columns for influence analysis;
+- max analysis rows for legacy bounded association analysis;
+- max feature columns for legacy association analysis;
 - exact vs approximate distinct-count mode;
 - fail-fast vs best-effort mode.
 
@@ -449,8 +507,8 @@ Quality checks come from three sources:
 
 - DBML constraints: required fields, primary keys, unique columns, foreign keys,
   and type expectations.
-- YAML business rules: range checks, accepted values, regex, date ordering, and
-  SQL expressions.
+- legacy rule config: range checks, accepted values, regex, date ordering, and
+  SQL expressions when supplied.
 - Built-in heuristics: empty strings, placeholder tokens, constant columns, high
   missingness, high cardinality, invalid dates, invalid numbers, duplicate rows,
   and suspicious identifiers.
@@ -464,8 +522,8 @@ Every issue must carry evidence:
 - affected percentage when meaningful;
 - evidence SQL or deterministic rule reference;
 - bounded sample artifact path;
-- probable cause when deterministic;
-- suggested fix;
+- evidence note when deterministic;
+- data-quality next step;
 - provenance showing whether it came from DBML, YAML, built-in heuristics, or
   graph validation.
 
@@ -496,13 +554,15 @@ Relationship validation should emit both issue records and graph-edge status.
 For example, an edge can be declared in DBML but marked `invalid` because the
 parent key is not unique or because orphan keys exceed the configured threshold.
 
-## Influence and Cross-Table Analysis
+## Legacy Association Analysis
 
-Influence analysis is association analysis, not causality analysis.
+The target-column association path is retained for compatibility. It is
+association analysis, not causality analysis, and is not part of the guided
+CSV+DBML product workflow.
 
 Allowed implementation pattern:
 
-- select a target column in `table.column` format;
+- select an explicit association field in `table.column` format;
 - build a bounded analysis relation in DuckDB;
 - include direct table features and selected parent-table features through safe
   joins;
@@ -512,9 +572,9 @@ Allowed implementation pattern:
 - compute association metrics with SQL or bounded in-memory frames;
 - label every result as association only.
 
-The default behavior should still produce a successful run when no target is
-provided. In that case `influence.json` should record `skipped` with a clear
-reason rather than crashing the pipeline.
+The default behavior should still produce a successful run when no association
+field is provided. In that case `influence.json` should record `skipped` with a
+clear reason rather than crashing the pipeline.
 
 The legacy `tanlong` branch may contain useful ideas for safe joins, fact-table
 selection, and cross-table correlation. Those ideas must be rewritten to use
@@ -531,29 +591,32 @@ only from existing machine artifacts:
 - `issues.json`;
 - `relationship_graph.json`;
 - `dataset_verdict.json`;
-- `influence.json`.
+- `influence.json` when the legacy association path is enabled.
 
 Current chart specs:
 
 - issue counts by severity and type;
 - missingness by table and top columns;
-- relationship FK status summary;
-- dataset verdict risk summary;
-- influence top features when available.
+- top numeric IQR outlier columns from profile summaries;
+- relationship FK health summary;
+- readiness risk summary;
+- legacy association chart when available.
 
-The Markdown and HTML reports render a static Senior Data Scientist review from
-those specs and the other generated machine artifacts. The report structure is
-evidence-first: executive scorecard, chart-summary bars, table impact, issue
-evidence, relationship/schema/lineage summary, and explicit L4 or no-LLM state.
+The Markdown and HTML reports render a static data-quality report from those
+specs and the other generated machine artifacts. The report structure is
+evidence-first: readiness, chart-summary bars, table readiness, issue evidence,
+schema/relationship summary, developer artifact appendix, and explicit LLM
+guardrail state when optional LLM artifacts are present.
 HTML uses simple CSS bars only; Markdown uses textual bars for PDF/package
 compatibility. The CLI does not need matplotlib, seaborn, browser automation,
 or raw-data plotting to produce these reports.
 
-The local web runner renders an interactive dashboard from the same generated
-chart specs and machine artifacts. Dashboard filtering and drilldown are
-client-side presentation over artifact JSON. Its Generated results panel may
-summarize dataset verdict, issue counts, table impact, runtime summary, and
-report links from those artifacts while preserving raw artifact links. The
+The local web runner renders an interactive issue-review surface from the same
+generated chart specs and machine artifacts. Filtering and drilldown are
+client-side presentation over artifact JSON. Its issue review snapshot may
+summarize data-quality readiness, issue counts, table readiness, runtime
+summary, and report links from those artifacts while preserving developer
+artifact links. The
 DBML diagram panel renders browser preflight state before a run and prefers
 generated `schema_diagram.json`, `relationship_graph.json`, and
 `schema_parse_report.json` artifact evidence after a run. The local diagram
@@ -574,11 +637,11 @@ The stable artifact should be chart data or a chart spec first. PNG/SVG/HTML
 rendering can be layered on top so the report remains reproducible in headless
 environments.
 
-## Severity and Verdict
+## Severity and Readiness
 
 Severity should be deterministic and explainable.
 
-Current v0.2 severity is rule-default based and normalized for verdict
+Current v0.2 severity is rule-default based and normalized for readiness
 aggregation:
 
 - P0: the run or core dataset contract is blocked;
@@ -586,7 +649,7 @@ aggregation:
 - P2: medium data quality issue that needs cleanup or confirmation;
 - P3: warning, outlier, or review-needed finding.
 
-Current verdict inputs:
+Current readiness inputs:
 
 - issue type;
 - bad count and affected percent;
@@ -595,26 +658,26 @@ Current verdict inputs:
 - schema evaluation summary;
 - relationship graph edge status.
 
-Roadmap verdict inputs:
+Roadmap readiness inputs:
 
-- target-column relevance;
+- legacy association-field relevance;
 - configurable thresholds;
 - compound issue patterns.
 
-Current verdict outputs:
+Current readiness outputs:
 
 - issue severity;
 - table-level risk;
-- deterministic table assessments with bounded business-impact categories;
+- deterministic table assessments with bounded analysis-impact categories;
 - relationship-level risk;
-- dataset-level readiness verdict such as `READY`, `WARN`, or `NOT_READY`;
-- top blockers and suggested next actions.
+- dataset-level readiness labels such as `READY`, `WARN`, or `NOT_READY`;
+- top blockers and data-quality next steps.
 
-The severity and verdict model from the legacy `tanlong` branch is a useful
+The severity and readiness model from the legacy `tanlong` branch is a useful
 product-behavior reference. It should be adapted to the current issue model and
 tested with deterministic fixtures.
 
-## LLM Narrative
+## Optional LLM Summary Artifacts
 
 The LLM layer is optional and runs after deterministic artifacts are complete.
 `fake` is available for local validation, and `openai` is available as the
@@ -628,10 +691,10 @@ LLM input may include:
 - issue summaries;
 - schema evaluation;
 - relationship graph summary;
-- verdict;
+- readiness label;
 - per-table assessment summary;
 - chart summaries;
-- influence summary.
+- legacy association summary when present.
 
 LLM input must not include:
 
@@ -642,25 +705,25 @@ LLM input must not include:
 - unbounded sample rows;
 - unsupported numbers or claims.
 
-The narrative role is "Senior Data Scientist". The output should explain:
+The compatibility LLM output should summarize:
 
-- dataset review status;
+- data-quality readiness;
 - important table and column findings;
 - relationship risks;
-- likely downstream modeling or analytics impact;
-- prioritized remediation steps;
+- likely downstream modeling or analysis impact;
+- prioritized data-quality next steps;
 - caveats and non-causal interpretation.
 
 Guardrail validation should run after generation:
 
 - verify numeric claims against allowed evidence;
 - verify issue/table/column references;
-- verify table/business-impact claims against `table_assessments.json`;
+- verify table analysis-impact claims against `table_assessments.json`;
 - reject causal wording unless explicitly supported;
-- fall back to deterministic narrative if validation fails.
+- fall back to deterministic summary output if validation fails.
 
 The OpenAI provider uses the Responses API with a bounded JSON prompt built
-from the same narrative context. It does not use the OpenAI SDK as a required
+from the same artifact context. It does not use the OpenAI SDK as a required
 dependency and must remain testable through an injected fake transport.
 Provider configuration is validated before dispatch: model names must be
 bounded, base URLs must be absolute http(s) URLs with HTTPS required outside
@@ -676,22 +739,25 @@ The output directory is the run contract.
 
 | Artifact | Purpose |
 | --- | --- |
-| `profile_summary.json` | Table and column statistics. |
+| `profile_summary.json` | Table and column statistics, including numeric percentiles and IQR outlier evidence. |
 | `issues.json` | Normalized data-quality, schema, and relationship findings. |
-| `influence.json` | Target-column association analysis or skipped status. |
+| `influence.json` | Legacy association analysis or skipped status. |
 | `samples/` | Bounded evidence rows for findings. |
 | `connector_metadata.json` | Optional connector source metadata, selected tables, row estimates, extraction status, warnings, and redaction status. |
 | `schema_parse_report.json` | DBML parsed object counts, warnings, unsupported constructs, and parse diagnostics. |
-| `lineage_graph.json` | Local lineage graph connecting sources, schema entities, relationships, profiler stages, and generated artifacts. |
+| `lineage_graph.json` | Developer runtime-context artifact connecting sources, schema entities, relationships, profiler stages, and generated artifacts. |
 | `schema_evaluation.json` | DBML-vs-CSV table/column conformance and schema issue references. |
 | `relationship_graph.json` | Table nodes, direct FK edges, FK metrics, status, and evidence links. |
-| `dataset_verdict.json` | Readiness verdict, review-risk score, scoring model metadata, blockers, and recommendations. |
-| `table_assessments.json` | One assessment per profiled table with role, review score, scoring model metadata, readiness, relationship risks, business-impact category, evidence refs, and actions. |
-| `charts/` | Deterministic chart specs and report visual-summary data. |
+| `dataset_verdict.json` | Data-quality readiness label, risk score, blockers, and data-quality next steps. |
+| `table_assessments.json` | One assessment per profiled table with role, health score, readiness, relationship risks, analysis-impact category, evidence refs, and data-quality next steps. |
+| `issue_action_plans.json` | One deterministic action plan per issue with finding summary, evidence values, fix checklist, verify checklist, priority, evidence coverage, actionability score, and human-review state. |
+| `issue_todos.json` | Grouped deterministic Fix data and Verify after fix todos derived from `issue_action_plans.json`, preserving occurrence context for table, column, issue, and priority. |
+| `quality_gates.json` | Deterministic gate statuses for Can run analysis, Can trust joins, Needs cleanup before sharing, and Outliers need review, with explanations, evidence values, linked context, and next actions. |
+| `charts/` | Deterministic chart specs and report visual-summary data, including `outliers_top_columns.json`. |
 | `schema_diagram.json` | Diagram metadata and dbdiagram link. |
 | `schema_diagram.dbml` | DBML used for diagram rendering. |
-| `l4_report.md` | Optional Senior Data Scientist narrative when `--use-llm` runs. |
-| `guardrail_report.json` | Optional L4 validation status, sanitized model config, checked claims, and violations. |
+| `l4_report.md` | Optional guarded LLM summary artifact when `--use-llm` runs. |
+| `guardrail_report.json` | Optional LLM validation status, sanitized model config, checked claims, and violations. |
 | `report.md` | Deterministic human-readable report. |
 | `report.html` | Static HTML report. |
 | `analysis_report.pdf` | Package-only optional PDF rendered from existing report artifacts when `vsf-profiler package --pdf` is used. |
@@ -699,9 +765,9 @@ The output directory is the run contract.
 | `index.html` | Package-only offline entrypoint linking reports and machine artifacts. |
 
 The package `index.html` is an offline review entrypoint, not a raw artifact
-dump. It mirrors the core report evidence with scorecards, L4 state, table
-impact, issue evidence, relationship/schema/lineage summaries, report links,
-chart-spec links, and bounded sample links. The optional
+dump. It mirrors the core report evidence with scorecards, LLM guardrail state,
+table readiness, issue evidence, schema/relationship summaries, developer
+artifact links, chart-spec links, and bounded sample links. The optional
 `analysis_report.pdf` is rendered from the generated Markdown report so the PDF
 shares the same core review evidence.
 
@@ -725,9 +791,10 @@ while richer artifacts are added.
 
 ## Web Architecture
 
-The current web UI has a hosted static preflight surface and a local-only runner.
+The current web UI has a historical static mapping preview and a local-only
+runner.
 
-Static browser preflight:
+Static browser preview:
 
 - reads DBML files in the browser;
 - reads only CSV headers;
@@ -736,9 +803,9 @@ Static browser preflight:
   deterministic layers, compact cards, orthogonal edges, and focused detail;
 - generates a dbdiagram.io link as a secondary external action.
 
-The Vercel deployment serves only this static preflight UI. It does not run the
-Python/DuckDB backend, database connectors, local path mode, LLM narrative
-generation, package/PDF export, or dashboard jobs.
+The historical static deployment serves only this browser preview. It does not
+run the Python/DuckDB backend, database connectors, local path mode, LLM summary
+generation, package/PDF export, or review jobs.
 
 Local runner:
 
@@ -748,7 +815,8 @@ browser workspace
   -> same application pipeline used by CLI
   -> outputs/web_runs/<job_id>/artifacts
   -> run_events.jsonl and run_summary.json
-  -> browser artifact viewer and interactive artifact dashboard
+  -> browser artifact viewer and interactive issue review
+  -> persistent run history by scanning outputs/web_runs folders
 ```
 
 The web runner must not create a separate profiling implementation. CLI and web
@@ -757,10 +825,11 @@ demo/small-medium files. Local path mode is the browser workflow for larger
 local datasets because it sends only path strings to the local backend and lets
 the Python pipeline read CSV files directly from disk.
 
-The interactive dashboard is a presentation layer. It consumes generated
+The interactive issue review is a presentation layer. It consumes generated
 `charts/*.json` and machine artifacts through protected artifact URLs. It may
 filter and group artifact rows for display, but it must not implement
-profiling, validation, relationship, verdict, influence, or LLM logic.
+profiling, validation, relationship, readiness, legacy association, or LLM
+logic.
 
 ## Performance Strategy
 
@@ -778,7 +847,7 @@ The system should scale by scanning and aggregating, not by retaining rows.
 | Composite FK | SQL joins and grouped checks over all key columns. |
 | Many-to-many validation | Junction-table pattern detection from key and relationship metadata. |
 | Issue samples | SQL query with `LIMIT sample_size`, written to CSV. |
-| Influence | SQL feature extraction plus bounded sample frame. |
+| Legacy association artifact | SQL feature extraction plus bounded sample frame. |
 | Charts | SQL aggregate bins and top-k datasets. |
 
 Large-file regression tests should include synthetic data that exceeds normal
@@ -788,7 +857,7 @@ is not raw speed alone; it is bounded memory and graceful degradation.
 The benchmark guardrail path writes `performance_guard_report.json` after a
 generated large-dataset run. The report records generated row counts, pipeline
 stage timings from `run_summary.json`, run event counts, peak RSS memory where
-supported, artifact sizes, influence row/feature limits, package and audit
+supported, artifact sizes, legacy association row/feature limits, package and audit
 status, and static materialization guard scan results. It is benchmark
 evidence, not a machine-independent performance SLA.
 
@@ -802,7 +871,7 @@ execution stages:
 3. Profile CSV tables and columns.
 4. Run data quality checks.
 5. Check relationships.
-6. Run influence analysis or record why it was skipped.
+6. Run legacy association analysis or record why it was skipped.
 7. Generate artifacts and reports.
 
 Console output should show stage start, stage success/failure, duration, and key
@@ -831,7 +900,11 @@ values. They may include table name, column name, issue type, severity,
 `bad_count`, `bad_rate`, and sample artifact path.
 
 For the local web runner, job status exposes the same stage metadata instead of
-inventing a separate progress model.
+inventing a separate progress model. Persistent run history is rebuilt from
+`outputs/web_runs/<job_id>/artifacts` by reading `run_summary.json`,
+`run_events.jsonl`, `quality_gates.json`, and other existing generated
+artifacts; it must not introduce an application database for this local
+workflow.
 
 ## Error Handling
 
@@ -842,7 +915,7 @@ Control-plane errors stop the run:
 - missing DBML file;
 - unreadable CSV directory;
 - invalid YAML syntax;
-- invalid target-column format;
+- invalid legacy association field format;
 - artifact output path cannot be created;
 - DuckDB cannot initialize with configured resource options.
 
@@ -898,7 +971,7 @@ Near-term hardening tests:
 - Runtime logging tests that assert `run.log`, `run_events.jsonl`, and
   `run_summary.json` are created and include stage events.
 - Guarded materialization tests that fail on unbounded `.fetchdf()` paths.
-- Severity/verdict tests with fixed issue sets.
+- Severity/readiness tests with fixed issue sets.
 - Chart-spec tests with fixed aggregate payloads.
 
 Roadmap tests:
@@ -906,7 +979,7 @@ Roadmap tests:
 - Native many-to-many DBML declaration cases.
 - Additional provider-adapter tests beyond OpenAI.
 - Web runner tests for local-only binding, uploaded demo runs, local path jobs,
-  dashboard artifact discovery, event-summary display markers, validation
+  issue-review artifact discovery, event-summary display markers, validation
   failures, and artifact path safety.
 - Optional real Postgres acceptance smoke using a disposable schema from
   `VSF_POSTGRES_TEST_URL` or a local Docker-created database, with explicit
@@ -922,11 +995,11 @@ not as the execution engine for large data.
 
 Keep and adapt:
 
-- ontology contracts for data quality, schema evaluation, verdict, graph, and
+- ontology contracts for data quality, schema evaluation, readiness, graph, and
   LLM reports;
 - severity aggregation and threshold concepts;
-- guardrail validation for narrative reports;
-- LLM analyst/editor flow as an optional presenter layer;
+- guardrail validation for optional LLM reports;
+- LLM summary flow as an optional presenter layer;
 - schema graph and cardinality ideas;
 - cross-table safe-join concepts;
 - web job-management ideas if a local backend is added.
@@ -954,11 +1027,10 @@ Drop or isolate:
 3. Add large-data memory regression tests and guarded `.fetchdf()` checks.
 4. Introduce richer ontology JSON for schema evaluation and relationship graph
    without changing the v0.2 pipeline shape.
-5. Extend deterministic verdict scoring with configurable thresholds and target
-   relevance.
+5. Extend deterministic readiness scoring with configurable thresholds.
 6. Extend DBML parsing for native many-to-many declarations and fuller DBML
    grammar compatibility.
 7. Extend chart specs with additional aggregate chart types and optional
    rendered images.
-8. Add additional external LLM provider adapters behind the optional narrative
+8. Add additional external LLM provider adapters behind the optional LLM
    boundary.

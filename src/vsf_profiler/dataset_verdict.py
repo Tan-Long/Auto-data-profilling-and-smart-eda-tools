@@ -30,22 +30,6 @@ SEVERITY_ALIASES = {
 ISSUE_RISK_WEIGHTS = {"P0": 30, "P1": 15, "P2": 5, "P3": 1}
 RELATIONSHIP_RISK_WEIGHTS = {"invalid": 10, "warning": 4, "skipped": 2}
 SCHEMA_RISK_WEIGHTS = {"missing_table_count": 25, "extra_csv_count": 2}
-RISK_SCORE_MODEL = {
-    "label": "Dataset review risk score",
-    "description": (
-        "Deterministic review heuristic for prioritizing EDA follow-up. "
-        "It is not a statistical health model."
-    ),
-    "formula": (
-        "min(100, P0*30 + P1*15 + P2*5 + P3*1 + invalid_fk*10 + "
-        "warning_fk*4 + skipped_fk*2 + missing_table*25 + extra_csv*2)"
-    ),
-    "issue_weights": ISSUE_RISK_WEIGHTS,
-    "relationship_weights": RELATIONSHIP_RISK_WEIGHTS,
-    "schema_weights": SCHEMA_RISK_WEIGHTS,
-    "score_range": {"min": 0, "max": 100},
-    "interpretation": "Higher means more review risk; P3 findings are low-weight review signals.",
-}
 
 
 def build_dataset_verdict(
@@ -66,7 +50,6 @@ def build_dataset_verdict(
         "version": 1,
         "verdict": verdict,
         "risk_score": risk_score,
-        "risk_score_model": RISK_SCORE_MODEL,
         "verdict_rationale": _verdict_rationale(
             verdict,
             issue_counts,
@@ -208,7 +191,7 @@ def _verdict_rationale(
         if blocker_count:
             parts.append(f"{blocker_count} P0/P1 blocker issue(s)")
         if relationship_status_counts.get("invalid", 0):
-            parts.append(f"{relationship_status_counts['invalid']} FK data-quality issue(s)")
+            parts.append(f"{relationship_status_counts['invalid']} invalid relationship edge(s)")
         if schema_summary.get("missing_table_count", 0):
             parts.append(f"{schema_summary['missing_table_count']} missing DBML table CSV(s)")
         return "; ".join(parts) + " make the dataset not ready for use."
@@ -327,7 +310,7 @@ def _recommended_next_actions(
     if schema_summary.get("missing_table_count", 0):
         _add_action(actions, seen, "Regenerate the extract so every DBML table has a CSV file.")
     if relationship_status_counts.get("invalid", 0):
-        _add_action(actions, seen, "Fix foreign-key data-quality issues before cross-table use.")
+        _add_action(actions, seen, "Fix invalid foreign-key relationships before cross-table use.")
 
     for row in sorted(
         issue_rows,

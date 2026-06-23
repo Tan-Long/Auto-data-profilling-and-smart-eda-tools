@@ -19,8 +19,6 @@ def test_dataset_verdict_ready_for_clean_artifacts():
 
     assert verdict["verdict"] == "READY"
     assert verdict["risk_score"] == 0
-    assert verdict["risk_score_model"]["label"] == "Dataset review risk score"
-    assert "P0*30" in verdict["risk_score_model"]["formula"]
     assert verdict["issue_counts"]["total"] == 0
     assert verdict["issue_counts"]["by_severity"] == {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
     assert verdict["top_blockers"] == []
@@ -104,8 +102,7 @@ def test_dataset_verdict_not_ready_for_blockers_and_invalid_relationships():
     assert verdict["affected_tables"][0]["table"] == "orders"
     assert verdict["affected_tables"][0]["max_severity"] == "P0"
     assert verdict["recommended_next_actions"][0].startswith("Resolve P0/P1")
-    assert "Fix foreign-key data-quality issues" in verdict["recommended_next_actions"][2]
-    assert "FK data-quality issue(s)" in verdict["verdict_rationale"]
+    assert "Fix invalid foreign-key relationships" in verdict["recommended_next_actions"][2]
 
 
 def _issue(

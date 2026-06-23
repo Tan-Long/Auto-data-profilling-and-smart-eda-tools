@@ -128,7 +128,7 @@ def test_pipeline_with_connector_writes_metadata_and_redacts_secrets(tmp_path):
     assert "connector_metadata.json" in report_md
     assert "lineage_graph.json" in report_md
     assert "Connector Metadata" in report_html
-    assert "Lineage Graph" in report_html
+    assert "Developer Runtime Context" in report_html
     assert run_summary["inputs"]["source_type"] == "postgres"
     assert run_summary["inputs"]["postgres_url"] == "postgresql://[redacted]@127.0.0.1:5432/demo"
     assert run_summary["artifact_paths"]["lineage_graph"] == "lineage_graph.json"

@@ -26,11 +26,11 @@ class CapturingProvider:
         issue = context["top_issues"][0]
         column_ref = f"{issue['table']}.{issue['columns'][0]}"
         return (
-            "# Senior Data Scientist Narrative\n\n"
+            "# LLM Data-Quality Summary Artifact\n\n"
             f"The deterministic artifacts show {summary['table_count']} tables, "
             f"{summary['issue_count']} issues, and risk score {summary['risk_score']}.\n\n"
             f"`{issue['issue_type']}` is present on `{column_ref}`.\n\n"
-            "Influence findings are association-only and require domain review.\n"
+            "Legacy association findings are association-only and require schema and data owner review.\n"
         )
 
 
@@ -39,7 +39,7 @@ class BadProvider:
 
     def generate(self, context: dict) -> str:
         return (
-            "# Senior Data Scientist Narrative\n\n"
+            "# LLM Data-Quality Summary Artifact\n\n"
             "The dataset has 999 issues. `ghost_table.bad_column` causes downstream churn.\n"
         )
 
@@ -94,7 +94,7 @@ def test_fake_provider_writes_l4_report_and_passed_guardrail(tmp_path):
     assert guardrail_report["checked_refs"]
     assert guardrail_report["violation_count"] == 0
     assert guardrail_report["violations"] == []
-    assert "Senior Data Scientist Narrative" in l4_report
+    assert "LLM Data-Quality Summary Artifact" in l4_report
     assert "association-only" in l4_report
     assert "l4_report.md" in report_md
     assert "guardrail_report.json" in report_md
@@ -118,7 +118,7 @@ def test_fake_provider_writes_l4_report_and_passed_guardrail(tmp_path):
         "influence.json",
     ]
     assert "guardrail_safe_draft" in provider.context
-    assert "Deterministic fallback narrative" not in provider.context["guardrail_safe_draft"]
+    assert "Deterministic fallback summary" not in provider.context["guardrail_safe_draft"]
     assert provider.context["guardrail_contract"]["required_output"] == (
         "Return guardrail_safe_draft exactly as Markdown."
     )
@@ -148,9 +148,11 @@ def test_configured_fake_provider_output_passes_guardrail(tmp_path):
     )
 
     guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
+    profile_summary = json.loads((out_dir / "profile_summary.json").read_text())
     l4_report = (out_dir / "l4_report.md").read_text()
     report_md = (out_dir / "report.md").read_text()
     report_html = (out_dir / "report.html").read_text()
+    column_count = sum(table["column_count"] for table in profile_summary["tables"].values())
 
     assert guardrail_report["status"] == "passed"
     assert guardrail_report["provider"] == "fake"
@@ -160,11 +162,15 @@ def test_configured_fake_provider_output_passes_guardrail(tmp_path):
     assert guardrail_report["fallback_reason"] == ""
     assert guardrail_report["violation_count"] == 0
     assert guardrail_report["violations"] == []
-    assert "Deterministic fallback narrative" not in l4_report
-    assert "Influence findings are association-only" in l4_report
-    assert "L4 guardrail status: **passed**" in report_md
+    assert "Deterministic fallback summary" not in l4_report
+    assert "Column Readiness Summary" in l4_report
+    assert f"The column review classified {column_count} columns" in l4_report
+    assert "Table-by-Table Health Review" in l4_report
+    assert "Column Issue Blocks" in l4_report
+    assert "Legacy association findings are association-only" in l4_report
+    assert "LLM guardrail status: **passed**" in report_md
     assert "provider=fake" in report_md
-    assert "L4 guardrail" in report_html
+    assert "LLM guardrail" in report_html
     assert "passed" in report_html
 
 
@@ -193,9 +199,12 @@ def test_openai_safe_draft_output_passes_without_fallback(tmp_path):
     assert guardrail_report["fallback_reason"] == ""
     assert guardrail_report["violation_count"] == 0
     assert guardrail_report["violations"] == []
-    assert "Guarded provider narrative" in l4_report
-    assert "Deterministic fallback narrative" not in l4_report
-    assert "L4 guardrail status: **passed**" in report_md
+    assert "Guarded provider summary" in l4_report
+    assert "Column Readiness Summary" in l4_report
+    assert "Table-by-Table Health Review" in l4_report
+    assert "Column Issue Blocks" in l4_report
+    assert "Deterministic fallback summary" not in l4_report
+    assert "LLM guardrail status: **passed**" in report_md
     assert "fallback" not in report_md.lower()
     assert provider.context["guardrail_safe_draft"] == l4_report
 
@@ -222,7 +231,7 @@ def test_bad_provider_output_uses_deterministic_fallback(tmp_path):
     assert guardrail_report["fallback_reason"] == "guardrail_failed"
     assert guardrail_report["violation_count"] >= 3
     assert {"numeric_claim", "reference", "causal_wording"}.issubset(violation_types)
-    assert "Deterministic fallback narrative" in l4_report
+    assert "Deterministic fallback summary" in l4_report
     assert "999" not in l4_report
     assert "ghost_table.bad_column" not in l4_report
 
@@ -266,8 +275,8 @@ def test_llm_disabled_preserves_deterministic_artifact_set(tmp_path):
     assert "l4_report" not in run_summary["artifact_paths"]
     assert "guardrail_report" not in run_summary["artifact_paths"]
     assert "llm_narrative" not in [stage["name"] for stage in run_summary["stage_timings"]]
-    assert "L4 Senior Data Scientist Narrative" in report_md
-    assert "L4 narrative was not enabled for this deterministic run" in report_md
+    assert "Developer LLM Guardrail Artifact" not in report_md
+    assert "Optional LLM summary artifact was not generated for this deterministic run" not in report_md
 
 
 def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
@@ -306,8 +315,8 @@ def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
                     "health_score": 42,
                     "readiness": "WARN",
                     "business_impact": {
-                        "category": "order_fulfillment",
-                        "label": "Order fulfillment",
+                        "category": "transaction_event_quality",
+                        "label": "Transaction event quality",
                     },
                 }
             ]
@@ -365,8 +374,8 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
                     "health_score": 100,
                     "readiness": "READY",
                     "business_impact": {
-                        "category": "order_fulfillment",
-                        "label": "Order fulfillment",
+                        "category": "transaction_event_quality",
+                        "label": "Transaction event quality",
                     },
                 },
                 {
@@ -375,8 +384,8 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
                     "health_score": 100,
                     "readiness": "READY",
                     "business_impact": {
-                        "category": "customer_feedback",
-                        "label": "Customer feedback",
+                        "category": "feedback_signal_quality",
+                        "label": "Feedback signal quality",
                     },
                 },
             ]
@@ -388,15 +397,15 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
     evidence = build_guardrail_evidence(artifacts, context)
 
     passed = validate_narrative(
-        "`orders` has impact category `order_fulfillment`.",
+        "`orders` has impact category `transaction_event_quality`.",
         evidence,
     )
     mismatched = validate_narrative(
-        "`orders` has impact category `customer_feedback`.",
+        "`orders` has impact category `feedback_signal_quality`.",
         evidence,
     )
     unsupported = validate_narrative(
-        "`orders` has financial reporting business impact.",
+        "`orders` has financial reporting analysis impact.",
         evidence,
     )
 
@@ -431,9 +440,9 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
                     "content": [
                         {
                             "type": "output_text",
-                            "text": "# Senior Data Scientist Narrative\n\n"
+                            "text": "# LLM Data-Quality Summary Artifact\n\n"
                             "The deterministic artifacts show 1 tables and 2 rows.\n\n"
-                            "Influence findings are association-only.",
+                            "Legacy association findings are association-only.",
                         }
                     ]
                 }
@@ -449,7 +458,7 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
         transport=fake_transport,
     )
     context = {
-        "role": "Senior Data Scientist",
+        "role": "Data-quality reviewer",
         "source_artifacts": ["profile_summary.json", "issues.json"],
         "privacy_contract": {
             "raw_csv_included": False,
@@ -459,9 +468,9 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
         "summary": {"table_count": 1, "row_count": 2},
         "tables": [{"table": "orders", "columns": ["order_id"], "row_count": 2}],
         "top_issues": [],
-        "guardrail_safe_draft": "# Senior Data Scientist Narrative\n\n"
+        "guardrail_safe_draft": "# LLM Data-Quality Summary Artifact\n\n"
         "The deterministic artifacts show 1 tables and 2 rows.\n\n"
-        "Influence findings are association-only.",
+        "Legacy association findings are association-only.",
         "guardrail_contract": {
             "required_output": "Return guardrail_safe_draft exactly as Markdown.",
         },
@@ -469,7 +478,7 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
 
     narrative = provider.generate(context)
 
-    assert "Senior Data Scientist Narrative" in narrative
+    assert "LLM Data-Quality Summary Artifact" in narrative
     assert len(calls) == 1
     call = calls[0]
     assert call["url"] == "https://example.test/v1/responses"
@@ -538,7 +547,7 @@ def test_openai_config_rejects_invalid_env_model_config(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("VSF_OPENAI_MODEL", "bad model")
 
-    with pytest.raises(typer.BadParameter, match="Invalid OpenAI L4 provider config"):
+    with pytest.raises(typer.BadParameter, match="Invalid OpenAI LLM provider config"):
         _llm_provider_from_config(None)
 
 

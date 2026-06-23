@@ -38,6 +38,9 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert (out_dir / "relationship_graph.json").exists()
     assert (out_dir / "dataset_verdict.json").exists()
     assert (out_dir / "table_assessments.json").exists()
+    assert (out_dir / "issue_action_plans.json").exists()
+    assert (out_dir / "issue_todos.json").exists()
+    assert (out_dir / "quality_gates.json").exists()
     assert (out_dir / "charts").is_dir()
     assert (out_dir / "schema_diagram.dbml").exists()
     assert (out_dir / "schema_diagram.json").exists()
@@ -55,6 +58,10 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text())
     dataset_verdict = json.loads((out_dir / "dataset_verdict.json").read_text())
     table_assessments = json.loads((out_dir / "table_assessments.json").read_text())
+    issue_action_plans = json.loads((out_dir / "issue_action_plans.json").read_text())
+    issue_todos = json.loads((out_dir / "issue_todos.json").read_text())
+    quality_gates = json.loads((out_dir / "quality_gates.json").read_text())
+    profile_summary = json.loads((out_dir / "profile_summary.json").read_text())
     chart_specs = {
         path.name: json.loads(path.read_text())
         for path in sorted((out_dir / "charts").glob("*.json"))
@@ -88,15 +95,49 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert table_assessments["artifact"] == "table_assessments"
     assert table_assessments["summary"]["table_count"] == 7
     assert len(table_assessments["assessments"]) == 7
-    assert {row["table"] for row in table_assessments["assessments"]} == set(
-        json.loads((out_dir / "profile_summary.json").read_text())["tables"]
-    )
+    assert {row["table"] for row in table_assessments["assessments"]} == set(profile_summary["tables"])
     assert any(row["readiness"] == "NOT_READY" for row in table_assessments["assessments"])
     assert any(
-        row["business_impact"]["category"] == "customer_feedback"
+        row["business_impact"]["category"] == "feedback_signal_quality"
         for row in table_assessments["assessments"]
         if row["table"] == "order_reviews"
     )
+    assert issue_action_plans["artifact"] == "issue_action_plans"
+    assert issue_action_plans["summary"]["plan_count"] == len(issues)
+    assert issue_action_plans["summary"]["source"] == "deterministic"
+    assert all(plan["source"] == "deterministic" for plan in issue_action_plans["plans"])
+    assert issue_todos["artifact"] == "issue_todos"
+    assert issue_todos["derived_from"] == "issue_action_plans.json"
+    assert issue_todos["summary"]["source"] == "deterministic"
+    assert issue_todos["summary"]["fix_data_group_count"] > 0
+    assert issue_todos["summary"]["verify_after_fix_group_count"] > 0
+    fix_todo_group_count = sum(
+        1 for group in issue_todos["groups"] if group["todo_type"] == "fix_data"
+    )
+    verify_todo_group_count = sum(
+        1 for group in issue_todos["groups"] if group["todo_type"] == "verify_after_fix"
+    )
+    assert quality_gates["artifact"] == "quality_gates"
+    assert quality_gates["source"] == "deterministic"
+    assert set(quality_gates["derived_from"]) == {
+        "preflight_review.json",
+        "issues.json",
+        "table_assessments.json",
+        "issue_action_plans.json",
+        "issue_todos.json",
+        "dataset_verdict.json",
+    }
+    gates = {gate["label"]: gate for gate in quality_gates["gates"]}
+    assert set(gates) == {
+        "Can run analysis",
+        "Can trust joins",
+        "Needs cleanup before sharing",
+        "Outliers need review",
+    }
+    assert gates["Can run analysis"]["status"] == "Blocked"
+    assert gates["Can trust joins"]["status"] == "Blocked"
+    assert gates["Needs cleanup before sharing"]["recommended_next_action"]["target"] == "Todos"
+    assert all(gate["evidence_values"] for gate in quality_gates["gates"])
     assert list(chart_specs) == [
         "dataset_verdict_risk_summary.json",
         "influence_top_features.json",
@@ -104,6 +145,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "issue_counts_by_type.json",
         "missingness_by_table.json",
         "missingness_top_columns.json",
+        "outliers_top_columns.json",
         "relationship_fk_health.json",
     ]
     for spec in chart_specs.values():
@@ -121,58 +163,100 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert chart_specs["issue_counts_by_severity.json"]["data"][0]["severity"] == "P0"
     assert chart_specs["issue_counts_by_type.json"]["data"][0]["count"] >= 1
     assert chart_specs["missingness_top_columns.json"]["data"]
+    assert chart_specs["outliers_top_columns.json"]["data"] == []
     assert chart_specs["relationship_fk_health.json"]["data"][0]["status"] == "invalid"
     assert chart_specs["dataset_verdict_risk_summary.json"]["summary"]["verdict"] == "NOT_READY"
     assert chart_specs["influence_top_features.json"]["data"]
+    price_profile = profile_summary["tables"]["order_items"]["columns"]["price"]
+    assert price_profile["p25"] is not None
+    assert price_profile["p50"] is not None
+    assert price_profile["p75"] is not None
+    assert price_profile["p95"] is not None
+    assert price_profile["p99"] is not None
+    assert price_profile["outliers"]["method"] == "iqr"
     assert schema_diagram["dbdiagram_url"].startswith("https://dbdiagram.io/embed?c=")
     assert any(table["table"] == "orders" and table["csv_path"] for table in schema_diagram["tables"])
     assert any(
         rel["child_table"] == "orders" and rel["parent_table"] == "customers"
         for rel in schema_diagram["relationships"]
     )
-    assert "DBML Diagram and CSV Mapping" in report_html
-    assert "VSF Senior Data Scientist Review" in report_md
-    assert "Senior Data Scientist Review" in report_html
-    assert "Executive Scorecard" in report_md
-    assert "Executive scorecard" in report_html
-    assert "L4 Senior Data Scientist Narrative" in report_md
-    assert "L4 Senior Data Scientist Narrative" in report_html
-    assert "L4 narrative was not enabled" in report_md
-    assert "L4 narrative was not enabled" in report_html
-    assert "Issue Evidence" in report_md
-    assert "Issue Evidence" in report_html
-    assert "Relationship, Schema, and Lineage Summary" in report_md
-    assert "Relationship, Schema, and Lineage Summary" in report_html
-    assert "Probable Cause" in report_md
-    assert "Probable Cause" in report_html
-    assert "Schema Parse Diagnostics" in report_md
-    assert "Schema Parse Diagnostics" in report_html
-    assert "schema_parse_report.json" in report_md
-    assert "schema_parse_report.json" in report_html
-    assert "Lineage Graph" in report_md
-    assert "Lineage Graph" in report_html
-    assert "lineage_graph.json" in report_md
-    assert "lineage_graph.json" in report_html
-    assert "schema_evaluation.json" in report_md
-    assert "relationship_graph.json" in report_md
-    assert "Dataset Verdict" in report_md
-    assert "dataset_verdict.json" in report_md
-    assert "Per-Table Assessment" in report_md
-    assert "table_assessments.json" in report_md
-    assert "Visual Summary" in report_md
-    assert "charts/issue_counts_by_severity.json" in report_md
-    assert "schema_evaluation.json" in report_html
-    assert "relationship_graph.json" in report_html
-    assert "Dataset Verdict" in report_html
-    assert "dataset_verdict.json" in report_html
-    assert "Per-Table Assessment" in report_html
-    assert "table_assessments.json" in report_html
-    assert "Visual Summary" in report_html
-    assert "charts/issue_counts_by_severity.json" in report_html
-    assert "Execution Flow" in report_md
-    assert "Execution Flow" in report_html
-    assert "Open DBML diagram in dbdiagram.io" in report_html
-    assert "orders.customer_id" in report_html
+    assert "VSF Data Quality Report" in report_md
+    assert "Data Quality Report" in report_html
+    for section in [
+        "Run Summary",
+        "Quality Gates",
+        "Table Overview",
+        "Column Issue Matrix",
+        "Issue Action Plans",
+        "Todos",
+        "Developer Artifacts",
+        "Evaluation Summary",
+    ]:
+        assert section in report_md
+        assert section in report_html
+    for answer in [
+        "Can this dataset run analysis?",
+        "Can joins be trusted?",
+        "No.",
+        "Can run analysis",
+        "Can trust joins",
+        "Needs cleanup before sharing",
+        "Outliers need review",
+    ]:
+        assert answer in report_md
+        assert answer in report_html
+    for action_plan_text in [
+        "Finding Values",
+        "Fix data checklist",
+        "Verify after fix checklist",
+        "Guidelines",
+        "Evidence coverage",
+        "Actionability",
+        "What should be fixed?",
+    ]:
+        assert action_plan_text in report_md
+        assert action_plan_text in report_html
+    expanded_plan_count = min(5, len(issue_action_plans["plans"]))
+    assert "Main report expands the first 5 highest-priority plans" in report_md
+    assert "Main report expands the first 5 highest-priority plans" in report_html
+    assert "additional plans are available in `issue_action_plans.json`" in report_md
+    assert report_md.count("##### Finding Values") == expanded_plan_count
+    assert report_html.count("<summary>") == expanded_plan_count
+    assert len(report_md.splitlines()) < 550
+    assert "Fix data" in report_md
+    assert "Verify after fix" in report_md
+    assert "This report shows the first 10 todo groups per type" in report_md
+    assert "This report shows the first 10 todo groups per type" in report_html
+    if fix_todo_group_count > 10:
+        assert f"{fix_todo_group_count - 10} additional Fix data groups" in report_md
+    if verify_todo_group_count > 10:
+        assert f"{verify_todo_group_count - 10} additional Verify after fix groups" in report_md
+    assert "Not evaluated" in report_md
+    assert "Not evaluated" in report_html
+    developer_section = report_md.index("## Developer Artifacts")
+    for artifact_name in [
+        "quality_gates.json",
+        "issue_action_plans.json",
+        "issue_todos.json",
+        "run_summary.json",
+    ]:
+        assert artifact_name in report_md
+        assert report_md.rindex(artifact_name) > developer_section
+        assert artifact_name in report_html
+    assert "Executive Scorecard" not in report_md
+    assert "Executive scorecard" not in report_html
+    assert "Developer LLM Guardrail Artifact" not in report_md
+    assert "Developer LLM Guardrail Artifact" not in report_html
+    assert "Optional LLM summary artifact was not generated" not in report_md
+    assert "Optional LLM summary artifact was not generated" not in report_html
+    assert "Issue Evidence" not in report_md
+    assert "Schema, Relationship, and Developer Artifact Summary" not in report_md
+    assert "Column Readiness Summary" not in report_md
+    assert "Column Issue Blocks" not in report_md
+    assert "Probable cause" not in report_md
+    assert "Suggested fix" not in report_md
+    assert "business rule" not in report_md.lower()
+    assert "business process" not in report_md.lower()
     assert run_summary["status"] == "success"
     assert run_summary["inputs"]["dbml_path"].endswith("schema.dbml")
     assert run_summary["inputs"]["csv_dir"].endswith("csv")
@@ -200,6 +284,9 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "relationship_graph",
         "dataset_verdict",
         "table_assessments",
+        "issue_action_plans",
+        "issue_todos",
+        "quality_gates",
         "charts_dir",
         "chart_dataset_verdict_risk_summary",
         "chart_influence_top_features",
@@ -207,6 +294,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "chart_issue_counts_by_type",
         "chart_missingness_by_table",
         "chart_missingness_top_columns",
+        "chart_outliers_top_columns",
         "chart_relationship_fk_health",
         "schema_diagram_json",
         "schema_diagram_dbml",
