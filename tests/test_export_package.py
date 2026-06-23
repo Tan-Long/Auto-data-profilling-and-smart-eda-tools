@@ -73,7 +73,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
 
     index_html = (package_dir / "index.html").read_text(encoding="utf-8")
     assert "Senior Data Scientist Review Package" in index_html
-    assert "Executive scorecard" in index_html
+    assert "Executive summary" in index_html
     assert "L4 Senior Data Scientist Narrative" in index_html
     assert "Table Impact" in index_html
     assert "Issue Evidence" in index_html
@@ -217,8 +217,7 @@ def _demo_output(tmp_path: Path) -> Path:
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
     )
     return out_dir

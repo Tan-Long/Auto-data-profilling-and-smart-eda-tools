@@ -25,7 +25,6 @@ def test_missing_column_emits_column_missing(tmp_path):
         dbml_path=root / "schema.dbml",
         csv_dir=csv_dir,
         rules_path=None,
-        target=None,
         out_dir=out_dir,
     )
 
@@ -51,7 +50,6 @@ def test_extra_column_emits_extra_column(tmp_path):
         dbml_path=root / "schema.dbml",
         csv_dir=csv_dir,
         rules_path=None,
-        target=None,
         out_dir=out_dir,
     )
 
@@ -82,7 +80,6 @@ def test_invalid_float_values_emit_type_cast_invalid(tmp_path):
         dbml_path=root / "schema.dbml",
         csv_dir=csv_dir,
         rules_path=None,
-        target=None,
         out_dir=out_dir,
     )
 
@@ -91,15 +88,14 @@ def test_invalid_float_values_emit_type_cast_invalid(tmp_path):
     assert type_issue["bad_count"] == 3
 
 
-def test_report_generated_without_target(tmp_path):
+def test_report_generated_without_optional_analysis_inputs(tmp_path):
     data_dir = create_small_demo(tmp_path / "demo")
     out_dir = tmp_path / "out"
 
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target=None,
+        rules_path=None,
         out_dir=out_dir,
     )
 
@@ -108,13 +104,10 @@ def test_report_generated_without_target(tmp_path):
     assert (out_dir / "schema_diagram.json").exists()
     assert (out_dir / "run_summary.json").exists()
     assert (out_dir / "report.html").exists()
-    influence = json.loads((out_dir / "influence.json").read_text())
     summary = json.loads((out_dir / "run_summary.json").read_text())
     report_md = (out_dir / "report.md").read_text()
-    assert influence["top_features"] == []
-    assert influence["notes"] == ["No target column was provided."]
-    assert summary["skipped_stages"][0]["name"] == "influence_analysis"
-    assert summary["skipped_stages"][0]["details"]["skip_reason"] == "No target column was provided."
+    assert "target" not in summary["inputs"]
+    assert not summary["skipped_stages"]
     assert "Execution Flow" in report_md
 
 

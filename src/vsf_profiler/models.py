@@ -118,22 +118,6 @@ class Issue(BaseModel):
     suggested_fix: list[str] = Field(default_factory=list)
 
 
-class InfluenceFeature(BaseModel):
-    feature: str
-    score: float
-    direction: str | None = None
-    method: str
-    interpretation: str
-
-
-class InfluenceResult(BaseModel):
-    target: str | None = None
-    method: str = "association_not_causation"
-    row_count: int = 0
-    top_features: list[InfluenceFeature] = Field(default_factory=list)
-    notes: list[str] = Field(default_factory=list)
-
-
 class RunEvent(BaseModel):
     sequence: int
     event_type: str

@@ -29,11 +29,18 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="diagramInspector"',
         'id="runnerForm"',
         'id="pathRunnerForm"',
+        'id="dataRunnerForm"',
         'id="runProfilerButton"',
         'id="runPathProfilerButton"',
+        'id="smallDemoPresetButton"',
+        'id="olistFullPresetButton"',
+        'id="runDataProfilerButton"',
         'id="dbmlPathInput"',
         'id="csvDirPathInput"',
-        'id="rulesPathInput"',
+        'id="dataSourceType"',
+        'id="dataUrlEnvInput"',
+        'id="llmReportToggle"',
+        'id="llmProviderSelect"',
         'id="stageList"',
         'id="mappingShowAllToggle"',
         'id="generatedResults"',
@@ -91,11 +98,27 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Evidence panels stay empty until a run writes artifacts.",
         "Upload mode",
         "Local path mode",
+        "Data mode",
+        "Demo nhỏ",
+        "Full Olist",
+        "LLM report",
+        "l4_report.md",
         "Run profiler to build the DBML diagram",
         "Reset local paths",
     ]
     for marker in required_html:
         assert marker in html
+
+    removed_input_markers = [
+        'id="rulesInput"',
+        'id="targetInput"',
+        'id="rulesPathInput"',
+        'id="pathTargetInput"',
+        'id="dataRulesPathInput"',
+        'id="dataTargetInput"',
+    ]
+    for marker in removed_input_markers:
+        assert marker not in html
 
     expected_section_order = [
         'id="runner"',
@@ -133,6 +156,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".dashboard-issue-list",
         ".stage-result",
         ".schema-coverage-grid",
+        ".data-runner-form",
+        ".path-preset-row",
+        ".runner-advanced-options",
         ".mapping-toolbar",
         ".generated-results-panel",
         ".stage-result-grid",
@@ -142,7 +168,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".artifact-review",
         ".artifact-review-kpis",
         ".artifact-chart-preview",
-        ".artifact-chart-gauge",
         ".artifact-chart-bar-row",
         ".issue-location-summary",
         ".issue-sample-banner",
@@ -161,6 +186,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "csvStemFromName",
         "normalizeCsvFile",
         "resetLocalPathDefaults",
+        "applyLocalPathPreset",
+        "activeLocalPathPreset",
         "autoLinkCsvs",
         "checkRunnerHealth",
         "startProfilerRun",
@@ -198,7 +225,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderJsonArtifactPreview",
         "renderRelationshipGraphArtifactReview",
         "renderChartSpecPreview",
-        "renderArtifactGaugePreview",
         "renderArtifactBarPreview",
         "renderGenericJsonArtifactReview",
         "renderMarkdownArtifactPreview",
@@ -277,15 +303,20 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert 'fetch("/api/health"' in js
     assert 'fetch("/api/jobs"' in js
     assert 'fetch("/api/path-jobs"' in js
+    assert 'fetch("/api/data-jobs"' in js
+    assert "rules_path" not in js
+    assert "#targetInput" not in js
+    assert "#pathTargetInput" not in js
     assert 'fetch(`/api/jobs/${jobId}/dashboard`' in js
     assert "new EventSource" in js
     assert "run_events.jsonl" in js
     assert "run_summary.json" in js
+    assert "l4_report.md" in js
+    assert "guardrail_report.json" in js
     assert "charts/issue_counts_by_severity.json" in js
     assert "charts/issue_counts_by_type.json" in js
     assert "charts/missingness_by_table.json" in js
     assert "charts/relationship_fk_health.json" in js
-    assert "charts/influence_top_features.json" in js
     assert "lineage_graph.json" in js
     assert "relationship_graph.json" in js
     assert "table_assessments.json" in js

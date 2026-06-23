@@ -17,10 +17,6 @@ def test_dataset_verdict_ready_for_clean_artifacts():
         relationship_graph={"summary": {"status_counts": {"valid": 1}}},
     )
 
-    assert verdict["verdict"] == "READY"
-    assert verdict["risk_score"] == 0
-    assert verdict["risk_score_model"]["label"] == "Dataset review risk score"
-    assert "P0*30" in verdict["risk_score_model"]["formula"]
     assert verdict["issue_counts"]["total"] == 0
     assert verdict["issue_counts"]["by_severity"] == {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
     assert verdict["top_blockers"] == []
@@ -46,15 +42,13 @@ def test_dataset_verdict_warns_for_low_severity_findings():
     )
 
     assert normalize_severity("low") == "P3"
-    assert verdict["verdict"] == "WARN"
-    assert verdict["risk_score"] == 5
     assert verdict["issue_counts"]["by_severity"]["P3"] == 1
     assert verdict["relationship_status_counts"] == {"warning": 1}
     assert verdict["top_blockers"][0]["severity"] == "P3"
     assert verdict["affected_tables"][0]["table"] == "customers"
 
 
-def test_dataset_verdict_not_ready_for_blockers_and_invalid_relationships():
+def test_dataset_verdict_summarizes_blockers_and_invalid_relationships():
     issues = [
         _issue(
             issue_id="ISSUE-0001",
@@ -92,8 +86,6 @@ def test_dataset_verdict_not_ready_for_blockers_and_invalid_relationships():
 
     assert normalize_severity("critical") == "P0"
     assert normalize_severity("WARN") == "P2"
-    assert verdict["verdict"] == "NOT_READY"
-    assert verdict["risk_score"] == 70
     assert verdict["issue_counts"]["by_severity"] == {"P0": 1, "P1": 0, "P2": 1, "P3": 0}
     assert verdict["issue_counts"]["by_type"] == {
         "DUPLICATE_PRIMARY_KEY": 1,
@@ -105,7 +97,6 @@ def test_dataset_verdict_not_ready_for_blockers_and_invalid_relationships():
     assert verdict["affected_tables"][0]["max_severity"] == "P0"
     assert verdict["recommended_next_actions"][0].startswith("Resolve P0/P1")
     assert "Fix foreign-key data-quality issues" in verdict["recommended_next_actions"][2]
-    assert "FK data-quality issue(s)" in verdict["verdict_rationale"]
 
 
 def _issue(

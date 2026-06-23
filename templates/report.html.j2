@@ -79,15 +79,15 @@
     }
     .muted { color: var(--foreground-secondary); }
     .artifact-links,
-    .scorecard,
+    .summary-cards,
     .summary-grid,
     .chart-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
-    .scorecard { margin-top: 16px; }
-    .scorecard-title {
+    .summary-cards { margin-top: 16px; }
+    .summary-title {
       margin: 14px 0 0;
       color: var(--foreground-secondary);
       font-size: 13px;
@@ -158,7 +158,7 @@
       font-weight: 800;
       white-space: nowrap;
     }
-    .P0, .P1, .NOT_READY, .invalid, .failed { color: var(--destructive); border-color: rgba(178, 59, 50, 0.35); }
+    .P0, .P1, .invalid, .failed { color: var(--destructive); border-color: rgba(178, 59, 50, 0.35); }
     .P2, .WARN, .warning, .fallback_used { color: var(--warning); border-color: rgba(154, 95, 0, 0.35); }
     .P3, .READY, .passed, .valid { color: var(--success); border-color: rgba(35, 118, 77, 0.35); }
     .not_enabled, .unknown { color: var(--info); border-color: rgba(49, 101, 150, 0.35); }
@@ -277,7 +277,7 @@
     }
     @media (max-width: 920px) {
       main { width: min(100% - 20px, 1240px); padding-top: 12px; }
-      .scorecard,
+      .summary-cards,
       .summary-grid,
       .chart-grid,
       .artifact-links { grid-template-columns: 1fr; }
@@ -292,10 +292,10 @@
     <header>
       <p class="eyebrow">VSF Data Profiler</p>
       <h1>Senior Data Scientist Review</h1>
-      <p class="muted">Deterministic evidence review. Influence findings are association-only, not causation.</p>
-      <h2 class="scorecard-title">Executive scorecard</h2>
-      <div class="scorecard" aria-label="Executive scorecard">
-        {% for card in scorecard %}
+      <p class="muted">Deterministic evidence review generated from VSF Data Profiler artifacts.</p>
+      <h2 class="summary-title">Executive summary</h2>
+      <div class="summary-cards" aria-label="Executive summary">
+        {% for card in summary_cards %}
         <article class="metric-card {{ card.tone }}">
           <span class="metric-label">{{ card.label }}</span>
           <strong class="metric-value">{{ card.value }}</strong>
@@ -305,11 +305,11 @@
       </div>
       <div class="review-note">
         {% if dataset_verdict.available %}
-        <strong>Dataset Verdict</strong>
-        <p>{{ dataset_verdict.verdict_rationale }}</p>
+        <strong>Dataset findings</strong>
+        <p>{{ dataset_verdict.issue_total }} issue records with {{ dataset_verdict.top_blockers | length }} top blocker records.</p>
         {% else %}
-        <strong>Dataset Verdict</strong>
-        <p>Dataset verdict metadata was not provided for this report.</p>
+        <strong>Dataset findings</strong>
+        <p>Dataset finding metadata was not provided for this report.</p>
         {% endif %}
         <ul class="actions-list">
           {% for action in recommended_actions[:5] %}
@@ -320,7 +320,7 @@
         </ul>
       </div>
       <div class="artifact-links" aria-label="Primary artifact links">
-        {% if dataset_verdict.available %}<a class="artifact-link" href="{{ dataset_verdict.path }}"><strong>Dataset verdict</strong><code>{{ dataset_verdict.path }}</code></a>{% endif %}
+        {% if dataset_verdict.available %}<a class="artifact-link" href="{{ dataset_verdict.path }}"><strong>Dataset findings</strong><code>{{ dataset_verdict.path }}</code></a>{% endif %}
         {% if table_assessments.available %}<a class="artifact-link" href="{{ table_assessments.path }}"><strong>Table assessments</strong><code>{{ table_assessments.path }}</code></a>{% endif %}
         {% if relationship_graph.available %}<a class="artifact-link" href="{{ relationship_graph.path }}"><strong>Relationship graph</strong><code>{{ relationship_graph.path }}</code></a>{% endif %}
         {% if lineage_graph.available %}<a class="artifact-link" href="{{ lineage_graph.path }}"><strong>Lineage graph</strong><code>{{ lineage_graph.path }}</code></a>{% endif %}
@@ -351,20 +351,6 @@
       <h2>Visual Summary</h2>
       {% if chart_specs.available %}
       <div class="chart-grid">
-        {% if chart_specs.risk_summary.available %}
-        <article class="chart-card">
-          <div class="chart-heading"><strong>Dataset Risk</strong><a href="{{ chart_specs.risk_summary.path }}">{{ chart_specs.risk_summary.path }}</a></div>
-          <p><span class="pill {{ chart_specs.risk_summary.verdict }}">{{ chart_specs.risk_summary.verdict }}</span> <strong>{{ chart_specs.risk_summary.risk_score }}/100</strong> risk across {{ chart_specs.risk_summary.issue_count }} issues.</p>
-          {% if dataset_verdict.risk_score_model %}
-          <p class="muted">{{ dataset_verdict.risk_score_model.description }} Formula: <code>{{ dataset_verdict.risk_score_model.formula }}</code></p>
-          {% endif %}
-          <div class="bar-row">
-            <span class="bar-label">Risk score</span>
-            <span class="bar-track"><span class="bar-fill danger" style="width: {{ chart_specs.risk_summary.bar_width_pct }}%;"></span></span>
-            <span class="bar-value">{{ chart_specs.risk_summary.risk_score }}/100</span>
-          </div>
-        </article>
-        {% endif %}
         <article class="chart-card">
           <div class="chart-heading"><strong>Issue Counts by Severity</strong><a href="{{ chart_specs.issue_severity.path }}">{{ chart_specs.issue_severity.path }}</a></div>
           <div class="bar-list">
@@ -413,22 +399,6 @@
             {% endfor %}
           </div>
         </article>
-        <article class="chart-card">
-          <div class="chart-heading"><strong>Influence Top Features</strong>{% if chart_specs.influence_top_features.available %}<a href="{{ chart_specs.influence_top_features.path }}">{{ chart_specs.influence_top_features.path }}</a>{% else %}<span>not generated</span>{% endif %}</div>
-          {% if chart_specs.influence_top_features.available %}
-          <div class="bar-list">
-            {% for row in chart_specs.influence_top_features.data %}
-            <div class="bar-row">
-              <span class="bar-label">{{ row.feature }}</span>
-              <span class="bar-track"><span class="bar-fill" style="width: {{ row.bar_width_pct }}%;"></span></span>
-              <span class="bar-value">{{ "%.4f" | format(row.score) }}</span>
-            </div>
-            {% endfor %}
-          </div>
-          {% else %}
-          <p class="muted">No influence chart was generated.</p>
-          {% endif %}
-        </article>
       </div>
       {% else %}
       <p>Chart specs were not provided for this report.</p>
@@ -436,27 +406,20 @@
     </section>
 
     <section>
-      <h2>Table Review Scores and Per-Table Assessment</h2>
+      <h2>Per-Table Assessment</h2>
       {% if table_assessments.available %}
       <div class="summary-grid">
         <article class="metric-card info"><span class="metric-label">Tables assessed</span><strong class="metric-value">{{ table_assessments.table_count }}</strong><p class="metric-detail">{{ table_assessments.path }}</p></article>
-        <article class="metric-card {% if table_assessments.average_review_score < 70 %}warn{% else %}ok{% endif %}"><span class="metric-label">Average review score</span><strong class="metric-value">{{ table_assessments.average_review_score }}/100</strong><p class="metric-detail">heuristic, not a statistical health model</p></article>
-        <article class="metric-card danger"><span class="metric-label">Not ready</span><strong class="metric-value">{{ table_assessments.readiness_counts.NOT_READY or 0 }}</strong><p class="metric-detail">tables requiring remediation</p></article>
+        <article class="metric-card info"><span class="metric-label">Business categories</span><strong class="metric-value">{{ table_assessments.business_impact_counts | length }}</strong><p class="metric-detail">from table name tokens</p></article>
       </div>
-      {% if table_assessments.score_model %}
-      <p class="muted">{{ table_assessments.score_model.description }} Formula: <code>{{ table_assessments.score_model.formula }}</code></p>
-      {% endif %}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Review Score</th><th>Penalty</th><th>Issues</th><th>Relationship Risks</th><th>Business Impact</th><th>Affected Columns</th><th>First Action</th></tr></thead>
+          <thead><tr><th>Table</th><th>Role</th><th>Issues</th><th>Relationship Findings</th><th>Business Impact</th><th>Affected Columns</th><th>First Action</th></tr></thead>
           <tbody>
             {% for row in table_assessments.assessments %}
             <tr>
               <td><code>{{ row.table }}</code></td>
               <td>{{ row.role }}</td>
-              <td><span class="pill {{ row.readiness }}">{{ row.readiness }}</span></td>
-              <td>{{ row.review_score }}</td>
-              <td>{{ row.score_penalty }}</td>
               <td>{{ row.issue_total }}</td>
               <td>{{ row.relationship_risk_count }}</td>
               <td>{{ row.business_impact_label }}<br><span class="muted">{{ row.business_impact_category }}</span></td>
@@ -464,7 +427,7 @@
               <td>{{ row.recommended_next_actions[0] if row.recommended_next_actions else "" }}</td>
             </tr>
             {% else %}
-            <tr><td>none</td><td>none</td><td>none</td><td>0</td><td>0</td><td>0</td><td>0</td><td>none</td><td>none</td><td>none</td></tr>
+            <tr><td>none</td><td>none</td><td>0</td><td>0</td><td>none</td><td>none</td><td>none</td></tr>
             {% endfor %}
           </tbody>
         </table>

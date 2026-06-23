@@ -2,7 +2,6 @@ const state = {
   dbmlText: "",
   dbmlName: "",
   dbmlFile: null,
-  rulesFile: null,
   runnerMode: "path",
   runnerAvailable: false,
   currentJob: null,
@@ -55,21 +54,27 @@ const els = {
   dbmlFileCard: document.querySelector("#dbmlFileCard"),
   dbmlFileName: document.querySelector("#dbmlFileName"),
   dbmlFileMeta: document.querySelector("#dbmlFileMeta"),
-  rulesInput: document.querySelector("#rulesInput"),
-  rulesFileCard: document.querySelector("#rulesFileCard"),
-  rulesFileName: document.querySelector("#rulesFileName"),
-  rulesFileMeta: document.querySelector("#rulesFileMeta"),
-  targetInput: document.querySelector("#targetInput"),
-  pathTargetInput: document.querySelector("#pathTargetInput"),
   runnerModeUpload: document.querySelector("#runnerModeUpload"),
   runnerModePath: document.querySelector("#runnerModePath"),
+  runnerModeData: document.querySelector("#runnerModeData"),
   runnerForm: document.querySelector("#runnerForm"),
   pathRunnerForm: document.querySelector("#pathRunnerForm"),
+  dataRunnerForm: document.querySelector("#dataRunnerForm"),
   runProfilerButton: document.querySelector("#runProfilerButton"),
   runPathProfilerButton: document.querySelector("#runPathProfilerButton"),
+  smallDemoPresetButton: document.querySelector("#smallDemoPresetButton"),
+  olistFullPresetButton: document.querySelector("#olistFullPresetButton"),
+  runDataProfilerButton: document.querySelector("#runDataProfilerButton"),
   dbmlPathInput: document.querySelector("#dbmlPathInput"),
   csvDirPathInput: document.querySelector("#csvDirPathInput"),
-  rulesPathInput: document.querySelector("#rulesPathInput"),
+  dataSourceType: document.querySelector("#dataSourceType"),
+  dataUrlEnvInput: document.querySelector("#dataUrlEnvInput"),
+  dataSchemaInput: document.querySelector("#dataSchemaInput"),
+  dataTablesInput: document.querySelector("#dataTablesInput"),
+  dataDbmlPathInput: document.querySelector("#dataDbmlPathInput"),
+  dataChunkRowsInput: document.querySelector("#dataChunkRowsInput"),
+  llmReportToggle: document.querySelector("#llmReportToggle"),
+  llmProviderSelect: document.querySelector("#llmProviderSelect"),
   runnerMessage: document.querySelector("#runnerMessage"),
   jobStatusBadge: document.querySelector("#jobStatusBadge"),
   eventCount: document.querySelector("#eventCount"),
@@ -172,7 +177,7 @@ Table olist_order_items_dataset {
 Table olist_order_reviews_dataset {
   review_id varchar
   order_id varchar [ref: > olist_orders_dataset.order_id]
-  review_score int
+  review_rating int
   review_comment_title varchar
   review_comment_message varchar
   review_creation_date timestamp
@@ -268,7 +273,7 @@ const demoCsvs = [
     columns: [
       "review_id",
       "order_id",
-      "review_score",
+      "review_rating",
       "review_comment_title",
       "review_comment_message",
       "review_creation_date",
@@ -328,13 +333,11 @@ function normalizeCsvFile(file) {
 }
 
 const dashboardChartPaths = {
-  risk: "charts/dataset_verdict_risk_summary.json",
   severity: "charts/issue_counts_by_severity.json",
   type: "charts/issue_counts_by_type.json",
   missingTable: "charts/missingness_by_table.json",
   missingColumns: "charts/missingness_top_columns.json",
   relationship: "charts/relationship_fk_health.json",
-  influence: "charts/influence_top_features.json",
 };
 
 const dashboardMachineArtifacts = [
@@ -345,7 +348,6 @@ const dashboardMachineArtifacts = [
   "table_assessments.json",
   "schema_evaluation.json",
   "lineage_graph.json",
-  "influence.json",
   "run_summary.json",
 ];
 
@@ -397,12 +399,19 @@ const localDiagramLimits = {
   relationships: 60,
 };
 const postRunDiagramArtifacts = ["schema_diagram.json", "schema_evaluation.json"];
-const defaultLocalPaths = {
-  dbmlPath: "data/demo_olist/schema.dbml",
-  csvDir: "data/demo_olist/csv",
-  rulesPath: "data/demo_olist/rules.yaml",
-  target: "olist_order_reviews_dataset.review_score",
+const localPathPresets = {
+  small: {
+    label: "Demo nhỏ",
+    dbmlPath: "data/demo_small/schema.dbml",
+    csvDir: "data/demo_small/csv",
+  },
+  olist: {
+    label: "Full Olist",
+    dbmlPath: "data/demo_olist/schema.dbml",
+    csvDir: "data/demo_olist/csv",
+  },
 };
+const defaultLocalPreset = "olist";
 
 els.dbmlInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -413,16 +422,6 @@ els.dbmlInput.addEventListener("change", async (event) => {
 
 els.csvInput.addEventListener("change", async (event) => {
   await loadCsvFiles([...event.target.files]);
-});
-
-els.rulesInput.addEventListener("change", (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    state.rulesFile = file;
-  } else {
-    state.rulesFile = null;
-  }
-  renderAll();
 });
 
 els.visualizeButton.addEventListener("click", () => {
@@ -473,6 +472,18 @@ els.runnerModePath.addEventListener("click", () => {
   setRunnerMode("path");
 });
 
+els.runnerModeData.addEventListener("click", () => {
+  setRunnerMode("data");
+});
+
+els.smallDemoPresetButton.addEventListener("click", () => {
+  applyLocalPathPreset("small");
+});
+
+els.olistFullPresetButton.addEventListener("click", () => {
+  applyLocalPathPreset("olist");
+});
+
 els.runnerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   await startProfilerRun();
@@ -483,11 +494,32 @@ els.pathRunnerForm.addEventListener("submit", async (event) => {
   await startPathRun();
 });
 
+els.dataRunnerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await startDataRun();
+});
+
+els.dataSourceType.addEventListener("change", () => {
+  if (els.dataSourceType.value === "mysql") {
+    els.dataUrlEnvInput.value = "VSF_PROFILER_MYSQL_URL";
+    els.dataSchemaInput.value = "";
+    els.dataSchemaInput.placeholder = "app_database";
+  } else {
+    els.dataUrlEnvInput.value = "VSF_PROFILER_POSTGRES_URL";
+    els.dataSchemaInput.value = "public";
+    els.dataSchemaInput.placeholder = "public";
+  }
+  renderControls();
+});
+
 [
   els.dbmlPathInput,
   els.csvDirPathInput,
-  els.rulesPathInput,
-  els.pathTargetInput,
+  els.dataUrlEnvInput,
+  els.dataSchemaInput,
+  els.dataTablesInput,
+  els.dataDbmlPathInput,
+  els.dataChunkRowsInput,
 ].forEach((input) => {
   input.addEventListener("input", () => {
     renderControls();
@@ -756,16 +788,16 @@ async function startProfilerRun() {
   uploadableCsvs.forEach((file) => {
     form.append("csv", file.sourceFile, file.sourceFile.name);
   });
-  if (state.rulesFile) {
-    form.append("rules", state.rulesFile, state.rulesFile.name);
-  }
-  const target = els.targetInput.value.trim();
-  if (target) {
-    form.append("target", target);
+  const llm = llmPayload();
+  if (llm.use_llm) {
+    form.append("use_llm", "true");
+    if (llm.llm_provider) {
+      form.append("llm_provider", llm.llm_provider);
+    }
   }
 
   state.runEvents = [];
-  state.currentJob = { status: "queued", artifacts: [] };
+  state.currentJob = { status: "queued", input_mode: "upload", artifacts: [] };
   resetDashboardState();
   renderJob();
   renderRunnerMessage("Uploading files to local runner...", "pending");
@@ -795,8 +827,6 @@ async function startPathRun() {
 
   const dbmlPath = els.dbmlPathInput.value.trim();
   const csvDir = els.csvDirPathInput.value.trim();
-  const rulesPath = els.rulesPathInput.value.trim();
-  const target = els.pathTargetInput.value.trim();
   if (!dbmlPath || !csvDir) {
     renderRunnerMessage("DBML file path and CSV directory path are required.", "error");
     return;
@@ -806,12 +836,7 @@ async function startPathRun() {
     dbml_path: dbmlPath,
     csv_dir: csvDir,
   };
-  if (rulesPath) {
-    payload.rules_path = rulesPath;
-  }
-  if (target) {
-    payload.target = target;
-  }
+  Object.assign(payload, llmPayload());
 
   state.runEvents = [];
   state.currentJob = { status: "queued", input_mode: "path", artifacts: [] };
@@ -840,10 +865,96 @@ async function startPathRun() {
   }
 }
 
+async function startDataRun() {
+  if (!state.runnerAvailable) {
+    renderRunnerMessage("Open this page with vsf-profiler web to run the backend pipeline.", "error");
+    return;
+  }
+
+  const sourceType = els.dataSourceType.value;
+  const urlEnv = els.dataUrlEnvInput.value.trim();
+  const schema = els.dataSchemaInput.value.trim();
+  const tables = els.dataTablesInput.value.trim();
+  const dbmlPath = els.dataDbmlPathInput.value.trim();
+  const chunkRows = els.dataChunkRowsInput.value.trim();
+  if (!urlEnv) {
+    renderRunnerMessage("Data mode needs an environment variable containing the database URL.", "error");
+    return;
+  }
+
+  const payload = {
+    source_type: sourceType,
+    url_env: urlEnv,
+  };
+  if (schema) {
+    payload.schema = schema;
+  }
+  if (tables) {
+    payload.tables = tables;
+  }
+  if (dbmlPath) {
+    payload.dbml_path = dbmlPath;
+  }
+  if (chunkRows) {
+    payload.chunk_rows = Number(chunkRows);
+  }
+  Object.assign(payload, llmPayload());
+
+  state.runEvents = [];
+  state.currentJob = { status: "queued", input_mode: "data", artifacts: [] };
+  resetDashboardState();
+  renderJob();
+  renderRunnerMessage(`Starting ${sourceType} data job on 127.0.0.1...`, "pending");
+  els.runDataProfilerButton.disabled = true;
+
+  try {
+    const response = await fetch("/api/data-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const responsePayload = await response.json();
+    if (!response.ok) {
+      throw new Error(responsePayload.error || "Backend rejected the data mode settings.");
+    }
+    state.currentJob = responsePayload;
+    renderRunnerMessage("Pipeline started. Runtime events are streaming from run_events.jsonl.", "pending");
+    connectEventStream(responsePayload.events_url);
+  } catch (error) {
+    renderRunnerMessage(error.message || "Unable to start data mode run.", "error");
+  } finally {
+    renderAll();
+  }
+}
+
+function llmPayload() {
+  if (!els.llmReportToggle.checked) {
+    return { use_llm: false };
+  }
+  const provider = els.llmProviderSelect.value.trim();
+  return {
+    use_llm: true,
+    ...(provider ? { llm_provider: provider } : {}),
+  };
+}
+
+function activeLocalPathPreset() {
+  const current = {
+    dbmlPath: els.dbmlPathInput.value.trim(),
+    csvDir: els.csvDirPathInput.value.trim(),
+  };
+  return Object.entries(localPathPresets).find(([, preset]) => (
+    preset.dbmlPath === current.dbmlPath &&
+    preset.csvDir === current.csvDir
+  ))?.[0] || "";
+}
+
 function setRunnerMode(mode) {
   state.runnerMode = mode;
   renderRunnerMessage(
-    mode === "path"
+    mode === "data"
+      ? "Start with a local database URL stored in an environment variable."
+      : mode === "path"
       ? "Start with local paths visible to the 127.0.0.1 runner."
       : "Start with files uploaded from this browser session.",
     "idle",
@@ -852,11 +963,19 @@ function setRunnerMode(mode) {
 }
 
 function resetLocalPathDefaults() {
-  els.dbmlPathInput.value = defaultLocalPaths.dbmlPath;
-  els.csvDirPathInput.value = defaultLocalPaths.csvDir;
-  els.rulesPathInput.value = defaultLocalPaths.rulesPath;
-  els.pathTargetInput.value = defaultLocalPaths.target;
-  renderRunnerMessage("Local path defaults restored. Run the profiler to generate evidence.", "idle");
+  applyLocalPathPreset(defaultLocalPreset, {
+    message: "Full Olist local path preset restored. Run the profiler to generate evidence.",
+  });
+}
+
+function applyLocalPathPreset(name, options = {}) {
+  const preset = localPathPresets[name] || localPathPresets[defaultLocalPreset];
+  els.dbmlPathInput.value = preset.dbmlPath;
+  els.csvDirPathInput.value = preset.csvDir;
+  renderRunnerMessage(
+    options.message || `${preset.label} local path preset selected.`,
+    "idle",
+  );
   renderAll();
 }
 
@@ -907,12 +1026,10 @@ function loadDemoState() {
   state.dbmlText = demoDbml;
   state.dbmlName = "demo_schema.dbml";
   state.dbmlFile = null;
-  state.rulesFile = null;
   state.csvFiles = demoCsvs.map(normalizeCsvFile);
-  els.dbmlPathInput.value = "data/demo_olist/schema.dbml";
-  els.csvDirPathInput.value = "data/demo_olist/csv";
-  els.rulesPathInput.value = "data/demo_olist/rules.yaml";
-  els.pathTargetInput.value = "olist_order_reviews_dataset.review_score";
+  const preset = localPathPresets[defaultLocalPreset];
+  els.dbmlPathInput.value = preset.dbmlPath;
+  els.csvDirPathInput.value = preset.csvDir;
   parseDbmlState();
   autoLinkCsvs();
   renderAll();
@@ -1228,6 +1345,9 @@ function runnerStatusText() {
   if (state.currentJob?.status) {
     return `${state.currentJob.status}`;
   }
+  if (state.runnerMode === "data") {
+    return "Ready for data mode";
+  }
   return state.runnerMode === "path" ? "Ready for local paths" : "Ready for uploaded files";
 }
 
@@ -1508,27 +1628,34 @@ function renderControls() {
   const hasUploadedDbml = Boolean(state.dbmlFile);
   const hasUploadedCsvs = state.csvFiles.some((file) => file.sourceFile);
   const hasPathInputs = Boolean(els.dbmlPathInput.value.trim() && els.csvDirPathInput.value.trim());
+  const hasDataInputs = Boolean(els.dataUrlEnvInput.value.trim());
   const jobRunning = ["queued", "running"].includes(state.currentJob?.status);
   els.visualizeButton.disabled = !hasGeneratedEvidence();
   els.autoLinkButton.disabled = true;
   els.runProfilerButton.disabled = !state.runnerAvailable || !hasUploadedDbml || !hasUploadedCsvs || jobRunning;
   els.runPathProfilerButton.disabled = !state.runnerAvailable || !hasPathInputs || jobRunning;
+  els.runDataProfilerButton.disabled = !state.runnerAvailable || !hasDataInputs || jobRunning;
   els.runnerModeUpload.classList.toggle("active", state.runnerMode === "upload");
   els.runnerModePath.classList.toggle("active", state.runnerMode === "path");
+  els.runnerModeData.classList.toggle("active", state.runnerMode === "data");
   els.runnerModeUpload.setAttribute("aria-selected", state.runnerMode === "upload" ? "true" : "false");
   els.runnerModePath.setAttribute("aria-selected", state.runnerMode === "path" ? "true" : "false");
+  els.runnerModeData.setAttribute("aria-selected", state.runnerMode === "data" ? "true" : "false");
+  const activePreset = activeLocalPathPreset();
+  [
+    [els.smallDemoPresetButton, "small"],
+    [els.olistFullPresetButton, "olist"],
+  ].forEach(([button, presetName]) => {
+    const active = activePreset === presetName;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
   els.runnerForm.hidden = state.runnerMode !== "upload";
   els.pathRunnerForm.hidden = state.runnerMode !== "path";
+  els.dataRunnerForm.hidden = state.runnerMode !== "data";
 }
 
 function renderRunner() {
-  if (state.rulesFile) {
-    els.rulesFileCard.hidden = false;
-    els.rulesFileName.textContent = state.rulesFile.name;
-    els.rulesFileMeta.textContent = `${formatBytes(state.rulesFile.size)} · optional rules`;
-  } else {
-    els.rulesFileCard.hidden = true;
-  }
   renderJob();
 }
 
@@ -1655,9 +1782,6 @@ function stageResultItems(stage) {
   if (name === "relationship_checks") {
     return fromDetails("relationship_count", "issue_count_added");
   }
-  if (name === "influence_analysis") {
-    return fromDetails("row_count", "feature_count");
-  }
   if (name === "write_machine_artifacts") {
     return fromDetails("artifact_count", "chart_spec_count", "table_assessment_count");
   }
@@ -1677,7 +1801,6 @@ function stageArtifactPaths(stageName) {
     profile_csv_tables: ["profile_summary.json"],
     data_quality_checks: ["issues.json", "dataset_verdict.json", "table_assessments.json"],
     relationship_checks: ["relationship_graph.json", "charts/relationship_fk_health.json"],
-    influence_analysis: ["influence.json", "charts/influence_top_features.json"],
     write_machine_artifacts: ["dataset_verdict.json", "lineage_graph.json", "run_summary.json"],
     render_reports: ["report.html", "report.md"],
   };
@@ -1708,7 +1831,6 @@ function stageResultSummary(stageName) {
     profile_csv_tables: "Streamed profile statistics",
     data_quality_checks: "Detected row and column quality issues",
     relationship_checks: "Validated PK/FK relationship status",
-    influence_analysis: "Computed bounded target influence",
     write_machine_artifacts: "Wrote machine-readable outputs",
     render_reports: "Rendered human-readable reports",
   };
@@ -1806,20 +1928,18 @@ function renderGeneratedResultPreviews(artifacts) {
 function renderGeneratedVerdictPreview(artifacts) {
   const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
   const hasVerdict = Boolean(Object.keys(verdict).length);
-  const riskScore = verdict.risk_score ?? verdict.summary?.risk_score;
-  const verdictLabel = verdict.verdict || verdict.summary?.verdict || "Waiting";
   const issueCount = verdict.issue_counts?.total ?? getDashboardIssues().length;
   const blockers = Array.isArray(verdict.top_blockers) ? verdict.top_blockers.length : 0;
   const body = hasVerdict
     ? `
       <div class="generated-result-kpi">
-        <strong>${escapeHtml(verdictLabel)}</strong>
-        <span>${escapeHtml(riskScore === undefined ? "--" : `${integerText(riskScore)}/100`)} risk</span>
+        <strong>${integerText(issueCount)}</strong>
+        <span>issues</span>
       </div>
-      <p>${integerText(issueCount)} issues · ${integerText(blockers)} top blockers</p>
+      <p>${integerText(blockers)} top blocker records</p>
     `
     : `<p class="muted">Waiting for <code>dataset_verdict.json</code> from the dashboard artifact loader.</p>`;
-  return generatedResultCard("Dataset verdict", "dataset_verdict.json", body, artifacts);
+  return generatedResultCard("Dataset findings", "dataset_verdict.json", body, artifacts);
 }
 
 function renderGeneratedIssueCountsPreview(artifacts) {
@@ -1850,13 +1970,11 @@ function renderGeneratedTableImpactPreview(artifacts) {
   const assessments = getDashboardTableAssessments();
   const summary = assessmentArtifact.summary || {};
   const tableCount = summary.table_count ?? assessments.length;
-  const averageReviewScore = summary.average_review_score ?? summary.average_health_score;
-  const notReady = summary.readiness_counts?.NOT_READY ?? assessments.filter((row) => row.readiness === "NOT_READY").length;
   const topTables = assessments
     .slice()
     .sort((a, b) => (
-      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
-      Number(a.review_score ?? a.health_score ?? 0) - Number(b.review_score ?? b.health_score ?? 0) ||
+      issueTotalForAssessment(b) - issueTotalForAssessment(a) ||
+      relationshipFindingsForAssessment(b) - relationshipFindingsForAssessment(a) ||
       String(a.table || "").localeCompare(String(b.table || ""))
     ))
     .slice(0, 3)
@@ -1868,11 +1986,20 @@ function renderGeneratedTableImpactPreview(artifacts) {
         <strong>${integerText(tableCount)}</strong>
         <span>tables</span>
       </div>
-      <p>${integerText(notReady)} not ready · ${averageReviewScore === undefined ? "--" : integerText(averageReviewScore)} avg review score</p>
+      <p>${integerText(Object.keys(summary.business_impact_counts || {}).length)} business categories</p>
       ${topTables ? `<div class="generated-mini-list">${topTables}</div>` : ""}
     `
     : `<p class="muted">Waiting for <code>table_assessments.json</code>.</p>`;
   return generatedResultCard("Table impact", "table_assessments.json", body, artifacts);
+}
+
+function issueTotalForAssessment(assessment) {
+  return Object.values(assessment.issue_counts_by_severity || {})
+    .reduce((total, value) => total + Number(value || 0), 0);
+}
+
+function relationshipFindingsForAssessment(assessment) {
+  return Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks.length : 0;
 }
 
 function renderGeneratedRuntimePreview(artifacts) {
@@ -1896,6 +2023,7 @@ function renderGeneratedReportLinks(artifacts) {
     ["report.html", "Report HTML"],
     ["report.md", "Report Markdown"],
     ["l4_report.md", "L4 report"],
+    ["guardrail_report.json", "Guardrail report"],
   ]
     .map(([path, label]) => {
       const url = artifactUrlFromArtifacts(path, artifacts);
@@ -2061,12 +2189,10 @@ function renderReportPanel() {
   }
 
   const panels = [
-    renderReportRiskPanel(),
     renderReportIssueSeverityPanel(),
     renderReportIssueTypePanel(),
     renderReportMissingnessPanel(),
     renderReportRelationshipHealthPanel(),
-    renderReportInfluencePanel(),
   ].filter(Boolean);
 
   els.reportChartPreview.innerHTML = panels.length
@@ -2106,12 +2232,10 @@ function renderDashboard() {
   }
 
   const panels = [
-    renderRiskPanel(),
     renderIssueSeverityPanel(filteredIssues),
     renderIssueTypePanel(filteredIssues),
     renderMissingnessPanel(),
     renderRelationshipHealthPanel(),
-    renderInfluencePanel(),
   ].filter(Boolean);
 
   els.dashboardPanelGrid.innerHTML = panels.join("");
@@ -2123,22 +2247,15 @@ function renderDashboard() {
       `Dashboard loaded with missing optional artifacts: ${artifactIndex.missing_artifacts.join(", ")}.`,
       "pending",
     );
-  } else if (artifacts["influence.json"] && !artifacts[dashboardChartPaths.influence]) {
-    renderDashboardMessage("Dashboard loaded. Influence chart is absent because no top features were generated.", "success");
   }
 }
 
 function renderDashboardSummary(issues) {
   const artifactIndex = state.dashboardArtifactIndex;
-  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
   const assessmentArtifact = state.dashboardArtifacts["table_assessments.json"] || {};
   const assessments = getDashboardTableAssessments();
-  const riskScore = verdict.risk_score ?? verdict.summary?.risk_score ?? "--";
-  const verdictLabel = verdict.verdict || verdict.summary?.verdict || (artifactIndex ? "unknown" : "Waiting");
   const paths = Object.keys(artifactIndex?.artifact_urls || {});
   els.dashboardSummaryStrip.innerHTML = `
-    <div><span>verdict</span><strong>${escapeHtml(verdictLabel)}</strong></div>
-    <div><span>risk</span><strong>${escapeHtml(riskScore === "--" ? "--" : `${integerText(riskScore)}/100`)}</strong></div>
     <div><span>issues</span><strong>${integerText(issues.length)}</strong></div>
     <div><span>tables</span><strong>${integerText(assessmentArtifact.summary?.table_count ?? assessments.length)}</strong></div>
     <div><span>artifacts</span><strong>${integerText(paths.length)}</strong></div>
@@ -2150,8 +2267,8 @@ function renderTableImpactSection() {
   const assessments = getDashboardTableAssessments()
     .filter((assessment) => filterMatchesTable(assessment.table))
     .sort((a, b) => (
-      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
-      Number(a.review_score ?? a.health_score ?? 0) - Number(b.review_score ?? b.health_score ?? 0) ||
+      issueTotalForAssessment(b) - issueTotalForAssessment(a) ||
+      relationshipFindingsForAssessment(b) - relationshipFindingsForAssessment(a) ||
       String(a.table || "").localeCompare(String(b.table || ""))
     ));
 
@@ -2159,7 +2276,7 @@ function renderTableImpactSection() {
     els.tableImpactStatus.textContent = state.dashboardLoadingJobId
       ? "Fetching table_assessments.json"
       : "Waiting for table_assessments.json";
-    els.tableImpactGrid.innerHTML = `<p class="muted">Run a job to review per-table readiness and business impact.</p>`;
+    els.tableImpactGrid.innerHTML = `<p class="muted">Run a job to review per-table business impact.</p>`;
     return;
   }
 
@@ -2176,7 +2293,6 @@ function renderTableImpactSection() {
     const impact = assessment.business_impact || {};
     const columns = Array.isArray(assessment.affected_columns) ? assessment.affected_columns : [];
     const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
-    const readiness = assessment.readiness || "unknown";
     return `
       <button class="table-impact-card" type="button" data-dashboard-kind="table_assessment" data-dashboard-value="${escapeHtml(assessment.table)}" data-dashboard-label="${escapeHtml(assessment.table)}">
         <span class="table-impact-rank">${String(index + 1).padStart(2, "0")}</span>
@@ -2184,12 +2300,10 @@ function renderTableImpactSection() {
           <code>${escapeHtml(assessment.table)}</code>
           <small>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</small>
         </span>
-        <span class="table-impact-score">${integerText(assessment.review_score ?? assessment.health_score)}<small>review score</small></span>
-        <span class="pill-status ${readinessPillClass(readiness)}">${escapeHtml(readiness)}</span>
         <span class="table-impact-meta">
           <span>${escapeHtml(impact.category || "general_analytics")}</span>
           <span>${integerText(columns.length)} columns</span>
-          <span>${integerText(risks.length)} relationship risks</span>
+          <span>${integerText(risks.length)} relationship findings</span>
         </span>
       </button>
     `;
@@ -3322,25 +3436,6 @@ function truncateMiddle(value, maxLength) {
   return `${text.slice(0, keep)}...${text.slice(text.length - keep)}`;
 }
 
-function renderRiskPanel() {
-  const spec = state.dashboardArtifacts[dashboardChartPaths.risk];
-  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
-  const summary = spec?.summary || {};
-  const riskScore = clampNumber(summary.risk_score ?? verdict.risk_score, 0, 100);
-  const riskLabel = summary.verdict || verdict.verdict || "unknown";
-  const issueCount = summary.issue_count ?? verdict.issue_counts?.total ?? getDashboardIssues().length;
-  return dashboardPanel(
-    "Dataset verdict",
-    "dataset_verdict.json",
-    `
-      <button class="risk-gauge-button" type="button" data-dashboard-kind="verdict" data-dashboard-value="${escapeHtml(riskLabel)}" data-dashboard-label="Dataset verdict ${escapeHtml(riskLabel)}">
-        ${riskGaugeSvg(riskScore)}
-        <span><strong>${escapeHtml(riskLabel)}</strong><small>${riskScore}/100 risk · ${issueCount} issues</small></span>
-      </button>
-    `,
-  );
-}
-
 function renderIssueSeverityPanel(filteredIssues) {
   const rows = severityOrder.map((severity) => ({
     label: severity,
@@ -3415,60 +3510,6 @@ function renderRelationshipHealthPanel() {
   );
 }
 
-function renderInfluencePanel() {
-  const spec = state.dashboardArtifacts[dashboardChartPaths.influence];
-  if (!spec) {
-    const influence = state.dashboardArtifacts["influence.json"] || {};
-    const reason = influence.skipped_reason || influence.notes?.[0] || "No influence top features were generated.";
-    return dashboardPanel(
-      "Influence top features",
-      "influence.json",
-      `<p class="muted">${escapeHtml(reason)}</p>`,
-    );
-  }
-  const rows = (spec.data || [])
-    .filter((row) => {
-      const table = state.dashboardFilters.table;
-      return table === "all" || String(row.feature || "").startsWith(`${table}__`);
-    })
-    .slice(0, 10)
-    .map((row) => ({
-      label: row.feature,
-      value: Math.abs(Number(row.score || 0)),
-      rawValue: Number(row.score || 0),
-      kind: "influence_feature",
-      detail: row.method || "",
-    }));
-  return dashboardPanel(
-    "Influence top features",
-    dashboardChartPaths.influence,
-    renderDashboardBars(rows, {
-      empty: "No influence features match the current table filter.",
-      valueFormatter: scoreText,
-      rawValue: true,
-    }),
-  );
-}
-
-function renderReportRiskPanel() {
-  const spec = state.dashboardArtifacts[dashboardChartPaths.risk];
-  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
-  const summary = spec?.summary || {};
-  const riskScore = clampNumber(summary.risk_score ?? verdict.risk_score, 0, 100);
-  const riskLabel = summary.verdict || verdict.verdict || "unknown";
-  const issueCount = summary.issue_count ?? verdict.issue_counts?.total ?? getDashboardIssues().length;
-  return reportPanel(
-    "Report: dataset risk",
-    dashboardChartPaths.risk,
-    `
-      <button class="risk-gauge-button" type="button" data-dashboard-kind="verdict" data-dashboard-value="${escapeHtml(riskLabel)}" data-dashboard-label="Dataset verdict ${escapeHtml(riskLabel)}">
-        ${riskGaugeSvg(riskScore)}
-        <span><strong>${escapeHtml(riskLabel)}</strong><small>${riskScore}/100 risk · ${issueCount} issues</small></span>
-      </button>
-    `,
-  );
-}
-
 function renderReportIssueSeverityPanel() {
   const spec = state.dashboardArtifacts[dashboardChartPaths.severity];
   const rows = (spec?.data || severityOrder.map((severity) => ({ severity, count: 0 })))
@@ -3537,37 +3578,6 @@ function renderReportRelationshipHealthPanel() {
     "Report: FK status",
     dashboardChartPaths.relationship,
     renderReportBars(rows, { empty: "No relationship chart rows were generated.", valueFormatter: integerText }),
-  );
-}
-
-function renderReportInfluencePanel() {
-  const spec = state.dashboardArtifacts[dashboardChartPaths.influence];
-  if (!spec) {
-    const influence = state.dashboardArtifacts["influence.json"] || {};
-    const reason = influence.skipped_reason || influence.notes?.[0] || "No influence top features were generated.";
-    return reportPanel(
-      "Report: influence",
-      "influence.json",
-      `<p class="muted">${escapeHtml(reason)}</p>`,
-    );
-  }
-  const rows = (spec.data || [])
-    .slice(0, 10)
-    .map((row) => ({
-      label: row.feature || "unknown",
-      value: Math.abs(Number(row.score || 0)),
-      rawValue: Number(row.score || 0),
-      kind: "influence_feature",
-      detail: row.method || "",
-    }));
-  return reportPanel(
-    "Report: influence",
-    dashboardChartPaths.influence,
-    renderReportBars(rows, {
-      empty: "No influence chart rows were generated.",
-      valueFormatter: scoreText,
-      rawValue: true,
-    }),
   );
 }
 
@@ -3725,7 +3735,7 @@ function setDrilldownSeverityFilter(severity) {
 
 function dashboardIssuesForSelection(selection, options = {}) {
   const issues = getFilteredDashboardIssues({ ignoreSeverityFilter: options.ignoreSeverityFilter });
-  if (!selection || selection.kind === "overview" || selection.kind === "verdict") {
+  if (!selection || selection.kind === "overview") {
     return issues;
   }
   if (selection.kind === "severity") {
@@ -3771,13 +3781,11 @@ function renderTableAssessmentDetails(selection) {
         <strong><code>${escapeHtml(assessment.table)}</code></strong>
         <p>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</p>
       </div>
-      <span class="pill-status ${readinessPillClass(assessment.readiness)}">${escapeHtml(assessment.readiness || "unknown")}</span>
       <dl class="graph-metadata">
-        <div><dt>review_score</dt><dd>${integerText(assessment.review_score ?? assessment.health_score)}/100</dd></div>
         <div><dt>business_impact</dt><dd>${escapeHtml(impact.category || "general_analytics")}</dd></div>
         <div><dt>impact_evidence</dt><dd>${escapeHtml(impact.rationale || "")}</dd></div>
         <div><dt>affected_columns</dt><dd>${escapeHtml(columns.length ? columns.join(", ") : "none")}</dd></div>
-        <div><dt>relationship_risks</dt><dd>${integerText(risks.length)}</dd></div>
+        <div><dt>relationship_findings</dt><dd>${integerText(risks.length)}</dd></div>
       </dl>
     </div>
   `;
@@ -3879,15 +3887,6 @@ function drilldownArtifactsForSelection(selection) {
   if (selection?.kind === "relationship_status") {
     paths.add("relationship_graph.json");
     paths.add(dashboardChartPaths.relationship);
-  }
-  if (selection?.kind === "influence_feature") {
-    paths.add("influence.json");
-    paths.add(dashboardChartPaths.influence);
-  }
-  if (selection?.kind === "verdict") {
-    paths.add(dashboardChartPaths.risk);
-    paths.add("schema_evaluation.json");
-    paths.add("relationship_graph.json");
   }
   return [...paths].filter((path) => artifactUrlFor(path));
 }
@@ -4166,9 +4165,6 @@ function renderJsonArtifactPreview(value, path = "") {
   if (artifactPath === "run_summary.json") {
     return renderRunSummaryArtifactReview(artifactPath, value);
   }
-  if (artifactPath === "influence.json") {
-    return renderInfluenceArtifactReview(artifactPath, value);
-  }
   if (artifactPath.startsWith("charts/") || value?.artifact === "chart_spec") {
     return renderChartSpecArtifactReview(artifactPath, value);
   }
@@ -4293,23 +4289,16 @@ function renderDatasetVerdictArtifactReview(path, artifact) {
   const counts = objectOrEmpty(artifact?.issue_counts);
   const bySeverity = objectOrEmpty(counts.by_severity);
   const blockers = Array.isArray(artifact?.top_blockers) ? artifact.top_blockers : [];
-  const scoreModel = objectOrEmpty(artifact?.risk_score_model);
   return artifactReviewShell(
-    "Dataset verdict review",
+    "Dataset findings review",
     path,
-    "EDA readiness, blocker issues, and deterministic review risk.",
+    "Issue counts, blocker records, and recommended actions.",
     `
       ${artifactReviewKpis([
-        ["verdict", artifact?.verdict || "unknown"],
-        ["risk", artifact?.risk_score === undefined ? "--" : `${integerText(artifact.risk_score)}/100`],
         ["issues", counts.total ?? 0],
         ["P0", bySeverity.P0 ?? 0],
         ["P1", bySeverity.P1 ?? 0],
       ])}
-      ${artifactReviewSection("Scoring model", `
-        <p>${escapeHtml(scoreModel.description || "Risk score is a deterministic EDA review heuristic, not a statistical health model.")}</p>
-        <p><code>${escapeHtml(scoreModel.formula || "Weighted severity, relationship, and schema findings capped at 100.")}</code></p>
-      `)}
       ${artifactReviewSection("Top blockers", blockers.length ? `
         <div class="artifact-review-rows">
           ${blockers.slice(0, 8).map((issue) => renderIssueReviewRow(issue)).join("")}
@@ -4324,31 +4313,24 @@ function renderDatasetVerdictArtifactReview(path, artifact) {
 
 function renderTableAssessmentsArtifactReview(path, artifact) {
   const summary = objectOrEmpty(artifact?.summary);
-  const scoreModel = objectOrEmpty(summary.score_model);
   const assessments = Array.isArray(artifact?.assessments) ? artifact.assessments : [];
   const sorted = assessments
     .slice()
     .sort((a, b) => (
-      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
-      Number(a.review_score ?? a.health_score ?? 0) - Number(b.review_score ?? b.health_score ?? 0) ||
+      issueTotalForAssessment(b) - issueTotalForAssessment(a) ||
+      relationshipFindingsForAssessment(b) - relationshipFindingsForAssessment(a) ||
       String(a.table || "").localeCompare(String(b.table || ""))
     ));
   return artifactReviewShell(
     "Table impact review",
     path,
-    "Per-table readiness, review score, business impact, and relationship risk.",
+    "Per-table role, business impact, issue counts, and relationship findings.",
     `
       ${artifactReviewKpis([
         ["tables", summary.table_count ?? assessments.length],
-        ["avg review", summary.average_review_score ?? summary.average_health_score ?? "--"],
-        ["not ready", summary.readiness_counts?.NOT_READY ?? sorted.filter((item) => item.readiness === "NOT_READY").length],
         ["business areas", Object.keys(objectOrEmpty(summary.business_impact_counts)).length],
       ])}
-      ${artifactReviewSection("Scoring model", `
-        <p>${escapeHtml(scoreModel.description || "Review score is a deterministic EDA prioritization heuristic, not a statistical health model.")}</p>
-        <p><code>${escapeHtml(scoreModel.formula || "100 minus weighted issue and relationship penalties.")}</code></p>
-      `)}
-      ${artifactReviewSection("Highest-risk tables", sorted.length ? `
+      ${artifactReviewSection("Table rows", sorted.length ? `
         <div class="artifact-review-rows">
           ${sorted.slice(0, 8).map((assessment) => {
             const impact = objectOrEmpty(assessment.business_impact);
@@ -4357,14 +4339,12 @@ function renderTableAssessmentsArtifactReview(path, artifact) {
               <article class="artifact-review-row">
                 <div class="artifact-review-row-header">
                   <strong><code>${escapeHtml(assessment.table)}</code></strong>
-                  ${artifactReviewPill(assessment.readiness || "unknown")}
                 </div>
                 <p>${escapeHtml(impact.label || "General analytics")} · ${escapeHtml(assessment.role || "unknown role")}</p>
                 <div class="artifact-review-meta">
-                  <span>${integerText(assessment.review_score ?? assessment.health_score)} review score</span>
                   <span>${integerText(assessment.row_count)} rows</span>
                   <span>${integerText(assessment.column_count)} columns</span>
-                  <span>${integerText(risks.length)} relationship risks</span>
+                  <span>${integerText(risks.length)} relationship findings</span>
                   <span>${integerText(arrayOfStrings(assessment.affected_columns).length)} affected columns</span>
                 </div>
               </article>
@@ -4556,40 +4536,6 @@ function renderRunSummaryArtifactReview(path, artifact) {
   );
 }
 
-function renderInfluenceArtifactReview(path, artifact) {
-  const features = Array.isArray(artifact?.top_features) ? artifact.top_features : [];
-  return artifactReviewShell(
-    "Influence review",
-    path,
-    "Bounded influence analysis result for the selected target.",
-    `
-      ${artifactReviewKpis([
-        ["target", artifact?.target || "unknown"],
-        ["method", artifact?.method || "unknown"],
-        ["rows", artifact?.row_count ?? 0],
-        ["features", features.length],
-      ])}
-      ${artifactReviewSection("Top features", features.length ? `
-        <div class="artifact-review-rows compact">
-          ${features.slice(0, 8).map((feature) => `
-            <article class="artifact-review-row">
-              <div class="artifact-review-row-header">
-                <strong><code>${escapeHtml(feature.feature)}</code></strong>
-                <span>${scoreText(feature.score)}</span>
-              </div>
-              <p>${escapeHtml(feature.interpretation || feature.direction || "Feature influence evidence")}</p>
-              <div class="artifact-review-meta">
-                <span>${escapeHtml(feature.direction || "direction n/a")}</span>
-                <span>${escapeHtml(feature.method || "method n/a")}</span>
-              </div>
-            </article>
-          `).join("")}
-        </div>
-      ` : `<p class="muted">No influence features were generated.</p>`)}
-    `,
-  );
-}
-
 function renderChartSpecArtifactReview(path, artifact) {
   const data = Array.isArray(artifact?.data) ? artifact.data : [];
   const sourceArtifacts = arrayOfStrings(artifact?.source_artifacts);
@@ -4635,29 +4581,7 @@ function chartSpecReviewSubtitle(artifact) {
 }
 
 function renderChartSpecPreview(artifact) {
-  const chartType = String(artifact?.chart_type || "").toLowerCase();
-  if (chartType === "gauge") {
-    return renderArtifactGaugePreview(artifact);
-  }
   return renderArtifactBarPreview(artifact);
-}
-
-function renderArtifactGaugePreview(artifact) {
-  const data = Array.isArray(artifact?.data) ? artifact.data : [];
-  const riskRow = data.find((row) => String(row?.label || "").toLowerCase() === "risk") || data[0] || {};
-  const riskScore = clampNumber(riskRow.value ?? artifact?.summary?.risk_score, 0, 100);
-  const verdict = artifact?.summary?.verdict || "Gauge";
-  const issueCount = artifact?.summary?.issue_count;
-  return `
-    <div class="artifact-chart-preview artifact-chart-gauge">
-      ${riskGaugeSvg(riskScore)}
-      <div class="artifact-chart-gauge-copy">
-        <strong>${integerText(riskScore)}/100 risk</strong>
-        <span>${escapeHtml(verdict)}</span>
-        ${issueCount === undefined ? "" : `<small>${integerText(issueCount)} issues from dataset_verdict.json</small>`}
-      </div>
-    </div>
-  `;
 }
 
 function renderArtifactBarPreview(artifact) {
@@ -4715,15 +4639,15 @@ function chartPreviewLabel(row, fallbackIndex) {
 }
 
 function chartPreviewValueKey(row) {
-  return ["count", "null_rate", "missing_rate", "value", "score"].find((candidate) => row[candidate] !== undefined && row[candidate] !== "") || "value";
+  return ["count", "null_rate", "missing_rate", "value"].find((candidate) => row[candidate] !== undefined && row[candidate] !== "") || "value";
 }
 
 function chartPreviewDisplayValue(value, valueKey, chartType) {
   if (valueKey.includes("rate")) {
     return percentText(value);
   }
-  if (chartType === "horizontal_bar" || valueKey === "score") {
-    return scoreText(value);
+  if (chartType === "horizontal_bar") {
+    return metricNumberText(value);
   }
   return integerText(value);
 }
@@ -5137,50 +5061,22 @@ function artifactLabel(path) {
     "lineage_graph.json": "Lineage graph",
     "profile_summary.json": "Profile summary",
     "relationship_graph.json": "Relationship graph",
-    "dataset_verdict.json": "Dataset verdict",
+    "dataset_verdict.json": "Dataset findings",
     "table_assessments.json": "Table assessments",
     "schema_evaluation.json": "Schema evaluation",
-    "influence.json": "Influence",
     "run_summary.json": "Run summary",
   };
   return labels[path] || path.replace(/^charts\//, "Chart: ");
 }
 
-function riskGaugeSvg(score) {
-  const normalized = clampNumber(score, 0, 100);
-  const circumference = 2 * Math.PI * 42;
-  const filled = circumference * normalized / 100;
-  return `
-    <svg class="risk-gauge" viewBox="0 0 104 104" role="img" aria-label="Risk score ${normalized} out of 100">
-      <circle class="risk-gauge-bg" cx="52" cy="52" r="42"></circle>
-      <circle class="risk-gauge-value" cx="52" cy="52" r="42" stroke-dasharray="${filled} ${circumference - filled}"></circle>
-      <text x="52" y="56" text-anchor="middle">${normalized}</text>
-    </svg>
-  `;
-}
-
 function dashboardTone(label) {
-  if (["P0", "P1", "invalid", "NOT_READY"].includes(label)) {
+  if (["P0", "P1", "invalid"].includes(label)) {
     return "danger";
   }
-  if (["P2", "warning", "skipped", "WARN"].includes(label)) {
+  if (["P2", "warning", "skipped"].includes(label)) {
     return "warn";
   }
   return "";
-}
-
-function readinessPillClass(readiness) {
-  if (readiness === "NOT_READY") {
-    return "missing";
-  }
-  if (readiness === "WARN") {
-    return "extra";
-  }
-  return "mapped";
-}
-
-function readinessOrder(readiness) {
-  return { NOT_READY: 0, WARN: 1, READY: 2 }[readiness] ?? 99;
 }
 
 function countBy(items, keyFn) {
@@ -5262,7 +5158,7 @@ function percentText(value) {
   return `${(Number(value || 0) * 100).toFixed(2)}%`;
 }
 
-function scoreText(value) {
+function decimalText(value) {
   return Number(value || 0).toFixed(4);
 }
 
@@ -5596,11 +5492,13 @@ function renderDiagramState(kind, title, message, model) {
 }
 
 function drawLocalDiagram(model, layout) {
-  els.diagramSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+  const viewBox = layout.viewBox || { x: 0, y: 0, width: layout.width, height: layout.height };
+  els.diagramSvg.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+  els.diagramSvg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   els.diagramSvg.classList.toggle("fit", state.diagramFit);
   els.localDiagram.classList.toggle("fit", state.diagramFit);
-  els.diagramSvg.style.width = state.diagramFit ? "100%" : `${layout.width}px`;
-  els.diagramSvg.style.height = state.diagramFit ? "100%" : `${layout.height}px`;
+  els.diagramSvg.style.width = state.diagramFit ? "100%" : `${viewBox.width}px`;
+  els.diagramSvg.style.height = state.diagramFit ? "100%" : `${viewBox.height}px`;
   els.diagramSvg.innerHTML = `
     <g class="diagram-edges">
       ${model.relationships.map((rel, index) => diagramRelationshipSvg(rel, layout, index)).join("")}
@@ -5676,7 +5574,9 @@ function layoutLocalDiagram(model) {
     });
   });
   const selection = diagramSelectionContext(model);
-  return { width, height, positions, tableRecords, graph, selection, topMargin };
+  const layout = { width, height, positions, tableRecords, graph, selection, topMargin };
+  layout.viewBox = diagramFullViewBox(model, layout);
+  return layout;
 }
 
 function buildDiagramGraph(model) {
@@ -5745,12 +5645,12 @@ function diagramVisibleColumns(table) {
   return { visible, hiddenCount, totalColumns };
 }
 
-function diagramRelationshipSvg(rel, layout, index) {
+function diagramRelationshipRoute(rel, layout, index) {
   const positions = layout.positions;
   const source = positions.get(rel.childTable);
   const target = positions.get(rel.parentTable);
   if (!source || !target) {
-    return "";
+    return null;
   }
   const sameLayer = source.layer === target.layer;
   const sourceColumn = (rel.childColumns || [])[0] || "";
@@ -5770,6 +5670,7 @@ function diagramRelationshipSvg(rel, layout, index) {
   let path;
   let labelX;
   let labelY;
+  let points;
   if (sameLayer) {
     const routeX = sourceIsLeft
       ? Math.max(source.x + source.width, target.x + target.width) + 44 + laneOffset
@@ -5777,6 +5678,12 @@ function diagramRelationshipSvg(rel, layout, index) {
     path = `M ${x1} ${y1} L ${routeX} ${y1} L ${routeX} ${y2} L ${x2} ${y2}`;
     labelX = routeX + direction * 8;
     labelY = (y1 + y2) / 2 - 6;
+    points = [
+      { x: x1, y: y1 },
+      { x: routeX, y: y1 },
+      { x: routeX, y: y2 },
+      { x: x2, y: y2 },
+    ];
   } else {
     const layerDistance = Math.abs(source.layer - target.layer);
     if (layerDistance > 1) {
@@ -5794,12 +5701,74 @@ function diagramRelationshipSvg(rel, layout, index) {
       ].join(" ");
       labelX = (sourceCorridor + targetCorridor) / 2;
       labelY = busY - 6;
+      points = [
+        { x: x1, y: y1 },
+        { x: sourceCorridor, y: y1 },
+        { x: sourceCorridor, y: busY },
+        { x: targetCorridor, y: busY },
+        { x: targetCorridor, y: y2 },
+        { x: x2, y: y2 },
+      ];
     } else {
       path = `M ${x1} ${y1} L ${sourceCorridor} ${y1} L ${sourceCorridor} ${y2} L ${x2} ${y2}`;
       labelX = sourceCorridor + direction * 8;
       labelY = (y1 + y2) / 2 - 6;
+      points = [
+        { x: x1, y: y1 },
+        { x: sourceCorridor, y: y1 },
+        { x: sourceCorridor, y: y2 },
+        { x: x2, y: y2 },
+      ];
     }
   }
+  return { path, labelX, labelY, x1, y1, x2, y2, points };
+}
+
+function diagramFullViewBox(model, layout) {
+  const padding = 80;
+  const labelWidth = 176;
+  const labelHeight = 24;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  function addRect(x, y, width, height) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  }
+  layout.tableRecords.forEach((record) => {
+    const position = layout.positions.get(record.table.name);
+    if (position) {
+      addRect(position.x, position.y, position.width, position.height);
+    }
+  });
+  model.relationships.forEach((rel, index) => {
+    const route = diagramRelationshipRoute(rel, layout, index);
+    if (!route) {
+      return;
+    }
+    route.points.forEach((point) => addRect(point.x, point.y, 0, 0));
+    addRect(route.labelX - 16, route.labelY - 18, labelWidth, labelHeight);
+  });
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return { x: 0, y: 0, width: layout.width, height: layout.height };
+  }
+  return {
+    x: Math.floor(minX - padding),
+    y: Math.floor(minY - padding),
+    width: Math.ceil(maxX - minX + padding * 2),
+    height: Math.ceil(maxY - minY + padding * 2),
+  };
+}
+
+function diagramRelationshipSvg(rel, layout, index) {
+  const route = diagramRelationshipRoute(rel, layout, index);
+  if (!route) {
+    return "";
+  }
+  const { path, labelX, labelY, x1, y1, x2, y2 } = route;
   const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
   const selectionClass = diagramRelationshipSelectionClass(rel, layout.selection);
   return `
@@ -6169,7 +6138,7 @@ function renderDiagramRelationshipMetrics(metrics = {}) {
     <div class="diagram-detail-section">
       <strong>Metrics</strong>
       <div class="diagram-chip-list">
-        ${entries.slice(0, 6).map(([key, value]) => `<span><code>${escapeHtml(key)}</code> ${escapeHtml(typeof value === "number" ? scoreOrIntegerText(value) : value)}</span>`).join("")}
+        ${entries.slice(0, 6).map(([key, value]) => `<span><code>${escapeHtml(key)}</code> ${escapeHtml(typeof value === "number" ? metricNumberText(value) : value)}</span>`).join("")}
       </div>
     </div>
   `;
@@ -6202,8 +6171,9 @@ function diagramArtifactLinks(paths) {
   return `<div class="diagram-artifact-links"><strong>Artifacts</strong><div>${links}</div></div>`;
 }
 
-function scoreOrIntegerText(value) {
-  return Number.isInteger(value) ? integerText(value) : Number(value).toFixed(3);
+function metricNumberText(value) {
+  const numeric = Number(value || 0);
+  return Number.isInteger(numeric) ? integerText(numeric) : decimalText(numeric);
 }
 
 function buildDbdiagramUrl(dbml) {

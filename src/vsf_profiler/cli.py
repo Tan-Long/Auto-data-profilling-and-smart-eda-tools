@@ -31,11 +31,6 @@ from vsf_profiler.doctor import (
 )
 from vsf_profiler.duckdb_utils import connect
 from vsf_profiler.export_package import create_analysis_package
-from vsf_profiler.influence_analyzer import (
-    MAX_ANALYSIS_ROWS,
-    MAX_FEATURE_COLUMNS,
-    analyze_influence,
-)
 from vsf_profiler.issue_catalog import IssueCatalog
 from vsf_profiler.lineage_graph import build_lineage_graph, read_run_events
 from vsf_profiler.llm_narrative import (
@@ -67,8 +62,6 @@ def run(
     dbml_arg: Optional[Path] = typer.Argument(None, help="Optional positional DBML path."),
     dbml: Optional[Path] = typer.Option(None, "--dbml", help="DBML schema path."),
     csv_dir: Optional[Path] = typer.Option(None, "--csv-dir", help="Directory containing CSV files."),
-    rules: Optional[Path] = typer.Option(None, "--rules", help="Optional YAML rules file."),
-    target: Optional[str] = typer.Option(None, "--target", help="Target column as table.column."),
     out: Path = typer.Option(..., "--out", help="Output directory."),
     postgres_url: Optional[str] = typer.Option(
         None,
@@ -122,18 +115,6 @@ def run(
         min=1,
         help="Rows fetched per MySQL chunk while extracting to DuckDB-readable files.",
     ),
-    max_analysis_rows: int = typer.Option(
-        MAX_ANALYSIS_ROWS,
-        "--max-analysis-rows",
-        min=1,
-        help="Maximum rows materialized for bounded influence analysis.",
-    ),
-    max_feature_columns: int = typer.Option(
-        MAX_FEATURE_COLUMNS,
-        "--max-feature-columns",
-        min=1,
-        help="Maximum feature columns materialized for bounded influence analysis.",
-    ),
     use_llm: bool = typer.Option(False, "--use-llm", help="Generate optional L4 narrative."),
     llm_provider: Optional[str] = typer.Option(
         None,
@@ -141,7 +122,7 @@ def run(
         help="Optional narrative provider: 'fake' for local validation or 'openai'.",
     ),
 ) -> None:
-    """Run profiling, validation, influence analysis, and report generation."""
+    """Run profiling, validation, and report generation."""
     dbml_path = dbml or dbml_arg
     if llm_provider and not use_llm:
         raise typer.BadParameter("--llm-provider requires --use-llm.")
@@ -167,14 +148,11 @@ def run(
     result = run_pipeline(
         dbml_path=dbml_path,
         csv_dir=csv_dir,
-        rules_path=rules,
-        target=target,
+        rules_path=None,
         out_dir=out,
         source_connector=source_connector,
         use_llm=use_llm,
         llm_provider=_llm_provider_from_config(llm_provider) if use_llm else None,
-        max_analysis_rows=max_analysis_rows,
-        max_feature_columns=max_feature_columns,
     )
     typer.echo(f"Wrote report: {result['report_html']}")
     typer.echo(f"Issues found: {result['issue_count']}")
@@ -222,8 +200,7 @@ def demo_run_olist(
     result = run_pipeline(
         dbml_path=Path("examples/olist/schema.dbml"),
         csv_dir=csv_dir,
-        rules_path=Path("examples/olist/rules.yaml"),
-        target="olist_order_reviews_dataset.review_score",
+        rules_path=None,
         out_dir=out,
     )
     typer.echo(f"Wrote report: {result['report_html']}")
@@ -315,14 +292,11 @@ def run_pipeline(
     *,
     dbml_path: Path | None,
     csv_dir: Path | None,
-    rules_path: Path | None,
-    target: str | None,
     out_dir: Path,
+    rules_path: Path | None = None,
     source_connector: TabularSourceConnector | None = None,
     use_llm: bool = False,
     llm_provider: NarrativeProvider | None = None,
-    max_analysis_rows: int = MAX_ANALYSIS_ROWS,
-    max_feature_columns: int = MAX_FEATURE_COLUMNS,
 ) -> dict[str, str | int]:
     out_dir.mkdir(parents=True, exist_ok=True)
     samples_dir = out_dir / "samples"
@@ -337,22 +311,16 @@ def run_pipeline(
             "dbml_path": str(dbml_path),
             "csv_dir": str(csv_dir),
             "rules_path": str(rules_path) if rules_path else None,
-            "target": target,
         }
     else:
         runtime_inputs = {
             **source_connector.runtime_inputs(),
             "dbml_path": str(dbml_path) if dbml_path else None,
             "rules_path": str(rules_path) if rules_path else None,
-            "target": target,
         }
     if use_llm:
         runtime_inputs["use_llm"] = True
         runtime_inputs["llm_provider"] = getattr(llm_provider, "name", "none")
-    if max_analysis_rows != MAX_ANALYSIS_ROWS:
-        runtime_inputs["max_analysis_rows"] = max_analysis_rows
-    if max_feature_columns != MAX_FEATURE_COLUMNS:
-        runtime_inputs["max_feature_columns"] = max_feature_columns
     runtime = RuntimeRecorder(
         out_dir=out_dir,
         inputs=runtime_inputs,
@@ -440,21 +408,6 @@ def run_pipeline(
                     len(issue_catalog.issues) - issue_count_before,
                 )
 
-            with runtime.stage("influence_analysis", "Run influence analysis") as stage:
-                influence = analyze_influence(
-                    con=con,
-                    schema=schema,
-                    catalog=catalog,
-                    target=target,
-                    max_analysis_rows=max_analysis_rows,
-                    max_feature_columns=max_feature_columns,
-                )
-                stage.add_detail("row_count", influence.row_count)
-                stage.add_detail("feature_count", len(influence.top_features))
-                if not target:
-                    stage.mark_skipped("No target column was provided.")
-                elif influence.notes and not influence.top_features:
-                    stage.add_detail("notes", influence.notes)
         finally:
             if con is not None:
                 con.close()
@@ -463,7 +416,6 @@ def run_pipeline(
             schema_diagram = build_schema_diagram(schema, catalog, out_dir)
             profile_summary_payload = profile.model_dump(mode="json")
             issues_payload = [issue.model_dump(mode="json") for issue in issue_catalog.issues]
-            influence_payload = influence.model_dump(mode="json")
             schema_evaluation = build_schema_evaluation(
                 schema=schema,
                 catalog=catalog,
@@ -491,7 +443,6 @@ def run_pipeline(
                 issues=issues_payload,
                 relationship_graph=relationship_graph,
                 dataset_verdict=dataset_verdict,
-                influence=influence_payload,
             )
             runtime.artifact_written(
                 out_dir / "schema_diagram.dbml",
@@ -509,12 +460,6 @@ def run_pipeline(
                 issues_payload,
                 runtime=runtime,
                 key="issues",
-            )
-            _write_json(
-                out_dir / "influence.json",
-                influence_payload,
-                runtime=runtime,
-                key="influence",
             )
             _write_json(
                 out_dir / "schema_parse_report.json",
@@ -576,7 +521,6 @@ def run_pipeline(
                     artifacts={
                         "profile_summary": profile_summary_payload,
                         "issues": issues_payload,
-                        "influence": influence_payload,
                         "schema_evaluation": schema_evaluation,
                         "relationship_graph": relationship_graph,
                         "dataset_verdict": dataset_verdict,
@@ -607,7 +551,6 @@ def run_pipeline(
                 out_dir=out_dir,
                 profile=profile,
                 issues=issue_catalog.issues,
-                influence=influence,
                 schema_diagram=schema_diagram,
                 schema_parse_report=schema_parse_report,
                 connector_metadata=connector_metadata,
@@ -647,7 +590,6 @@ def run_pipeline(
             out_dir=out_dir,
             profile=profile,
             issues=issue_catalog.issues,
-            influence=influence,
             schema_diagram=schema_diagram,
             schema_parse_report=schema_parse_report,
             connector_metadata=connector_metadata,

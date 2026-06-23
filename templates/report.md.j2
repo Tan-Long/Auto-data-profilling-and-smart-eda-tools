@@ -1,21 +1,22 @@
 # VSF Senior Data Scientist Review
 
-Deterministic evidence review generated from VSF Data Profiler artifacts. Influence findings are association-only, not causal.
+Deterministic evidence review generated from VSF Data Profiler artifacts.
 
-## 1. Executive Scorecard
+## 1. Executive Summary
 
 | Signal | Value | Evidence |
 | --- | --- | --- |
-{% for card in scorecard -%}
+{% for card in summary_cards -%}
 | {{ card.label }} | {{ card.value }} | {{ card.detail }} |
 {% endfor %}
 
 {% if dataset_verdict.available -%}
-### Dataset Verdict
+### Dataset Findings
 
-**Verdict rationale:** {{ dataset_verdict.verdict_rationale }}
+- Issue total: {{ dataset_verdict.issue_total }}
+- Top blocker records: {{ dataset_verdict.top_blockers | length }}
 {% else -%}
-Dataset verdict metadata was not provided for this report.
+Dataset finding metadata was not provided for this report.
 {% endif %}
 
 ### Recommended Actions
@@ -58,20 +59,6 @@ Dataset verdict metadata was not provided for this report.
 | `{{ chart.path }}` | {{ chart.source_artifacts | join(", ") }} |
 {% endfor %}
 
-### Dataset Risk
-
-{% if chart_specs.risk_summary.available -%}
-- Verdict: {{ chart_specs.risk_summary.verdict }}
-- Risk score: {{ chart_specs.risk_summary.risk_score }}/100
-- Issue count: {{ chart_specs.risk_summary.issue_count }}
-{% if dataset_verdict.risk_score_model -%}
-- Risk score model: {{ dataset_verdict.risk_score_model.description }}
-- Risk formula: `{{ dataset_verdict.risk_score_model.formula }}`
-{% endif %}
-{% else -%}
-- Dataset risk chart spec was not generated.
-{% endif %}
-
 ### Issue Counts by Severity
 
 | Severity | Count | Visual |
@@ -112,42 +99,23 @@ Dataset verdict metadata was not provided for this report.
 | none | 0 | `....................` |
 {% endfor %}
 
-### Influence Top Features
-
-Target: `{{ influence.target or "none" }}`
-
-Method: {{ influence.method }}. This is association, not causation.
-
-| Rank | Feature | Score | Method | Interpretation | Visual |
-| ---: | --- | ---: | --- | --- | --- |
-{% for row in chart_specs.influence_top_features.data -%}
-| {{ row.rank }} | {{ row.feature }} | {{ "%.4f" | format(row.score) }} | {{ row.method }} | {{ row.interpretation }} | `{{ row.bar_text }}` |
-{% else -%}
-| 0 | none | 0 | none | No influence features were produced. | `....................` |
-{% endfor %}
 {% else -%}
 Chart specs were not provided for this report.
 {% endif %}
 
-## 4. Table Review Scores and Per-Table Assessment
+## 4. Per-Table Assessment
 
 {% if table_assessments.available -%}
 - Assessment artifact: `{{ table_assessments.path }}`
 - Tables assessed: {{ table_assessments.table_count }}
-- Average review score: {{ table_assessments.average_review_score }}/100
-{% if table_assessments.score_model -%}
-- Review score model: {{ table_assessments.score_model.description }}
-- Review score formula: `{{ table_assessments.score_model.formula }}`
-{% endif %}
-- Readiness counts: {% for readiness, count in table_assessments.readiness_counts.items() %}{{ readiness }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
 - Business impact counts: {% for impact, count in table_assessments.business_impact_counts.items() %}{{ impact }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}
 
-| Table | Role | Readiness | Review Score | Penalty | Issues | Relationship Risks | Business Impact | Affected Columns | First Action |
-| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
+| Table | Role | Issues | Relationship Findings | Business Impact | Affected Columns | First Action |
+| --- | --- | ---: | ---: | --- | --- | --- |
 {% for row in table_assessments.assessments -%}
-| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.review_score }} | {{ row.score_penalty }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.business_impact_label }} | {{ row.affected_columns | join(", ") if row.affected_columns else "none" }} | {{ row.recommended_next_actions[0] if row.recommended_next_actions else "" }} |
+| {{ row.table }} | {{ row.role }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.business_impact_label }} | {{ row.affected_columns | join(", ") if row.affected_columns else "none" }} | {{ row.recommended_next_actions[0] if row.recommended_next_actions else "" }} |
 {% else -%}
-| none | none | none | 0 | 0 | 0 | 0 | none | none | none |
+| none | none | 0 | 0 | none | none | none |
 {% endfor %}
 {% else -%}
 Table assessment metadata was not provided for this report.

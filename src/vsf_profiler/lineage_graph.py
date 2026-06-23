@@ -25,7 +25,6 @@ BASE_EVIDENCE_ARTIFACTS = [
 MACHINE_REPORT_SOURCES = [
     "profile_summary.json",
     "issues.json",
-    "influence.json",
     "schema_parse_report.json",
     "schema_evaluation.json",
     "relationship_graph.json",
@@ -485,11 +484,9 @@ def _add_stage_artifact_edges(
         "profile_csv_tables": ["profile_summary.json"],
         "data_quality_checks": ["issues.json"],
         "relationship_checks": ["relationship_graph.json"],
-        "influence_analysis": ["influence.json"],
         "write_machine_artifacts": [
             "profile_summary.json",
             "issues.json",
-            "influence.json",
             "schema_parse_report.json",
             "connector_metadata.json",
             "schema_evaluation.json",
@@ -543,7 +540,6 @@ def _add_artifact_dependency_edges(
             "relationship_graph.json",
             "dataset_verdict.json",
         ],
-        "influence.json": ["profile_summary.json"],
         "lineage_graph.json": [
             "schema_parse_report.json",
             "schema_evaluation.json",

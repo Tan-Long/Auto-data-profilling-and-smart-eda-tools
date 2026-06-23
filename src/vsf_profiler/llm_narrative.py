@@ -24,7 +24,6 @@ SOURCE_ARTIFACTS = [
     "dataset_verdict.json",
     "table_assessments.json",
     "charts/*.json",
-    "influence.json",
 ]
 
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
@@ -40,10 +39,9 @@ OPENAI_NARRATIVE_INSTRUCTIONS = """You are writing as a Senior Data Scientist.
 Use only the supplied JSON context, which is derived from deterministic structured artifacts.
 Do not use external facts, raw CSV data, row-level samples, or unbounded examples.
 Do not invent numeric claims; every number must appear in the supplied evidence.
-Reference tables, columns, issue ids, issue types, severities, and verdicts only when they appear in the supplied evidence.
+Reference tables, columns, issue ids, issue types, severities, and dataset findings only when they appear in the supplied evidence.
 Reference table business-impact categories only when they appear in table_assessments.json for that table.
 Do not use causal wording such as causes, caused, drives, leads to, due to, because, or root cause.
-Use association-only language for influence findings.
 The supplied JSON includes guardrail_safe_draft. Return that Markdown exactly.
 Do not wrap the response in a code fence. Do not add a preface, suffix, extra bullets, or rewritten wording.
 """
@@ -77,15 +75,11 @@ ALLOWED_ARTIFACT_FIELD_REFS = {
     "bad_count",
     "business_impact",
     "column_count",
-    "health_score",
     "issue_count",
     "issue_counts_by_severity",
     "issue_type",
-    "readiness",
     "recommended_next_actions",
     "relationship_risk_count",
-    "review_score",
-    "risk_score",
     "row_count",
     "severity",
     "table_count",
@@ -151,13 +145,12 @@ class FakeNarrativeProvider:
             "# Senior Data Scientist Narrative\n\n"
             "## Dataset Review\n\n"
             f"The deterministic artifacts show {summary['table_count']} tables, "
-            f"{summary['row_count']} rows, {summary['issue_count']} issues, and a "
-            f"risk score of {summary['risk_score']}.\n\n"
+            f"{summary['row_count']} rows, and {summary['issue_count']} issues.\n\n"
             "## Priority Findings\n\n"
             f"The highest-priority reviewed issue type is `{top_issue.get('issue_type', 'none')}` "
             f"on {top_ref or 'the mapped tables'}.\n\n"
             "## Modeling Caveat\n\n"
-            "Influence findings are association-only and should be validated before use in decisions.\n"
+            "The structured artifacts support data-quality review, not causal or predictive claims.\n"
         )
 
 
@@ -307,7 +300,6 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
     schema_evaluation = artifacts["schema_evaluation"]
     relationship_graph = artifacts["relationship_graph"]
     charts = artifacts["chart_specs"]
-    influence = artifacts["influence"]
     table_assessments = artifacts.get("table_assessments") or {"assessments": []}
     tables = profile.get("tables") or {}
     issue_counts = dataset_verdict.get("issue_counts") or {}
@@ -324,8 +316,6 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
             "column_count": sum((table.get("column_count") or 0) for table in tables.values()),
             "row_count": sum((table.get("row_count") or 0) for table in tables.values()),
             "issue_count": len(issues),
-            "risk_score": dataset_verdict.get("risk_score", 0),
-            "verdict": dataset_verdict.get("verdict", ""),
             "severity_counts": issue_counts.get("by_severity") or {},
             "issue_type_counts": issue_counts.get("by_type") or {},
         },
@@ -353,8 +343,6 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
         "schema_summary": schema_evaluation.get("summary") or {},
         "relationship_summary": relationship_graph.get("summary") or {},
         "dataset_verdict": {
-            "verdict": dataset_verdict.get("verdict", ""),
-            "verdict_rationale": dataset_verdict.get("verdict_rationale", ""),
             "top_blockers": dataset_verdict.get("top_blockers") or [],
             "recommended_next_actions": dataset_verdict.get("recommended_next_actions") or [],
         },
@@ -362,9 +350,6 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
             {
                 "table": row.get("table"),
                 "role": row.get("role"),
-                "health_score": row.get("health_score"),
-                "review_score": row.get("review_score", row.get("health_score")),
-                "readiness": row.get("readiness"),
                 "issue_counts_by_severity": row.get("issue_counts_by_severity") or {},
                 "affected_columns": row.get("affected_columns") or [],
                 "relationship_risk_count": len(row.get("relationship_risks") or []),
@@ -376,13 +361,6 @@ def build_narrative_context(artifacts: dict[str, Any]) -> dict[str, Any]:
         "chart_summaries": {
             name: spec.get("summary") or {}
             for name, spec in sorted(charts.items())
-        },
-        "influence": {
-            "target": influence.get("target"),
-            "method": influence.get("method", ""),
-            "row_count": influence.get("row_count", 0),
-            "top_features": (influence.get("top_features") or [])[:10],
-            "notes": influence.get("notes") or [],
         },
     }
     safe_draft = guardrail_safe_l4_draft(context)
@@ -417,9 +395,7 @@ def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
         "",
         (
             f"The run reviewed {summary['table_count']} tables, {summary['column_count']} columns, "
-            f"and {summary['row_count']} rows. The deterministic verdict is "
-            f"`{summary['verdict']}` with risk score {summary['risk_score']} and "
-            f"{summary['issue_count']} issues."
+            f"and {summary['row_count']} rows with {summary['issue_count']} issue records."
         ),
         "",
         "## Priority Findings",
@@ -442,9 +418,7 @@ def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
         impact = row.get("business_impact") or {}
         category = impact.get("category") or "general_analytics"
         lines.append(
-            f"- `{row['table']}` is `{row['readiness']}` with review score "
-            f"{row.get('review_score', row.get('health_score'))}, role `{row['role']}`, "
-            f"and impact category `{category}`."
+            f"- `{row['table']}` has role `{row['role']}` and impact category `{category}`."
         )
     lines.extend(
         [
@@ -463,10 +437,7 @@ def _structured_l4_narrative(context: dict[str, Any], *, intro: str) -> str:
             "",
             "## Modeling Caveat",
             "",
-            (
-                "Influence findings are association-only. Validate important patterns with "
-                "domain review before operational use."
-            ),
+            "The structured artifacts support data-quality review, not causal or predictive claims.",
             "",
         ]
     )
@@ -491,7 +462,6 @@ def _guardrail_contract_from_draft(draft: str) -> dict[str, Any]:
             "No preface or suffix.",
             "No additional numeric claims.",
             "No causal wording.",
-            "Use association-only wording for influence findings.",
         ],
     }
 
@@ -510,14 +480,8 @@ def build_guardrail_evidence(
         refs.setdefault(artifact, set()).add("source_artifacts")
     refs.setdefault("l4_report.md", set()).add("optional_artifact")
     refs.setdefault("guardrail_report.json", set()).add("optional_artifact")
-    refs.setdefault("association-only", set()).add("allowed_phrase")
-    refs.setdefault("association", set()).add("allowed_phrase")
-    refs.setdefault("READY", set()).add("verdict")
-    refs.setdefault("WARN", set()).add("verdict")
-    refs.setdefault("NOT_READY", set()).add("verdict")
     for field_ref in ALLOWED_ARTIFACT_FIELD_REFS:
         refs.setdefault(field_ref, set()).add("artifact_field")
-    numbers.setdefault("100", set()).add("risk_score_scale")
     return {
         "numbers": numbers,
         "refs": refs,
@@ -727,12 +691,8 @@ def _collect_refs(value: Any, refs: dict[str, set[str]], path: str = "$") -> Non
             "issue_id",
             "issue_type",
             "severity",
-            "verdict",
             "status",
-            "target",
-            "feature",
             "role",
-            "readiness",
             "category",
             "label",
         ):
@@ -834,7 +794,7 @@ def _validated_openai_model(model: str) -> str:
     if not MODEL_NAME_RE.fullmatch(model_name):
         raise ValueError(
             "VSF_OPENAI_MODEL must be 1-128 characters and contain only letters, "
-            "numbers, dot, underscore, dash, slash, or colon."
+            "numbers, dot, low line, dash, slash, or colon."
         )
     return model_name
 

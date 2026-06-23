@@ -7,13 +7,10 @@ def test_chart_specs_are_deterministic_and_aggregate_only():
         issues=_issues(),
         relationship_graph=_relationship_graph(),
         dataset_verdict=_dataset_verdict(),
-        influence=_influence(),
         top_n=2,
     )
 
     assert list(specs) == [
-        "dataset_verdict_risk_summary.json",
-        "influence_top_features.json",
         "issue_counts_by_severity.json",
         "issue_counts_by_type.json",
         "missingness_by_table.json",
@@ -49,30 +46,6 @@ def test_chart_specs_are_deterministic_and_aggregate_only():
     assert specs["relationship_fk_health.json"]["details"]["edges"][0]["id"] == (
         "orders.customer_id->customers.customer_id"
     )
-
-    risk_summary = specs["dataset_verdict_risk_summary.json"]["summary"]
-    assert risk_summary == {"verdict": "NOT_READY", "risk_score": 70, "issue_count": 4}
-    assert specs["dataset_verdict_risk_summary.json"]["data"] == [
-        {"label": "risk", "value": 70},
-        {"label": "remaining", "value": 30},
-    ]
-
-    influence_rows = specs["influence_top_features.json"]["data"]
-    assert [row["feature"] for row in influence_rows] == ["orders__status", "customers__state"]
-
-
-def test_influence_chart_spec_is_skipped_without_features():
-    specs = build_chart_specs(
-        profile_summary=_profile_summary(),
-        issues=[],
-        relationship_graph={"summary": {"status_counts": {}}},
-        dataset_verdict={"risk_score": 0, "issue_counts": {"total": 0}},
-        influence={"top_features": []},
-    )
-
-    assert "influence_top_features.json" not in specs
-
-
 def _profile_summary() -> dict:
     return {
         "tables": {
@@ -147,8 +120,6 @@ def _relationship_graph() -> dict:
 
 def _dataset_verdict() -> dict:
     return {
-        "verdict": "NOT_READY",
-        "risk_score": 70,
         "issue_counts": {
             "total": 4,
             "by_severity": {"P0": 1, "P1": 2, "P2": 0, "P3": 1},
@@ -158,16 +129,4 @@ def _dataset_verdict() -> dict:
                 "PRIMARY_KEY_NULL": 1,
             },
         },
-    }
-
-
-def _influence() -> dict:
-    return {
-        "target": "orders.review_score",
-        "method": "association_not_causation",
-        "row_count": 2,
-        "top_features": [
-            {"feature": "customers__state", "score": 0.25, "method": "target_mean"},
-            {"feature": "orders__status", "score": 0.75, "method": "target_mean"},
-        ],
     }

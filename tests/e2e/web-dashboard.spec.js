@@ -59,11 +59,19 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page.locator("#runnerModePath").click();
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
+  await expect(page.locator("#olistFullPresetButton")).toHaveAttribute("aria-pressed", "true");
+  await page.locator("#smallDemoPresetButton").click();
+  await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
+  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
+  await expect(page.locator("#smallDemoPresetButton")).toHaveAttribute("aria-pressed", "true");
+  await page.locator("#olistFullPresetButton").click();
+  await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_olist/schema.dbml");
+  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_olist/csv");
+  await expect(page.locator("#rulesPathInput")).toHaveCount(0);
+  await expect(page.locator("#pathTargetInput")).toHaveCount(0);
 
   await page.locator("#dbmlPathInput").fill("data/demo_olist/schema.dbml");
   await page.locator("#csvDirPathInput").fill("data/demo_olist/csv");
-  await page.locator("#rulesPathInput").fill("data/demo_olist/rules.yaml");
-  await page.locator("#pathTargetInput").fill("olist_order_reviews_dataset.review_score");
 
   await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
   await page.locator("#runPathProfilerButton").click();
@@ -72,15 +80,15 @@ test("local path run renders the interactive dashboard from generated artifacts"
     timeout: 60_000,
   });
   await expect(page.locator("#dashboardMessage")).toContainText(
-    /Dashboard loaded|Influence chart is absent/,
+    /Dashboard loaded/,
     { timeout: 20_000 },
   );
 
   await expect(page.locator("#dashboardStatusBadge")).toContainText(
     "succeeded dashboard",
   );
-  await expect(page.locator("#dashboardIssueCount")).toContainText("15/15 issues");
-  await expect(page.locator("#dashboardSummaryStrip")).toContainText("verdict");
+  await expect(page.locator("#dashboardIssueCount")).toContainText(/\d+\/\d+ issues/);
+  await expect(page.locator("#dashboardSummaryStrip")).toContainText("issues");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
   await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
   await expect(page.locator("#diagramMessage")).toContainText("Generated artifacts");
@@ -90,6 +98,44 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("timestamp");
   await expect(page.locator("#diagramSvg")).toContainText("FK issue");
   await expect(page.locator('#diagramSvg [data-diagram-table="olist_order_payments_dataset"]')).toHaveCount(1);
+  const diagramEdgeViewport = await page.locator("#diagramSvg").evaluate((svg) => {
+    const [viewX, viewY, viewWidth, viewHeight] = (svg.getAttribute("viewBox") || "0 0 0 0")
+      .split(/\s+/)
+      .map(Number);
+    const view = {
+      x: viewX,
+      y: viewY,
+      right: viewX + viewWidth,
+      bottom: viewY + viewHeight,
+    };
+    const edges = [...svg.querySelectorAll("path.diagram-edge")].map((edge) => {
+      const numbers = (edge.getAttribute("d") || "").match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+      const points = [];
+      for (let index = 0; index < numbers.length; index += 2) {
+        points.push({ x: numbers[index], y: numbers[index + 1] });
+      }
+      const xValues = points.map((point) => point.x);
+      const yValues = points.map((point) => point.y);
+      return {
+        id: edge.closest("[data-diagram-relationship]")?.dataset.diagramRelationship || "",
+        x: Math.min(...xValues),
+        y: Math.min(...yValues),
+        right: Math.max(...xValues),
+        bottom: Math.max(...yValues),
+      };
+    });
+    return {
+      edgeCount: edges.length,
+      outside: edges.filter((edge) => (
+        edge.x < view.x ||
+        edge.y < view.y ||
+        edge.right > view.right ||
+        edge.bottom > view.bottom
+      )),
+    };
+  });
+  expect(diagramEdgeViewport.edgeCount).toBeGreaterThan(0);
+  expect(diagramEdgeViewport.outside).toEqual([]);
   await expect(page.locator("#mappedMetric")).toHaveText("9");
   await expect(page.locator("#missingMetric")).toHaveText("0");
   await expect(page.locator("#extraMetric")).toHaveText("0");
@@ -140,14 +186,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await expect(page.locator("#generatedResults")).toContainText("Generated results");
   const generatedResults = page.locator("#artifactList");
-  await expect(generatedResults).toContainText("Dataset verdict");
-  await expect(generatedResults).toContainText("NOT_READY");
+  await expect(generatedResults).toContainText("Dataset findings");
   await expect(generatedResults).toContainText("Issue counts");
-  await expect(generatedResults).toContainText("15 issues");
+  await expect(generatedResults).toContainText(/\d+\s+issues/);
   await expect(generatedResults).toContainText("Table impact");
   await expect(generatedResults).toContainText("9 tables");
   await expect(generatedResults).toContainText("Runtime summary");
-  await expect(generatedResults).toContainText("8 stages");
+  await expect(generatedResults).toContainText("7 stages");
   await expect(generatedResults).toContainText("Report HTML");
   await expect(generatedResults).toContainText("report.html");
   await expect(generatedResults).toContainText("Report Markdown");
@@ -157,12 +202,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#report")).toContainText("Generated report");
   await expect(page.locator("#reportChartPreview")).toContainText("Report: issue severity");
   await expect(page.locator("#reportChartPreview")).toContainText("P1");
-  await expect(page.locator("#reportChartPreview")).toContainText("12");
   await expect(page.locator("#reportChartPreview")).toContainText("Report: missingness");
   await expect(page.locator("#reportChartPreview")).toContainText("olist_orders_dataset");
   await expect(page.locator("#reportChartPreview")).toContainText("Report: FK status");
   await expect(page.locator("#reportChartPreview")).toContainText("FK issue");
-  await expect(page.locator("#reportChartPreview")).toContainText("Report: influence");
   await expect(page.locator("#reportChartPreview")).not.toContainText("No chart data");
   await expect(page.locator("#artifactPreviewMeta")).toContainText("report.html");
   await expect(page.locator("#artifactPreview")).toContainText("HTML report preview");
@@ -183,12 +226,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#artifactPreview")).toContainText("Profile summary review");
 
   const dashboard = page.locator("#dashboardPanelGrid");
-  await expect(dashboard).toContainText("Dataset verdict");
   await expect(dashboard).toContainText("Issue counts by severity");
   await expect(dashboard).toContainText("Issue counts by type");
   await expect(dashboard).toContainText("Missingness by table");
   await expect(dashboard).toContainText("Relationship FK status");
-  await expect(dashboard).toContainText("Influence top features");
 
   await expect(page.locator("#tableImpact")).toContainText("Table Impact");
   await expect(page.locator("#tableImpactStatus")).toContainText(
@@ -272,7 +313,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: "outputs/graph_progressive_screenshots/relationship-full.png",
   });
 
-  await expect(page.locator("#dashboardArtifactCount")).toContainText(/1[6-7] files/);
+  await expect(page.locator("#dashboardArtifactCount")).toContainText("14 files");
   await expect(page.locator("#dashboardArtifactLinks")).toContainText(
     "charts/issue_counts_by_severity.json",
   );
@@ -344,16 +385,6 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator('[data-dashboard-panel-path="charts/issue_counts_by_severity.json"]')).toBeFocused();
   expect(await popupOpened).toBe(false);
   await page
-    .locator('#dashboardArtifactLinks .artifact-json-link[data-artifact-path="charts/dataset_verdict_risk_summary.json"]')
-    .click();
-  await expect(page.locator("#artifactPreview")).toBeFocused();
-  await expect(page.locator("#artifactPreviewMeta")).toContainText(
-    "charts/dataset_verdict_risk_summary.json",
-  );
-  await expect(page.locator("#artifactPreview")).toContainText("Chart preview");
-  await expect(page.locator("#artifactPreview .artifact-chart-preview")).toBeVisible();
-  await expect(page.locator("#artifactPreview .risk-gauge")).toBeVisible();
-  await page
     .locator('#dashboardArtifactLinks .artifact-json-link[data-artifact-path="charts/issue_counts_by_severity.json"]')
     .click();
   await expect(page.locator("#artifactPreviewMeta")).toContainText(
@@ -362,7 +393,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#artifactPreview .artifact-chart-bar-row").first()).toBeVisible();
 
   await page.locator("#dashboardSeverityFilter").selectOption("P1");
-  await expect(page.locator("#dashboardIssueCount")).toContainText("/15 issues");
+  await expect(page.locator("#dashboardIssueCount")).toContainText(/\d+\/\d+ issues/);
 
   await page
     .locator('[data-dashboard-kind="severity"][data-dashboard-value="P1"]')

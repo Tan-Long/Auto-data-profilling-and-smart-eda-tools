@@ -14,8 +14,6 @@ The CLI accepts:
 - Or a Postgres connection URL/environment variable plus selected schema/tables.
 - Or a MySQL/MariaDB connection URL/environment variable plus selected
   database/tables.
-- An optional YAML business-rules file.
-- An optional target column in `table.column` format.
 - An optional `--use-llm` flag for a guarded Senior Data Scientist narrative.
 - An optional `--llm-provider` value, currently `fake` or `openai`, used only
   when `--use-llm` is set.
@@ -25,16 +23,15 @@ The CLI accepts:
 - A package command, `vsf-profiler package`, that exports an existing output
   directory for offline review without rerunning profiling.
 - A doctor command, `vsf-profiler doctor`, that reports required and optional
-  local environment readiness without printing secret values.
+  local environment checks without printing secret values.
 - A local benchmark script, `scripts/benchmark_large_dataset.py`, that
-  generates deterministic relational CSV/DBML/rules inputs, runs the existing
+  generates deterministic relational CSV/DBML inputs, runs the existing
   Python/DuckDB pipeline, and writes benchmark evidence.
 
 The CLI produces:
 
 - `profile_summary.json`
 - `issues.json`
-- `influence.json`
 - `schema_parse_report.json`
 - optionally, `connector_metadata.json` when a database connector runs
 - `lineage_graph.json`
@@ -113,7 +110,6 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 - Materialize DuckDB results into pandas only through bounded helpers with
   explicit row and column limits.
 - Generate automatic quality checks from DBML constraints.
-- Run YAML rules for range, accepted values, regex, and expressions.
 - Validate foreign-key relationships with orphan, duplicate parent key, null FK,
   child duplicate checks for one-to-one relationships, composite FK joins, and
   join coverage metrics.
@@ -128,18 +124,14 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 - Generate relationship graph artifacts with table nodes, FK edges, declared and
   observed cardinality, runtime FK metrics, statuses, junction-table detection,
   and issue/sample evidence links.
-- Generate a deterministic dataset verdict artifact with normalized severity
-  counts, review-risk score, scoring formula metadata, top blockers, affected
-  tables, and recommended next actions.
+- Generate a deterministic dataset finding artifact with normalized severity
+  counts, top blockers, affected tables, and recommended next actions.
 - Generate a deterministic per-table assessment artifact with one row per
-  profiled table, including role, review score, scoring formula metadata,
-  readiness, issue counts, affected columns, relationship risks, name-token
-  business impact category, evidence artifact references, and recommended next
-  actions. The review score is a deterministic EDA prioritization heuristic,
-  not a statistical health model.
+  profiled table, including role, issue counts, affected columns, relationship
+  findings, name-token business impact category, evidence artifact references,
+  and recommended next actions.
 - Generate deterministic chart-spec artifacts from aggregate outputs for issue
-  counts, missingness, relationship FK status, dataset risk, and influence top
-  features when available.
+  counts, missingness, and relationship FK status.
 - Generate DBML diagram artifacts, including a stateless dbdiagram.io embed
   link when the encoded DBML fits safely in a URL.
 - Show CSV-file-to-DBML-table mapping, primary keys, foreign keys, and
@@ -150,9 +142,8 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   controls, and selected table or relationship detail, then linking uploaded
   CSV files with DBML tables before running profiling.
 - Provide a local-only browser runner with separate upload mode and local path
-  mode. Upload mode handles demo/small-medium DBML, CSV, and optional rules
-  files. Local path mode validates browser-entered DBML, CSV directory, optional
-  rules, and optional target paths without sending CSV bytes through the
+  mode. Upload mode handles demo/small-medium DBML and CSV files. Local path
+  mode validates browser-entered DBML and CSV directory paths without sending CSV bytes through the
   browser. Both modes must call the existing Python DuckDB pipeline, preserve
   artifact names, and visualize `run_events.jsonl` and `run_summary.json`
   rather than infer stage status in JavaScript.
@@ -162,7 +153,7 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   filters, and show drilldown details with matching issues, affected
   tables/columns, counts/rates, relevant artifact links, and bounded sample CSV
   links when available. The runner's Generated results panel previews dataset
-  verdict, issue counts, table impact, runtime summary, and report links from
+  findings, issue counts, table impact, runtime summary, and report links from
   those generated artifacts while preserving raw artifact links. It also
   switches the DBML diagram panel from browser preflight state to generated
   `schema_diagram.json`, `relationship_graph.json`, and
@@ -170,9 +161,8 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   renderer remains local-only and presentation-only: it does not add backend
   routes, rename artifacts, fetch raw CSV rows, or infer new profiler facts. It
   also renders a dedicated Table Impact section from
-  `table_assessments.json`, including table readiness, review score, role,
-  affected-column count, relationship-risk count, and deterministic
-  business-impact category.
+  `table_assessments.json`, including table role, affected-column count,
+  relationship-finding count, and deterministic business-impact category.
 - Provide interactive lineage and relationship graph views in the web-runner
   dashboard from `lineage_graph.json` and `relationship_graph.json`. The graph
   views support table, column, relationship, and runtime/artifact scopes plus
@@ -188,7 +178,7 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   artifacts or generated PDF contain unredacted secret-like values.
 - Provide release-candidate operational checks: `vsf-profiler doctor` must
   check Python, required imports, DuckDB, optional Postgres and MySQL/MariaDB
-  connector readiness, optional PDF backend readiness, optional
+  connector checks, optional PDF backend checks, optional
   Node/Playwright, and OpenAI env presence without leaking secrets; `make
   demo-full` must compose the existing demo, package export, artifact audit,
   and optional Playwright dashboard E2E; and
@@ -200,17 +190,13 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
   Python/DuckDB pipeline without a second profiler engine, create charts,
   reports, package output, and artifact audit evidence, and write
   `performance_guard_report.json` with total/per-table rows, stage runtime,
-  peak RSS memory when supported, artifact sizes, influence row/feature limits,
-  default Postgres chunk size, package/audit status, and source materialization
-  guard scan results.
-- Run association-based influence analysis for a target column, including an
-  Olist review-score preset, with explicit max analysis rows and max feature
-  columns.
+  peak RSS memory when supported, artifact sizes, default Postgres chunk size,
+  package/audit status, and source materialization guard scan results.
 - Record runtime execution flow through a human-readable log, ordered JSONL
   events, and a summary with stage timings, issue counts, artifact paths, and
   skipped or failed stage details.
 - Generate deterministic Markdown and HTML reports with a Senior Data Scientist
-  review layout: executive scorecard, visual summaries from chart specs, table
+  review layout: executive summary, visual summaries from chart specs, table
   impact, issue evidence, relationship/schema/lineage summary, and explicit
   no-LLM or L4 guardrail state.
 - Link schema parse diagnostics from deterministic Markdown/HTML reports and

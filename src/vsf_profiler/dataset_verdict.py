@@ -27,27 +27,6 @@ SEVERITY_ALIASES = {
     "WARN": "P2",
 }
 
-ISSUE_RISK_WEIGHTS = {"P0": 30, "P1": 15, "P2": 5, "P3": 1}
-RELATIONSHIP_RISK_WEIGHTS = {"invalid": 10, "warning": 4, "skipped": 2}
-SCHEMA_RISK_WEIGHTS = {"missing_table_count": 25, "extra_csv_count": 2}
-RISK_SCORE_MODEL = {
-    "label": "Dataset review risk score",
-    "description": (
-        "Deterministic review heuristic for prioritizing EDA follow-up. "
-        "It is not a statistical health model."
-    ),
-    "formula": (
-        "min(100, P0*30 + P1*15 + P2*5 + P3*1 + invalid_fk*10 + "
-        "warning_fk*4 + skipped_fk*2 + missing_table*25 + extra_csv*2)"
-    ),
-    "issue_weights": ISSUE_RISK_WEIGHTS,
-    "relationship_weights": RELATIONSHIP_RISK_WEIGHTS,
-    "schema_weights": SCHEMA_RISK_WEIGHTS,
-    "score_range": {"min": 0, "max": 100},
-    "interpretation": "Higher means more review risk; P3 findings are low-weight review signals.",
-}
-
-
 def build_dataset_verdict(
     *,
     issues: list[Issue],
@@ -58,21 +37,10 @@ def build_dataset_verdict(
     issue_counts = _issue_counts(issue_rows)
     schema_summary = _schema_summary(schema_evaluation)
     relationship_status_counts = _relationship_status_counts(relationship_graph)
-    risk_score = _risk_score(issue_counts, schema_summary, relationship_status_counts)
-    verdict = _verdict(issue_counts, schema_summary, relationship_status_counts)
 
     return {
         "artifact": "dataset_verdict",
         "version": 1,
-        "verdict": verdict,
-        "risk_score": risk_score,
-        "risk_score_model": RISK_SCORE_MODEL,
-        "verdict_rationale": _verdict_rationale(
-            verdict,
-            issue_counts,
-            schema_summary,
-            relationship_status_counts,
-        ),
         "severity_scale": SEVERITY_SCALE,
         "issue_counts": issue_counts,
         "schema_summary": schema_summary,
@@ -80,7 +48,6 @@ def build_dataset_verdict(
         "top_blockers": _top_blockers(issue_rows),
         "affected_tables": _affected_tables(issue_rows),
         "recommended_next_actions": _recommended_next_actions(
-            verdict=verdict,
             issue_rows=issue_rows,
             schema_summary=schema_summary,
             relationship_status_counts=relationship_status_counts,
@@ -148,83 +115,6 @@ def _relationship_status_counts(relationship_graph: dict[str, Any] | None) -> di
     summary = (relationship_graph or {}).get("summary") or {}
     raw_counts = summary.get("status_counts") or {}
     return {str(status): _to_int(count) for status, count in sorted(raw_counts.items())}
-
-
-def _risk_score(
-    issue_counts: dict[str, Any],
-    schema_summary: dict[str, int],
-    relationship_status_counts: dict[str, int],
-) -> int:
-    severity_counts = issue_counts["by_severity"]
-    score = sum(
-        severity_counts[severity] * ISSUE_RISK_WEIGHTS[severity]
-        for severity in SEVERITIES
-    )
-    score += sum(
-        relationship_status_counts.get(status, 0) * weight
-        for status, weight in RELATIONSHIP_RISK_WEIGHTS.items()
-    )
-    score += sum(
-        schema_summary.get(name, 0) * weight
-        for name, weight in SCHEMA_RISK_WEIGHTS.items()
-    )
-    return min(100, int(score))
-
-
-def _verdict(
-    issue_counts: dict[str, Any],
-    schema_summary: dict[str, int],
-    relationship_status_counts: dict[str, int],
-) -> str:
-    severity_counts = issue_counts["by_severity"]
-    blocker_issue_count = severity_counts["P0"] + severity_counts["P1"]
-    if (
-        blocker_issue_count > 0
-        or schema_summary.get("missing_table_count", 0) > 0
-        or relationship_status_counts.get("invalid", 0) > 0
-    ):
-        return "NOT_READY"
-    if (
-        issue_counts["total"] > 0
-        or schema_summary.get("extra_csv_count", 0) > 0
-        or schema_summary.get("schema_issue_count", 0) > 0
-        or relationship_status_counts.get("warning", 0) > 0
-        or relationship_status_counts.get("skipped", 0) > 0
-    ):
-        return "WARN"
-    return "READY"
-
-
-def _verdict_rationale(
-    verdict: str,
-    issue_counts: dict[str, Any],
-    schema_summary: dict[str, int],
-    relationship_status_counts: dict[str, int],
-) -> str:
-    severity_counts = issue_counts["by_severity"]
-    if verdict == "NOT_READY":
-        parts = []
-        blocker_count = severity_counts["P0"] + severity_counts["P1"]
-        if blocker_count:
-            parts.append(f"{blocker_count} P0/P1 blocker issue(s)")
-        if relationship_status_counts.get("invalid", 0):
-            parts.append(f"{relationship_status_counts['invalid']} FK data-quality issue(s)")
-        if schema_summary.get("missing_table_count", 0):
-            parts.append(f"{schema_summary['missing_table_count']} missing DBML table CSV(s)")
-        return "; ".join(parts) + " make the dataset not ready for use."
-    if verdict == "WARN":
-        parts = []
-        lower_count = severity_counts["P2"] + severity_counts["P3"]
-        if lower_count:
-            parts.append(f"{lower_count} P2/P3 issue(s)")
-        if relationship_status_counts.get("warning", 0):
-            parts.append(f"{relationship_status_counts['warning']} relationship warning(s)")
-        if relationship_status_counts.get("skipped", 0):
-            parts.append(f"{relationship_status_counts['skipped']} skipped relationship check(s)")
-        if schema_summary.get("extra_csv_count", 0):
-            parts.append(f"{schema_summary['extra_csv_count']} extra CSV file(s)")
-        return "; ".join(parts) + " require review before use."
-    return "No blocking or warning findings were detected in the deterministic artifacts."
 
 
 def _top_blockers(issue_rows: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
@@ -309,7 +199,6 @@ def _table_group() -> dict[str, Any]:
 
 def _recommended_next_actions(
     *,
-    verdict: str,
     issue_rows: list[dict[str, Any]],
     schema_summary: dict[str, int],
     relationship_status_counts: dict[str, int],
@@ -318,7 +207,13 @@ def _recommended_next_actions(
     actions: list[str] = []
     seen: set[str] = set()
 
-    if verdict == "NOT_READY":
+    severity_counts = Counter(row["severity"] for row in issue_rows)
+    if (
+        severity_counts["P0"]
+        or severity_counts["P1"]
+        or schema_summary.get("missing_table_count", 0)
+        or relationship_status_counts.get("invalid", 0)
+    ):
         _add_action(
             actions,
             seen,

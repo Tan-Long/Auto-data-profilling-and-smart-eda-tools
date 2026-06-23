@@ -63,10 +63,6 @@ def test_benchmark_script_writes_performance_guard_report(tmp_path):
             "120",
             "--tables",
             "7",
-            "--max-analysis-rows",
-            "40",
-            "--max-feature-columns",
-            "3",
             "--force",
         ],
         cwd=repo_root,
@@ -101,13 +97,6 @@ def test_benchmark_script_writes_performance_guard_report(tmp_path):
     )
     assert report["memory"]["supported"] is True
     assert report["memory"]["peak_rss_mb"] > 0
-    assert report["limits"]["influence_row_count"] <= 40
-    assert report["limits"]["influence_top_feature_count"] <= 3
-    assert report["limits"]["analysis_row_limit_enforced"] is True
-    assert report["limits"]["analysis_feature_limit_enforced"] is True
-    assert report["limits"]["analysis_row_limit_reported"] is True
-    assert report["limits"]["analysis_feature_limit_reported"] is True
-    assert report["limits"]["feature_truncation_reported"] is True
     assert report["limits"]["postgres_chunk_rows_default"] > 0
     assert report["artifacts"]["chart_generation_success"] is True
     assert report["artifacts"]["report_generation_success"] is True

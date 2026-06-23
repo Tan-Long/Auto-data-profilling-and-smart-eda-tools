@@ -1272,7 +1272,7 @@ h3 {
 
 .dashboard-sidebar {
   display: grid;
-  grid-template-columns: minmax(130px, 0.7fr) repeat(3, minmax(150px, 1fr)) minmax(120px, auto) minmax(220px, 1.1fr);
+  grid-template-columns: minmax(160px, 0.8fr) repeat(3, minmax(170px, 1fr)) minmax(120px, auto);
   align-items: end;
   gap: 10px;
   padding: 12px;
@@ -1294,6 +1294,7 @@ h3 {
 }
 
 .dashboard-sidebar .form-message {
+  grid-column: 1 / -1;
   min-height: 38px;
   margin: 0;
   padding: 9px 10px;
@@ -1434,28 +1435,13 @@ h3 {
   font-weight: 800;
 }
 
-.table-impact-score {
-  display: grid;
-  justify-items: end;
-  color: var(--foreground-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 20px;
-  font-weight: 900;
-}
-
-.table-impact-score small {
-  color: var(--foreground-tertiary);
-  font-size: 10px;
-  font-weight: 800;
-}
-
 .dashboard-graph-toolbar {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 0.9fr)) minmax(260px, 1.2fr) minmax(170px, 0.7fr);
-  gap: 10px;
-  align-items: end;
+  grid-template-columns: minmax(190px, 0.75fr) minmax(240px, 0.9fr) minmax(0, 1.5fr);
+  gap: 12px;
+  align-items: start;
   margin-bottom: 12px;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
@@ -1463,6 +1449,10 @@ h3 {
 
 .dashboard-graph-mode {
   align-self: end;
+}
+
+.dashboard-graph-mode.detail-mode {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .graph-control-group {
@@ -1481,18 +1471,19 @@ h3 {
 
 .graph-toggle-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
   min-width: 0;
 }
 
 .toggle-label {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 6px;
-  min-height: 34px;
-  padding: 6px 8px;
+  min-height: 38px;
+  padding: 7px 9px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-panel);
@@ -1509,7 +1500,7 @@ h3 {
 }
 
 .graph-reset-button {
-  min-height: 34px;
+  min-height: 38px;
   padding: 6px 10px;
   font-size: 12px;
 }
@@ -1541,6 +1532,11 @@ h3 {
   background: var(--surface-overlay);
   color: var(--foreground-primary);
   font-weight: 800;
+}
+
+.graph-scope-label {
+  grid-column: 1 / 3;
+  max-width: 420px;
 }
 
 .dashboard-graph-canvas {
@@ -1944,21 +1940,6 @@ h3 {
   font-weight: 800;
 }
 
-.table-assessment-score {
-  display: grid;
-  justify-items: end;
-  color: var(--foreground-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.table-assessment-score small {
-  color: var(--foreground-tertiary);
-  font-size: 10px;
-  font-weight: 700;
-}
-
 .dashboard-bar-row {
   display: grid;
   grid-template-columns: minmax(96px, 0.42fr) minmax(96px, 1fr) minmax(64px, auto);
@@ -2027,72 +2008,6 @@ h3 {
   color: var(--foreground-tertiary);
   font-size: 10px;
   font-weight: 700;
-}
-
-.risk-gauge-button {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  min-height: 132px;
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-panel);
-  color: var(--foreground-primary);
-  cursor: pointer;
-  text-align: left;
-}
-
-.risk-gauge-button:hover,
-.risk-gauge-button:focus-visible {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.risk-gauge {
-  width: 96px;
-  height: 96px;
-  flex: 0 0 96px;
-  transform: rotate(-90deg);
-}
-
-.risk-gauge-bg,
-.risk-gauge-value {
-  fill: none;
-  stroke-width: 11;
-}
-
-.risk-gauge-bg {
-  stroke: var(--surface-inset);
-}
-
-.risk-gauge-value {
-  stroke: var(--destructive);
-  stroke-linecap: round;
-}
-
-.risk-gauge text {
-  fill: var(--foreground-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 20px;
-  font-weight: 900;
-  transform: rotate(90deg);
-  transform-origin: 52px 52px;
-}
-
-.risk-gauge-button strong {
-  display: block;
-  font-size: 22px;
-  line-height: 1;
-}
-
-.risk-gauge-button small {
-  display: block;
-  margin-top: 6px;
-  color: var(--foreground-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
 }
 
 .dashboard-detail-grid {
@@ -2327,8 +2242,8 @@ h3 {
 
 .runner-controls {
   display: grid;
-  grid-template-columns: minmax(180px, 0.22fr) minmax(0, 1fr);
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
   gap: 12px;
   min-width: 0;
   padding: 14px;
@@ -2347,6 +2262,11 @@ h3 {
   background: var(--surface-inset);
 }
 
+.runner-controls > .runner-mode-switch {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(100%, 520px);
+}
+
 .mode-button {
   min-height: 38px;
   border: 1px solid transparent;
@@ -2360,7 +2280,7 @@ h3 {
 
 .mode-button:hover {
   border-color: var(--border-default);
-  background: rgba(255, 253, 247, 0.64);
+  background: var(--surface-overlay);
 }
 
 .mode-button.active {
@@ -2410,7 +2330,8 @@ h3 {
 .runner-upload-options {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(136px, auto);
+  grid-template-columns: minmax(136px, auto);
+  justify-content: start;
   gap: 10px;
   align-items: end;
   min-width: 0;
@@ -2424,13 +2345,71 @@ h3 {
 
 .path-runner-form {
   grid-template-columns:
-    minmax(0, 1.2fr)
-    minmax(0, 1fr)
-    minmax(0, 1fr)
-    minmax(0, 1.25fr)
+    minmax(190px, 1.15fr)
+    minmax(190px, 1fr)
     minmax(124px, auto);
   align-items: end;
   gap: 10px;
+}
+
+.path-preset-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(110px, auto) minmax(220px, 360px);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.path-preset-row > span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.path-preset-switch {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.data-runner-form {
+  grid-template-columns:
+    minmax(150px, 0.7fr)
+    minmax(190px, 1fr)
+    minmax(150px, 0.8fr)
+    minmax(220px, 1.2fr);
+  align-items: end;
+  gap: 10px;
+}
+
+.data-runner-form .button {
+  min-height: 42px;
+  align-self: end;
+  white-space: nowrap;
+}
+
+.runner-advanced-options {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) minmax(160px, 220px) minmax(0, 1fr);
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.runner-advanced-options .form-message {
+  min-height: 38px;
+  margin: 0;
+}
+
+.compact-select {
+  gap: 4px;
 }
 
 .path-runner-form .field-label {
@@ -2457,7 +2436,8 @@ h3 {
 }
 
 .field-label input[type="text"],
-.field-label input[type="file"] {
+.field-label input[type="file"],
+.field-label select {
   width: 100%;
   min-height: 42px;
   padding: 9px 11px;
@@ -3122,43 +3102,6 @@ button.artifact-link {
   background: var(--surface-panel-strong);
 }
 
-.artifact-chart-gauge {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.artifact-chart-gauge .risk-gauge {
-  width: 112px;
-  height: 112px;
-  flex-basis: 112px;
-}
-
-.artifact-chart-gauge-copy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.artifact-chart-gauge-copy strong {
-  color: var(--foreground-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 20px;
-  font-weight: 900;
-}
-
-.artifact-chart-gauge-copy span {
-  color: var(--foreground-secondary);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.artifact-chart-gauge-copy small {
-  color: var(--foreground-tertiary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .artifact-chart-bars {
   display: grid;
   gap: 8px;
@@ -3563,6 +3506,54 @@ button.artifact-link {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+@media (max-width: 1320px) {
+  .dashboard-sidebar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .dashboard-graph-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .graph-toggle-row {
+    grid-column: 1 / -1;
+  }
+
+  .graph-scope-label {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+
+  .dashboard-sidebar .runtime-heading,
+  .dashboard-sidebar .form-message {
+    grid-column: 1 / -1;
+  }
+
+  .path-runner-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .path-preset-row {
+    grid-template-columns: 1fr;
+  }
+
+  .data-runner-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .runner-advanced-options {
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  }
+
+  .runner-advanced-options .form-message {
+    grid-column: 1 / -1;
+  }
+
+  .path-runner-form .button {
+    justify-self: start;
+  }
+}
+
 @media (max-width: 1080px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -3596,6 +3587,8 @@ button.artifact-link {
 	  .upload-runner-form,
 	  .runner-upload-options,
 	  .path-runner-form,
+	  .data-runner-form,
+	  .runner-advanced-options,
 	  .runtime-panel {
 	    grid-template-columns: 1fr;
 	  }
@@ -3641,12 +3634,24 @@ button.artifact-link {
 
   .topbar {
     display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 18px;
   }
 
   .topbar-actions,
   .panel-heading {
     display: grid;
     justify-content: stretch;
+  }
+
+  .topbar-actions {
+    justify-content: stretch;
+  }
+
+  .topbar h2 {
+    font-size: 22px;
+    line-height: 1.16;
   }
 
   .button {
@@ -3658,7 +3663,13 @@ button.artifact-link {
     grid-template-columns: 1fr;
   }
 
+  .graph-scope-label {
+    grid-column: auto;
+    max-width: none;
+  }
+
   .graph-toggle-row {
+    grid-template-columns: 1fr;
     align-items: stretch;
   }
 
@@ -3699,8 +3710,6 @@ button.artifact-link {
   }
 
   .dashboard-bar-value,
-  .table-assessment-score,
-  .table-impact-score,
   .issue-counts {
     justify-items: start;
   }

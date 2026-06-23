@@ -84,7 +84,6 @@ def test_pipeline_with_mysql_connector_writes_metadata_and_redacts_secrets(tmp_p
         dbml_path=None,
         csv_dir=None,
         rules_path=None,
-        target=None,
         out_dir=out_dir,
         source_connector=connector,
     )
@@ -139,7 +138,6 @@ def test_mysql_connector_supports_dbml_supplied_schema(tmp_path):
         dbml_path=dbml_path,
         csv_dir=None,
         rules_path=None,
-        target=None,
         out_dir=out_dir,
         source_connector=connector,
     )
@@ -165,8 +163,6 @@ def test_cli_csv_mode_is_not_hijacked_by_mysql_env(tmp_path, monkeypatch):
             str(data_dir / "schema.dbml"),
             "--csv-dir",
             str(data_dir / "csv"),
-            "--rules",
-            str(data_dir / "rules.yaml"),
             "--out",
             str(out_dir),
         ],

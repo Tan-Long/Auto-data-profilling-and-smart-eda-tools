@@ -28,9 +28,9 @@ class CapturingProvider:
         return (
             "# Senior Data Scientist Narrative\n\n"
             f"The deterministic artifacts show {summary['table_count']} tables, "
-            f"{summary['issue_count']} issues, and risk score {summary['risk_score']}.\n\n"
+            f"and {summary['issue_count']} issues.\n\n"
             f"`{issue['issue_type']}` is present on `{column_ref}`.\n\n"
-            "Influence findings are association-only and require domain review.\n"
+            "The structured artifacts support data-quality review, not causal or predictive claims.\n"
         )
 
 
@@ -71,8 +71,7 @@ def test_fake_provider_writes_l4_report_and_passed_guardrail(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
         use_llm=True,
         llm_provider=provider,
@@ -95,7 +94,7 @@ def test_fake_provider_writes_l4_report_and_passed_guardrail(tmp_path):
     assert guardrail_report["violation_count"] == 0
     assert guardrail_report["violations"] == []
     assert "Senior Data Scientist Narrative" in l4_report
-    assert "association-only" in l4_report
+    assert "data-quality review" in l4_report
     assert "l4_report.md" in report_md
     assert "guardrail_report.json" in report_md
     assert "l4_report.md" in report_html
@@ -115,7 +114,6 @@ def test_fake_provider_writes_l4_report_and_passed_guardrail(tmp_path):
         "dataset_verdict.json",
         "table_assessments.json",
         "charts/*.json",
-        "influence.json",
     ]
     assert "guardrail_safe_draft" in provider.context
     assert "Deterministic fallback narrative" not in provider.context["guardrail_safe_draft"]
@@ -140,8 +138,7 @@ def test_configured_fake_provider_output_passes_guardrail(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
         use_llm=True,
         llm_provider=provider,
@@ -161,7 +158,7 @@ def test_configured_fake_provider_output_passes_guardrail(tmp_path):
     assert guardrail_report["violation_count"] == 0
     assert guardrail_report["violations"] == []
     assert "Deterministic fallback narrative" not in l4_report
-    assert "Influence findings are association-only" in l4_report
+    assert "structured artifacts support data-quality review" in l4_report
     assert "L4 guardrail status: **passed**" in report_md
     assert "provider=fake" in report_md
     assert "L4 guardrail" in report_html
@@ -176,8 +173,7 @@ def test_openai_safe_draft_output_passes_without_fallback(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
         use_llm=True,
         llm_provider=provider,
@@ -207,8 +203,7 @@ def test_bad_provider_output_uses_deterministic_fallback(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
         use_llm=True,
         llm_provider=BadProvider(),
@@ -234,8 +229,7 @@ def test_missing_provider_config_uses_deterministic_fallback(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
         use_llm=True,
     )
@@ -254,8 +248,7 @@ def test_llm_disabled_preserves_deterministic_artifact_set(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
     )
 
@@ -294,8 +287,6 @@ def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
         "schema_evaluation": {"summary": {"mapped_table_count": 1}},
         "relationship_graph": {"summary": {"edge_count": 1}},
         "dataset_verdict": {
-            "verdict": "WARN",
-            "risk_score": 42,
             "issue_counts": {"by_severity": {"P1": 1}, "by_type": {"ORPHAN_FOREIGN_KEY": 1}},
         },
         "table_assessments": {
@@ -303,8 +294,6 @@ def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
                 {
                     "table": "orders",
                     "role": "fact",
-                    "health_score": 42,
-                    "readiness": "WARN",
                     "business_impact": {
                         "category": "order_fulfillment",
                         "label": "Order fulfillment",
@@ -313,13 +302,12 @@ def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
             ]
         },
         "chart_specs": {},
-        "influence": {"target": "orders.order_id", "top_features": [], "row_count": 0},
     }
     context = build_narrative_context(artifacts)
     evidence = build_guardrail_evidence(artifacts, context)
 
     passed = validate_narrative(
-        "There are 1 issues on `orders.order_id` with risk score 42.",
+        "There are 1 issues on `orders.order_id`.",
         evidence,
     )
     failed = validate_narrative(
@@ -329,7 +317,7 @@ def test_guardrail_rejects_unsupported_numbers_refs_and_causal_wording():
 
     assert passed["status"] == "passed"
     field_ref_passed = validate_narrative(
-        "Review the `health_score` and `relationship_risk_count` fields in table_assessments.json.",
+        "Review the `relationship_risk_count` field in table_assessments.json.",
         evidence,
     )
     assert field_ref_passed["status"] == "passed"
@@ -353,8 +341,6 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
         "schema_evaluation": {"summary": {"mapped_table_count": 2}},
         "relationship_graph": {"summary": {"edge_count": 0}},
         "dataset_verdict": {
-            "verdict": "READY",
-            "risk_score": 0,
             "issue_counts": {"by_severity": {}, "by_type": {}},
         },
         "table_assessments": {
@@ -362,8 +348,6 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
                 {
                     "table": "orders",
                     "role": "fact",
-                    "health_score": 100,
-                    "readiness": "READY",
                     "business_impact": {
                         "category": "order_fulfillment",
                         "label": "Order fulfillment",
@@ -372,8 +356,6 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
                 {
                     "table": "order_reviews",
                     "role": "event",
-                    "health_score": 100,
-                    "readiness": "READY",
                     "business_impact": {
                         "category": "customer_feedback",
                         "label": "Customer feedback",
@@ -382,7 +364,6 @@ def test_guardrail_rejects_unsupported_business_impact_claims():
             ]
         },
         "chart_specs": {},
-        "influence": {"target": None, "top_features": [], "row_count": 0},
     }
     context = build_narrative_context(artifacts)
     evidence = build_guardrail_evidence(artifacts, context)
@@ -433,7 +414,7 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
                             "type": "output_text",
                             "text": "# Senior Data Scientist Narrative\n\n"
                             "The deterministic artifacts show 1 tables and 2 rows.\n\n"
-                            "Influence findings are association-only.",
+                            "The structured artifacts support data-quality review.",
                         }
                     ]
                 }
@@ -461,7 +442,7 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
         "top_issues": [],
         "guardrail_safe_draft": "# Senior Data Scientist Narrative\n\n"
         "The deterministic artifacts show 1 tables and 2 rows.\n\n"
-        "Influence findings are association-only.",
+        "The structured artifacts support data-quality review.",
         "guardrail_contract": {
             "required_output": "Return guardrail_safe_draft exactly as Markdown.",
         },

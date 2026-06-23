@@ -13,7 +13,6 @@ BASELINE_MANIFEST = Path("outputs/olist_deterministic_manifest_before_openai.jso
 DETERMINISTIC_ARTIFACTS = [
     "profile_summary.json",
     "issues.json",
-    "influence.json",
     "schema_evaluation.json",
     "relationship_graph.json",
     "dataset_verdict.json",

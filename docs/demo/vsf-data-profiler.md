@@ -11,7 +11,7 @@ bundled Olist-shaped demo dataset and does not require internet access.
 2. Run the release demo:
    `PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-full`
 3. Open `outputs/olist_demo/report.html`. Point out schema mapping,
-   relationship checks, issue counts, visual summaries, dataset verdict, and
+   relationship checks, issue counts, visual summaries, dataset findings, and
    execution flow.
 4. Show the artifact directory:
    `find outputs/olist_demo -maxdepth 2 -type f | sort`
@@ -52,8 +52,6 @@ Fake LLM demo:
 PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
   --dbml data/demo_olist/schema.dbml \
   --csv-dir data/demo_olist/csv \
-  --rules data/demo_olist/rules.yaml \
-  --target olist_order_reviews_dataset.review_score \
   --out outputs/olist_demo_l4 \
   --use-llm \
   --llm-provider fake
@@ -68,8 +66,6 @@ cp .env.example .env
 PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
   --dbml data/demo_olist/schema.dbml \
   --csv-dir data/demo_olist/csv \
-  --rules data/demo_olist/rules.yaml \
-  --target olist_order_reviews_dataset.review_score \
   --out outputs/olist_demo_l4_openai_smoke \
   --use-llm \
   --llm-provider openai
@@ -87,9 +83,9 @@ open outputs/olist_demo_l4_openai_smoke/report.html
 | `schema_parse_report.json` | DBML parsed object counts, warnings, unsupported constructs, and parser diagnostics. |
 | `schema_evaluation.json` | DBML-vs-CSV conformance summary, including missing/extra table or column evidence and schema issue references. |
 | `relationship_graph.json` | Graph of tables and DBML relationships with observed FK status, cardinality, junction-table detection, and relationship issue links. |
-| `dataset_verdict.json` | Deterministic readiness verdict, review-risk score, scoring formula, top blockers, affected tables, and recommended next actions. |
-| `table_assessments.json` | One deterministic assessment per profiled table with role, review score, scoring formula, readiness, relationship risks, name-token business impact, evidence refs, and next actions. |
-| `charts/*.json` | Deterministic chart specs for issue counts, missingness, relationship FK status, risk, and influence top features. |
+| `dataset_verdict.json` | Deterministic issue counts, top blockers, affected tables, and recommended next actions. |
+| `table_assessments.json` | One deterministic assessment per profiled table with role, issue counts, relationship findings, name-token business impact, evidence refs, and next actions. |
+| `charts/*.json` | Deterministic chart specs for issue counts, missingness, and relationship FK status. |
 | `l4_report.md` | Optional Senior Data Scientist narrative generated only when `--use-llm` runs; may be provider output or deterministic fallback. |
 | `guardrail_report.json` | Audit record for L4 validation: status, provider, fallback reason, checked numbers, checked refs, violations, and raw-data flags. |
 
