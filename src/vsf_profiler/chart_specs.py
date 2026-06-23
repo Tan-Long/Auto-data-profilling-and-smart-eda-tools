@@ -11,7 +11,6 @@ ALLOWED_SOURCE_ARTIFACTS = {
     "issues.json",
     "relationship_graph.json",
     "dataset_verdict.json",
-    "influence.json",
 }
 STATUS_ORDER = {"invalid": 0, "warning": 1, "skipped": 2, "valid": 3}
 
@@ -22,10 +21,9 @@ def build_chart_specs(
     issues: list[dict[str, Any]],
     relationship_graph: dict[str, Any],
     dataset_verdict: dict[str, Any],
-    influence: dict[str, Any],
     top_n: int = 10,
 ) -> dict[str, dict[str, Any]]:
-    specs = {
+    return dict(sorted({
         "issue_counts_by_severity.json": _issue_counts_by_severity_spec(
             dataset_verdict,
             issues,
@@ -34,12 +32,7 @@ def build_chart_specs(
         "missingness_by_table.json": _missingness_by_table_spec(profile_summary),
         "missingness_top_columns.json": _missingness_top_columns_spec(profile_summary, top_n),
         "relationship_fk_health.json": _relationship_fk_health_spec(relationship_graph),
-        "dataset_verdict_risk_summary.json": _dataset_verdict_risk_spec(dataset_verdict),
-    }
-    influence_spec = _influence_top_features_spec(influence, top_n)
-    if influence_spec is not None:
-        specs["influence_top_features.json"] = influence_spec
-    return dict(sorted(specs.items()))
+    }.items()))
 
 
 def _base_spec(
@@ -195,64 +188,6 @@ def _relationship_fk_health_spec(relationship_graph: dict[str, Any]) -> dict[str
             "edge_count": _to_int(summary.get("edge_count")),
         },
         details={"edges": edge_rows},
-    )
-
-
-def _dataset_verdict_risk_spec(dataset_verdict: dict[str, Any]) -> dict[str, Any]:
-    risk_score = max(0, min(_to_int(dataset_verdict.get("risk_score")), 100))
-    remaining_score = 100 - risk_score
-    return _base_spec(
-        chart_id="dataset_verdict_risk_summary",
-        title="Dataset Verdict Risk Summary",
-        chart_type="gauge",
-        source_artifacts=["dataset_verdict.json"],
-        data=[
-            {"label": "risk", "value": risk_score},
-            {"label": "remaining", "value": remaining_score},
-        ],
-        summary={
-            "verdict": dataset_verdict.get("verdict", ""),
-            "risk_score": risk_score,
-            "issue_count": _to_int((dataset_verdict.get("issue_counts") or {}).get("total")),
-        },
-    )
-
-
-def _influence_top_features_spec(
-    influence: dict[str, Any],
-    top_n: int,
-) -> dict[str, Any] | None:
-    features = list(influence.get("top_features") or [])
-    if not features:
-        return None
-
-    rows = [
-        {
-            "feature": str(feature.get("feature", "")),
-            "score": _round_float(feature.get("score")),
-            "direction": feature.get("direction") or "",
-            "method": str(feature.get("method", "")),
-            "interpretation": str(feature.get("interpretation", "")),
-        }
-        for feature in features
-    ]
-    rows.sort(key=lambda row: (-abs(row["score"]), row["feature"]))
-    rows = [
-        {"rank": index, **row}
-        for index, row in enumerate(rows[:top_n], start=1)
-    ]
-    return _base_spec(
-        chart_id="influence_top_features",
-        title="Influence Top Features",
-        chart_type="horizontal_bar",
-        source_artifacts=["influence.json"],
-        data=rows,
-        summary={
-            "target": influence.get("target"),
-            "method": influence.get("method", ""),
-            "row_count": _to_int(influence.get("row_count")),
-            "top_n": top_n,
-        },
     )
 
 

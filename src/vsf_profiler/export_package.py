@@ -22,7 +22,6 @@ FIXED_ZIP_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
 REQUIRED_ARTIFACTS = [
     "profile_summary.json",
     "issues.json",
-    "influence.json",
     "schema_parse_report.json",
     "lineage_graph.json",
     "schema_evaluation.json",
@@ -363,8 +362,6 @@ def _render_index_html(
     severity_counts = verdict_issue_counts.get("by_severity") or {}
     issue_total = verdict_issue_counts.get("total", len(issues))
     blocker_count = sum(int(severity_counts.get(severity, 0) or 0) for severity in ("P0", "P1"))
-    verdict_label = verdict.get("verdict", "unknown")
-    risk_score = verdict.get("risk_score", "n/a")
     relationship_summary = relationship_graph.get("summary") or {}
     table_assessment_summary = table_assessments.get("summary") or {}
     lineage_summary = lineage_graph.get("summary") or {}
@@ -375,18 +372,16 @@ def _render_index_html(
     column_count = sum(int(table.get("column_count") or 0) for table in profile_tables.values())
     relationship_status_counts = relationship_summary.get("status_counts") or {}
     invalid_fk_count = int(relationship_status_counts.get("invalid", 0) or 0)
-    table_score_model = table_assessment_summary.get("score_model") or {}
     l4_status = guardrail_report.get("status", "not_enabled") if guardrail_report else "not_enabled"
     l4_provider = guardrail_report.get("provider", "none") if guardrail_report else "none"
     cards = [
-        ("Verdict", verdict_label, f"Risk score {risk_score}"),
         ("Issues", str(issue_total), f"{blocker_count} P0/P1 blockers"),
         ("Tables", str(len(profile_tables) or eval_summary.get("mapped_table_count", "0")), f"{row_count} rows, {column_count} columns"),
         ("FK Status", f"{invalid_fk_count}/{relationship_summary.get('edge_count', 0)}", "Invalid relationship edges"),
         (
             "Table assessments",
             str(table_assessment_summary.get("table_count", "0")),
-            "Readiness rows",
+            "Per-table rows",
         ),
         ("L4", l4_status, f"{l4_provider} provider"),
         ("Artifacts", str(len(artifact_index)), "Package files"),
@@ -460,9 +455,9 @@ def _render_index_html(
     th {{ background: var(--surface-inset); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; text-transform: uppercase; }}
     .table-wrap {{ overflow-x: auto; }}
     .pill {{ display: inline-flex; min-height: 24px; align-items: center; border: 1px solid var(--border-default); border-radius: 999px; padding: 2px 8px; font: 800 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
-    .NOT_READY, .P0, .P1, .failed, .invalid {{ color: var(--destructive); border-color: rgba(178, 59, 50, 0.35); }}
-    .WARN, .P2, .fallback_used, .warning {{ color: var(--warning); border-color: rgba(154, 95, 0, 0.35); }}
-    .READY, .P3, .passed, .valid {{ color: var(--success); border-color: rgba(35, 118, 77, 0.35); }}
+    .P0, .P1, .failed, .invalid {{ color: var(--destructive); border-color: rgba(178, 59, 50, 0.35); }}
+    .P2, .fallback_used, .warning {{ color: var(--warning); border-color: rgba(154, 95, 0, 0.35); }}
+    .P3, .passed, .valid {{ color: var(--success); border-color: rgba(35, 118, 77, 0.35); }}
     .not_enabled, .unknown {{ color: var(--info); border-color: rgba(49, 101, 150, 0.35); }}
     .section {{ margin-top: 16px; }}
     .links {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }}
@@ -502,13 +497,13 @@ def _render_index_html(
       {''.join(_metric_card(label, value, detail) for label, value, detail in cards)}
     </section>
     <section class="section panel">
-      <h2>Executive scorecard</h2>
-      <p class="meta">{_h(verdict.get("verdict_rationale", "No verdict rationale was included."))}</p>
+      <h2>Executive summary</h2>
+      <p class="meta">Deterministic summary from generated issue, schema, relationship, table, and runtime artifacts.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Signal</th><th>Value</th><th>Evidence</th></tr></thead>
           <tbody>
-            {''.join(_scorecard_row(label, value, detail) for label, value, detail in cards)}
+            {''.join(_summary_row(label, value, detail) for label, value, detail in cards)}
           </tbody>
         </table>
       </div>
@@ -519,11 +514,10 @@ def _render_index_html(
     </section>
     <section class="section panel">
       <h2>Table Impact</h2>
-      <p class="meta">Powered by <code>table_assessments.json</code>. Readiness, review score, relationship risk, and business-impact labels are deterministic artifact evidence.</p>
-      <p class="meta">{_h(table_score_model.get("description", "Review score is a deterministic EDA prioritization heuristic."))} Formula: <code>{_h(table_score_model.get("formula", "100 - weighted issue and relationship penalties"))}</code></p>
+      <p class="meta">Powered by <code>table_assessments.json</code>. Role, relationship findings, and business-impact labels are deterministic artifact evidence.</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Review score</th><th>Penalty</th><th>Issues</th><th>Relationship risks</th><th>Business impact</th><th>First action</th></tr></thead>
+          <thead><tr><th>Table</th><th>Role</th><th>Issues</th><th>Relationship Findings</th><th>Business impact</th><th>First action</th></tr></thead>
           <tbody>
             {table_impact_rows_html(table_assessments)}
           </tbody>
@@ -663,9 +657,6 @@ def table_impact_rows_html(table_assessments: dict[str, Any]) -> str:
             "<tr>"
             f"<td><code>{_h(row.get('table', ''))}</code></td>"
             f"<td>{_h(row.get('role', ''))}</td>"
-            f"<td><span class=\"pill {_h(row.get('readiness', 'unknown'))}\">{_h(row.get('readiness', 'unknown'))}</span></td>"
-            f"<td>{_h(row.get('review_score', row.get('health_score', 0)))}</td>"
-            f"<td>{_h((row.get('score_penalty_breakdown') or {}).get('total_penalty', 0))}</td>"
             f"<td>{_h(issue_total)}</td>"
             f"<td>{_h(len(row.get('relationship_risks') or []))}</td>"
             f"<td>{_h(impact.get('label', ''))}<br><span class=\"meta\">{_h(impact.get('category', ''))}</span></td>"
@@ -673,7 +664,7 @@ def table_impact_rows_html(table_assessments: dict[str, Any]) -> str:
             "</tr>"
         )
     if not rows:
-        return '<tr><td colspan="9">No table assessment rows were included.</td></tr>'
+        return '<tr><td colspan="6">No table assessment rows were included.</td></tr>'
     return "".join(rows)
 
 
@@ -701,13 +692,13 @@ def issue_rows_html(issues: list[dict[str, Any]], artifact_index: dict[str, dict
     return "".join(rows)
 
 
-def _scorecard_row(label: str, value: Any, detail: str) -> str:
+def _summary_row(label: str, value: Any, detail: str) -> str:
     return f"<tr><td>{_h(label)}</td><td><strong>{_h(value)}</strong></td><td>{_h(detail)}</td></tr>"
 
 
 def _artifact_links() -> list[tuple[str, str]]:
     return [
-        ("Dataset verdict", "dataset_verdict.json"),
+        ("Dataset findings", "dataset_verdict.json"),
         ("Table assessments", "table_assessments.json"),
         ("Profile summary", "profile_summary.json"),
         ("Issues", "issues.json"),
@@ -715,7 +706,6 @@ def _artifact_links() -> list[tuple[str, str]]:
         ("Schema evaluation", "schema_evaluation.json"),
         ("Relationship graph", "relationship_graph.json"),
         ("Lineage graph", "lineage_graph.json"),
-        ("Influence", "influence.json"),
         ("Runtime summary", "run_summary.json"),
         ("Runtime events", "run_events.jsonl"),
         ("Runtime log", "run.log"),

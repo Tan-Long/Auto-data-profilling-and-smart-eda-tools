@@ -93,7 +93,6 @@ def test_pipeline_with_connector_writes_metadata_and_redacts_secrets(tmp_path):
         dbml_path=None,
         csv_dir=None,
         rules_path=None,
-        target=None,
         out_dir=out_dir,
         source_connector=connector,
     )
@@ -142,7 +141,6 @@ def test_runtime_redacts_secret_strings_on_connector_failure(tmp_path):
             dbml_path=None,
             csv_dir=None,
             rules_path=None,
-            target=None,
             out_dir=tmp_path / "out",
             source_connector=FailingConnector(secret_url=SECRET_URL),
         )
@@ -165,8 +163,6 @@ def test_cli_csv_mode_is_not_hijacked_by_postgres_env(tmp_path, monkeypatch):
             str(data_dir / "schema.dbml"),
             "--csv-dir",
             str(data_dir / "csv"),
-            "--rules",
-            str(data_dir / "rules.yaml"),
             "--out",
             str(out_dir),
         ],
@@ -231,7 +227,6 @@ def test_postgres_integration_uses_local_fixture_or_skips(tmp_path):
             dbml_path=None,
             csv_dir=None,
             rules_path=None,
-            target=None,
             out_dir=out_dir,
             source_connector=connector,
         )

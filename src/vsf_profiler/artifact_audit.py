@@ -19,8 +19,6 @@ from vsf_profiler.export_package import (
 
 
 REQUIRED_CHARTS = [
-    "charts/dataset_verdict_risk_summary.json",
-    "charts/influence_top_features.json",
     "charts/issue_counts_by_severity.json",
     "charts/issue_counts_by_type.json",
     "charts/missingness_by_table.json",
@@ -30,7 +28,6 @@ REQUIRED_CHARTS = [
 EXPECTED_ARTIFACT_PATHS = {
     "profile_summary": "profile_summary.json",
     "issues": "issues.json",
-    "influence": "influence.json",
     "schema_parse_report": "schema_parse_report.json",
     "lineage_graph": "lineage_graph.json",
     "schema_evaluation": "schema_evaluation.json",
@@ -38,8 +35,6 @@ EXPECTED_ARTIFACT_PATHS = {
     "dataset_verdict": "dataset_verdict.json",
     "table_assessments": "table_assessments.json",
     "charts_dir": "charts",
-    "chart_dataset_verdict_risk_summary": "charts/dataset_verdict_risk_summary.json",
-    "chart_influence_top_features": "charts/influence_top_features.json",
     "chart_issue_counts_by_severity": "charts/issue_counts_by_severity.json",
     "chart_issue_counts_by_type": "charts/issue_counts_by_type.json",
     "chart_missingness_by_table": "charts/missingness_by_table.json",

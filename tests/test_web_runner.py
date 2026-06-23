@@ -50,11 +50,6 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
             UploadedFile(filename=path.name, content=path.read_bytes())
             for path in sorted((data_dir / "csv").glob("*.csv"))
         ],
-        rules=UploadedFile(
-            filename="rules.yaml",
-            content=(data_dir / "rules.yaml").read_bytes(),
-        ),
-        target="order_reviews.review_score",
     )
 
     wait_for_job(job)
@@ -72,6 +67,9 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     assert (job.out_dir / "run_events.jsonl").exists()
     assert (job.out_dir / "run_summary.json").exists()
     assert (job.out_dir / "report.html").exists()
+    summary = json.loads((job.out_dir / "run_summary.json").read_text(encoding="utf-8"))
+    assert summary["inputs"]["rules_path"] is None
+    assert "target" not in summary["inputs"]
 
     payload = store.job_payload(job)
     artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
@@ -85,8 +83,6 @@ def test_web_runner_path_job_writes_canonical_artifacts_without_csv_upload(tmp_p
     job = store.start_path_job(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
     )
 
     wait_for_job(job)
@@ -95,11 +91,37 @@ def test_web_runner_path_job_writes_canonical_artifacts_without_csv_upload(tmp_p
     assert job.input_mode == "path"
     assert not list(job.input_dir.rglob("*.csv"))
     assert (job.out_dir / "charts" / "issue_counts_by_type.json").exists()
+    summary = json.loads((job.out_dir / "run_summary.json").read_text(encoding="utf-8"))
+    assert summary["inputs"]["rules_path"] is None
+    assert "target" not in summary["inputs"]
 
     payload = store.job_payload(job)
     assert payload["input_mode"] == "path"
     artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
     assert REQUIRED_ARTIFACTS.issubset(artifact_paths)
+
+
+def test_web_runner_path_job_can_generate_l4_report(tmp_path):
+    data_dir = create_small_demo(tmp_path / "data" / "demo_small")
+    store = WebRunStore(run_root=tmp_path / "web_runs")
+
+    job = store.start_path_job(
+        dbml_path=data_dir / "schema.dbml",
+        csv_dir=data_dir / "csv",
+        rules_path=None,
+        use_llm=True,
+        llm_provider="fake",
+    )
+
+    wait_for_job(job)
+
+    assert job.status == "succeeded"
+    assert (job.out_dir / "l4_report.md").exists()
+    assert (job.out_dir / "guardrail_report.json").exists()
+    payload = store.job_payload(job)
+    artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
+    assert "l4_report.md" in artifact_paths
+    assert "guardrail_report.json" in artifact_paths
 
 
 def test_web_runner_path_job_validates_inputs_before_start(tmp_path):
@@ -135,7 +157,7 @@ def test_web_runner_path_job_validates_inputs_before_start(tmp_path):
         )
 
     unsupported_rules = data_dir / "rules.txt"
-    unsupported_rules.write_text((data_dir / "rules.yaml").read_text(encoding="utf-8"))
+    unsupported_rules.write_text("rules: {}\n", encoding="utf-8")
     with pytest.raises(ValueError, match=".yaml"):
         store.start_path_job(
             dbml_path=data_dir / "schema.dbml",
@@ -143,11 +165,19 @@ def test_web_runner_path_job_validates_inputs_before_start(tmp_path):
             rules_path=unsupported_rules,
         )
 
-    with pytest.raises(ValueError, match="table.column"):
-        store.start_path_job(
-            dbml_path=data_dir / "schema.dbml",
-            csv_dir=data_dir / "csv",
-            target="review_score",
+
+def test_web_runner_data_job_validates_connector_settings(tmp_path, monkeypatch):
+    store = WebRunStore(run_root=tmp_path / "web_runs")
+    monkeypatch.delenv("VSF_PROFILER_POSTGRES_URL", raising=False)
+
+    with pytest.raises(ValueError, match="Postgres URL"):
+        store.start_data_job(source_type="postgres", url_env="VSF_PROFILER_POSTGRES_URL")
+
+    with pytest.raises(ValueError, match="Tables"):
+        store.start_data_job(
+            source_type="postgres",
+            url_env="VSF_PROFILER_POSTGRES_URL",
+            tables="orders;drop",
         )
 
 
@@ -163,8 +193,6 @@ def test_web_runner_path_job_http_endpoint(tmp_path):
             {
                 "dbml_path": str(data_dir / "schema.dbml"),
                 "csv_dir": str(data_dir / "csv"),
-                "rules_path": str(data_dir / "rules.yaml"),
-                "target": "order_reviews.review_score",
             },
         )
 
@@ -204,8 +232,6 @@ def test_web_runner_dashboard_endpoint_lists_generated_artifact_urls(tmp_path):
             {
                 "dbml_path": str(data_dir / "schema.dbml"),
                 "csv_dir": str(data_dir / "csv"),
-                "rules_path": str(data_dir / "rules.yaml"),
-                "target": "order_reviews.review_score",
             },
         )
         job_payload = _wait_for_http_job(base_url, payload["job_id"])
@@ -216,7 +242,6 @@ def test_web_runner_dashboard_endpoint_lists_generated_artifact_urls(tmp_path):
         assert dashboard["status"] == "succeeded"
         assert dashboard["missing_artifacts"] == []
         assert "charts/issue_counts_by_severity.json" in dashboard["chart_artifacts"]
-        assert "charts/influence_top_features.json" in dashboard["chart_artifacts"]
         for artifact_path in [
             "issues.json",
             "profile_summary.json",
@@ -226,7 +251,6 @@ def test_web_runner_dashboard_endpoint_lists_generated_artifact_urls(tmp_path):
             "schema_evaluation.json",
             "schema_parse_report.json",
             "lineage_graph.json",
-            "influence.json",
             "run_summary.json",
             "charts/issue_counts_by_type.json",
         ]:
@@ -251,7 +275,6 @@ def test_web_runner_dashboard_lists_optional_connector_metadata_when_present(tmp
     job = store.start_path_job(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
     )
     wait_for_job(job)
     assert job.status == "succeeded"

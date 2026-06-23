@@ -45,7 +45,7 @@ Table order_payments {
 Table order_reviews {
   review_id varchar [pk, not null]
   order_id varchar [ref: > orders.order_id]
-  review_score int
+  review_rating int
   review_comment_message varchar
 }
 
@@ -58,41 +58,6 @@ Table sellers {
   seller_id varchar [pk, not null]
   seller_state varchar
 }
-"""
-
-
-SMALL_RULES = """rules:
-  order_reviews:
-    - id: REVIEW_SCORE_RANGE
-      type: range
-      column: review_score
-      min: 1
-      max: 5
-      severity: P1
-
-  order_payments:
-    - id: PAYMENT_VALUE_NON_NEGATIVE
-      type: range
-      column: payment_value
-      min: 0
-      severity: P1
-
-  order_items:
-    - id: PRICE_NON_NEGATIVE
-      type: range
-      column: price
-      min: 0
-      severity: P1
-
-  orders:
-    - id: DELIVERED_AFTER_PURCHASE
-      type: expression
-      columns:
-        - order_purchase_timestamp
-        - order_delivered_customer_date
-      expression: "order_delivered_customer_date >= order_purchase_timestamp"
-      where: "order_delivered_customer_date IS NOT NULL"
-      severity: P1
 """
 
 
@@ -140,7 +105,7 @@ Table olist_order_payments_dataset {
 Table olist_order_reviews_dataset {
   review_id varchar
   order_id varchar [ref: > olist_orders_dataset.order_id]
-  review_score int
+  review_rating int
   review_comment_title varchar
   review_comment_message varchar
   review_creation_date timestamp
@@ -181,67 +146,11 @@ Table olist_geolocation_dataset {
 """
 
 
-OLIST_SAMPLE_RULES = """rules:
-  olist_order_reviews_dataset:
-    - id: REVIEW_SCORE_RANGE
-      type: range
-      column: review_score
-      min: 1
-      max: 5
-      severity: P1
-
-  olist_order_payments_dataset:
-    - id: PAYMENT_VALUE_NON_NEGATIVE
-      type: range
-      column: payment_value
-      min: 0
-      severity: P1
-
-  olist_order_items_dataset:
-    - id: PRICE_NON_NEGATIVE
-      type: range
-      column: price
-      min: 0
-      severity: P1
-
-    - id: FREIGHT_VALUE_NON_NEGATIVE
-      type: range
-      column: freight_value
-      min: 0
-      severity: P2
-
-  olist_orders_dataset:
-    - id: ORDER_STATUS_VALID
-      type: accepted_values
-      column: order_status
-      values:
-        - delivered
-        - shipped
-        - canceled
-        - unavailable
-        - invoiced
-        - processing
-        - created
-        - approved
-      severity: P2
-
-    - id: DELIVERED_AFTER_PURCHASE
-      type: expression
-      columns:
-        - order_purchase_timestamp
-        - order_delivered_customer_date
-      expression: "order_delivered_customer_date >= order_purchase_timestamp"
-      where: "order_delivered_customer_date IS NOT NULL"
-      severity: P1
-"""
-
-
 def create_small_demo(out: str | Path) -> Path:
     root = Path(out)
     csv_dir = root / "csv"
     csv_dir.mkdir(parents=True, exist_ok=True)
     (root / "schema.dbml").write_text(SMALL_SCHEMA)
-    (root / "rules.yaml").write_text(SMALL_RULES)
 
     _write_csv(
         csv_dir / "customers.csv",
@@ -291,11 +200,11 @@ def create_small_demo(out: str | Path) -> Path:
     )
     _write_csv(
         csv_dir / "order_reviews.csv",
-        ["review_id", "order_id", "review_score", "review_comment_message"],
+        ["review_id", "order_id", "review_rating", "review_comment_message"],
         [
             ["R001", "O001", "5", "great"],
             ["R002", "O002", "1", "late"],
-            ["R003", "O003", "9", "invalid score"],
+            ["R003", "O003", "9", "invalid rating"],
             ["R004", "O999", "2", "orphan order"],
         ],
     )
@@ -317,7 +226,6 @@ def create_olist_sample(out: str | Path) -> Path:
     csv_dir = root / "csv"
     csv_dir.mkdir(parents=True, exist_ok=True)
     (root / "schema.dbml").write_text(OLIST_SAMPLE_SCHEMA)
-    (root / "rules.yaml").write_text(OLIST_SAMPLE_RULES)
 
     _write_csv(
         csv_dir / "olist_customers_dataset.csv",
@@ -432,7 +340,7 @@ def create_olist_sample(out: str | Path) -> Path:
         [
             "review_id",
             "order_id",
-            "review_score",
+            "review_rating",
             "review_comment_title",
             "review_comment_message",
             "review_creation_date",
@@ -441,7 +349,7 @@ def create_olist_sample(out: str | Path) -> Path:
         [
             ["R001", "O001", "5", "great", "fast delivery", "2024-01-04", "2024-01-04"],
             ["R002", "O002", "1", "late", "arrived late", "2024-01-05", "2024-01-05"],
-            ["R003", "O003", "9", "invalid score", "score outside range", "2024-01-07", "2024-01-07"],
+            ["R003", "O003", "9", "invalid rating", "rating outside range", "2024-01-07", "2024-01-07"],
             ["R004", "O999", "2", "orphan order", "missing order reference", "2024-01-08", "2024-01-08"],
         ],
     )

@@ -2,8 +2,8 @@
 
 `vsf-profiler` is a local-first CLI and `127.0.0.1` web runner that profiles
 CSV datasets against a DBML schema, detects common data quality and
-relationship issues, runs association-based influence analysis, and writes
-Markdown/HTML reports plus machine-readable artifacts.
+relationship issues, and writes Markdown/HTML reports plus machine-readable
+artifacts.
 
 This repository still carries Harness docs under `docs/` for agent workflow.
 The product implemented here is `VSF Data Profiler`.
@@ -53,7 +53,6 @@ Expected artifacts:
 ```text
 outputs/demo_small/profile_summary.json
 outputs/demo_small/issues.json
-outputs/demo_small/influence.json
 outputs/demo_small/schema_parse_report.json
 outputs/demo_small/lineage_graph.json
 outputs/demo_small/schema_evaluation.json
@@ -101,8 +100,6 @@ vsf-profiler doctor
 vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
-  --target order_reviews.review_score \
   --out outputs/demo_small
 
 vsf-profiler package \
@@ -115,8 +112,6 @@ python scripts/benchmark_large_dataset.py \
   --work-dir outputs/benchmark_ci \
   --rows 600 \
   --tables 7 \
-  --max-analysis-rows 120 \
-  --max-feature-columns 4 \
   --force
 
 # Postgres mode reads selected local database tables through a chunked connector.
@@ -126,7 +121,6 @@ vsf-profiler run \
   --postgres-url-env VSF_PROFILER_POSTGRES_URL \
   --postgres-schema public \
   --postgres-tables customers,orders,order_items \
-  --target orders.order_total \
   --out outputs/postgres_profile
 
 # MySQL/MariaDB mode uses the same connector boundary and temporary chunked extracts.
@@ -135,14 +129,11 @@ vsf-profiler run \
   --mysql-url-env VSF_PROFILER_MYSQL_URL \
   --mysql-schema app \
   --mysql-tables customers,orders,order_items \
-  --target orders.order_total \
   --out outputs/mysql_profile
 
 vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
-  --target order_reviews.review_score \
   --out outputs/demo_small_l4 \
   --use-llm \
   --llm-provider fake
@@ -152,8 +143,6 @@ cp .env.example .env
 vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
-  --target order_reviews.review_score \
   --out outputs/demo_small_l4_openai \
   --use-llm \
   --llm-provider openai
@@ -234,10 +223,9 @@ python -m json.tool outputs/benchmark_large/run/performance_guard_report.json
 ```
 
 Interpret the report as environment-specific evidence. It records row counts,
-stage runtimes, peak RSS memory when supported, artifact sizes, influence row
-and feature limits, default Postgres chunk size, chart/report/package success,
-artifact audit status, and the source scan proving no production
-`pandas.read_csv` or unguarded `.fetchdf()` paths.
+stage runtimes, peak RSS memory when supported, artifact sizes, default Postgres
+chunk size, chart/report/package success, artifact audit status, and the source
+scan proving no production `pandas.read_csv` or unguarded `.fetchdf()` paths.
 
 ## Web UI and Local Runner
 
@@ -269,24 +257,24 @@ open http://127.0.0.1:8765
 
 The local runner binds only to `127.0.0.1`. It preserves CLI artifact
 contracts and can run upload-mode jobs for demo/small-medium files or local
-path mode jobs where browser-entered DBML, CSV directory, and optional rules
-paths are validated locally without uploading CSV bytes through the browser.
+path mode jobs where browser-entered DBML paths and CSV directory paths are
+validated locally without uploading CSV bytes through the browser.
 After a run completes, the local runner shows an interactive dashboard from
 generated artifact URLs such as
 `charts/*.json`, `issues.json`, `profile_summary.json`,
 `relationship_graph.json`, `dataset_verdict.json`,
 `table_assessments.json`, `schema_parse_report.json`, `lineage_graph.json`,
-`schema_evaluation.json`, `schema_diagram.json`, `influence.json`, and
-`run_summary.json`. The DBML diagram panel switches from browser preflight
+`schema_evaluation.json`, `schema_diagram.json`, and `run_summary.json`.
+The DBML diagram panel switches from browser preflight
 state to generated `schema_diagram.json`, `relationship_graph.json`, and
 `schema_parse_report.json` artifacts after a run. Its local ERD renderer uses
 deterministic table layers, compact PK/FK-focused cards, orthogonal
 relationship edges, fit/expanded/non-key controls, and table or relationship
 drilldown backed by existing artifact evidence. The Generated results panel
-previews verdict, issue counts, table impact, runtime summary, and report links
+previews dataset findings, issue counts, table impact, runtime summary, and report links
 from those artifacts while keeping raw artifact links available.
 
-- Upload mode sends browser-selected DBML/CSV/rules files to the local backend
+- Upload mode sends browser-selected DBML/CSV files to the local backend
   and is intended for demos and small-to-medium local files.
 - Local path mode sends only local path strings to the backend, then runs the
   existing Python/DuckDB pipeline directly against those paths. Use it for
@@ -308,7 +296,6 @@ v0.2 local release-candidate scope:
   extracts.
 - DuckDB-backed profiling without full pandas CSV loads.
 - DBML-derived quality checks.
-- YAML business rules.
 - FK relationship checks with cardinality, composite FK, and junction-table support.
 - Issue catalog with evidence SQL and sample bad rows.
 - DBML diagram artifacts with a dbdiagram.io embed link and CSV-to-table mapping.
@@ -317,7 +304,7 @@ v0.2 local release-candidate scope:
   CSV mapping status, relationship drilldown, and parser diagnostics.
 - Additive lineage graph artifact connecting input sources, schema entities,
   relationships, profiler stages, and generated artifacts.
-- Deterministic severity aggregation and dataset verdict artifact.
+- Deterministic issue aggregation and dataset findings artifact.
 - Deterministic chart-spec artifacts rendered as report visual summaries.
 - Static web UI and Vercel preflight deployment for browser-side DBML/CSV
   mapping and visualization preview only.
@@ -330,7 +317,7 @@ v0.2 local release-candidate scope:
   bounded sample evidence, an optional deterministic zip archive, and optional
   `analysis_report.pdf` without raw source CSV files.
 - Generated Markdown, HTML, package index, and package PDF reports use a
-  Senior Data Scientist review layout: executive scorecard, visual summaries,
+  Senior Data Scientist review layout: executive summary, visual summaries,
   table impact, issue evidence, relationship/schema/lineage summaries, and
   explicit L4 guardrail state from existing artifacts only.
 - Release-candidate hardening with `vsf-profiler doctor`, `make demo-full`,
@@ -344,7 +331,6 @@ v0.2 local release-candidate scope:
   opt-in API usage with `.env` configuration. OpenAI-compatible model config is
   validated before dispatch, and reports/dashboard views surface L4 guardrail
   status, provider, fallback reason, and artifact links when L4 artifacts exist.
-- Olist-specific influence preset for `review_score`.
 
 Non-goals:
 

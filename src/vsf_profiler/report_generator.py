@@ -6,7 +6,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from vsf_profiler.dataset_verdict import SEVERITIES, issue_sort_key, normalize_severity
-from vsf_profiler.models import InfluenceResult, Issue, ProfileSummary
+from vsf_profiler.models import Issue, ProfileSummary
 
 
 RELATIONSHIP_ISSUES = {
@@ -22,7 +22,6 @@ def generate_reports(
     out_dir: Path,
     profile: ProfileSummary,
     issues: list[Issue],
-    influence: InfluenceResult,
     schema_diagram: dict[str, Any],
     schema_parse_report: dict[str, Any] | None = None,
     connector_metadata: dict[str, Any] | None = None,
@@ -38,7 +37,6 @@ def generate_reports(
         out_dir,
         profile,
         issues,
-        influence,
         schema_diagram,
         schema_parse_report,
         connector_metadata,
@@ -72,7 +70,6 @@ def _build_context(
     out_dir: Path,
     profile: ProfileSummary,
     issues: list[Issue],
-    influence: InfluenceResult,
     schema_diagram: dict[str, Any],
     schema_parse_report: dict[str, Any] | None,
     connector_metadata: dict[str, Any] | None,
@@ -108,7 +105,7 @@ def _build_context(
                 1 for issue in issues if normalize_severity(issue.severity) in {"P0", "P1"}
             ),
         },
-        "scorecard": _scorecard_context(
+        "summary_cards": _summary_card_context(
             table_count=table_count,
             column_count=column_count,
             row_count=row_count,
@@ -124,7 +121,6 @@ def _build_context(
         "relationship_issues": [
             issue for issue in sorted_issues if issue.issue_type in RELATIONSHIP_ISSUES
         ],
-        "influence": influence,
         "schema_diagram": schema_diagram,
         "schema_parse_report": schema_parse_context,
         "connector_metadata": connector_context,
@@ -157,7 +153,7 @@ def _recommended_actions(issues: list[Issue], dataset_verdict: dict[str, Any]) -
     return actions
 
 
-def _scorecard_context(
+def _summary_card_context(
     *,
     table_count: int,
     column_count: int,
@@ -179,18 +175,6 @@ def _scorecard_context(
         else "deterministic run"
     )
     return [
-        {
-            "label": "Verdict",
-            "value": dataset_verdict.get("verdict", "unknown"),
-            "detail": "dataset_verdict.json",
-            "tone": _tone_for_label(dataset_verdict.get("verdict", "")),
-        },
-        {
-            "label": "Risk",
-            "value": f"{dataset_verdict.get('risk_score', 0)}/100",
-            "detail": dataset_verdict.get("verdict_rationale", ""),
-            "tone": "danger" if _numeric(dataset_verdict.get("risk_score")) >= 75 else "warn",
-        },
         {
             "label": "Issues",
             "value": len(issues),
@@ -254,10 +238,6 @@ def _dataset_verdict_context(dataset_verdict: dict[str, Any] | None) -> dict[str
     return {
         "available": True,
         "path": "dataset_verdict.json",
-        "verdict": dataset_verdict.get("verdict", ""),
-        "risk_score": dataset_verdict.get("risk_score", 0),
-        "risk_score_model": dataset_verdict.get("risk_score_model") or {},
-        "verdict_rationale": dataset_verdict.get("verdict_rationale", ""),
         "issue_total": issue_counts.get("total", 0),
         "severity_counts": {
             severity: severity_counts.get(severity, 0)
@@ -390,10 +370,6 @@ def _table_assessments_context(table_assessments: dict[str, Any] | None) -> dict
             {
                 "table": row.get("table", ""),
                 "role": row.get("role", ""),
-                "health_score": row.get("health_score", 0),
-                "review_score": row.get("review_score", row.get("health_score", 0)),
-                "score_penalty": (row.get("score_penalty_breakdown") or {}).get("total_penalty", 0),
-                "readiness": row.get("readiness", ""),
                 "issue_total": sum((row.get("issue_counts_by_severity") or {}).values()),
                 "affected_columns": row.get("affected_columns") or [],
                 "relationship_risk_count": len(row.get("relationship_risks") or []),
@@ -407,13 +383,6 @@ def _table_assessments_context(table_assessments: dict[str, Any] | None) -> dict
         "available": True,
         "path": "table_assessments.json",
         "table_count": summary.get("table_count", 0),
-        "average_health_score": summary.get("average_health_score", 0),
-        "average_review_score": summary.get(
-            "average_review_score",
-            summary.get("average_health_score", 0),
-        ),
-        "score_model": summary.get("score_model") or {},
-        "readiness_counts": summary.get("readiness_counts") or {},
         "role_counts": summary.get("role_counts") or {},
         "business_impact_counts": summary.get("business_impact_counts") or {},
         "assessments": assessments,
@@ -472,13 +441,6 @@ def _chart_specs_context(chart_specs: dict[str, dict[str, Any]] | None) -> dict[
         "relationship_edges": (chart_specs.get("relationship_fk_health.json") or {})
         .get("details", {})
         .get("edges", [])[:10],
-        "risk_summary": _risk_chart_context(
-            chart_specs.get("dataset_verdict_risk_summary.json"),
-        ),
-        "influence_top_features": _chart_data_context(
-            chart_specs.get("influence_top_features.json"),
-            value_key="score",
-        ),
     }
 
 
@@ -502,22 +464,6 @@ def _chart_data_context(
     }
 
 
-def _risk_chart_context(spec: dict[str, Any] | None) -> dict[str, Any]:
-    if not spec:
-        return {"available": False}
-    summary = spec.get("summary") or {}
-    risk_score = _numeric(summary.get("risk_score"))
-    return {
-        "available": True,
-        "title": spec.get("title", ""),
-        "path": "charts/dataset_verdict_risk_summary.json",
-        "verdict": summary.get("verdict", ""),
-        "risk_score": risk_score,
-        "issue_count": summary.get("issue_count", 0),
-        "bar_width_pct": max(0.0, min(risk_score, 100.0)),
-    }
-
-
 def _with_bar_widths(rows: list[dict[str, Any]], value_key: str) -> list[dict[str, Any]]:
     max_value = max((_abs_numeric(row.get(value_key)) for row in rows), default=0.0)
     denominator = max(max_value, 1.0)
@@ -537,11 +483,11 @@ def _bar_text(width_pct: float, *, width: int = 20) -> str:
 
 
 def _tone_for_label(label: str) -> str:
-    if label in {"P0", "P1", "NOT_READY", "invalid", "failed"}:
+    if label in {"P0", "P1", "invalid", "failed"}:
         return "danger"
-    if label in {"P2", "WARN", "warning", "fallback_used", "skipped"}:
+    if label in {"P2", "warning", "fallback_used", "skipped"}:
         return "warn"
-    if label in {"P3", "READY", "passed", "success", "completed", "valid"}:
+    if label in {"P3", "passed", "success", "completed", "valid"}:
         return "ok"
     return "info"
 

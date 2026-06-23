@@ -21,7 +21,6 @@ REQUIRED_ARTIFACTS = {
     "lineage_graph.json",
     "dataset_verdict.json",
     "table_assessments.json",
-    "influence.json",
     "run.log",
     "run_events.jsonl",
     "run_summary.json",
@@ -29,7 +28,6 @@ REQUIRED_ARTIFACTS = {
     "report.html",
 }
 REQUIRED_CHARTS = {
-    "dataset_verdict_risk_summary.json",
     "issue_counts_by_severity.json",
     "issue_counts_by_type.json",
     "missingness_by_table.json",
@@ -45,7 +43,7 @@ def test_real_postgres_acceptance_smoke_introspection_and_dbml_modes(tmp_path):
         reason="Real Postgres smoke requires `python -m pip install -e .[postgres]`.",
     )
     schema_name = f"vsf_accept_{uuid.uuid4().hex[:8]}"
-    rules_path = _write_rules(tmp_path / "rules.yaml")
+    rules_path = _write_rules(tmp_path / "business_rules.yaml")
     dbml_path = _write_dbml(tmp_path / "schema.dbml")
 
     _create_fixture(psycopg, url, schema_name)
@@ -131,7 +129,7 @@ def _create_fixture(psycopg, url: str, schema_name: str) -> None:
                 CREATE TABLE "{schema_name}"."order_reviews" (
                   review_id text PRIMARY KEY,
                   order_id text REFERENCES "{schema_name}"."orders"(order_id),
-                  review_score integer
+                  review_rating integer
                 )
                 '''
             )
@@ -192,7 +190,6 @@ def _run_postgres_pipeline(
         dbml_path=dbml_path,
         csv_dir=None,
         rules_path=rules_path,
-        target="order_reviews.review_score",
         out_dir=out_dir,
         source_connector=connector,
     )
@@ -294,7 +291,7 @@ def _write_rules(path: Path) -> Path:
 rules:
   order_reviews:
     - type: range
-      column: review_score
+      column: review_rating
       min: 1
       max: 5
       severity: P1
@@ -328,7 +325,7 @@ Table orders {
 Table order_reviews {
   review_id varchar [pk, not null]
   order_id varchar [ref: > orders.order_id]
-  review_score int [not null]
+  review_rating int [not null]
 }
 """.lstrip(),
         encoding="utf-8",

@@ -353,8 +353,6 @@ def _artifact_key(path: Path) -> str:
         return "profile_summary"
     if name == "issues.json":
         return "issues"
-    if name == "influence.json":
-        return "influence"
     if name == "schema_diagram.json":
         return "schema_diagram_json"
     if name == "schema_diagram.dbml":

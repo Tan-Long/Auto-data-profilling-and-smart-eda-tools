@@ -32,18 +32,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=DEFAULT_BENCHMARK_TABLES,
         help="Number of relational tables to generate.",
     )
-    parser.add_argument(
-        "--max-analysis-rows",
-        type=int,
-        default=1_000,
-        help="Maximum rows materialized for bounded influence analysis.",
-    )
-    parser.add_argument(
-        "--max-feature-columns",
-        type=int,
-        default=8,
-        help="Maximum feature columns materialized for bounded influence analysis.",
-    )
     parser.add_argument("--seed", type=int, default=DEFAULT_BENCHMARK_SEED, help="Deterministic seed.")
     parser.add_argument(
         "--signal-columns",
@@ -67,8 +55,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         work_dir=args.work_dir,
         rows=args.rows,
         tables=args.tables,
-        max_analysis_rows=args.max_analysis_rows,
-        max_feature_columns=args.max_feature_columns,
         seed=args.seed,
         signal_columns=args.signal_columns,
         force=args.force,

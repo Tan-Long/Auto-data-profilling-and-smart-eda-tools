@@ -40,7 +40,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">DBML + CSV -> evidence artifacts</p>
-          <h2>Run the profiler, inspect risk, review table impact, and open the generated evidence package.</h2>
+          <h2>Run the profiler, review table impact, and open the generated evidence package.</h2>
           <p class="topbar-note">Full jobs use the local <code>127.0.0.1</code> runner. Diagram, mapping, and contract evidence render only from generated artifacts.</p>
           <div class="topbar-meta" aria-label="Console operating model">
             <span><strong>01</strong> local run</span>
@@ -90,7 +90,7 @@
           <div>
             <p class="eyebrow">Run profiler</p>
             <h3>Start a local Python/DuckDB run</h3>
-            <p class="section-copy">Use local paths by default. Switch to upload mode only when the browser should send selected files to the runner.</p>
+            <p class="section-copy">Use local paths by default. Switch to upload mode only when the browser should send DBML and CSV files to the runner.</p>
           </div>
           <span class="badge" id="jobStatusBadge">No job</span>
         </div>
@@ -100,6 +100,7 @@
             <div class="runner-mode-switch" role="tablist" aria-label="Runner mode">
               <button class="mode-button" id="runnerModeUpload" type="button" role="tab" aria-selected="false" aria-controls="runnerForm">Upload mode</button>
               <button class="mode-button active" id="runnerModePath" type="button" role="tab" aria-selected="true" aria-controls="pathRunnerForm">Local path mode</button>
+              <button class="mode-button" id="runnerModeData" type="button" role="tab" aria-selected="false" aria-controls="dataRunnerForm">Data mode</button>
             </div>
 
             <form class="runner-form upload-runner-form" id="runnerForm" hidden>
@@ -128,26 +129,18 @@
               </div>
 
               <div class="runner-upload-options">
-                <label class="field-label" for="rulesInput">
-                  Optional rules file
-                  <input id="rulesInput" type="file" accept=".yaml,.yml,.json,.txt">
-                </label>
-                <div class="file-card compact" id="rulesFileCard" hidden>
-                  <span class="file-icon" aria-hidden="true">YML</span>
-                  <div>
-                    <strong id="rulesFileName">rules.yaml</strong>
-                    <p id="rulesFileMeta">Ready for backend run</p>
-                  </div>
-                </div>
-                <label class="field-label" for="targetInput">
-                  Target column
-                  <input id="targetInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="olist_order_reviews_dataset.review_score">
-                </label>
                 <button class="button primary" id="runProfilerButton" type="submit" disabled>Run upload job</button>
               </div>
             </form>
 
             <form class="runner-form path-runner-form" id="pathRunnerForm">
+              <div class="path-preset-row" role="group" aria-label="Local path presets">
+                <span>Run preset</span>
+                <div class="runner-mode-switch path-preset-switch">
+                  <button class="mode-button" id="smallDemoPresetButton" type="button" data-path-preset="small">Demo nhỏ</button>
+                  <button class="mode-button active" id="olistFullPresetButton" type="button" data-path-preset="olist">Full Olist</button>
+                </div>
+              </div>
               <label class="field-label" for="dbmlPathInput">
                 DBML file path
                 <input id="dbmlPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_olist/schema.dbml">
@@ -156,16 +149,55 @@
                 CSV directory path
                 <input id="csvDirPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_olist/csv">
               </label>
-              <label class="field-label" for="rulesPathInput">
-                Optional rules path
-                <input id="rulesPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_olist/rules.yaml">
-              </label>
-              <label class="field-label" for="pathTargetInput">
-                Target column
-                <input id="pathTargetInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="olist_order_reviews_dataset.review_score">
-              </label>
               <button class="button primary" id="runPathProfilerButton" type="submit" disabled>Run path job</button>
             </form>
+
+            <form class="runner-form data-runner-form" id="dataRunnerForm" hidden>
+              <label class="field-label" for="dataSourceType">
+                Source
+                <select id="dataSourceType">
+                  <option value="postgres">Postgres</option>
+                  <option value="mysql">MySQL/MariaDB</option>
+                </select>
+              </label>
+              <label class="field-label" for="dataUrlEnvInput">
+                URL env var
+                <input id="dataUrlEnvInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="VSF_PROFILER_POSTGRES_URL">
+              </label>
+              <label class="field-label" for="dataSchemaInput">
+                Schema/database
+                <input id="dataSchemaInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="public">
+              </label>
+              <label class="field-label" for="dataTablesInput">
+                Selected tables
+                <input id="dataTablesInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="orders, customers">
+              </label>
+              <label class="field-label" for="dataDbmlPathInput">
+                Optional DBML path
+                <input id="dataDbmlPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="data/demo_olist/schema.dbml">
+              </label>
+              <label class="field-label" for="dataChunkRowsInput">
+                Chunk rows
+                <input id="dataChunkRowsInput" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="10000">
+              </label>
+              <button class="button primary" id="runDataProfilerButton" type="submit" disabled>Run data job</button>
+            </form>
+
+            <div class="runner-advanced-options" aria-label="Optional run outputs">
+              <label class="toggle-label llm-toggle-label" for="llmReportToggle">
+                <input id="llmReportToggle" type="checkbox">
+                <span>LLM report</span>
+              </label>
+              <label class="field-label compact-select" for="llmProviderSelect">
+                Provider
+                <select id="llmProviderSelect">
+                  <option value="">Env/default</option>
+                  <option value="fake">Fake local</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </label>
+              <p class="form-message">When enabled, the run writes <code>l4_report.md</code> and <code>guardrail_report.json</code> if guardrails pass.</p>
+            </div>
 
             <p class="form-message" id="runnerMessage" role="status">Start with local paths visible to the 127.0.0.1 runner.</p>
           </div>
@@ -325,7 +357,7 @@
           <div>
             <p class="eyebrow">Post-run review</p>
             <h3>Dashboard</h3>
-            <p class="section-copy">Review verdict, table readiness, graph topology, issue evidence, and supporting artifacts after reading the generated report.</p>
+            <p class="section-copy">Review graph topology, issue evidence, table impact, and supporting artifacts after reading the generated report.</p>
           </div>
           <span class="badge" id="dashboardStatusBadge">Waiting for run</span>
         </div>
@@ -333,8 +365,6 @@
         <div class="dashboard-layout">
           <div class="dashboard-main">
             <div class="dashboard-summary-strip" id="dashboardSummaryStrip" aria-label="Dashboard summary">
-              <div><span>verdict</span><strong>Waiting</strong></div>
-              <div><span>risk</span><strong>--</strong></div>
               <div><span>issues</span><strong>0</strong></div>
               <div><span>tables</span><strong>0</strong></div>
             </div>
@@ -372,7 +402,7 @@
                 <span id="tableImpactStatus">Waiting for table_assessments.json</span>
               </div>
               <div class="table-impact-grid" id="tableImpactGrid">
-                <p class="muted">Run a job to review per-table readiness and business impact.</p>
+                <p class="muted">Run a job to review per-table business impact.</p>
               </div>
             </section>
 
@@ -395,7 +425,7 @@
                 </div>
                 <div class="graph-control-group">
                   <span>View</span>
-                  <div class="runner-mode-switch dashboard-graph-mode" role="group" aria-label="Graph detail level">
+                  <div class="runner-mode-switch dashboard-graph-mode detail-mode" role="group" aria-label="Graph detail level">
                     <button class="mode-button active" id="dashboardGraphDisplayOverview" type="button" aria-pressed="true">Overview</button>
                     <button class="mode-button" id="dashboardGraphDisplayFocus" type="button" aria-pressed="false">Focus</button>
                     <button class="mode-button" id="dashboardGraphDisplayFull" type="button" aria-pressed="false">Full</button>

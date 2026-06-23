@@ -92,8 +92,7 @@ def test_pipeline_writes_relationship_graph_metrics_and_evidence(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
     )
 

@@ -11,8 +11,7 @@ def test_demo_lineage_graph_links_sources_schema_stages_and_artifacts(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
     )
 
@@ -26,8 +25,8 @@ def test_demo_lineage_graph_links_sources_schema_stages_and_artifacts(tmp_path):
     assert lineage["summary"]["table_count"] == 7
     assert lineage["summary"]["column_count"] >= 27
     assert lineage["summary"]["relationship_count"] == 6
-    assert lineage["summary"]["stage_count"] == 8
-    assert lineage["summary"]["artifact_count"] >= 20
+    assert lineage["summary"]["stage_count"] == 7
+    assert lineage["summary"]["artifact_count"] >= 18
     assert lineage["summary"]["edge_count"] == len(lineage["edges"])
     assert {
         "schema_parse_report.json",
@@ -72,4 +71,4 @@ def test_demo_lineage_graph_links_sources_schema_stages_and_artifacts(tmp_path):
     ) in edges
 
     lineage_text = json.dumps(lineage)
-    assert "review_score\n" not in lineage_text
+    assert "review_rating\n" not in lineage_text

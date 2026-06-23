@@ -268,7 +268,7 @@ def _yaml_rules(
     loaded = yaml.safe_load(path.read_text()) or {}
     rules_by_table = loaded.get("rules", {})
     if not isinstance(rules_by_table, dict):
-        raise ValueError("rules.yaml must contain a top-level 'rules' mapping")
+        raise ValueError("Rules file must contain a top-level 'rules' mapping")
 
     for table_name, rules in rules_by_table.items():
         catalog_table = catalog.tables.get(table_name)

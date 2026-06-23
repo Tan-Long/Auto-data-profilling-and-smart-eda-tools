@@ -14,7 +14,6 @@ from vsf_profiler.artifact_audit import REQUIRED_CHARTS, audit_artifacts
 from vsf_profiler.cli import run_pipeline
 from vsf_profiler.connectors import DEFAULT_POSTGRES_CHUNK_ROWS
 from vsf_profiler.export_package import create_analysis_package
-from vsf_profiler.influence_analyzer import MAX_ANALYSIS_ROWS, MAX_FEATURE_COLUMNS
 
 
 PERFORMANCE_GUARD_REPORT = "performance_guard_report.json"
@@ -48,8 +47,6 @@ class GeneratedBenchmarkDataset:
     root: Path
     dbml_path: Path
     csv_dir: Path
-    rules_path: Path
-    target: str
     requested_rows: int
     requested_tables: int
     seed: int
@@ -80,9 +77,7 @@ def create_large_benchmark_dataset(
     selected_tables = TABLE_ORDER[:tables]
     table_rows = _table_row_counts(rows, selected_tables)
     dbml_path = root / "schema.dbml"
-    rules_path = root / "rules.yaml"
     dbml_path.write_text(_schema_dbml(selected_tables, signal_columns), encoding="utf-8")
-    rules_path.write_text(_rules_yaml(selected_tables), encoding="utf-8")
 
     if "customers" in selected_tables:
         _write_csv(csv_dir / "customers.csv", _customers_rows(table_rows["customers"], seed))
@@ -118,8 +113,6 @@ def create_large_benchmark_dataset(
         root=root,
         dbml_path=dbml_path,
         csv_dir=csv_dir,
-        rules_path=rules_path,
-        target="order_reviews.review_score",
         requested_rows=rows,
         requested_tables=tables,
         seed=seed,
@@ -133,15 +126,12 @@ def run_large_dataset_benchmark(
     work_dir: Path,
     rows: int = DEFAULT_BENCHMARK_ROWS,
     tables: int = DEFAULT_BENCHMARK_TABLES,
-    max_analysis_rows: int = MAX_ANALYSIS_ROWS,
-    max_feature_columns: int = MAX_FEATURE_COLUMNS,
     seed: int = DEFAULT_BENCHMARK_SEED,
     signal_columns: int = DEFAULT_SIGNAL_COLUMNS,
     force: bool = False,
     create_package: bool = True,
 ) -> dict[str, Any]:
     _validate_generator_args(rows=rows, tables=tables, signal_columns=signal_columns)
-    _validate_limits(max_analysis_rows=max_analysis_rows, max_feature_columns=max_feature_columns)
     if work_dir.exists():
         if not force:
             raise ValueError(f"Benchmark work directory already exists: {work_dir}")
@@ -163,11 +153,8 @@ def run_large_dataset_benchmark(
     run_pipeline(
         dbml_path=dataset.dbml_path,
         csv_dir=dataset.csv_dir,
-        rules_path=dataset.rules_path,
-        target=dataset.target,
+        rules_path=None,
         out_dir=run_dir,
-        max_analysis_rows=max_analysis_rows,
-        max_feature_columns=max_feature_columns,
     )
     wall_seconds = round(time.perf_counter() - wall_started, 6)
 
@@ -210,8 +197,6 @@ def run_large_dataset_benchmark(
         work_dir=work_dir,
         started_at=started_at,
         wall_seconds=wall_seconds,
-        max_analysis_rows=max_analysis_rows,
-        max_feature_columns=max_feature_columns,
         package_result=package_result,
         artifact_audit={"status": "pending", "violations": []},
     )
@@ -229,8 +214,6 @@ def run_large_dataset_benchmark(
         work_dir=work_dir,
         started_at=started_at,
         wall_seconds=wall_seconds,
-        max_analysis_rows=max_analysis_rows,
-        max_feature_columns=max_feature_columns,
         package_result=package_result,
         artifact_audit=artifact_audit,
     )
@@ -243,7 +226,7 @@ def scan_production_materialization_guards(src_root: Path | None = None) -> dict
     fetchdf_offenders: list[str] = []
     read_csv_offenders: list[str] = []
     pandas_import_offenders: list[str] = []
-    allowed_pandas_imports = {"duckdb_utils.py", "influence_analyzer.py"}
+    allowed_pandas_imports = {"duckdb_utils.py"}
     for path in sorted(root.glob("*.py")):
         text = path.read_text(encoding="utf-8")
         if path.name != "duckdb_utils.py" and FETCHDF_TOKEN in text:
@@ -277,26 +260,19 @@ def _build_performance_guard_report(
     work_dir: Path,
     started_at: str,
     wall_seconds: float,
-    max_analysis_rows: int,
-    max_feature_columns: int,
     package_result: dict[str, Any],
     artifact_audit: dict[str, Any],
 ) -> dict[str, Any]:
     run_summary = _read_json(run_dir / "run_summary.json")
     run_events = _read_jsonl(run_dir / "run_events.jsonl")
     profile_summary = _read_json(run_dir / "profile_summary.json")
-    influence = _read_json(run_dir / "influence.json")
     materialization = scan_production_materialization_guards()
     artifact_sizes = _artifact_sizes(run_dir)
     memory = _peak_rss_memory()
     chart_success = all((run_dir / path).is_file() for path in REQUIRED_CHARTS)
     report_success = (run_dir / "report.md").is_file() and (run_dir / "report.html").is_file()
     profile_rows = _profile_row_counts(profile_summary)
-    limits = _limit_evidence(
-        influence=influence,
-        max_analysis_rows=max_analysis_rows,
-        max_feature_columns=max_feature_columns,
-    )
+    limits = _limit_evidence()
     package_success = bool(package_result.get("success"))
     violations = _benchmark_violations(
         run_summary=run_summary,
@@ -305,7 +281,6 @@ def _build_performance_guard_report(
         package_success=package_success,
         audit=artifact_audit,
         materialization=materialization,
-        limits=limits,
         memory=memory,
     )
     return {
@@ -323,8 +298,6 @@ def _build_performance_guard_report(
             "signal_columns": dataset.signal_columns,
             "dbml_path": str(dataset.dbml_path),
             "csv_dir": str(dataset.csv_dir),
-            "rules_path": str(dataset.rules_path),
-            "target": dataset.target,
             "total_rows": dataset.total_rows,
             "tables": [
                 {
@@ -363,32 +336,11 @@ def _build_performance_guard_report(
     }
 
 
-def _limit_evidence(
-    *,
-    influence: dict[str, Any],
-    max_analysis_rows: int,
-    max_feature_columns: int,
-) -> dict[str, Any]:
-    notes = influence.get("notes") if isinstance(influence.get("notes"), list) else []
-    top_features = influence.get("top_features") if isinstance(influence.get("top_features"), list) else []
-    row_count = int(influence.get("row_count") or 0)
-    feature_count = len(top_features)
-    row_note = f"Influence dataframe limited to at most {max_analysis_rows} rows."
-    feature_note = f"Influence dataframe limited to at most {max_feature_columns} feature columns."
+def _limit_evidence() -> dict[str, Any]:
     return {
-        "max_analysis_rows": max_analysis_rows,
-        "max_feature_columns": max_feature_columns,
         "postgres_chunk_rows_default": DEFAULT_POSTGRES_CHUNK_ROWS,
         "connector_chunking_applicable": False,
         "csv_scan_mode": "duckdb_read_csv_auto",
-        "influence_row_count": row_count,
-        "influence_top_feature_count": feature_count,
-        "influence_notes": notes,
-        "analysis_row_limit_enforced": row_count <= max_analysis_rows,
-        "analysis_feature_limit_enforced": feature_count <= max_feature_columns,
-        "analysis_row_limit_reported": row_note in notes,
-        "analysis_feature_limit_reported": feature_note in notes,
-        "feature_truncation_reported": any("Feature columns truncated" in str(note) for note in notes),
     }
 
 
@@ -400,7 +352,6 @@ def _benchmark_violations(
     package_success: bool,
     audit: dict[str, Any],
     materialization: dict[str, Any],
-    limits: dict[str, Any],
     memory: dict[str, Any],
 ) -> list[dict[str, str]]:
     violations: list[dict[str, str]] = []
@@ -418,15 +369,6 @@ def _benchmark_violations(
         violations.append({"code": "ARTIFACT_AUDIT_FAILED", "message": "Artifact audit did not pass."})
     if materialization.get("status") != "passed":
         violations.append({"code": "MATERIALIZATION_GUARD_FAILED", "message": "Source scan found unsafe materialization usage."})
-    for key in [
-        "analysis_row_limit_enforced",
-        "analysis_feature_limit_enforced",
-        "analysis_row_limit_reported",
-        "analysis_feature_limit_reported",
-        "feature_truncation_reported",
-    ]:
-        if not limits.get(key):
-            violations.append({"code": f"LIMIT_{key.upper()}_FALSE", "message": f"{key} is false."})
     if memory.get("supported") and memory.get("peak_rss_mb") is None:
         violations.append({"code": "PEAK_RSS_MISSING", "message": "Peak RSS is supported but missing."})
     return violations
@@ -439,13 +381,6 @@ def _validate_generator_args(*, rows: int, tables: int, signal_columns: int) -> 
         raise ValueError(f"tables must be between {MIN_TABLE_COUNT} and {len(TABLE_ORDER)}")
     if signal_columns <= 0:
         raise ValueError("signal_columns must be greater than zero")
-
-
-def _validate_limits(*, max_analysis_rows: int, max_feature_columns: int) -> None:
-    if max_analysis_rows <= 0:
-        raise ValueError("max_analysis_rows must be greater than zero")
-    if max_feature_columns <= 0:
-        raise ValueError("max_feature_columns must be greater than zero")
 
 
 def _table_row_counts(rows: int, selected_tables: list[str]) -> dict[str, int]:
@@ -505,7 +440,7 @@ def _schema_dbml(selected_tables: list[str], signal_columns: int) -> str:
             f"""Table order_reviews {{
   review_id varchar [pk, not null]
   order_id varchar [ref: > orders.order_id]
-  review_score int
+  review_rating int
   review_comment_message varchar
 {signal_lines}
 }}"""
@@ -568,49 +503,6 @@ def _schema_dbml(selected_tables: list[str], signal_columns: int) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
-def _rules_yaml(selected_tables: list[str]) -> str:
-    sections = [
-        """rules:
-  order_reviews:
-    - id: BENCH_REVIEW_SCORE_RANGE
-      type: range
-      column: review_score
-      min: 1
-      max: 5
-      severity: P1""",
-    ]
-    if "order_payments" in selected_tables:
-        sections.append(
-            """  order_payments:
-    - id: BENCH_PAYMENT_NON_NEGATIVE
-      type: range
-      column: payment_value
-      min: 0
-      severity: P1"""
-        )
-    if "orders" in selected_tables:
-        sections.append(
-            """  orders:
-    - id: BENCH_DELIVERED_AFTER_PURCHASE
-      type: expression
-      columns:
-        - order_purchase_timestamp
-        - order_delivered_customer_date
-      expression: "order_delivered_customer_date >= order_purchase_timestamp"
-      severity: P1"""
-        )
-    if "order_items" in selected_tables:
-        sections.append(
-            """  order_items:
-    - id: BENCH_PRICE_NON_NEGATIVE
-      type: range
-      column: price
-      min: 0
-      severity: P1"""
-        )
-    return "\n\n".join(sections) + "\n"
-
-
 def _customers_rows(count: int, seed: int) -> Iterable[list[str]]:
     yield ["customer_id", "customer_state", "signup_segment"]
     states = ["SP", "RJ", "MG", "BA", "PR", "SC"]
@@ -663,19 +555,19 @@ def _orders_rows(count: int, table_rows: dict[str, int], seed: int) -> Iterable[
 
 def _order_reviews_rows(count: int, seed: int, signal_columns: int) -> Iterable[list[str]]:
     signal_headers = [f"signal_{index:02d}" for index in range(signal_columns)]
-    yield ["review_id", "order_id", "review_score", "review_comment_message", *signal_headers]
+    yield ["review_id", "order_id", "review_rating", "review_comment_message", *signal_headers]
     for index in range(count):
-        score = (index % 5) + 1
+        rating = (index % 5) + 1
         if index and index % 97 == 0:
-            score = 9
+            rating = 9
         order_id = f"O{index:08d}"
         if index and index % 257 == 0:
             order_id = "O99999999"
         signals = [
-            f"{round((score * (signal_index + 1)) + ((index + seed) % 13) / 10, 4):.4f}"
+            f"{round((rating * (signal_index + 1)) + ((index + seed) % 13) / 10, 4):.4f}"
             for signal_index in range(signal_columns)
         ]
-        yield [f"R{index:08d}", order_id, str(score), f"comment-{index % 11}", *signals]
+        yield [f"R{index:08d}", order_id, str(rating), f"comment-{index % 11}", *signals]
 
 
 def _order_payments_rows(count: int, seed: int) -> Iterable[list[str]]:

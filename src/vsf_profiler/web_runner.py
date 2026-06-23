@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import re
 import secrets
 import threading
@@ -22,7 +23,8 @@ DEFAULT_WEB_PORT = 8765
 DEFAULT_RUN_ROOT = Path("outputs/web_runs")
 MAX_UPLOAD_BYTES = 250 * 1024 * 1024
 MAX_PATH_JOB_BYTES = 16 * 1024
-TARGET_PATTERN = re.compile(r"^[A-Za-z_][\w]*\.[A-Za-z_][\w]*$")
+ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+TABLE_LIST_PATTERN = re.compile(r"^[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)?(?:\s*,\s*[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)?)*$")
 
 ARTIFACT_LABELS = {
     "profile_summary.json": "Profile summary",
@@ -32,9 +34,8 @@ ARTIFACT_LABELS = {
     "lineage_graph.json": "Lineage graph",
     "schema_evaluation.json": "Schema evaluation",
     "relationship_graph.json": "Relationship graph",
-    "dataset_verdict.json": "Dataset verdict",
+    "dataset_verdict.json": "Dataset findings",
     "table_assessments.json": "Table assessments",
-    "influence.json": "Influence",
     "report.html": "HTML report",
     "report.md": "Markdown report",
     "run_events.jsonl": "Runtime events",
@@ -54,7 +55,6 @@ DASHBOARD_REQUIRED_ARTIFACTS = [
     "dataset_verdict.json",
     "table_assessments.json",
     "schema_evaluation.json",
-    "influence.json",
     "run_summary.json",
 ]
 
@@ -105,7 +105,8 @@ class WebRunStore:
         dbml: UploadedFile,
         csv_files: list[UploadedFile],
         rules: UploadedFile | None = None,
-        target: str | None = None,
+        use_llm: bool = False,
+        llm_provider: str | None = None,
     ) -> WebRunJob:
         if not csv_files:
             raise ValueError("At least one CSV file is required.")
@@ -126,7 +127,7 @@ class WebRunStore:
             )
         rules_path: Path | None = None
         if rules is not None and rules.content.strip():
-            rules_path = input_dir / _safe_filename(rules.filename, fallback="rules.yaml")
+            rules_path = input_dir / _safe_filename(rules.filename, fallback="business_rules.yaml")
             rules_path.write_bytes(rules.content)
 
         job = WebRunJob(
@@ -141,7 +142,8 @@ class WebRunStore:
             self._jobs[job_id] = job
         thread = threading.Thread(
             target=self._run_job,
-            args=(job, dbml_path, csv_dir, rules_path, target or None),
+            args=(job, dbml_path, csv_dir, rules_path),
+            kwargs={"use_llm": use_llm, "llm_provider_name": llm_provider},
             name=f"vsf-web-run-{job_id}",
             daemon=True,
         )
@@ -154,7 +156,8 @@ class WebRunStore:
         dbml_path: str | Path,
         csv_dir: str | Path,
         rules_path: str | Path | None = None,
-        target: str | None = None,
+        use_llm: bool = False,
+        llm_provider: str | None = None,
     ) -> WebRunJob:
         validated_dbml_path = _validated_file_path(
             dbml_path,
@@ -169,7 +172,6 @@ class WebRunStore:
                 label="Rules path",
                 extensions={".yaml", ".yml"},
             )
-        validated_target = _validated_target(target)
 
         job_id = _new_job_id()
         root_dir = self.run_root / job_id
@@ -182,7 +184,8 @@ class WebRunStore:
             "dbml_path": str(validated_dbml_path),
             "csv_dir": str(validated_csv_dir),
             "rules_path": str(validated_rules_path) if validated_rules_path else None,
-            "target": validated_target,
+            "use_llm": use_llm,
+            "llm_provider": llm_provider,
         }
         (input_dir / "path_inputs.json").write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False),
@@ -206,8 +209,135 @@ class WebRunStore:
                 validated_dbml_path,
                 validated_csv_dir,
                 validated_rules_path,
-                validated_target,
             ),
+            kwargs={"use_llm": use_llm, "llm_provider_name": llm_provider},
+            name=f"vsf-web-run-{job_id}",
+            daemon=True,
+        )
+        thread.start()
+        return job
+
+    def start_data_job(
+        self,
+        *,
+        source_type: str,
+        url_env: str | None = None,
+        schema: str | None = None,
+        tables: str | None = None,
+        chunk_rows: int | None = None,
+        dbml_path: str | Path | None = None,
+        rules_path: str | Path | None = None,
+        use_llm: bool = False,
+        llm_provider: str | None = None,
+    ) -> WebRunJob:
+        from vsf_profiler.cli import _source_connector_from_cli
+        from vsf_profiler.connectors import (
+            DEFAULT_MYSQL_CHUNK_ROWS,
+            DEFAULT_MYSQL_SCHEMA,
+            DEFAULT_MYSQL_URL_ENV,
+            DEFAULT_POSTGRES_CHUNK_ROWS,
+            DEFAULT_POSTGRES_SCHEMA,
+            DEFAULT_POSTGRES_URL_ENV,
+        )
+
+        source = str(source_type or "").strip().lower()
+        if source not in {"postgres", "mysql"}:
+            raise ValueError("Data mode source must be postgres or mysql.")
+        validated_url_env = _validated_env_name(
+            url_env or (DEFAULT_POSTGRES_URL_ENV if source == "postgres" else DEFAULT_MYSQL_URL_ENV),
+            label="URL env var",
+        )
+        validated_schema = _optional_identifier(schema, label="Schema")
+        validated_tables = _optional_table_list(tables)
+        validated_chunk_rows = _validated_chunk_rows(
+            chunk_rows or (DEFAULT_POSTGRES_CHUNK_ROWS if source == "postgres" else DEFAULT_MYSQL_CHUNK_ROWS)
+        )
+        validated_dbml_path = (
+            _validated_file_path(dbml_path, label="DBML path", extensions={".dbml"})
+            if dbml_path is not None and str(dbml_path).strip()
+            else None
+        )
+        validated_rules_path = (
+            _validated_file_path(rules_path, label="Rules path", extensions={".yaml", ".yml"})
+            if rules_path is not None and str(rules_path).strip()
+            else None
+        )
+        if not os.environ.get(validated_url_env, "").strip():
+            if source == "postgres":
+                raise ValueError(f"Postgres URL was not provided. Set {validated_url_env}.")
+            raise ValueError(f"MySQL URL was not provided. Set {validated_url_env}.")
+        if source == "postgres":
+            source_connector = _source_connector_from_cli(
+                postgres_url=None,
+                postgres_url_env=validated_url_env,
+                postgres_schema=validated_schema or DEFAULT_POSTGRES_SCHEMA,
+                postgres_tables=validated_tables,
+                postgres_chunk_rows=validated_chunk_rows,
+                mysql_url=None,
+                mysql_url_env=DEFAULT_MYSQL_URL_ENV,
+                mysql_schema=DEFAULT_MYSQL_SCHEMA,
+                mysql_tables=None,
+                mysql_chunk_rows=DEFAULT_MYSQL_CHUNK_ROWS,
+                csv_mode_requested=False,
+            )
+        else:
+            source_connector = _source_connector_from_cli(
+                postgres_url=None,
+                postgres_url_env=DEFAULT_POSTGRES_URL_ENV,
+                postgres_schema=DEFAULT_POSTGRES_SCHEMA,
+                postgres_tables=None,
+                postgres_chunk_rows=DEFAULT_POSTGRES_CHUNK_ROWS,
+                mysql_url=None,
+                mysql_url_env=validated_url_env,
+                mysql_schema=validated_schema or DEFAULT_MYSQL_SCHEMA,
+                mysql_tables=validated_tables,
+                mysql_chunk_rows=validated_chunk_rows,
+                csv_mode_requested=False,
+            )
+        if source_connector is None:
+            raise ValueError("Data mode could not create a source connector. Check the URL env var.")
+
+        job_id = _new_job_id()
+        root_dir = self.run_root / job_id
+        input_dir = root_dir / "input"
+        out_dir = root_dir / "artifacts"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "input_mode": "data",
+            "source_type": source,
+            "url_env": validated_url_env,
+            "schema": validated_schema,
+            "tables": validated_tables,
+            "chunk_rows": validated_chunk_rows,
+            "dbml_path": str(validated_dbml_path) if validated_dbml_path else None,
+            "rules_path": str(validated_rules_path) if validated_rules_path else None,
+            "use_llm": use_llm,
+            "llm_provider": llm_provider,
+        }
+        (input_dir / "data_inputs.json").write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        job = WebRunJob(
+            job_id=job_id,
+            root_dir=root_dir,
+            input_dir=input_dir,
+            csv_dir=input_dir,
+            out_dir=out_dir,
+            input_mode="data",
+        )
+        with self._lock:
+            self._jobs[job_id] = job
+        thread = threading.Thread(
+            target=self._run_job,
+            args=(job, validated_dbml_path, None, validated_rules_path),
+            kwargs={
+                "source_connector": source_connector,
+                "use_llm": use_llm,
+                "llm_provider_name": llm_provider,
+            },
             name=f"vsf-web-run-{job_id}",
             daemon=True,
         )
@@ -297,12 +427,15 @@ class WebRunStore:
     def _run_job(
         self,
         job: WebRunJob,
-        dbml_path: Path,
-        csv_dir: Path,
+        dbml_path: Path | None,
+        csv_dir: Path | None,
         rules_path: Path | None,
-        target: str | None,
+        *,
+        source_connector: Any | None = None,
+        use_llm: bool = False,
+        llm_provider_name: str | None = None,
     ) -> None:
-        from vsf_profiler.cli import run_pipeline
+        from vsf_profiler.cli import _llm_provider_from_config, run_pipeline
 
         job.status = "running"
         job.started_at = _iso_now()
@@ -311,8 +444,10 @@ class WebRunStore:
                 dbml_path=dbml_path,
                 csv_dir=csv_dir,
                 rules_path=rules_path,
-                target=target,
                 out_dir=job.out_dir,
+                source_connector=source_connector,
+                use_llm=use_llm,
+                llm_provider=_llm_provider_from_config(llm_provider_name) if use_llm else None,
             )
         except Exception as exc:
             job.status = "failed"
@@ -347,7 +482,8 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                     dbml=payload["dbml"],
                     csv_files=payload["csv_files"],
                     rules=payload.get("rules"),
-                    target=payload.get("target"),
+                    use_llm=bool(payload.get("use_llm")),
+                    llm_provider=payload.get("llm_provider"),
                 )
             elif parsed.path == "/api/path-jobs":
                 payload = self._parse_path_job_body()
@@ -355,7 +491,21 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                     dbml_path=payload["dbml_path"],
                     csv_dir=payload["csv_dir"],
                     rules_path=payload.get("rules_path"),
-                    target=payload.get("target"),
+                    use_llm=bool(payload.get("use_llm")),
+                    llm_provider=payload.get("llm_provider"),
+                )
+            elif parsed.path == "/api/data-jobs":
+                payload = self._parse_data_job_body()
+                job = self.store.start_data_job(
+                    source_type=payload["source_type"],
+                    url_env=payload.get("url_env"),
+                    schema=payload.get("schema"),
+                    tables=payload.get("tables"),
+                    chunk_rows=payload.get("chunk_rows"),
+                    dbml_path=payload.get("dbml_path"),
+                    rules_path=payload.get("rules_path"),
+                    use_llm=bool(payload.get("use_llm")),
+                    llm_provider=payload.get("llm_provider"),
                 )
             else:
                 self.send_error(HTTPStatus.NOT_FOUND)
@@ -482,31 +632,51 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
             "dbml": dbml,
             "csv_files": csv_files,
             "rules": rules,
-            "target": fields.get("target") or None,
+            "use_llm": _truthy_field(fields.get("use_llm")),
+            "llm_provider": fields.get("llm_provider") or None,
         }
 
-    def _parse_path_job_body(self) -> dict[str, str | None]:
-        content_type = self.headers.get("Content-Type", "")
-        if "application/json" not in content_type:
-            raise ValueError("Expected application/json path job payload.")
-        content_length = int(self.headers.get("Content-Length", "0"))
-        if content_length <= 0:
-            raise ValueError("Path job body is empty.")
-        if content_length > MAX_PATH_JOB_BYTES:
-            raise ValueError("Path job payload is too large.")
-        body = self.rfile.read(content_length)
-        try:
-            payload = json.loads(body.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ValueError("Path job payload must be valid JSON.") from exc
-        if not isinstance(payload, dict):
-            raise ValueError("Path job payload must be a JSON object.")
+    def _parse_path_job_body(self) -> dict[str, str | bool | None]:
+        payload = self._parse_json_body(label="Path job", max_bytes=MAX_PATH_JOB_BYTES)
         return {
             "dbml_path": _required_string(payload, "dbml_path"),
             "csv_dir": _required_string(payload, "csv_dir"),
             "rules_path": _optional_string(payload, "rules_path"),
-            "target": _optional_string(payload, "target"),
+            "use_llm": _optional_bool(payload, "use_llm"),
+            "llm_provider": _optional_string(payload, "llm_provider"),
         }
+
+    def _parse_data_job_body(self) -> dict[str, str | int | bool | None]:
+        payload = self._parse_json_body(label="Data job", max_bytes=MAX_PATH_JOB_BYTES)
+        return {
+            "source_type": _required_string(payload, "source_type"),
+            "url_env": _optional_string(payload, "url_env"),
+            "schema": _optional_string(payload, "schema"),
+            "tables": _optional_string(payload, "tables"),
+            "chunk_rows": _optional_int(payload, "chunk_rows"),
+            "dbml_path": _optional_string(payload, "dbml_path"),
+            "rules_path": _optional_string(payload, "rules_path"),
+            "use_llm": _optional_bool(payload, "use_llm"),
+            "llm_provider": _optional_string(payload, "llm_provider"),
+        }
+
+    def _parse_json_body(self, *, label: str, max_bytes: int) -> dict[str, Any]:
+        content_type = self.headers.get("Content-Type", "")
+        if "application/json" not in content_type:
+            raise ValueError(f"Expected application/json {label.lower()} payload.")
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length <= 0:
+            raise ValueError(f"{label} body is empty.")
+        if content_length > max_bytes:
+            raise ValueError(f"{label} payload is too large.")
+        body = self.rfile.read(content_length)
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{label} payload must be valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"{label} payload must be a JSON object.")
+        return payload
 
     def _serve_static(self, path: str) -> None:
         if path in {"", "/"}:
@@ -586,7 +756,6 @@ def _canonical_artifact_paths(out_dir: Path) -> list[str]:
         "relationship_graph.json",
         "dataset_verdict.json",
         "table_assessments.json",
-        "influence.json",
         "schema_diagram.json",
         "schema_diagram.dbml",
         "run_events.jsonl",
@@ -644,15 +813,45 @@ def _validated_csv_dir(path_value: str | Path) -> Path:
     return path.resolve()
 
 
-def _validated_target(target: str | None) -> str | None:
-    if target is None:
+def _validated_env_name(value: str, *, label: str) -> str:
+    stripped = str(value or "").strip()
+    if not stripped:
+        raise ValueError(f"{label} is required.")
+    if not ENV_NAME_PATTERN.match(stripped):
+        raise ValueError(f"{label} must be an environment variable name.")
+    return stripped
+
+
+def _optional_identifier(value: str | None, *, label: str) -> str | None:
+    if value is None:
         return None
-    stripped = target.strip()
+    stripped = value.strip()
     if not stripped:
         return None
-    if not TARGET_PATTERN.match(stripped):
-        raise ValueError("Target column must use table.column format.")
+    if not re.match(r"^[A-Za-z_][\w]*$", stripped):
+        raise ValueError(f"{label} must be an identifier.")
     return stripped
+
+
+def _optional_table_list(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if not TABLE_LIST_PATTERN.match(stripped):
+        raise ValueError("Tables must be a comma-separated list of table or schema.table names.")
+    return stripped
+
+
+def _validated_chunk_rows(value: int) -> int:
+    try:
+        rows = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Chunk rows must be an integer.") from exc
+    if rows <= 0 or rows > 100_000:
+        raise ValueError("Chunk rows must be between 1 and 100000.")
+    return rows
 
 
 def _required_string(payload: dict[str, Any], key: str) -> str:
@@ -670,6 +869,33 @@ def _optional_string(payload: dict[str, Any], key: str) -> str | None:
         raise ValueError(f"{key} must be a string.")
     stripped = value.strip()
     return stripped or None
+
+
+def _optional_bool(payload: dict[str, Any], key: str) -> bool:
+    value = payload.get(key)
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return _truthy_field(value)
+    raise ValueError(f"{key} must be a boolean.")
+
+
+def _optional_int(payload: dict[str, Any], key: str) -> int | None:
+    value = payload.get(key)
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{key} must be an integer.")
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{key} must be an integer.") from exc
+
+
+def _truthy_field(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _safe_filename(filename: str, *, fallback: str) -> str:

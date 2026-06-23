@@ -12,8 +12,7 @@ def test_relationship_checker_finds_orphans(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
-        target="order_reviews.review_score",
+        rules_path=None,
         out_dir=out_dir,
     )
 
@@ -165,7 +164,6 @@ def test_extended_relationship_cardinality_composite_fk_and_junction_detection(t
         dbml_path=schema_path,
         csv_dir=csv_dir,
         rules_path=None,
-        target=None,
         out_dir=out_dir,
     )
 

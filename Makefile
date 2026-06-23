@@ -11,8 +11,6 @@ demo-small:
 	vsf-profiler run \
 		--dbml data/demo_olist/schema.dbml \
 		--csv-dir data/demo_olist/csv \
-		--rules data/demo_olist/rules.yaml \
-		--target olist_order_reviews_dataset.review_score \
 		--out outputs/olist_demo
 
 demo-full:
@@ -47,8 +45,6 @@ benchmark-small:
 		--work-dir outputs/benchmark_ci \
 		--rows 600 \
 		--tables 7 \
-		--max-analysis-rows 120 \
-		--max-feature-columns 4 \
 		--force
 
 benchmark-large:
@@ -56,8 +52,6 @@ benchmark-large:
 		--work-dir outputs/benchmark_large \
 		--rows 50000 \
 		--tables 8 \
-		--max-analysis-rows 5000 \
-		--max-feature-columns 10 \
 		--force
 
 download-olist:

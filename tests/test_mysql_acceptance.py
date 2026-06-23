@@ -70,7 +70,6 @@ def test_mysql_acceptance_uses_local_fixture_or_skips(tmp_path):
             dbml_path=None,
             csv_dir=None,
             rules_path=None,
-            target=None,
             out_dir=out_dir,
             source_connector=connector,
         )
