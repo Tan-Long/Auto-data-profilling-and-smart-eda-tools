@@ -14,8 +14,13 @@ def test_evaluation_catalog_lists_built_in_datasets_without_uploads():
     assert dataset_ids == {
         "retail_orders_seeded_faults",
         "support_tickets_seeded_faults",
+        "public_diabetes_seeded_faults",
+        "public_manufacturing_defects_seeded_faults",
     }
     assert all(dataset["input_policy"] == "built_in_local_only" for dataset in catalog["datasets"])
+    public_datasets = [dataset for dataset in catalog["datasets"] if dataset["dataset_id"].startswith("public_")]
+    assert {dataset["source_license"] for dataset in public_datasets} == {"MIT"}
+    assert all(dataset["source_local_path"].startswith("data/evaluation_public/") for dataset in public_datasets)
 
 
 def test_evaluation_benchmark_writes_ground_truth_baseline_and_summary(
@@ -82,6 +87,44 @@ def test_evaluation_benchmark_writes_ground_truth_baseline_and_summary(
         if row["baseline_coverage"] == "native"
     } == {"unavailable"}
     assert all("ModuleNotFoundError" not in row.get("reason", "") for row in baseline["rows"])
+
+
+@pytest.mark.parametrize(
+    ("dataset_id", "expected_group_count"),
+    [
+        ("public_diabetes_seeded_faults", 12),
+        ("public_manufacturing_defects_seeded_faults", 10),
+    ],
+)
+def test_public_evaluation_datasets_run_from_local_snapshots(
+    tmp_path,
+    monkeypatch,
+    dataset_id,
+    expected_group_count,
+):
+    monkeypatch.setattr(
+        evaluation,
+        "_great_expectations_availability",
+        lambda: {
+            "status": "unavailable",
+            "version": None,
+            "reason": "Great Expectations is not installed in this local environment.",
+        },
+    )
+
+    summary = evaluation.run_evaluation_benchmark(
+        dataset_id=dataset_id,
+        input_dir=tmp_path / "input",
+        out_dir=tmp_path / "artifacts",
+    )
+
+    assert summary["dataset"]["source_license"] == "MIT"
+    assert summary["dataset"]["source_local_path"].startswith("data/evaluation_public/")
+    assert summary["ground_truth"]["expected_issue_group_count"] == expected_group_count
+    assert summary["correctness"]["vsf_caught_group_count"] == expected_group_count
+    assert summary["correctness"]["vsf_missed_group_count"] == 0
+    assert summary["correctness"]["vsf_extra_group_count"] == 0
+    assert summary["correctness"]["bad_count_exact_group_count"] == expected_group_count
 
 
 def test_evaluation_benchmark_rejects_unknown_dataset(tmp_path):

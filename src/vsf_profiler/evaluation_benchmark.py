@@ -15,6 +15,7 @@ from vsf_profiler.demo_data import create_small_demo
 GROUND_TRUTH_ARTIFACT = "ground_truth_issues.json"
 BASELINE_COMPARISON_ARTIFACT = "baseline_comparison.json"
 EVALUATION_SUMMARY_ARTIFACT = "evaluation_summary.json"
+PUBLIC_EVALUATION_DATA_ROOT = Path(__file__).resolve().parents[2] / "data" / "evaluation_public"
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,10 @@ class EvaluationDatasetSpec:
     target: str | None
     generator: Callable[[Path], EvaluationInputPaths]
     ground_truth_factory: Callable[[], list[dict[str, Any]]]
+    source_name: str = "VSF seeded demo data"
+    source_url: str = ""
+    source_license: str = ""
+    source_local_path: str = ""
 
 
 SUPPORT_SCHEMA = """Table accounts {
@@ -94,6 +99,94 @@ SUPPORT_RULES = """rules:
 """
 
 
+DIABETES_SCHEMA = """Table diabetes_records {
+  patient_id varchar [pk, not null]
+  pregnancies int
+  glucose int
+  blood_pressure int
+  skin_thickness int
+  insulin int
+  bmi float
+  diabetes_pedigree_function float
+  age int
+  outcome int
+}
+"""
+
+
+DIABETES_RULES = """rules:
+  diabetes_records:
+    - id: GLUCOSE_POSITIVE
+      type: range
+      column: glucose
+      min: 1
+      max: 400
+      severity: P1
+    - id: BLOOD_PRESSURE_POSITIVE
+      type: range
+      column: blood_pressure
+      min: 1
+      max: 220
+      severity: P1
+    - id: BMI_POSITIVE
+      type: range
+      column: bmi
+      min: 1
+      max: 120
+      severity: P1
+    - id: INSULIN_NON_NEGATIVE
+      type: range
+      column: insulin
+      min: 0
+      max: 900
+      severity: P1
+    - id: OUTCOME_BINARY
+      type: accepted_values
+      column: outcome
+      values:
+        - "0"
+        - "1"
+      severity: P1
+"""
+
+
+MANUFACTURING_SCHEMA = """Table production_runs {
+  run_id varchar [pk, not null]
+  run_date varchar [not null]
+  cost float
+  output float
+  defective float
+}
+"""
+
+
+MANUFACTURING_RULES = """rules:
+  production_runs:
+    - id: COST_NON_NEGATIVE
+      type: range
+      column: cost
+      min: 0
+      severity: P1
+    - id: OUTPUT_POSITIVE
+      type: range
+      column: output
+      min: 1
+      max: 1000
+      severity: P1
+    - id: DEFECTIVE_PERCENT_RANGE
+      type: range
+      column: defective
+      min: 0
+      max: 100
+      severity: P1
+    - id: RUN_DATE_FORMAT
+      type: regex
+      column: run_date
+      pattern: '^\\d{2}-\\d{2}-\\d{2}$'
+      severity: P2
+"""
+
+
 def evaluation_catalog_payload() -> dict[str, Any]:
     datasets = [
         {
@@ -105,6 +198,10 @@ def evaluation_catalog_payload() -> dict[str, Any]:
             "expected_issue_group_count": spec.expected_issue_group_count,
             "target": spec.target,
             "input_policy": "built_in_local_only",
+            "source_name": spec.source_name,
+            "source_url": spec.source_url,
+            "source_license": spec.source_license,
+            "source_local_path": spec.source_local_path,
         }
         for spec in _dataset_specs()
     ]
@@ -474,6 +571,38 @@ def _dataset_specs() -> list[EvaluationDatasetSpec]:
             generator=_generate_support_tickets_dataset,
             ground_truth_factory=_support_tickets_ground_truth,
         ),
+        EvaluationDatasetSpec(
+            dataset_id="public_diabetes_seeded_faults",
+            label="Public diabetes seeded faults",
+            summary="Plotly public diabetes CSV snapshot with seeded patient key defects, "
+            "missing clinical measurements, range violations, and outliers.",
+            domain="healthcare",
+            expected_table_count=1,
+            expected_issue_group_count=12,
+            target="diabetes_records.outcome",
+            generator=_generate_public_diabetes_dataset,
+            ground_truth_factory=_public_diabetes_ground_truth,
+            source_name="Plotly datasets diabetes.csv",
+            source_url="https://github.com/plotly/datasets/blob/master/diabetes.csv",
+            source_license="MIT",
+            source_local_path="data/evaluation_public/plotly_diabetes/diabetes.csv",
+        ),
+        EvaluationDatasetSpec(
+            dataset_id="public_manufacturing_defects_seeded_faults",
+            label="Public manufacturing defects seeded faults",
+            summary="Plotly public cost/output/defective CSV snapshot with seeded run-id, "
+            "date-format, negative-cost, impossible-output, and defect-rate errors.",
+            domain="manufacturing",
+            expected_table_count=1,
+            expected_issue_group_count=10,
+            target="production_runs.defective",
+            generator=_generate_public_manufacturing_dataset,
+            ground_truth_factory=_public_manufacturing_ground_truth,
+            source_name="Plotly datasets cost_output_defective.csv",
+            source_url="https://github.com/plotly/datasets/blob/master/cost_output_defective.csv",
+            source_license="MIT",
+            source_local_path="data/evaluation_public/plotly_manufacturing/cost_output_defective.csv",
+        ),
     ]
 
 
@@ -546,6 +675,117 @@ def _generate_support_tickets_dataset(root: Path) -> EvaluationInputPaths:
     )
 
 
+def _generate_public_diabetes_dataset(root: Path) -> EvaluationInputPaths:
+    source_path = PUBLIC_EVALUATION_DATA_ROOT / "plotly_diabetes" / "diabetes.csv"
+    source_rows = _read_public_csv_rows(source_path)[:14]
+    root.mkdir(parents=True, exist_ok=True)
+    csv_dir = root / "csv"
+    csv_dir.mkdir(parents=True, exist_ok=True)
+    (root / "schema.dbml").write_text(DIABETES_SCHEMA, encoding="utf-8")
+    (root / "rules.yaml").write_text(DIABETES_RULES, encoding="utf-8")
+
+    rows: list[list[str]] = []
+    for index, row in enumerate(source_rows, start=1):
+        patient_id = f"P{index:03d}"
+        if index == 4:
+            patient_id = "P003"
+        if index == 5:
+            patient_id = ""
+        glucose = row["Glucose"]
+        blood_pressure = row["BloodPressure"]
+        insulin = row["Insulin"]
+        bmi = row["BMI"]
+        outcome = row["Outcome"]
+        if index == 6:
+            glucose = "0"
+        if index == 7:
+            blood_pressure = "0"
+        if index == 8:
+            insulin = "-8"
+        if index == 9:
+            bmi = "220"
+        if index == 10:
+            outcome = "2"
+        rows.append(
+            [
+                patient_id,
+                row["Pregnancies"],
+                glucose,
+                blood_pressure,
+                row["SkinThickness"],
+                insulin,
+                bmi,
+                row["DiabetesPedigreeFunction"],
+                row["Age"],
+                outcome,
+            ]
+        )
+    _write_csv(
+        csv_dir / "diabetes_records.csv",
+        [
+            "patient_id",
+            "pregnancies",
+            "glucose",
+            "blood_pressure",
+            "skin_thickness",
+            "insulin",
+            "bmi",
+            "diabetes_pedigree_function",
+            "age",
+            "outcome",
+        ],
+        rows,
+    )
+    return EvaluationInputPaths(
+        root=root,
+        dbml_path=root / "schema.dbml",
+        csv_dir=csv_dir,
+        rules_path=root / "rules.yaml",
+    )
+
+
+def _generate_public_manufacturing_dataset(root: Path) -> EvaluationInputPaths:
+    source_path = PUBLIC_EVALUATION_DATA_ROOT / "plotly_manufacturing" / "cost_output_defective.csv"
+    source_rows = _read_public_csv_rows(source_path)
+    root.mkdir(parents=True, exist_ok=True)
+    csv_dir = root / "csv"
+    csv_dir.mkdir(parents=True, exist_ok=True)
+    (root / "schema.dbml").write_text(MANUFACTURING_SCHEMA, encoding="utf-8")
+    (root / "rules.yaml").write_text(MANUFACTURING_RULES, encoding="utf-8")
+
+    rows: list[list[str]] = []
+    for index, row in enumerate(source_rows, start=1):
+        run_id = f"RUN-{index:03d}"
+        run_date = row["date"]
+        cost = row["cost"]
+        output = row["output"]
+        defective = row["defective"]
+        if index == 3:
+            run_id = "RUN-002"
+        if index == 4:
+            run_id = ""
+        if index == 5:
+            run_date = "bad-date"
+        if index == 6:
+            cost = "-25"
+        if index == 7:
+            output = "5000"
+        if index == 8:
+            defective = "140"
+        rows.append([run_id, run_date, cost, output, defective])
+    _write_csv(
+        csv_dir / "production_runs.csv",
+        ["run_id", "run_date", "cost", "output", "defective"],
+        rows,
+    )
+    return EvaluationInputPaths(
+        root=root,
+        dbml_path=root / "schema.dbml",
+        csv_dir=csv_dir,
+        rules_path=root / "rules.yaml",
+    )
+
+
 def _retail_orders_ground_truth() -> list[dict[str, Any]]:
     return [
         _gt("GT-RETAIL-001", "REQUIRED_FIELD_NULL", "P1", "customers", ["customer_id"], 1, "native", "DBML not-null expectation.", baseline_check={"type": "not_null"}),
@@ -580,6 +820,38 @@ def _support_tickets_ground_truth() -> list[dict[str, Any]]:
         _gt("GT-SUPPORT-012", "FOREIGN_KEY_NULL", "P3", "ticket_assignments", ["ticket_id"], 1, "not_covered", "Not covered by baseline.", parent_table="tickets", parent_columns=["ticket_id"]),
         _gt("GT-SUPPORT-013", "ORPHAN_FOREIGN_KEY", "P1", "ticket_assignments", ["ticket_id"], 1, "not_covered", "Not covered by baseline.", parent_table="tickets", parent_columns=["ticket_id"]),
         _gt("GT-SUPPORT-014", "ORPHAN_FOREIGN_KEY", "P1", "ticket_assignments", ["agent_id"], 1, "not_covered", "Not covered by baseline.", parent_table="agents", parent_columns=["agent_id"]),
+    ]
+
+
+def _public_diabetes_ground_truth() -> list[dict[str, Any]]:
+    return [
+        _gt("GT-DIABETES-001", "REQUIRED_FIELD_NULL", "P1", "diabetes_records", ["patient_id"], 1, "native", "DBML not-null expectation.", baseline_check={"type": "not_null"}),
+        _gt("GT-DIABETES-002", "PRIMARY_KEY_NULL", "P0", "diabetes_records", ["patient_id"], 1, "native", "Primary-key not-null expectation.", baseline_check={"type": "not_null"}),
+        _gt("GT-DIABETES-003", "DUPLICATE_PRIMARY_KEY", "P0", "diabetes_records", ["patient_id"], 2, "native", "Column uniqueness expectation.", baseline_check={"type": "unique"}),
+        _gt("GT-DIABETES-004", "NUMERIC_OUTLIER", "P3", "diabetes_records", ["blood_pressure"], 4, "not_covered", "Not covered by baseline."),
+        _gt("GT-DIABETES-005", "NUMERIC_OUTLIER", "P3", "diabetes_records", ["insulin"], 2, "not_covered", "Not covered by baseline."),
+        _gt("GT-DIABETES-006", "NUMERIC_OUTLIER", "P3", "diabetes_records", ["bmi"], 2, "not_covered", "Not covered by baseline."),
+        _gt("GT-DIABETES-007", "NUMERIC_OUTLIER", "P3", "diabetes_records", ["diabetes_pedigree_function"], 2, "not_covered", "Not covered by baseline."),
+        _gt("GT-DIABETES-008", "VALUE_OUT_OF_RANGE", "P1", "diabetes_records", ["glucose"], 1, "native", "Clinical glucose range expectation.", baseline_check={"type": "between", "min": 1, "max": 400}),
+        _gt("GT-DIABETES-009", "VALUE_OUT_OF_RANGE", "P1", "diabetes_records", ["blood_pressure"], 2, "native", "Blood-pressure range expectation.", baseline_check={"type": "between", "min": 1, "max": 220}),
+        _gt("GT-DIABETES-010", "VALUE_OUT_OF_RANGE", "P1", "diabetes_records", ["bmi"], 2, "native", "BMI range expectation.", baseline_check={"type": "between", "min": 1, "max": 120}),
+        _gt("GT-DIABETES-011", "VALUE_OUT_OF_RANGE", "P1", "diabetes_records", ["insulin"], 1, "native", "Insulin range expectation.", baseline_check={"type": "between", "min": 0, "max": 900}),
+        _gt("GT-DIABETES-012", "ACCEPTED_VALUE_VIOLATION", "P1", "diabetes_records", ["outcome"], 1, "native", "Binary outcome expectation.", baseline_check={"type": "in_set", "values": ["0", "1"]}),
+    ]
+
+
+def _public_manufacturing_ground_truth() -> list[dict[str, Any]]:
+    return [
+        _gt("GT-MFG-001", "REQUIRED_FIELD_NULL", "P1", "production_runs", ["run_id"], 1, "native", "DBML not-null expectation.", baseline_check={"type": "not_null"}),
+        _gt("GT-MFG-002", "PRIMARY_KEY_NULL", "P0", "production_runs", ["run_id"], 1, "native", "Primary-key not-null expectation.", baseline_check={"type": "not_null"}),
+        _gt("GT-MFG-003", "DUPLICATE_PRIMARY_KEY", "P0", "production_runs", ["run_id"], 2, "native", "Column uniqueness expectation.", baseline_check={"type": "unique"}),
+        _gt("GT-MFG-004", "NUMERIC_OUTLIER", "P3", "production_runs", ["cost"], 3, "not_covered", "Not covered by baseline."),
+        _gt("GT-MFG-005", "NUMERIC_OUTLIER", "P3", "production_runs", ["output"], 1, "not_covered", "Not covered by baseline."),
+        _gt("GT-MFG-006", "NUMERIC_OUTLIER", "P3", "production_runs", ["defective"], 1, "not_covered", "Not covered by baseline."),
+        _gt("GT-MFG-007", "NEGATIVE_VALUE_NOT_ALLOWED", "P1", "production_runs", ["cost"], 1, "native", "Non-negative cost expectation.", baseline_check={"type": "between", "min": 0}),
+        _gt("GT-MFG-008", "VALUE_OUT_OF_RANGE", "P1", "production_runs", ["output"], 1, "native", "Production output range expectation.", baseline_check={"type": "between", "min": 1, "max": 1000}),
+        _gt("GT-MFG-009", "VALUE_OUT_OF_RANGE", "P1", "production_runs", ["defective"], 1, "native", "Defective percentage range expectation.", baseline_check={"type": "between", "min": 0, "max": 100}),
+        _gt("GT-MFG-010", "REGEX_MISMATCH", "P2", "production_runs", ["run_date"], 1, "not_covered", "Not covered by baseline."),
     ]
 
 
@@ -787,7 +1059,21 @@ def _dataset_payload(spec: EvaluationDatasetSpec) -> dict[str, Any]:
         "domain": spec.domain,
         "table_count": spec.expected_table_count,
         "target": spec.target,
+        "source_name": spec.source_name,
+        "source_url": spec.source_url,
+        "source_license": spec.source_license,
+        "source_local_path": spec.source_local_path,
     }
+
+
+def _read_public_csv_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Public evaluation source snapshot is missing: {path}. "
+            "Restore data/evaluation_public before running Evaluate."
+        )
+    with path.open("r", newline="", encoding="utf-8") as handle:
+        return [dict(row) for row in csv.DictReader(handle)]
 
 
 def _read_json_list(path: Path) -> list[dict[str, Any]]:

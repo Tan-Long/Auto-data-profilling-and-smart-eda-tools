@@ -33,5 +33,7 @@ test-results/
 .interface-design/*
 !.interface-design/system.md
 
-data/
+data/*
+!data/evaluation_public/
+!data/evaluation_public/**
 outputs/

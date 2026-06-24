@@ -36,21 +36,24 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await page.locator("#evaluateFlowButton").click();
     await expect(page.locator("#evaluateFlow")).toBeVisible();
     await expect(page.locator("#evaluateFlow input[type='file']")).toHaveCount(0);
-    await expect(page.locator("#evaluationCatalogCount")).toContainText("2 datasets", {
+    await expect(page.locator("#evaluationCatalogCount")).toContainText("4 datasets", {
       timeout: 10_000,
     });
     await expect(page.locator("#evaluationDatasetList")).toContainText("Retail orders seeded faults");
     await expect(page.locator("#evaluationDatasetList")).toContainText("Support tickets seeded faults");
+    await expect(page.locator("#evaluationDatasetList")).toContainText("Public diabetes seeded faults");
+    await expect(page.locator("#evaluationDatasetList")).toContainText("Public manufacturing defects seeded faults");
+    await expect(page.locator("#evaluationDatasetList")).toContainText("MIT source");
     record(
       matrix,
       "Evaluate catalog",
       "Evaluate exposes only built-in datasets and no file upload controls.",
-      "Two curated datasets are listed; no DBML/CSV file inputs exist in Evaluate.",
+      "Four curated datasets are listed, including public local snapshots; no DBML/CSV file inputs exist in Evaluate.",
       await screenshot(page.locator("#evaluateFlow"), "02-evaluate-catalog.png"),
     );
 
-    await page.locator('[data-evaluation-dataset-id="support_tickets_seeded_faults"]').click();
-    await expect(page.locator('[data-evaluation-dataset-id="support_tickets_seeded_faults"]')).toHaveAttribute(
+    await page.locator('[data-evaluation-dataset-id="public_manufacturing_defects_seeded_faults"]').click();
+    await expect(page.locator('[data-evaluation-dataset-id="public_manufacturing_defects_seeded_faults"]')).toHaveAttribute(
       "aria-checked",
       "true",
     );
@@ -71,7 +74,7 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       matrix,
       "Evaluate run",
       "A selected built-in dataset runs and shows correctness, usefulness, baseline, and artifact links.",
-      "Support tickets evaluation completed with expected rows and artifact links.",
+      "Public manufacturing evaluation completed with expected rows and artifact links.",
       await screenshot(page.locator("#evaluationComparison"), "03-evaluate-run.png"),
     );
 

@@ -13,6 +13,7 @@ COPY src ./src
 COPY templates ./templates
 COPY web ./web
 COPY examples ./examples
+COPY data/evaluation_public ./data/evaluation_public
 
 RUN python -m pip install --no-cache-dir -e .
 

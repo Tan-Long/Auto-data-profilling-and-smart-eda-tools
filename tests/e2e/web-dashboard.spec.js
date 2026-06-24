@@ -44,11 +44,14 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#workflowNav")).not.toContainText("Connect");
   await expect(page.locator("#workflowNav")).not.toContainText("Locked");
   await expect(page.locator("#evaluateFlow")).toContainText("Built-in faulty dataset comparison");
-  await expect(page.locator("#evaluationCatalogCount")).toContainText("2 datasets", {
+  await expect(page.locator("#evaluationCatalogCount")).toContainText("4 datasets", {
     timeout: 10_000,
   });
   await expect(page.locator("#evaluationDatasetList")).toContainText("Retail orders seeded faults");
   await expect(page.locator("#evaluationDatasetList")).toContainText("Support tickets seeded faults");
+  await expect(page.locator("#evaluationDatasetList")).toContainText("Public diabetes seeded faults");
+  await expect(page.locator("#evaluationDatasetList")).toContainText("Public manufacturing defects seeded faults");
+  await expect(page.locator("#evaluationDatasetList")).toContainText("MIT source");
   await expect(page.locator("#evaluateFlow")).toContainText("No arbitrary uploads");
   await expect(page.locator("#evaluateFlow input[type='file']")).toHaveCount(0);
   await expect(page.locator("#evaluateFlow #runnerForm")).toHaveCount(0);

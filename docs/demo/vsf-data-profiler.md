@@ -123,6 +123,7 @@ The final demo-readiness proof should include these fresh screenshots:
 | `evaluation_summary.json` | Built-in benchmark comparison summary for VSF correctness, usefulness, and baseline status. |
 | `ground_truth_issues.json` | Seeded expected findings for the selected built-in evaluation dataset. |
 | `baseline_comparison.json` | Great Expectations baseline comparison rows, including unavailable and not-covered states. |
+| `data/evaluation_public/*` | Local public CSV snapshots for Evaluate demos, including Plotly diabetes and manufacturing defect datasets with MIT attribution. |
 | `report.html` / `report.md` | Compact fixed-section reports for the normal user review path. |
 | `samples/*.csv` | Bounded bad-row samples for evidence preview. Full source CSV files stay outside the package and artifact API. |
 

@@ -79,7 +79,10 @@ those action plans while preserving table, column, issue, and priority context.
 The web runner also exposes a separate Evaluate tool. It uses built-in faulty
 datasets only, writes `ground_truth_issues.json`, `baseline_comparison.json`,
 and `evaluation_summary.json`, and renders unavailable or not-covered baseline
-states explicitly when Great Expectations is not installed.
+states explicitly when Great Expectations is not installed. Public demo
+datasets are cached local snapshots under `data/evaluation_public/`, currently
+derived from Plotly `diabetes.csv` and `cost_output_defective.csv` with seeded
+faults and MIT-license attribution.
 
 ## Compatibility And Developer Surfaces
 

@@ -18,7 +18,9 @@ htmlcov/
 node_modules/
 playwright-report/
 test-results/
-data/
+data/*
+!data/evaluation_public/
+!data/evaluation_public/**
 outputs/
 dist/
 target/

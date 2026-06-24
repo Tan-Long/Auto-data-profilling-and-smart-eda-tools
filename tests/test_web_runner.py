@@ -176,7 +176,11 @@ def test_web_runner_evaluation_job_uses_built_in_dataset_catalog(tmp_path, monke
     assert {dataset["dataset_id"] for dataset in catalog["datasets"]} == {
         "retail_orders_seeded_faults",
         "support_tickets_seeded_faults",
+        "public_diabetes_seeded_faults",
+        "public_manufacturing_defects_seeded_faults",
     }
+    public_datasets = [dataset for dataset in catalog["datasets"] if dataset["dataset_id"].startswith("public_")]
+    assert {dataset["source_license"] for dataset in public_datasets} == {"MIT"}
 
     job = store.start_evaluation_job(dataset_id="retail_orders_seeded_faults")
     wait_for_job(job)

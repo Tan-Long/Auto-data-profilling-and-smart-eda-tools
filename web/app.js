@@ -1805,7 +1805,9 @@ function renderEvaluationDatasetList() {
           <code>${escapeHtml(dataset.domain || "dataset")}</code>
           <span>${integerText(dataset.table_count)} tables</span>
           <span>${integerText(dataset.expected_issue_group_count)} expected groups</span>
+          ${dataset.source_license ? `<span>${escapeHtml(dataset.source_license)} source</span>` : ""}
         </span>
+        ${dataset.source_name ? `<small>${escapeHtml(dataset.source_name)}</small>` : ""}
       </button>
     `;
   }).join("");

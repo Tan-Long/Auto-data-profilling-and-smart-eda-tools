@@ -356,6 +356,10 @@ contracts. The first screen separates the two supported demo flows:
   mode, with mandatory preflight review before a run.
 - **Evaluate tool** for built-in faulty dataset comparisons against seeded
   ground truth and the available Great Expectations baseline state.
+  Evaluate includes synthetic retail/support datasets plus local public
+  snapshots derived from Plotly `diabetes.csv` and
+  `cost_output_defective.csv` under `data/evaluation_public/` so demos do not
+  need network access.
 
 After a Profile run, the local runner opens the review surface with Quality
 Gates, Review Issues, deterministic action plans, grouped todos, Report /
