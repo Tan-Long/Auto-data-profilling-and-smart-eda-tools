@@ -2601,6 +2601,7 @@ function renderStages(job) {
     });
   }
 
+  insertInferredRuntimeStages(stageMap, job);
   els.stageList.innerHTML = "";
   const visibleStages = visibleRuntimeStages([...stageMap.values()]);
   if (!visibleStages.length) {
@@ -2609,6 +2610,32 @@ function renderStages(job) {
   }
   visibleStages.forEach((stage) => {
     els.stageList.insertAdjacentHTML("beforeend", renderRuntimeStage(stage));
+  });
+}
+
+function insertInferredRuntimeStages(stageMap, job) {
+  if (!job || !["queued", "running"].includes(job.status)) {
+    return;
+  }
+  if (!job.llm?.enabled || stageMap.has("llm_narrative")) {
+    return;
+  }
+  const machineArtifactsStage = stageMap.get("write_machine_artifacts");
+  if (machineArtifactsStage?.status !== "completed") {
+    return;
+  }
+  const provider = job.llm.provider || state.llmMode || "openai";
+  stageMap.set("llm_narrative", {
+    name: "llm_narrative",
+    displayName: "Generate optional LLM summary artifact",
+    status: "running",
+    duration: null,
+    details: {
+      selected_provider: provider,
+      external_api_call: provider === "openai" ? "starting" : "no",
+      wait_reason: "Waiting for provider response and guardrail validation.",
+    },
+    skipReason: "",
   });
 }
 
@@ -2630,12 +2657,25 @@ function renderRuntimeStage(stage) {
           <span class="stage-info-icon" aria-hidden="true">i</span>
           <span class="stage-info-tooltip" role="tooltip">${escapeHtml(purpose)}</span>
         </span>
-        <span class="pill-status ${stage.status === "failed" ? "missing" : "mapped"}">${escapeHtml(status)}</span>
+        <span class="pill-status ${runtimeStageStatusClass(status)}">${escapeHtml(status)}</span>
         <span class="stage-expand-label">Details</span>
       </summary>
       ${renderRuntimeStageDropdown(stage, purpose)}
     </details>
   `;
+}
+
+function runtimeStageStatusClass(status) {
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "skipped") {
+    return "skipped";
+  }
+  if (status === "running" || status === "queued") {
+    return "running";
+  }
+  return "mapped";
 }
 
 function renderRuntimeStageDropdown(stage, purpose) {

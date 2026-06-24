@@ -559,6 +559,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "runtimeStageDescriptions" in js
     assert "renderRuntimeStage" in js
     assert "renderRuntimeStageDropdown" in js
+    assert "insertInferredRuntimeStages" in js
+    assert "Waiting for provider response and guardrail validation." in js
+    assert "runtimeStageStatusClass" in js
     assert "renderRunHistory" in js
     assert "sourceStageStatusText" in js
     assert "compactPreflightStatusText" in js
