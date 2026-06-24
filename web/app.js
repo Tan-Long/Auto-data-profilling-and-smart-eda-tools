@@ -98,6 +98,8 @@ const els = {
   sourceStateBadge: document.querySelector("#sourceStateBadge"),
   sourceStateSummary: document.querySelector("#sourceStateSummary"),
   sourceStateDetails: document.querySelector("#sourceStateDetails"),
+  inputSetup: document.querySelector("#inputSetup"),
+  upload: document.querySelector("#upload"),
   quickDemoButton: document.querySelector("#quickDemoButton"),
   clearUploadButton: document.querySelector("#clearUploadButton"),
   preflightStatus: document.querySelector("#preflightStatus"),
@@ -1271,6 +1273,9 @@ function renderProfileStepper() {
     const sectionSteps = (section.dataset.profileStepSection || "").split(/\s+/).filter(Boolean);
     section.hidden = !sectionSteps.includes(currentStep);
   });
+  const hideUploadSetup = currentStep === "connect" && pathSourceActive();
+  els.inputSetup.hidden = els.inputSetup.hidden || hideUploadSetup;
+  els.upload.hidden = els.upload.hidden || hideUploadSetup;
   document.querySelectorAll("[data-profile-step-card]").forEach((card) => {
     const cardStep = card.dataset.profileStepCard;
     const cardIndex = profileSteps.indexOf(cardStep);
@@ -1615,6 +1620,15 @@ function profileSourceReady() {
     state.dbmlFile &&
     state.csvFiles.some((file) => file.sourceFile) &&
     !state.dbmlParseError,
+  );
+}
+
+function pathSourceActive() {
+  return state.runnerMode === "path" && Boolean(
+    state.dbmlText ||
+    state.csvFiles.length ||
+    els.dbmlPathInput.value.trim() ||
+    els.csvDirPathInput.value.trim(),
   );
 }
 

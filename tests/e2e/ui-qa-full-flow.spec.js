@@ -77,6 +77,9 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "connect");
     await expect(page.locator("#sourceStateTitle")).toContainText("Source status");
     await expect(page.locator("#inputSetup")).toContainText("Connect DBML + CSV");
+    await expect(page.locator("#upload")).toBeVisible();
+    await expect(page.locator("#dbmlDropzone")).toBeVisible();
+    await expect(page.locator("#csvDropzone")).toBeVisible();
     await expect(page.locator("#issues")).toBeHidden();
     await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
     await expect(page.locator("#csvList")).not.toContainText("customers.csv");
@@ -92,6 +95,9 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await page.locator("#quickDemoButton").click();
     await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
     await expect(page.locator("#sourceStateSummary")).toContainText("DBML + CSV demo is loaded");
+    await expect(page.locator("#upload")).toBeHidden();
+    await expect(page.locator("#dbmlDropzone")).toBeHidden();
+    await expect(page.locator("#csvDropzone")).toBeHidden();
     await expect(page.locator("#runnerMessage")).toContainText("DBML + CSV demo is loaded");
     await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
     await expect(page.locator("#csvList")).toContainText("customers.csv");

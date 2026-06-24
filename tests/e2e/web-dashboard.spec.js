@@ -78,6 +78,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#sourceStateTitle")).toContainText("Source status");
   await expect(page.locator("#inputSetup")).toContainText("Connect DBML + CSV");
   await expect(page.locator("#inputSetup")).toContainText("Upload files and map tables");
+  await expect(page.locator("#upload")).toBeVisible();
+  await expect(page.locator("#dbmlDropzone")).toBeVisible();
+  await expect(page.locator("#csvDropzone")).toBeVisible();
   await expect(page.locator("#issues")).toBeHidden();
   await expect(page.locator("#runner")).toBeHidden();
   await expect(page.locator("#preflightReview")).toBeHidden();
@@ -95,6 +98,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#quickDemoButton").click();
   await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
   await expect(page.locator("#sourceStateSummary")).toContainText("DBML + CSV demo is loaded");
+  await expect(page.locator("#inputSetup")).toBeHidden();
+  await expect(page.locator("#upload")).toBeHidden();
+  await expect(page.locator("#dbmlDropzone")).toBeHidden();
+  await expect(page.locator("#csvDropzone")).toBeHidden();
   await expect(page.locator("#runnerMessage")).toContainText("DBML + CSV demo is loaded");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
   await expect(page.locator("#csvList")).toContainText("customers.csv");
@@ -104,6 +111,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#runner")).toBeHidden();
   await page.locator("#clearUploadButton").click();
   await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+  await expect(page.locator("#inputSetup")).toBeVisible();
+  await expect(page.locator("#upload")).toBeVisible();
+  await expect(page.locator("#dbmlDropzone")).toBeVisible();
+  await expect(page.locator("#csvDropzone")).toBeVisible();
   await expect(page.locator("#csvList")).not.toContainText("customers.csv");
   await expect(page.locator("#runnerMessage")).toContainText("Source cleared");
   await expect(page.locator("#diagramEmpty")).toBeVisible();
@@ -147,6 +158,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");
 
   await page.locator("#quickDemoButton").click();
+  await expect(page.locator("#upload")).toBeHidden();
   await expect(page.locator("#runner")).toBeHidden();
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
   await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
