@@ -144,8 +144,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
   await expect(page.locator("#localDiagram")).toBeVisible();
   await expect(page.locator("#diagramSvg")).toContainText("orders");
-  await expect(page.locator("#diagramSvg")).toContainText("PK order_id");
-  await expect(page.locator("#diagramSvg")).toContainText("FK customer_id");
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="order_id"] .diagram-column-icon-key')).toHaveCount(1);
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="customer_id"] .diagram-column-icon-link')).toHaveCount(1);
+  await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="order_id"]')).toContainText("varchar");
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveCount(1);
   await expect(page.locator("#diagramFitButton")).toBeVisible();
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");

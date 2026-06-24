@@ -6843,18 +6843,50 @@ function diagramCompactRoleLabel(label) {
 
 function diagramColumnRowSvg(column, y, width) {
   const role = column.isPk && column.isFk ? "PK/FK" : column.isPk ? "PK" : column.isFk ? "FK" : "COL";
-  const roleWidth = role.length > 2 ? 40 : 28;
   const rowWidth = Math.max(120, width - 20);
-  const nameLimit = width > 220 ? 25 : 21;
   const tone = column.isPk ? "pk" : column.isFk ? "fk" : "non-key";
   const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
+  const typeLabel = String(column.type || "");
+  const typeWidth = typeLabel ? Math.min(78, Math.max(34, typeLabel.length * 6 + 10)) : 0;
+  const nameX = column.isPk && column.isFk ? 50 : column.isPk || column.isFk ? 36 : 18;
+  const typeX = width - 18;
+  const nameLimit = Math.max(9, Math.floor((typeX - nameX - typeWidth - 8) / 6));
   return `
     <g class="diagram-column-row diagram-column-row-${tone}" data-diagram-column="${escapeHtml(column.name)}" data-diagram-column-y="${y}">
       <title>${escapeHtml(`${role} ${column.name}${target}`)}</title>
       <rect class="diagram-column-row-bg" x="10" y="${y - 14}" width="${rowWidth}" height="18" rx="6"></rect>
-      <rect class="diagram-column-role-bg" x="14" y="${y - 12}" width="${roleWidth}" height="14" rx="5"></rect>
-      <text class="diagram-column-role" x="${14 + roleWidth / 2}" y="${y - 2}" text-anchor="middle">${escapeHtml(role)}</text>
-      <text class="diagram-column-name" x="${20 + roleWidth}" y="${y - 2}">${escapeHtml(truncateMiddle(column.name, nameLimit))}</text>
+      ${diagramColumnIconSvg(column, y)}
+      <text class="diagram-column-name" x="${nameX}" y="${y - 2}">${escapeHtml(truncateMiddle(column.name, nameLimit))}</text>
+      ${typeLabel ? `<text class="diagram-column-type" x="${typeX}" y="${y - 2}" text-anchor="end">${escapeHtml(truncateMiddle(typeLabel, 12))}</text>` : ""}
+    </g>
+  `;
+}
+
+function diagramColumnIconSvg(column, y) {
+  const icons = [];
+  if (column.isPk) {
+    icons.push(diagramKeyIconSvg(16, y));
+  }
+  if (column.isFk) {
+    icons.push(diagramLinkIconSvg(column.isPk ? 30 : 16, y));
+  }
+  return icons.join("");
+}
+
+function diagramKeyIconSvg(x, y) {
+  return `
+    <g class="diagram-column-icon diagram-column-icon-key" aria-hidden="true">
+      <circle cx="${x + 4}" cy="${y - 7}" r="3"></circle>
+      <path d="M ${x + 7} ${y - 7} H ${x + 17} M ${x + 12} ${y - 7} V ${y - 4} M ${x + 16} ${y - 7} V ${y - 4}"></path>
+    </g>
+  `;
+}
+
+function diagramLinkIconSvg(x, y) {
+  return `
+    <g class="diagram-column-icon diagram-column-icon-link" aria-hidden="true">
+      <rect x="${x + 1}" y="${y - 11}" width="10" height="6" rx="3" transform="rotate(-25 ${x + 6} ${y - 8})"></rect>
+      <rect x="${x + 8}" y="${y - 8}" width="10" height="6" rx="3" transform="rotate(-25 ${x + 13} ${y - 5})"></rect>
     </g>
   `;
 }
