@@ -153,6 +153,23 @@ Data style: monospace with tabular numbers.
 - Selecting a table assessment row populates drilldown with matching issues,
   assessment detail, and artifact links.
 
+### Issue Review
+
+- Stage 4 should summarize issue distribution with compact visual bars for
+  severity, affected tables, and issue types before the issue table.
+- The visual summary is a human review aid, not a developer graph pane; avoid
+  schema context graph, influence graph, raw artifact-source controls, or
+  decorative charts.
+- The issue list should default to a compact table with table, column, problem,
+  affected rows, and status. Avoid expanded table/column card groups that make
+  the stage page run long before the user selects an issue.
+- Selected issue detail starts with a visual focus map: table, column,
+  relationship context when present, affected-row meter, and issue type before
+  longer evidence, fix guidance, and optional LLM enrichment.
+- Issue detail should appear immediately after the issue table, keep raw
+  evidence collapsible by default, and use internal scrolling for long
+  deterministic action plans instead of stretching the whole review stage.
+
 ### Local ERD Diagram
 
 - DBML preview uses deterministic ERD layering over existing browser DBML state
@@ -194,3 +211,4 @@ Data style: monospace with tabular numbers.
 | Default DBML preview to full-column reading | Demo feedback needs the ERD to behave more like dbdiagram.io: columns are visible immediately, while optional controls reduce clutter only when requested | 2026-06-24 |
 | Remove visible DBML inspector rail | Demo feedback found the selected-table inspector too verbose and duplicative; the ERD should use the full available width and keep detailed evidence in the review/report flow | 2026-06-24 |
 | Use ERD endpoint glyphs for relationship cardinality | Text labels like `1` and `*` felt detached from the FK line; crow's-foot endpoints attach cardinality to the relationship itself | 2026-06-24 |
+| Add compact visual issue review | Stage 4 text-only issue review was hard to scan; compact charts, an issue table, and a selected-issue focus map make table, column, type, and affected rows visible before detailed text | 2026-06-24 |

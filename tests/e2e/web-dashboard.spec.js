@@ -379,6 +379,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("readiness");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("gates");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
+  await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toBeVisible();
+  await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toContainText("Issue map");
+  await expect(page.locator("#dashboardPanelGrid .issue-visual-chart")).toHaveCount(3);
+  expect(await page.locator("#dashboardPanelGrid .issue-visual-row").count()).toBeGreaterThan(3);
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
 
   await goToProfileStep(page, "connect");
@@ -432,7 +436,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await goToProfileStep(page, "review");
   const dashboard = page.locator("#dashboardPanelGrid");
-  await expect(dashboard).toContainText("Table -> Column -> Issue");
+  await expect(dashboard).toContainText("Issue table");
+  await expect(dashboard.locator(".issue-review-table")).toBeVisible();
+  await expect(dashboard.locator(".issue-review-header")).toContainText("Affected");
+  await expect(dashboard.locator(".issue-row-meter").first()).toBeVisible();
   await expect(dashboard).toContainText("customers");
   await expect(dashboard).toContainText("customer_id");
   await expect(dashboard).toContainText("Required Field Null");
@@ -497,8 +504,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#qualityGatesStatus")).toContainText("source=deterministic");
   await expect(page.locator("#todosStatus")).toContainText("grouped todos");
   fs.mkdirSync("outputs/us073_goal4", { recursive: true });
-  await page.locator("#dashboard").scrollIntoViewIfNeeded();
-  await page.locator("#dashboard").screenshot({
+  await page.locator("#dashboardPanelGrid").scrollIntoViewIfNeeded();
+  await page.locator("#dashboardPanelGrid").screenshot({
     path: "outputs/us073_goal4/review-issues-default.png",
   });
   await page.evaluate(() => {
@@ -514,6 +521,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Where");
+  await expect(page.locator("#dashboardDrilldown .issue-focus-map")).toBeVisible();
+  await expect(page.locator("#dashboardDrilldown .issue-focus-map")).toContainText("sellers.seller_id");
+  await expect(page.locator("#dashboardDrilldown .issue-focus-track span")).toHaveAttribute("style", /width: [^0]/);
   await expect(page.locator("#dashboardDrilldown")).toContainText("What happened");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Why it matters");
@@ -535,7 +545,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("LLM enrichment add-on");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Run LLM enrichment");
   fs.mkdirSync("outputs/us073_goal11", { recursive: true });
-  await page.locator("#dashboardDrilldown").screenshot({
+  const issueDetailPanel = page.locator("#dashboard .dashboard-detail").first();
+  await issueDetailPanel.screenshot({
     path: "outputs/us073_goal11/issue-drawer-before-llm-enrichment.png",
   });
   await page.locator('[data-issue-llm-provider="fake"]').click();
@@ -549,10 +560,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("Extra verification");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Human review needed");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Deterministic action plans remain the source of truth");
-  await page.locator("#dashboardDrilldown").screenshot({
+  await page.locator("#dashboardDrilldown .issue-llm-enrichment").scrollIntoViewIfNeeded();
+  await issueDetailPanel.screenshot({
     path: "outputs/us073_goal11/issue-drawer-after-fake-enrichment.png",
   });
-  await page.locator("#dashboardDrilldown").screenshot({
+  await issueDetailPanel.screenshot({
     path: `${goal12Dir}/issue-drawer-after-fake-llm-enrichment.png`,
   });
   await page.locator('[data-issue-llm-provider="openai"]').click();
@@ -563,13 +575,15 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   await expect(page.locator("#dashboardDrilldown")).toContainText("unavailable");
   await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI provider was selected");
-  await page.locator("#dashboardDrilldown").screenshot({
+  await page.locator("#dashboardDrilldown .issue-llm-enrichment").scrollIntoViewIfNeeded();
+  await issueDetailPanel.screenshot({
     path: "outputs/us073_goal11/issue-drawer-openai-failure.png",
   });
-  await page.locator("#dashboardDrilldown").screenshot({
+  await issueDetailPanel.screenshot({
     path: `${goal12Dir}/issue-drawer-openai-unavailable.png`,
   });
-  await page.locator("#dashboardDrilldown").screenshot({
+  await page.locator("#dashboardDrilldown .issue-detail-header").scrollIntoViewIfNeeded();
+  await issueDetailPanel.screenshot({
     path: "outputs/us073_goal4/review-issue-detail-drawer.png",
   });
   fs.mkdirSync("outputs/us073_goal5", { recursive: true });

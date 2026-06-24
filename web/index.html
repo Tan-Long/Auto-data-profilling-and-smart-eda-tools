@@ -370,8 +370,20 @@
               </div>
             </section>
 
-            <div class="dashboard-panel-grid issue-inbox-grid" id="dashboardPanelGrid" aria-label="Review Issues by table and column">
-              <p class="muted">Run a job to review issues by table and column.</p>
+            <div class="dashboard-panel-grid issue-inbox-grid" id="dashboardPanelGrid" aria-label="Review Issues visual charts and issue table">
+              <p class="muted">Run a job to review visual charts and the issue table.</p>
+            </div>
+
+            <div class="dashboard-detail-grid">
+              <section class="dashboard-detail" aria-live="polite">
+                <div class="runtime-heading">
+                  <strong>Issue detail drawer</strong>
+                  <span id="dashboardDrilldownMeta">No selection</span>
+                </div>
+                <div id="dashboardDrilldown">
+                  <p class="muted">Select an issue to inspect where it happened, evidence, impact, and fix guidance.</p>
+                </div>
+              </section>
             </div>
 
             <section class="dashboard-section todos-section" id="todos" aria-labelledby="todosTitle">
@@ -412,18 +424,6 @@
                 <p class="muted">Run a job to review per-table readiness and affected columns.</p>
               </div>
             </section>
-
-            <div class="dashboard-detail-grid">
-              <section class="dashboard-detail" aria-live="polite">
-                <div class="runtime-heading">
-                  <strong>Issue detail drawer</strong>
-                  <span id="dashboardDrilldownMeta">No selection</span>
-                </div>
-                <div id="dashboardDrilldown">
-                  <p class="muted">Select an issue to inspect where it happened, evidence, impact, and fix guidance.</p>
-                </div>
-              </section>
-            </div>
           </div>
         </div>
       </section>

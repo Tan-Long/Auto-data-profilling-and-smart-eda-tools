@@ -134,7 +134,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="selectedRunTimelineStatus"',
         'id="dashboard"',
         'id="dashboardPanelGrid"',
-        'aria-label="Review Issues by table and column"',
+        'aria-label="Review Issues visual charts and issue table"',
         "Issue detail drawer",
         "Select an issue to inspect where it happened, evidence, impact, and fix guidance.",
         'id="dashboardSeverityFilter"',
@@ -265,9 +265,13 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".info-popover-card",
         ".preflight-item",
         ".issue-inbox-grid",
-        ".issue-table-group",
-        ".issue-column-group",
+        ".issue-review-table",
+        ".issue-review-header",
+        ".issue-review-body",
+        ".issue-row-meter",
         ".issue-detail-drawer",
+        ".issue-detail-disclosure",
+        ".issue-context-strip",
         ".evidence-value",
         ".issue-llm-enrichment",
         ".issue-llm-controls",
@@ -284,6 +288,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".quality-gate-evidence-value",
         ".dashboard-filters",
         ".dashboard-filter-field",
+        ".issue-visual-summary",
+        ".issue-visual-chart",
+        ".issue-focus-map",
         ".developer-options",
         ".runner-source-switch",
         ".diagram-role-bridge",
@@ -376,7 +383,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderDashboard",
         "renderDashboardSummary",
         "renderIssueInbox",
-        "buildIssueInboxModel",
         "renderIssueDetailDrawer",
         "renderIssueLlmEnrichment",
         "runIssueLlmEnrichment",
@@ -501,8 +507,6 @@ def test_web_review_surfaces_use_single_flow_layouts():
         ".quality-gate-heading",
         ".quality-gate-evidence",
         ".table-impact-grid",
-        ".issue-table-heading",
-        ".issue-inbox-row",
         ".dashboard-detail-grid",
         ".table-assessment-detail",
         ".dashboard-issue-row",
@@ -521,6 +525,9 @@ def test_web_review_surfaces_use_single_flow_layouts():
     for selector in single_flow_selectors:
         assert "grid-template-columns: minmax(0, 1fr);" in _css_block(css, selector)
 
+    assert "max-height:" in _css_block(css, ".issue-review-body")
+    assert "overflow: auto;" in _css_block(css, ".issue-review-body")
+    assert "grid-template-columns:" in _css_block(css, ".issue-inbox-row")
     assert "Avoid primary two-column split layouts for review surfaces" in design
 
 
@@ -550,7 +557,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "workflowTargetFromViewport" in js
     assert "data-workflow-nav-target" in js
     assert "Quality Gates" in js
-    assert "Table -> Column -> Issue" in js
+    assert "Issue table" in js
+    assert "Charts and issue table" in js
+    assert "renderIssueVisualSummary" in js
+    assert "renderIssueFocusMap" in js
     assert "selectedRunTimeline" in js
     assert "data-run-history-job-id" in js
     assert "charts/issue_counts_by_severity.json" in js

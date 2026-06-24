@@ -46,11 +46,11 @@ window.VSF_WORKFLOW_NAV_CONFIG = {
       target: "qualityGates",
       substeps: [
         { target: "qualityGates", label: "Quality Gates", detail: "Can run, trust, and share" },
-        { target: "dashboardPanelGrid", label: "Review Issues", detail: "Table -> Column -> Issue" },
+        { target: "dashboardPanelGrid", label: "Review Issues", detail: "Charts and issue table" },
+        { target: "dashboardDrilldown", label: "Issue Detail", detail: "Where, evidence, fix guidance" },
         { target: "todos", label: "Todos", detail: "Fix data and verify after fix" },
         { target: "reportExport", label: "Report / Export", detail: "Open reports and copy todos" },
         { target: "tableImpact", label: "Table Readiness", detail: "Per-table analysis readiness" },
-        { target: "dashboardDrilldown", label: "Issue Detail", detail: "Where, evidence, fix guidance" },
       ],
     },
   ],

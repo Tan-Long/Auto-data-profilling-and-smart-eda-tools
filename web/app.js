@@ -3212,7 +3212,10 @@ function renderDashboard() {
     return;
   }
 
-  els.dashboardPanelGrid.innerHTML = renderIssueInbox(filteredIssues);
+  els.dashboardPanelGrid.innerHTML = `
+    ${renderIssueVisualSummary(filteredIssues)}
+    ${renderIssueInbox(filteredIssues)}
+  `;
   renderDashboardDrilldown();
 
   if ((artifactIndex.missing_artifacts || []).length) {
@@ -3926,6 +3929,72 @@ function renderRelationshipHealthPanel() {
   );
 }
 
+function renderIssueVisualSummary(filteredIssues) {
+  const tableRows = [...countBy(filteredIssues, (issue) => issue.table || "Schema / dataset").entries()]
+    .map(([label, value]) => ({ label, value, kind: "table" }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .slice(0, 5);
+  const typeRows = [...countBy(filteredIssues, (issue) => issue.issue_type || "unknown").entries()]
+    .map(([label, value]) => ({ label, displayLabel: issueTypeText(label), value, kind: "issue_type" }))
+    .sort((a, b) => b.value - a.value || a.displayLabel.localeCompare(b.displayLabel))
+    .slice(0, 5);
+  const severityRows = severityOrder
+    .map((label) => ({ label, value: filteredIssues.filter((issue) => issue.severity === label).length, kind: "severity" }))
+    .filter((row) => row.value > 0);
+  const badRows = sum(filteredIssues.map((issue) => Number(issue.bad_count || 0)));
+  return `
+    <section class="issue-visual-summary" aria-label="Issue visual summary">
+      <div class="issue-visual-heading">
+        <div>
+          <p class="eyebrow">Visual summary</p>
+          <h4>Issue map</h4>
+        </div>
+        <div class="issue-visual-total">
+          <strong>${integerText(filteredIssues.length)}</strong>
+          <span>issues · ${integerText(badRows)} bad rows</span>
+        </div>
+      </div>
+      <div class="issue-visual-grid">
+        ${renderIssueVisualChart("Severity", "Run impact", severityRows, "No severities match the current filters.")}
+        ${renderIssueVisualChart("Top tables", "Where issues cluster", tableRows, "No tables match the current filters.")}
+        ${renderIssueVisualChart("Issue types", "What failed", typeRows, "No issue types match the current filters.")}
+      </div>
+    </section>
+  `;
+}
+
+function renderIssueVisualChart(title, subtitle, rows, emptyText) {
+  const maxValue = Math.max(...rows.map((row) => Number(row.value || 0)), 1);
+  return `
+    <article class="issue-visual-chart">
+      <div class="issue-visual-chart-heading">
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(subtitle)}</span>
+      </div>
+      ${rows.length ? `
+        <div class="issue-visual-bars">
+          ${rows.map((row) => renderIssueVisualRow(row, maxValue)).join("")}
+        </div>
+      ` : `<p class="muted">${escapeHtml(emptyText)}</p>`}
+    </article>
+  `;
+}
+
+function renderIssueVisualRow(row, maxValue) {
+  const value = Number(row.value || 0);
+  const width = value > 0 ? Math.max(5, Math.round(value / maxValue * 100)) : 0;
+  const label = row.displayLabel || row.label;
+  return `
+    <button class="issue-visual-row" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.label)}" data-dashboard-label="${escapeHtml(label)}">
+      <span class="issue-visual-row-label">${escapeHtml(label)}</span>
+      <span class="issue-visual-row-track" aria-hidden="true">
+        <span class="issue-visual-row-fill ${dashboardTone(row.label)}" style="width: ${width}%"></span>
+      </span>
+      <span class="issue-visual-row-value">${integerText(value)}</span>
+    </button>
+  `;
+}
+
 function renderInfluencePanel() {
   const spec = state.dashboardArtifacts[dashboardChartPaths.influence];
   if (!spec) {
@@ -3999,8 +4068,15 @@ function renderDashboardBars(rows, options = {}) {
 }
 
 function renderIssueInbox(filteredIssues) {
-  const model = buildIssueInboxModel(filteredIssues);
-  if (!model.tables.length) {
+  const issues = [...filteredIssues].sort((a, b) => (
+    issueStatusOrder(issueStatus(a)) - issueStatusOrder(issueStatus(b)) ||
+    (a.table || "").localeCompare(b.table || "") ||
+    issuePrimaryColumn(a).localeCompare(issuePrimaryColumn(b)) ||
+    issueGuid(a).localeCompare(issueGuid(b))
+  ));
+  const tableCount = uniqueSorted(issues.map((issue) => issue.table).filter(Boolean)).length;
+  const columnCount = new Set(issues.map((issue) => `${issue.table || "Schema / dataset"}.${issuePrimaryColumn(issue)}`)).size;
+  if (!issues.length) {
     return `
       <section class="issue-inbox-empty">
         <strong>No issues match the current filters.</strong>
@@ -4010,148 +4086,60 @@ function renderIssueInbox(filteredIssues) {
   }
 
   return `
-    <section class="issue-inbox" aria-label="Review Issues grouped by table, column, and issue">
+    <section class="issue-inbox" aria-label="Review Issues compact issue table">
       <div class="issue-inbox-heading">
         <div>
           <p class="eyebrow">Review Issues</p>
-          <h4>Table -> Column -> Issue</h4>
+          <h4>Issue table</h4>
+          <p>Click a row to see the exact table, column, evidence, explanation, and fix checklist.</p>
         </div>
         <div class="issue-inbox-totals" aria-label="Issue inbox summary">
-          <span>${integerText(model.issueCount)} issues</span>
-          <span>${integerText(model.columnCount)} columns</span>
-          <span>${integerText(model.tableCount)} tables</span>
+          <span>${integerText(issues.length)} issues</span>
+          <span>${integerText(columnCount)} columns</span>
+          <span>${integerText(tableCount)} tables</span>
         </div>
       </div>
-      <div class="issue-table-list">
-        ${model.tables.map(renderIssueTableGroup).join("")}
+      <div class="issue-review-table" role="table" aria-label="Issues by table and column">
+        <div class="issue-review-header" role="row">
+          <span role="columnheader">Issue</span>
+          <span role="columnheader">Table</span>
+          <span role="columnheader">Column</span>
+          <span role="columnheader">Problem</span>
+          <span role="columnheader">Affected</span>
+          <span role="columnheader">Status</span>
+        </div>
+        <div class="issue-review-body">
+          ${issues.map(renderInboxIssueRow).join("")}
+        </div>
       </div>
     </section>
   `;
 }
 
-function buildIssueInboxModel(filteredIssues) {
-  const assessments = new Map(getDashboardTableAssessments().map((assessment) => [assessment.table, assessment]));
-  const includeCleanTables = state.dashboardFilters.severity === "all" && state.dashboardFilters.issueType === "all";
-  const tableNames = new Set(filteredIssues.map((issue) => issue.table || "Schema / dataset"));
-  if (includeCleanTables) {
-    getDashboardTableAssessments()
-      .filter((assessment) => filterMatchesTable(assessment.table))
-      .forEach((assessment) => tableNames.add(assessment.table));
-  }
-
-  const tables = [...tableNames]
-    .filter((tableName) => state.dashboardFilters.table === "all" || tableName === state.dashboardFilters.table)
-    .map((tableName) => {
-      const assessment = assessments.get(tableName) || {};
-      const issues = filteredIssues.filter((issue) => (issue.table || "Schema / dataset") === tableName);
-      const columns = buildIssueColumnGroups(issues);
-      const status = tableIssueStatus(issues, assessment);
-      return {
-        table: tableName,
-        assessment,
-        issues,
-        columns,
-        status,
-        issueCount: issues.length,
-        columnCount: columns.filter((column) => column.key !== "__table__").length,
-      };
-    })
-    .sort((a, b) => (
-      issueStatusOrder(a.status) - issueStatusOrder(b.status) ||
-      b.issueCount - a.issueCount ||
-      a.table.localeCompare(b.table)
-    ));
-
-  return {
-    tables,
-    issueCount: filteredIssues.length,
-    columnCount: sum(tables.map((table) => table.columnCount)),
-    tableCount: tables.length,
-  };
-}
-
-function buildIssueColumnGroups(issues) {
-  const groups = new Map();
-  issues.forEach((issue) => {
-    const key = issuePrimaryColumn(issue);
-    if (!groups.has(key)) {
-      groups.set(key, {
-        key,
-        label: issueColumnLabel(issue, key),
-        issues: [],
-      });
-    }
-    groups.get(key).issues.push(issue);
-  });
-  return [...groups.values()]
-    .map((group) => ({
-      ...group,
-      status: aggregateIssueStatus(group.issues),
-    }))
-    .sort((a, b) => (
-      (a.key === "__table__" ? -1 : 0) - (b.key === "__table__" ? -1 : 0) ||
-      issueStatusOrder(a.status) - issueStatusOrder(b.status) ||
-      a.label.localeCompare(b.label)
-    ));
-}
-
-function renderIssueTableGroup(table) {
-  const readiness = table.assessment.readiness ? statusFromReadiness(table.assessment.readiness) : table.status;
-  const rowCount = table.assessment.row_count;
-  const role = table.assessment.role || "table";
-  return `
-    <article class="issue-table-group">
-      <div class="issue-table-heading">
-        <div>
-          <code>${escapeHtml(table.table)}</code>
-          <p>${escapeHtml(role)}${rowCount === undefined ? "" : ` · ${integerText(rowCount)} rows`}</p>
-        </div>
-        <span class="pill-status ${issueStatusClass(readiness)}">${escapeHtml(readiness)}</span>
-        <div class="issue-table-counts">
-          <span>${integerText(table.issueCount)} issues</span>
-          <span>${integerText(table.columnCount)} columns</span>
-        </div>
-      </div>
-      ${table.columns.length
-        ? table.columns.map((column) => renderIssueColumnGroup(table.table, column)).join("")
-        : `<div class="issue-column-group clean"><strong>Clean</strong><p>No issues detected for this table in the current filters.</p></div>`}
-    </article>
-  `;
-}
-
-function renderIssueColumnGroup(tableName, column) {
-  const tableScope = column.key === "__table__";
-  return `
-    <div class="issue-column-group ${tableScope ? "table-scope" : ""}">
-      <div class="issue-column-heading">
-        <div>
-          <strong>${escapeHtml(tableScope ? "Schema/table-level checks" : column.label)}</strong>
-          <p>${escapeHtml(tableScope ? "Separated from column findings" : `${column.issues.length} issue${column.issues.length === 1 ? "" : "s"} on this column`)}</p>
-        </div>
-        <span class="pill-status ${issueStatusClass(column.status)}">${escapeHtml(column.status)}</span>
-      </div>
-      <div class="issue-row-list">
-        ${column.issues.map((issue) => renderInboxIssueRow(tableName, column, issue)).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderInboxIssueRow(tableName, column, issue) {
+function renderInboxIssueRow(issue) {
   const status = issueStatus(issue);
   const selected = state.dashboardSelection?.kind === "issue" && state.dashboardSelection.value === issue.issue_id;
+  const tableName = issue.table || "Schema / dataset";
+  const columnKey = issuePrimaryColumn(issue);
+  const columnLabel = issueColumnLabel(issue, columnKey);
+  const context = issueRowContext(issue, tableName, { key: columnKey, label: columnLabel });
+  const affectedPercent = Math.min(100, Math.max(0, Number(issue.bad_rate || 0) * 100));
+  const affectedWidth = Number(issue.bad_count || 0) > 0 ? Math.max(2, affectedPercent) : 0;
   return `
-    <button class="issue-inbox-row ${selected ? "selected" : ""}" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issue.issue_id)}" data-dashboard-label="${escapeHtml(issue.issue_id)}">
-      <span class="issue-guid">${escapeHtml(issueGuid(issue))}</span>
-      <span class="issue-row-main">
+    <button class="issue-inbox-row ${selected ? "selected" : ""}" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issue.issue_id)}" data-dashboard-label="${escapeHtml(issue.issue_id)}" data-dashboard-scroll="drilldown" role="row" aria-label="${escapeHtml(`${issueGuid(issue)} ${tableName} ${columnLabel} ${issueTypeLabel(issue)}`)}">
+      <span class="issue-guid" role="cell">${escapeHtml(issueGuid(issue))}</span>
+      <span class="issue-table-cell" role="cell"><code>${escapeHtml(tableName)}</code></span>
+      <span class="issue-column-cell" role="cell"><code>${escapeHtml(columnLabel)}</code>${context ? `<small>${escapeHtml(context)}</small>` : ""}</span>
+      <span class="issue-row-main" role="cell">
         <strong>${escapeHtml(issueTypeLabel(issue))}</strong>
-        <small>${escapeHtml(issueRowContext(issue, tableName, column))}</small>
+        <small>${escapeHtml(issueScopeLabel(issue))}</small>
       </span>
-      <span class="pill-status ${issueStatusClass(status)}">${escapeHtml(status)}</span>
-      <span class="issue-counts">
+      <span class="issue-counts" role="cell">
         <span>${integerText(issue.bad_count)} rows</span>
+        <span class="issue-row-meter" aria-label="${escapeHtml(percentText(issue.bad_rate))} affected"><span style="width: ${affectedWidth}%"></span></span>
         <span>${percentText(issue.bad_rate)}</span>
       </span>
+      <span class="pill-status ${issueStatusClass(status)}" role="cell">${escapeHtml(status)}</span>
     </button>
   `;
 }
@@ -4240,18 +4228,63 @@ function renderIssueDetailDrawer(issue) {
         </div>
         <span class="pill-status ${issueStatusClass(status)}">${escapeHtml(status)}</span>
       </div>
+      ${renderIssueFocusMap(issue, parent)}
       ${renderIssueDetailSection("Where", renderIssueWhere(issue, parent))}
       ${renderIssueDetailSection("What happened", renderIssueWhatHappened(issue))}
-      ${renderIssueDetailSection("Evidence", renderIssueEvidence(issue))}
       ${renderIssueDetailSection("Why it matters", renderIssueWhyItMatters(issue))}
       ${renderIssueDetailSection("How to fix", renderIssueHowToFix(issue))}
+      ${renderIssueDetailSection("Evidence", renderIssueEvidence(issue), { collapsed: true })}
       ${renderIssueDetailSection("Action plan", renderIssueActionPlan(actionPlan, issue))}
       ${renderIssueDetailSection("LLM enrichment add-on", renderIssueLlmEnrichment(actionPlan, issue))}
     </article>
   `;
 }
 
-function renderIssueDetailSection(title, body) {
+function renderIssueFocusMap(issue, parent) {
+  const table = issue.table || "Schema / dataset";
+  const columns = Array.isArray(issue.columns) && issue.columns.length ? issue.columns.join(", ") : "Table-level";
+  const affectedPercent = Math.min(100, Math.max(0, Number(issue.bad_rate || 0) * 100));
+  const affectedWidth = Number(issue.bad_count || 0) > 0 ? Math.max(2, affectedPercent) : 0;
+  const parentColumns = Array.isArray(issue.parent_columns) && issue.parent_columns.length ? issue.parent_columns.join(", ") : "key";
+  const relationship = isRelationshipIssue(issue) && issue.parent_table
+    ? `<span class="issue-focus-link"><code>${escapeHtml(table)}.${escapeHtml(columns)}</code><span>-></span><code>${escapeHtml(issue.parent_table)}.${escapeHtml(parentColumns)}</code></span>`
+    : "";
+  return `
+    <section class="issue-focus-map" aria-label="Selected issue visual focus">
+      <div class="issue-focus-location">
+        <span>Where</span>
+        <strong><code>${escapeHtml(table)}</code></strong>
+        <p><code>${escapeHtml(columns)}</code></p>
+        ${relationship || (parent ? `<p class="issue-focus-parent">Parent ${parent}</p>` : "")}
+      </div>
+      <div class="issue-focus-impact">
+        <span>Affected rows</span>
+        <strong>${integerText(issue.bad_count)} / ${integerText(issue.total_count)}</strong>
+        <div class="issue-focus-track" aria-label="${escapeHtml(percentText(issue.bad_rate))} affected">
+          <span style="width: ${affectedWidth}%"></span>
+        </div>
+        <p>${escapeHtml(percentText(issue.bad_rate))} of checked rows</p>
+      </div>
+      <div class="issue-focus-status">
+        <span>Why</span>
+        <strong>${escapeHtml(issueScopeLabel(issue))}</strong>
+        <p>${escapeHtml(issueTypeLabel(issue))}</p>
+      </div>
+    </section>
+  `;
+}
+
+function renderIssueDetailSection(title, body, options = {}) {
+  if (options.collapsed) {
+    return `
+      <details class="issue-detail-section issue-detail-disclosure">
+        <summary><h5>${escapeHtml(title)}</h5><span>Show details</span></summary>
+        <div class="issue-detail-disclosure-body">
+          ${body}
+        </div>
+      </details>
+    `;
+  }
   return `
     <section class="issue-detail-section">
       <h5>${escapeHtml(title)}</h5>
@@ -4263,24 +4296,24 @@ function renderIssueDetailSection(title, body) {
 function renderIssueWhere(issue, parent) {
   const columns = Array.isArray(issue.columns) && issue.columns.length ? issue.columns.join(", ") : "Table-level";
   return `
-    <dl class="issue-detail-grid">
-      <div><dt>Table</dt><dd><code>${escapeHtml(issue.table || "Schema / dataset")}</code></dd></div>
-      <div><dt>Column</dt><dd><code>${escapeHtml(columns)}</code></dd></div>
-      <div><dt>Scope</dt><dd>${escapeHtml(issueScopeLabel(issue))}</dd></div>
-      <div><dt>Severity</dt><dd>${escapeHtml(issue.severity || "unknown")}</dd></div>
-      ${parent ? `<div><dt>Parent context</dt><dd>${parent}</dd></div>` : ""}
-    </dl>
+    <div class="issue-context-strip">
+      <div><span>Table</span><code>${escapeHtml(issue.table || "Schema / dataset")}</code></div>
+      <div><span>Column</span><code>${escapeHtml(columns)}</code></div>
+      <div><span>Scope</span><strong>${escapeHtml(issueScopeLabel(issue))}</strong></div>
+      <div><span>Severity</span><strong>${escapeHtml(issue.severity || "unknown")}</strong></div>
+      ${parent ? `<div><span>Parent context</span>${parent}</div>` : ""}
+    </div>
   `;
 }
 
 function renderIssueWhatHappened(issue) {
   return `
     <p>${escapeHtml(issueWhatHappened(issue))}</p>
-    <dl class="issue-detail-grid">
-      <div><dt>Issue type</dt><dd><code>${escapeHtml(issue.issue_type || "UNKNOWN")}</code></dd></div>
-      <div><dt>Affected rows</dt><dd>${integerText(issue.bad_count)} of ${integerText(issue.total_count)}</dd></div>
-      <div><dt>Affected rate</dt><dd>${percentText(issue.bad_rate)}</dd></div>
-    </dl>
+    <div class="issue-context-strip">
+      <div><span>Issue type</span><code>${escapeHtml(issue.issue_type || "UNKNOWN")}</code></div>
+      <div><span>Affected rows</span><strong>${integerText(issue.bad_count)} of ${integerText(issue.total_count)}</strong></div>
+      <div><span>Affected rate</span><strong>${percentText(issue.bad_rate)}</strong></div>
+    </div>
   `;
 }
 
@@ -4794,23 +4827,11 @@ function issueTypeLabel(issue) {
   if (isOutlierIssue(issue)) {
     return "Review warning: numeric outlier";
   }
-  return String(issue.issue_type || "UNKNOWN").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+  return issueTypeText(issue.issue_type || "UNKNOWN");
 }
 
-function aggregateIssueStatus(issues) {
-  if (!issues.length) {
-    return "Clean";
-  }
-  return issues
-    .map(issueStatus)
-    .sort((a, b) => issueStatusOrder(a) - issueStatusOrder(b))[0];
-}
-
-function tableIssueStatus(issues, assessment = {}) {
-  if (issues.length) {
-    return aggregateIssueStatus(issues);
-  }
-  return assessment.readiness ? statusFromReadiness(assessment.readiness) : "Clean";
+function issueTypeText(value) {
+  return String(value || "UNKNOWN").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function issueStatus(issue) {
