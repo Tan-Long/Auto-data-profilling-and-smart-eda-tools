@@ -419,10 +419,10 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Schema/table-level checks",
         "Parent context",
         "Where",
-        "What happened",
         "Evidence",
-        "Why it matters",
-        "How to fix",
+        "Evidence facts",
+        "Detection query",
+        "Recommended work",
         "LLM enrichment add-on",
         "Why this was flagged",
         "Extra fix suggestion",
@@ -675,6 +675,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "issueActionPlanJson" in js
     assert "Fix data checklist" in js
     assert "Verify after fix checklist" in js
+    assert "Evidence facts" in js
+    assert "Detection query" in js
+    assert "Recommended work" in js
+    assert "Finding values" not in js
     assert "Evidence coverage" in js
     assert "Actionability" in js
     assert "source=deterministic" in js

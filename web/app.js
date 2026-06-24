@@ -5175,9 +5175,9 @@ function renderIssueDetailDrawer(issue) {
       </div>
       ${renderIssueFocusMap(issue, parent)}
       ${renderIssueSampleRows(issue)}
-      ${renderIssueActionDisclosure("Fix / Todo", "Deterministic checklist", renderIssueActionPlan(actionPlan, issue), { open: true })}
+      ${renderIssueActionDisclosure("Evidence", "Counts, sample, query", renderIssueEvidencePack(issue, parent), { open: true })}
+      ${renderIssueActionDisclosure("Fix / Todo", "Actions only", renderIssueActionPlan(actionPlan, issue), { open: true })}
       ${renderIssueActionDisclosure("LLM enrichment add-on", "OpenAI context for this issue", renderIssueLlmEnrichment(actionPlan, issue), { open: state.issueLlmPanelOpen })}
-      ${renderIssueActionDisclosure("Evidence", "What happened, why, raw values", renderIssueEvidencePack(issue, parent))}
     </article>
   `;
 }
@@ -5442,58 +5442,39 @@ function renderIssueActionDisclosure(title, subtitle, body, options = {}) {
 }
 
 function renderIssueEvidencePack(issue, parent) {
+  const path = issue.sample_bad_rows_path || "";
+  const query = String(issue.evidence_sql || "").trim();
   return `
-    <div class="issue-evidence-pack">
+    <div class="issue-evidence-pack compact">
+      <div class="issue-evidence-intro">
+        <strong>Evidence scope</strong>
+        <p>${escapeHtml(issueWhatHappened(issue))}</p>
+      </div>
       <section>
-        <h5>Where</h5>
-        ${renderIssueWhere(issue, parent)}
+        <h5>Evidence facts</h5>
+        ${renderIssueEvidence(issue, {
+          excludeLabels: ["Issue guid", "Sample rows", "Evidence query"],
+        })}
       </section>
-      <section>
-        <h5>What happened</h5>
-        ${renderIssueWhatHappened(issue)}
-      </section>
-      <section>
-        <h5>Why it matters</h5>
-        ${renderIssueWhyItMatters(issue)}
-      </section>
-      <section>
-        <h5>How to fix</h5>
-        ${renderIssueHowToFix(issue)}
-      </section>
-      <section>
-        <h5>Raw evidence values</h5>
-        ${renderIssueEvidence(issue)}
-      </section>
+      ${path ? `
+        <p class="issue-evidence-note">Row preview above is the bounded sample for <code>${escapeHtml(path)}</code>; highlighted cells mark the issue columns.</p>
+      ` : ""}
+      ${parent ? `<p class="issue-evidence-note">Parent context: ${parent}</p>` : ""}
+      ${query ? `
+        <details class="issue-detail-disclosure issue-evidence-query">
+          <summary><h5>Detection query</h5><span>Show SQL</span></summary>
+          <div class="issue-detail-disclosure-body">
+            <pre><code>${escapeHtml(query)}</code></pre>
+          </div>
+        </details>
+      ` : ""}
     </div>
   `;
 }
 
-function renderIssueWhere(issue, parent) {
-  const columns = Array.isArray(issue.columns) && issue.columns.length ? issue.columns.join(", ") : "Table-level";
-  return `
-    <div class="issue-context-strip">
-      <div><span>Table</span><code>${escapeHtml(issue.table || "Schema / dataset")}</code></div>
-      <div><span>Column</span><code>${escapeHtml(columns)}</code></div>
-      <div><span>Scope</span><strong>${escapeHtml(issueScopeLabel(issue))}</strong></div>
-      <div><span>Severity</span><strong>${escapeHtml(issue.severity || "unknown")}</strong></div>
-      ${parent ? `<div><span>Parent context</span>${parent}</div>` : ""}
-    </div>
-  `;
-}
-
-function renderIssueWhatHappened(issue) {
-  return `
-    <p>${escapeHtml(issueWhatHappened(issue))}</p>
-    <div class="issue-context-strip">
-      <div><span>Issue type</span><code>${escapeHtml(issue.issue_type || "UNKNOWN")}</code></div>
-      <div><span>Affected rows</span><strong>${integerText(issue.bad_count)} of ${integerText(issue.total_count)}</strong></div>
-      <div><span>Affected rate</span><strong>${percentText(issue.bad_rate)}</strong></div>
-    </div>
-  `;
-}
-
-function renderIssueEvidence(issue) {
-  const evidenceValues = issueEvidenceValues(issue);
+function renderIssueEvidence(issue, options = {}) {
+  const excludeLabels = new Set(options.excludeLabels || []);
+  const evidenceValues = issueEvidenceValues(issue).filter((item) => !excludeLabels.has(item.label));
   return `
     <div class="evidence-value-list">
       ${evidenceValues.map((item) => `
@@ -5509,22 +5490,6 @@ function renderIssueEvidence(issue) {
   `;
 }
 
-function renderIssueWhyItMatters(issue) {
-  const causes = Array.isArray(issue.probable_causes) ? issue.probable_causes : [];
-  return `
-    <p>${escapeHtml(issueImpactText(issue))}</p>
-    ${causes.length ? `<ul class="issue-detail-list">${causes.slice(0, 3).map((cause) => `<li>${escapeHtml(cause)}</li>`).join("")}</ul>` : ""}
-  `;
-}
-
-function renderIssueHowToFix(issue) {
-  const fixes = Array.isArray(issue.suggested_fix) ? issue.suggested_fix : [];
-  if (!fixes.length) {
-    return `<p>Inspect bounded sample rows and update the source pipeline or DBML contract.</p>`;
-  }
-  return `<ul class="issue-detail-list">${fixes.slice(0, 4).map((fix) => `<li>${escapeHtml(fix)}</li>`).join("")}</ul>`;
-}
-
 function renderIssueActionPlan(plan, issue) {
   if (!plan) {
     return `
@@ -5536,12 +5501,17 @@ function renderIssueActionPlan(plan, issue) {
   }
   const coverage = plan.evidence_coverage || {};
   const actionability = plan.actionability_score || {};
-  const evidenceValues = Array.isArray(plan.evidence_values) ? plan.evidence_values : [];
   const sourceValue = plan.source === "deterministic" ? "source=deterministic" : `source=${plan.source || "deterministic"}`;
   return `
     <div class="action-plan">
       ${renderIssueExportControls(plan)}
-      <p class="action-plan-summary">${escapeHtml(plan.finding_summary || "Finding summary needs human review.")}</p>
+      <div class="action-plan-summary">
+        <div>
+          <span>Recommended work</span>
+          <strong>${escapeHtml(plan.priority || "Needs human review")}</strong>
+        </div>
+        <code>${escapeHtml(sourceValue)}</code>
+      </div>
       ${plan.human_review_required ? `
         <div class="action-plan-human-review">
           <strong>Needs human review</strong>
@@ -5551,11 +5521,19 @@ function renderIssueActionPlan(plan, issue) {
       <div class="issue-fix-todo-grid">
         <div class="action-plan-block">
           <strong>Fix data checklist</strong>
-          ${renderActionPlanSteps(plan.fix_data_steps, plan.fix_data_checklist, 4)}
+          ${renderActionPlanSteps(plan.fix_data_steps, plan.fix_data_checklist, 2, {
+            collapseRemaining: true,
+            showEvidence: false,
+            showWhy: false,
+          })}
         </div>
         <div class="action-plan-block">
           <strong>Verify after fix checklist</strong>
-          ${renderActionPlanSteps(plan.verify_after_fix_steps, plan.verify_after_fix_checklist, 4)}
+          ${renderActionPlanSteps(plan.verify_after_fix_steps, plan.verify_after_fix_checklist, 2, {
+            collapseRemaining: true,
+            showEvidence: false,
+            showWhy: false,
+          })}
         </div>
       </div>
       <div class="action-plan-llm-nudge">
@@ -5563,7 +5541,7 @@ function renderIssueActionPlan(plan, issue) {
         <p>OpenAI enrichment can add concise context for this selected issue using bounded issue evidence, action steps, and sample metadata only.</p>
       </div>
       <details class="issue-detail-disclosure action-plan-more">
-        <summary><h5>More deterministic context</h5><span>Metrics, guidelines, finding values</span></summary>
+        <summary><h5>More deterministic context</h5><span>Metrics and guidelines</span></summary>
         <div class="issue-detail-disclosure-body">
           <div class="action-plan-metrics" aria-label="Action plan metrics">
             ${renderActionPlanMetric("Priority", plan.priority || "Needs human review", "")}
@@ -5578,10 +5556,6 @@ function renderIssueActionPlan(plan, issue) {
               `${actionability.label || "Unknown"} · ${integerText(actionability.score)}/100`,
               actionability.explanation || "Shows whether this plan has enough context to assign.",
             )}
-          </div>
-          <div class="action-plan-block">
-            <strong>Finding values</strong>
-            ${renderActionPlanEvidenceValues(evidenceValues)}
           </div>
           <div class="action-plan-block">
             <strong>Guidelines</strong>
@@ -5843,54 +5817,44 @@ function renderActionPlanMetric(label, value, explanation) {
   `;
 }
 
-function renderActionPlanEvidenceValues(values) {
-  if (!values.length) {
-    return `<p class="muted">No deterministic finding values were available.</p>`;
-  }
-  return `
-    <div class="evidence-value-list action-plan-values">
-      ${values.map((item) => {
-        const rawValue = actionPlanRawValue(item);
-        const artifactPath = String(item.artifact || "");
-        const url = artifactPath && !artifactPath.endsWith(".json") ? artifactUrlFor(artifactPath) : "";
-        return `
-          <div class="evidence-value">
-            <span>${escapeHtml(item.label || "Value")}</span>
-            ${url
-              ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><code>${escapeHtml(rawValue)}</code></a>`
-              : `<code>${escapeHtml(rawValue)}</code>`}
-            <p>${escapeHtml(item.meaning || "Deterministic evidence value.")}</p>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
-function renderActionPlanSteps(steps, fallbackItems, limit = 4) {
+function renderActionPlanSteps(steps, fallbackItems, limit = 4, options = {}) {
   const structured = Array.isArray(steps) ? steps.filter((step) => step && typeof step === "object") : [];
+  const showEvidence = options.showEvidence !== false;
+  const showWhy = options.showWhy !== false;
   if (structured.length) {
+    const visibleSteps = structured.slice(0, limit);
+    const remainingSteps = options.collapseRemaining ? structured.slice(limit) : [];
     return `
       <div class="action-plan-step-list">
-        ${structured.slice(0, limit).map((step, index) => {
-          const evidence = String(step.evidence || "").trim();
-          const why = String(step.why || "").trim();
-          return `
-            <div class="action-plan-step">
-              <div class="action-plan-step-heading">
-                <span>${String(index + 1).padStart(2, "0")}</span>
-                <strong>${escapeHtml(step.title || "Action step")}</strong>
-              </div>
-              <p>${escapeHtml(step.detail || "Needs human review before assigning this action.")}</p>
-              ${evidence ? `<small><b>Evidence</b>${escapeHtml(evidence)}</small>` : ""}
-              ${why ? `<small><b>Why</b>${escapeHtml(why)}</small>` : ""}
+        ${visibleSteps.map((step, index) => renderActionPlanStep(step, index, { showEvidence, showWhy })).join("")}
+        ${remainingSteps.length ? `
+          <details class="action-plan-remaining">
+            <summary>${integerText(remainingSteps.length)} more checklist step${remainingSteps.length === 1 ? "" : "s"}</summary>
+            <div class="action-plan-step-list">
+              ${remainingSteps.map((step, index) => renderActionPlanStep(step, index + limit, { showEvidence, showWhy })).join("")}
             </div>
-          `;
-        }).join("")}
+          </details>
+        ` : ""}
       </div>
     `;
   }
   return renderActionPlanList(fallbackItems, limit);
+}
+
+function renderActionPlanStep(step, index, options = {}) {
+  const evidence = String(step.evidence || "").trim();
+  const why = String(step.why || "").trim();
+  return `
+    <div class="action-plan-step">
+      <div class="action-plan-step-heading">
+        <span>${String(index + 1).padStart(2, "0")}</span>
+        <strong>${escapeHtml(step.title || "Action step")}</strong>
+      </div>
+      <p>${escapeHtml(step.detail || "Needs human review before assigning this action.")}</p>
+      ${options.showEvidence && evidence ? `<small><b>Evidence</b>${escapeHtml(evidence)}</small>` : ""}
+      ${options.showWhy && why ? `<small><b>Why</b>${escapeHtml(why)}</small>` : ""}
+    </div>
+  `;
 }
 
 function renderActionPlanList(items, limit = 6) {
@@ -5899,14 +5863,6 @@ function renderActionPlanList(items, limit = 6) {
     return `<p class="muted">Needs human review before todos can be assigned.</p>`;
   }
   return `<ul class="issue-detail-list">${list.slice(0, limit).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
-}
-
-function actionPlanRawValue(item) {
-  const value = item?.raw_value ?? item?.rawValue ?? "";
-  if (typeof value === "number") {
-    return Number.isInteger(value) ? integerText(value) : String(value);
-  }
-  return String(value);
 }
 
 function issueEvidenceValues(issue) {
@@ -6007,22 +5963,6 @@ function issueWhatHappened(issue) {
     return "Schema or table-level contract evidence needs review before this table is treated as clean.";
   }
   return "Column-level data-quality evidence violated the DBML or profiler rule for this field.";
-}
-
-function issueImpactText(issue) {
-  if (isOutlierIssue(issue)) {
-    return "Outliers can be valid business events, but they should be reviewed before they drive analysis or reporting.";
-  }
-  if (isRelationshipIssue(issue)) {
-    return "Relationship issues can hide records, create duplicate joins, or make downstream table comparisons unreliable.";
-  }
-  if (["PRIMARY_KEY_NULL", "DUPLICATE_PRIMARY_KEY", "PARENT_KEY_DUPLICATE"].includes(issue.issue_type)) {
-    return "Key issues can break entity identity and make joins or deduplication unsafe.";
-  }
-  if (issueScopeKind(issue) === "table") {
-    return "Table-level contract issues can make the dataset incomplete before column-level checks begin.";
-  }
-  return "This issue can reduce trust in analysis that depends on the affected table or column.";
 }
 
 function issueParentContext(issue) {

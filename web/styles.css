@@ -3572,11 +3572,68 @@ h3 {
   gap: 12px;
 }
 
+.issue-evidence-pack.compact {
+  gap: 10px;
+}
+
 .issue-evidence-pack h5 {
   margin: 0 0 6px;
   color: var(--foreground-primary);
   font-size: 13px;
   font-weight: 900;
+}
+
+.issue-evidence-intro {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+}
+
+.issue-evidence-intro strong {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.issue-evidence-intro p,
+.issue-evidence-note {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.issue-evidence-note {
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+}
+
+.issue-evidence-note code {
+  color: var(--foreground-primary);
+  overflow-wrap: anywhere;
+}
+
+.issue-evidence-query pre {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-rail);
+}
+
+.issue-evidence-query code {
+  color: #f6faf8;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .issue-context-strip {
@@ -3647,6 +3704,10 @@ h3 {
   gap: 8px;
 }
 
+.issue-evidence-pack.compact .evidence-value-list {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 .evidence-value {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -3700,10 +3761,42 @@ h3 {
 }
 
 .action-plan-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 9px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-inset);
+}
+
+.action-plan-summary div {
+  display: grid;
+  gap: 3px;
+}
+
+.action-plan-summary span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.action-plan-summary strong {
+  color: var(--foreground-primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.action-plan-summary code {
+  padding: 4px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  font-size: 11px;
 }
 
 .action-plan-metrics {
@@ -3753,11 +3846,34 @@ h3 {
 .action-plan-block {
   display: grid;
   gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
 }
 
 .action-plan-step-list {
   display: grid;
   gap: 8px;
+}
+
+.action-plan-remaining {
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.action-plan-remaining > summary {
+  padding: 8px 10px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  list-style-position: inside;
+}
+
+.action-plan-remaining > .action-plan-step-list {
+  padding: 0 10px 10px;
 }
 
 .action-plan-step {
@@ -3840,10 +3956,6 @@ h3 {
   color: var(--foreground-secondary);
   font-size: 12px;
   line-height: 1.35;
-}
-
-.action-plan-values .evidence-value {
-  background: var(--surface-overlay);
 }
 
 .action-plan-human-review {
