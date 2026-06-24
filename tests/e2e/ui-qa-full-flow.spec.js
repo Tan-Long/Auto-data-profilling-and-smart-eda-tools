@@ -229,13 +229,14 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#todosStatus")).toContainText("grouped todos");
     await expect(page.locator("#reportExportStatus")).toContainText("Reports ready");
     await expect(page.locator("#tableImpactStatus")).toContainText("tables from table_assessments.json");
-    await expect(page.locator("#dashboardGraphStatus")).toContainText("Runtime artifact context");
-    await expect(page.locator("#dashboardArtifactLinks")).toContainText("quality_gates.json");
+    await expect(page.locator("#graphs")).toHaveCount(0);
+    await expect(page.locator("#dashboardGraphDrilldown")).toHaveCount(0);
+    await expect(page.locator("#artifacts")).toHaveCount(0);
     record(
       matrix,
       "Small demo run",
-      "Local path Small demo completes and populates all review/report/artifact surfaces.",
-      "Run completed with stages, artifacts, gates, issues, todos, report/export, table readiness, graphs, and developer artifact links.",
+      "Local path Small demo completes and populates the user-facing review/report surfaces.",
+      "Run completed with stages, gates, issues, todos, report/export, and table readiness; developer graph/artifact source panes stayed absent.",
       await screenshot(page.locator("#dashboard"), "09-small-demo-review.png"),
     );
 
@@ -287,24 +288,15 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       await screenshot(page.locator("#reportExport"), "11-report-export-copy.png"),
     );
 
-    await page.locator("#dashboardGraphModeRelationship").click();
-    await page.locator("#dashboardGraphInvalidOnlyToggle").check();
-    await page.locator("#dashboardGraphDisplayFull").click();
-    await expect(page.locator("#dashboardGraphStatus")).toContainText("Relationship graph");
-    await expect(page.locator("#dashboardGraphStatus")).toContainText("invalid/warning only");
-    const graphNode = page.locator('#dashboardGraphSvg [data-graph-node-id^="relationship-edge:"]').first();
-    await expect.poll(async () => graphNode.count()).toBeGreaterThan(0);
-    await graphNode.focus();
-    await graphNode.press("Enter");
-    await expect(page.locator("#dashboardGraphDrilldown")).toContainText("relationship_graph.json");
-    await page.locator("#dashboardGraphResetView").click();
-    await expect(page.locator("#dashboardGraphDisplayOverview")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#dashboard")).not.toContainText("Developer Schema Context");
+    await expect(page.locator("#dashboard")).not.toContainText("Graph drilldown");
+    await expect(page.locator("#dashboard")).not.toContainText("Developer artifact sources");
     record(
       matrix,
-      "Graph controls",
-      "Graph mode, invalid-only filter, keyboard selection, and reset work.",
-      "Relationship graph full mode selected an edge with Enter, drilldown loaded, and reset returned to Overview.",
-      await screenshot(page.locator(".dashboard-graph"), "12-graph-controls.png"),
+      "Developer surfaces removed",
+      "Dashboard review does not expose developer schema graph, graph drilldown, or developer artifact source panes.",
+      "The post-run dashboard omitted the removed developer panels while issue, todo, and report controls remained usable.",
+      await screenshot(page.locator("#dashboard"), "12-dashboard-without-developer-surfaces.png"),
     );
 
     await page.reload();

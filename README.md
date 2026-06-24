@@ -359,9 +359,9 @@ contracts. The first screen separates the two supported demo flows:
 
 After a Profile run, the local runner opens the review surface with Quality
 Gates, Review Issues, deterministic action plans, grouped todos, Report /
-Export, table readiness, and Developer artifact evidence. Selected issues can
-run optional fake/OpenAI enrichment as a short structured add-on; the
-deterministic action plan remains the source of truth.
+Export, and table readiness. Selected issues can run optional fake/OpenAI
+enrichment as a short structured add-on; the deterministic action plan remains
+the source of truth.
 
 Treat Olist preset paths, optional LLM report artifacts, graph artifacts, and
 raw artifact links as developer/demo support surfaces.
@@ -393,16 +393,16 @@ generated artifact URLs such as
 `table_assessments.json`, `schema_parse_report.json`,
 `schema_evaluation.json`, `schema_diagram.json`, and `run_summary.json`.
 Compatibility artifacts such as `lineage_graph.json` and `influence.json` may
-also be present behind developer artifact links. The DBML diagram panel
-switches from browser preview
+also be generated for artifact compatibility, but they are not shown as a
+primary dashboard pane. The DBML diagram panel switches from browser preview
 state to generated `schema_diagram.json`, `relationship_graph.json`, and
 `schema_parse_report.json` artifacts after a run. Its local ERD renderer uses
 deterministic table layers, compact PK/FK-focused cards, orthogonal
 relationship edges, fit/expanded/non-key controls, and table or relationship
 drilldown backed by existing artifact evidence. The post-run snapshot previews
 data-quality readiness, issue counts, table readiness, runtime summary, and
-report links from those artifacts while keeping developer artifact links
-available.
+report links from those artifacts without exposing a separate developer
+artifact-source pane.
 
 - Upload mode sends browser-selected DBML/CSV files to the local backend and is
   intended for demos and small-to-medium local files.

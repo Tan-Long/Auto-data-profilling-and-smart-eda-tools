@@ -126,22 +126,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'aria-label="Review Issues by table and column"',
         "Issue detail drawer",
         "Select an issue to inspect where it happened, evidence, impact, and fix guidance.",
-        'id="dashboardGraphModeLineage"',
-        'id="dashboardGraphModeRelationship"',
-        'id="dashboardGraphDisplayOverview"',
-        'id="dashboardGraphDisplayFocus"',
-        'id="dashboardGraphDisplayFull"',
-        'id="dashboardGraphColumnsToggle"',
-        'id="dashboardGraphRuntimeToggle"',
-        'id="dashboardGraphInvalidOnlyToggle"',
-        'id="dashboardGraphResetView"',
-        'id="dashboardGraphScope"',
-        'id="dashboardGraphStatus"',
-        'id="dashboardGraphSvg"',
-        'id="dashboardGraphLegend"',
-        'id="dashboardGraphDrilldown"',
-        "Reset graph view",
-        "Invalid/warning only",
         'id="dashboardSeverityFilter"',
         'id="dashboardIssueTypeFilter"',
         'id="dashboardTableFilter"',
@@ -210,6 +194,30 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Connection URL",
         "Schema / database",
         "Table list",
+        'id="graphs"',
+        'id="artifacts"',
+        'id="dashboardGraphModeLineage"',
+        'id="dashboardGraphModeRelationship"',
+        'id="dashboardGraphDisplayOverview"',
+        'id="dashboardGraphDisplayFocus"',
+        'id="dashboardGraphDisplayFull"',
+        'id="dashboardGraphColumnsToggle"',
+        'id="dashboardGraphRuntimeToggle"',
+        'id="dashboardGraphInvalidOnlyToggle"',
+        'id="dashboardGraphResetView"',
+        'id="dashboardGraphScope"',
+        'id="dashboardGraphStatus"',
+        'id="dashboardGraphSvg"',
+        'id="dashboardGraphLegend"',
+        'id="dashboardGraphDrilldown"',
+        'id="dashboardArtifactLinks"',
+        "Developer Schema Context",
+        "Graph drilldown",
+        "Developer artifact sources",
+        "Schema context",
+        "Developer artifacts",
+        "Reset graph view",
+        "Invalid/warning only",
     ]
     for marker in forbidden_html:
         assert marker not in html
@@ -363,7 +371,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderTableImpactSection",
         "renderDashboardDrilldown",
         "renderL4GuardrailDetails",
-        "renderDashboardGraph",
         "guardrailStatusClass",
         "renderDiagram",
         "buildDiagramModel",
@@ -406,18 +413,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "diagram-relationship",
         "diagram-edge-terminal-parent",
         "diagram-cardinality-one",
-        "buildLineageGraphView",
-        "buildRelationshipGraphView",
-        "dashboardGraphSelection",
-        "dashboardGraphDisplay",
-        "dashboardGraphShowColumns",
-        "dashboardGraphShowRuntime",
-        "dashboardGraphInvalidOnly",
-        "applyDashboardGraphFocus",
-        "graphSelectionContext",
-        "renderGraphDirectConnections",
-        "renderGraphTableColumns",
-        "artifact-summary:generated",
         "EventSource",
         "renderAll();",
         "buildDbdiagramUrl",
@@ -535,7 +530,8 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderReportExportSection" in js
     assert "Copy Fix data Markdown" in js
     assert "Copy Verify after fix Markdown" in js
-    assert "Raw JSON and runtime artifacts are listed in Developer artifacts below." in js
+    assert "Reports and todo exports are ready for review." in js
+    assert "Developer artifacts below" not in js
     assert "getIssueTodosArtifact" in js
     assert "No todos generated" in js
     assert "Todo artifact missing" in js
@@ -563,7 +559,7 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Evidence coverage" in js
     assert "Actionability" in js
     assert "source=deterministic" in js
-    assert "data-graph-node-id" in js
+    assert "data-graph-node-id" not in js
     assert "profile_dataset" not in js
     assert "run_quality_checks" not in js
     assert "XMLHttpRequest" not in js

@@ -19,8 +19,8 @@ Depth: borders and surface shifts only. No broad shadows, no decorative
 gradients, no soft parchment treatment.
 
 Signature: an evidence review stack: CSV+DBML run controls first, then
-readiness, issue counts, table readiness, report links, and developer artifact
-links, all tied back to generated machine artifacts.
+readiness, issue counts, todos, table readiness, and report links, all tied
+back to generated machine artifacts without a separate developer-source pane.
 
 ## Domain Exploration
 
@@ -140,7 +140,7 @@ Data style: monospace with tabular numbers.
   only the highest-priority action plans needed for demo review.
 - Full issue evidence, all action plans, and developer/debug detail belong in
   named artifacts such as `issue_action_plans.json`, `issue_todos.json`, and
-  developer artifact links.
+  export packages, not as a primary dashboard pane.
 - When a report truncates evidence, it must say exactly what is shown, what is
   hidden, and which artifact contains the full deterministic data.
 
@@ -170,33 +170,17 @@ Data style: monospace with tabular numbers.
 - Selection highlights the chosen table or relationship plus direct neighbors,
   while the detail panel shows artifact-backed table/edge evidence and links.
 
-### Developer Schema Context
-
-- Developer schema context opens in a low-noise overview: table-level
-  structure first, with column, runtime, and artifact fan-out hidden until
-  explicit user intent.
-- Graph controls use compact segmented modes for Overview, Focus, and Full,
-  plus toggles for columns, runtime/artifacts, invalid/warning relationships,
-  and reset.
-- Relationship mode defaults to table-to-table FK edges. Relationship detail
-  belongs in the drilldown and in Full mode nodes, not persistent edge labels.
-- Lineage mode defaults to source -> table -> artifact-summary lanes. Runtime
-  stages and individual artifact fan-out are opt-in.
-- Selected nodes and direct neighbors are emphasized; unrelated graph elements
-  fade instead of disappearing, preserving orientation without clutter.
-- Edge color is mostly neutral. Amber/red is reserved for warning or invalid
-  evidence, and labels appear only on hover/focus or active selection.
-
 ## Decisions
 
 | Decision | Rationale | Date |
 | --- | --- | --- |
 | Use a restrained local data-quality console for US-056 | The demo goal is to run the profiler and inspect generated evidence, not present a decorative upload workspace | 2026-06-16 |
-| Keep the dashboard as the primary post-run surface | The strongest demo moment is readiness, table assessment, graph evidence, and artifacts after the Python/DuckDB run completes | 2026-06-16 |
+| Keep the dashboard as the primary post-run surface | The strongest demo moment is readiness, issues, todos, table assessment, and reports after the Python/DuckDB run completes | 2026-06-16 |
 | Reframe the console as guided CSV+DBML data-quality profiling | US-073 narrows the product contract while keeping advanced code paths as compatibility/developer surfaces | 2026-06-23 |
 | Preserve artifact names and routes in UI copy and controls | The web runner is a local presenter over canonical artifacts, not a new profiling engine | 2026-06-16 |
 | Use an ERD-style local DBML diagram pattern for US-061 | The local preview must be demo-readable without relying on the external dbdiagram.io iframe | 2026-06-17 |
-| Default dashboard graphs to progressive disclosure for US-062 | Demo reviewers need readable topology first and artifact-level evidence only on selection or explicit toggles | 2026-06-17 |
+| Deprecate dashboard graph panes for US-073 demo flow | Graph artifacts may still exist for compatibility, but the primary demo dashboard should not expose schema-context graph controls or graph drilldown | 2026-06-17 |
 | Demote database source mode for US-073 | Postgres/MySQL inputs remain local compatibility controls, but the product-facing workflow is CSV plus DBML | 2026-06-23 |
 | Use single-flow review layouts for US-073 | Meeting feedback rejected side-by-side two-column review presentation; demo users need to read stages, gates, issues, actions, and todos in a single vertical flow | 2026-06-23 |
 | Compact deterministic reports for US-073 | Meeting feedback rejected long LLM-style text dumps; report readers need summary tables and bounded expanded examples, while full artifacts stay available for audit | 2026-06-23 |
+| Remove developer graph and artifact-source panes from the primary dashboard | Demo feedback rejected the extra developer schema context, graph drilldown, and raw artifact source panes because they distract from issue review and next actions | 2026-06-24 |

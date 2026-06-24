@@ -28,8 +28,6 @@
         <a class="nav-item" href="#todos">Todos</a>
         <a class="nav-item" href="#reportExport">Report / Export</a>
         <a class="nav-item" href="#tableImpact">Table readiness</a>
-        <a class="nav-item" href="#graphs">Schema context</a>
-        <a class="nav-item" href="#artifacts">Developer artifacts</a>
       </nav>
 
       <div class="sidebar-card">
@@ -425,7 +423,7 @@
               <div class="report-export-todos" id="reportExportTodos">
                 <p class="muted">Todo exports load after deterministic todos are generated.</p>
               </div>
-              <p class="form-message" id="reportExportMessage" role="status">Report links are shown before Developer artifacts.</p>
+              <p class="form-message" id="reportExportMessage" role="status">Reports and todo exports are ready after a completed run.</p>
             </section>
 
             <section class="dashboard-section table-impact-section" id="tableImpact" aria-labelledby="tableImpactTitle">
@@ -438,60 +436,6 @@
               </div>
             </section>
 
-            <section class="dashboard-graph" id="graphs" aria-labelledby="dashboardGraphTitle">
-              <div class="runtime-heading">
-                <strong id="dashboardGraphTitle">Developer Schema Context</strong>
-                <span id="dashboardGraphStatus">Waiting for artifacts</span>
-              </div>
-              <div class="dashboard-graph-toolbar">
-                <div class="graph-control-group">
-                  <span>Artifact</span>
-                  <div class="runner-mode-switch dashboard-graph-mode" role="tablist" aria-label="Graph artifact">
-                    <button class="mode-button active" id="dashboardGraphModeLineage" type="button" role="tab" aria-selected="true">Runtime artifacts</button>
-                    <button class="mode-button" id="dashboardGraphModeRelationship" type="button" role="tab" aria-selected="false">Relationships</button>
-                  </div>
-                </div>
-                <div class="graph-control-group">
-                  <span>View</span>
-                  <div class="runner-mode-switch dashboard-graph-mode" role="group" aria-label="Graph detail level">
-                    <button class="mode-button active" id="dashboardGraphDisplayOverview" type="button" aria-pressed="true">Overview</button>
-                    <button class="mode-button" id="dashboardGraphDisplayFocus" type="button" aria-pressed="false">Focus</button>
-                    <button class="mode-button" id="dashboardGraphDisplayFull" type="button" aria-pressed="false">Full</button>
-                  </div>
-                </div>
-                <div class="graph-toggle-row" aria-label="Graph detail toggles">
-                  <label class="toggle-label">
-                    <input id="dashboardGraphColumnsToggle" type="checkbox">
-                    <span>Show columns</span>
-                  </label>
-                  <label class="toggle-label">
-                    <input id="dashboardGraphRuntimeToggle" type="checkbox">
-                    <span>Show runtime/artifacts</span>
-                  </label>
-                  <label class="toggle-label">
-                    <input id="dashboardGraphInvalidOnlyToggle" type="checkbox">
-                    <span>Invalid/warning only</span>
-                  </label>
-                  <button class="ghost-button graph-reset-button" id="dashboardGraphResetView" type="button">Reset graph view</button>
-                </div>
-                <label class="field-label graph-scope-label" for="dashboardGraphScope">
-                  Detail scope
-                  <select id="dashboardGraphScope">
-                    <option value="table">Tables</option>
-                    <option value="columns">Columns</option>
-                    <option value="relationships">Relationships</option>
-                    <option value="runtime">Runtime + artifacts</option>
-                  </select>
-                </label>
-              </div>
-              <div class="dashboard-graph-canvas">
-                <svg id="dashboardGraphSvg" class="dashboard-graph-svg" role="img" aria-label="Developer artifact graph"></svg>
-              </div>
-              <div class="graph-legend" id="dashboardGraphLegend">
-                <span>No graph loaded</span>
-              </div>
-            </section>
-
             <div class="dashboard-detail-grid">
               <section class="dashboard-detail" aria-live="polite">
                 <div class="runtime-heading">
@@ -500,24 +444,6 @@
                 </div>
                 <div id="dashboardDrilldown">
                   <p class="muted">Select an issue to inspect where it happened, evidence, impact, and fix guidance.</p>
-                </div>
-              </section>
-              <section class="dashboard-detail" aria-live="polite">
-                <div class="runtime-heading">
-                  <strong>Graph drilldown</strong>
-                  <span id="dashboardGraphDrilldownMeta">No node</span>
-                </div>
-                <div id="dashboardGraphDrilldown">
-                  <p class="muted">Select a graph node to inspect metadata and evidence artifacts.</p>
-                </div>
-              </section>
-              <section class="dashboard-detail" id="artifacts">
-                <div class="runtime-heading">
-                  <strong>Developer artifact sources</strong>
-                  <span id="dashboardArtifactCount">0 files</span>
-                </div>
-                <div class="artifact-list compact" id="dashboardArtifactLinks">
-                  <p class="muted">Developer artifact sources are listed after artifact discovery.</p>
                 </div>
               </section>
             </div>

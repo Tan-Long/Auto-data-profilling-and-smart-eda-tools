@@ -545,106 +545,14 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("feedback_signal_quality");
   await expect(page.locator("#dashboardDrilldown")).toContainText("affected_columns");
 
-  await expect(page.locator("#dashboardGraphStatus")).toContainText("Runtime artifact context");
-  await expect(page.locator("#dashboardGraphStatus")).toContainText("Overview");
-  await expect
-    .poll(async () => page.locator("#dashboardGraphSvg [data-graph-node-id]").count())
-    .toBeGreaterThan(0);
-  await expect(page.locator("#dashboardGraphLegend")).toContainText("Table");
-  await expect(page.locator('#dashboardGraphSvg [data-graph-node-id^="column:"]')).toHaveCount(0);
-  await expect(page.locator('#dashboardGraphSvg [data-graph-node-id^="stage:"]')).toHaveCount(0);
-  await expect(page.locator('#dashboardGraphSvg [data-graph-node-id^="artifact:"]')).toHaveCount(0);
-
-  await page
-    .locator("#dashboardGraphSvg [data-graph-node-id]")
-    .filter({ hasText: "orders" })
-    .first()
-    .click();
-  await expect(page.locator("#dashboardGraphDrilldownMeta")).toContainText("orders");
-  await expect(page.locator("#dashboardGraphDrilldown")).toContainText(
-    "lineage_graph.json",
-  );
-  await expect(page.locator("#dashboardGraphDrilldown")).toContainText("Direct neighbors");
-  await expect(page.locator("#dashboardGraphDrilldown")).toContainText("Columns in inspector");
-  await expect(page.locator("#dashboardGraphSvg .graph-node.dimmed").first()).toBeVisible();
-
-  await page.locator("#dashboardGraphDisplayFocus").click();
-  await expect(page.locator("#dashboardGraphStatus")).toContainText("Focus");
-  await expect(page.locator("#dashboardGraphSvg .graph-node.selected")).toHaveCount(1);
-  await page.locator("#dashboardGraphResetView").click();
-  await expect(page.locator("#dashboardGraphStatus")).toContainText("Overview");
-  await expect(page.locator("#dashboardGraphDisplayOverview")).toHaveAttribute("aria-pressed", "true");
-  fs.mkdirSync("outputs/graph_progressive_screenshots", { recursive: true });
-  await page.locator(".dashboard-graph").screenshot({
-    path: "outputs/graph_progressive_screenshots/lineage-overview.png",
-  });
-
-  await page.locator("#dashboardGraphModeRelationship").click();
-  await expect(page.locator("#dashboardGraphStatus")).toContainText(
-    "Relationship graph",
-  );
-  await expect(page.locator("#dashboardGraphStatus")).toContainText("Overview");
-  await expect(
-    page.locator('#dashboardGraphSvg [data-graph-node-id^="relationship-edge:"]'),
-  ).toHaveCount(0);
-  await page.locator("#dashboardGraphInvalidOnlyToggle").check();
-  await expect(page.locator("#dashboardGraphStatus")).toContainText(
-    "invalid/warning only",
-  );
-  await page.locator("#dashboardGraphDisplayFull").click();
-  await expect(page.locator("#dashboardGraphStatus")).toContainText(
-    "Relationships",
-  );
-  await expect
-    .poll(async () =>
-      page.locator('#dashboardGraphSvg [data-graph-node-id^="relationship-edge:"]').count(),
-    )
-    .toBeGreaterThan(0);
-  await page
-    .locator('#dashboardGraphSvg [data-graph-node-id^="relationship-edge:"]')
-    .first()
-    .click();
-  await expect(page.locator("#dashboardGraphDrilldown")).toContainText(
-    "relationship_graph.json",
-  );
-  await expect(page.locator("#dashboardGraphDrilldown")).toContainText(
-    /ORPHAN_FOREIGN_KEY|FOREIGN_KEY_NULL|PARENT_KEY_DUPLICATE|CHILD_RELATIONSHIP_DUPLICATE/,
-  );
-  await page.locator(".dashboard-graph").screenshot({
-    path: "outputs/graph_progressive_screenshots/relationship-full.png",
-  });
-
-  await expect(page.locator("#dashboardArtifactCount")).toContainText(/(?:21|22) files/);
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "charts/issue_counts_by_severity.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "charts/outliers_top_columns.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "schema_parse_report.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "relationship_graph.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "table_assessments.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "issue_action_plans.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "issue_todos.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "issue_llm_enrichments.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "quality_gates.json",
-  );
-  await expect(page.locator("#dashboardArtifactLinks")).toContainText(
-    "lineage_graph.json",
-  );
+  await expect(page.locator("#graphs")).toHaveCount(0);
+  await expect(page.locator("#dashboardGraphSvg")).toHaveCount(0);
+  await expect(page.locator("#dashboardGraphDrilldown")).toHaveCount(0);
+  await expect(page.locator("#artifacts")).toHaveCount(0);
+  await expect(page.locator("#dashboardArtifactLinks")).toHaveCount(0);
+  await expect(page.locator("#dashboard")).not.toContainText("Developer Schema Context");
+  await expect(page.locator("#dashboard")).not.toContainText("Graph drilldown");
+  await expect(page.locator("#dashboard")).not.toContainText("Developer artifact sources");
 
   await page.locator("#dashboardSeverityFilter").selectOption("P1");
   await expect(page.locator("#dashboardIssueCount")).toContainText("/12 issues");
