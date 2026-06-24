@@ -87,6 +87,10 @@ const els = {
   csvDropzone: document.querySelector("#csvDropzone"),
   dbmlStatus: document.querySelector("#dbmlStatus"),
   csvStatus: document.querySelector("#csvStatus"),
+  sourceStateBadge: document.querySelector("#sourceStateBadge"),
+  sourceStateSummary: document.querySelector("#sourceStateSummary"),
+  sourceStateDetails: document.querySelector("#sourceStateDetails"),
+  clearUploadButton: document.querySelector("#clearUploadButton"),
   preflightStatus: document.querySelector("#preflightStatus"),
   mappingStatus: document.querySelector("#mappingStatus"),
   runnerStatus: document.querySelector("#runnerStatus"),
@@ -212,339 +216,31 @@ const els = {
   loadDemoButton: document.querySelector("#loadDemoButton"),
 };
 
-const demoDbml = `Table customers {
-  customer_id varchar [pk, not null]
-  customer_name varchar
-  customer_state varchar
-}
-
-Table orders {
-  order_id varchar [pk, not null]
-  customer_id varchar [ref: > customers.customer_id]
-  order_status varchar
-  order_purchase_timestamp timestamp
-  order_delivered_customer_date timestamp
-}
-
-Table order_items {
-  order_id varchar [ref: > orders.order_id]
-  order_item_id int
-  product_id varchar [ref: > products.product_id]
-  seller_id varchar [ref: > sellers.seller_id]
-  price float
-  freight_value float
-
-  indexes {
-    (order_id, order_item_id) [pk]
-  }
-}
-
-Table order_payments {
-  order_id varchar [ref: > orders.order_id]
-  payment_sequential int
-  payment_type varchar
-  payment_installments int
-  payment_value float
-}
-
-Table order_reviews {
-  review_id varchar [pk, not null]
-  order_id varchar [ref: > orders.order_id]
-  review_score int
-  review_comment_message varchar
-}
-
-Table products {
-  product_id varchar [pk, not null]
-  product_category_name varchar
-}
-
-Table sellers {
-  seller_id varchar [pk, not null]
-  seller_state varchar
-}`;
-
-const demoCsvs = [
-  { name: "customers.csv", stem: "customers", columns: ["customer_id", "customer_name", "customer_state"], size: 112 },
-  {
-    name: "orders.csv",
-    stem: "orders",
-    columns: [
-      "order_id",
-      "customer_id",
-      "order_status",
-      "order_purchase_timestamp",
-      "order_delivered_customer_date",
-    ],
-    size: 370,
-  },
-  {
-    name: "order_items.csv",
-    stem: "order_items",
-    columns: ["order_id", "order_item_id", "product_id", "seller_id", "price", "freight_value"],
-    size: 183,
-  },
-  {
-    name: "order_payments.csv",
-    stem: "order_payments",
-    columns: ["order_id", "payment_sequential", "payment_type", "payment_installments", "payment_value"],
-    size: 159,
-  },
-  {
-    name: "order_reviews.csv",
-    stem: "order_reviews",
-    columns: ["review_id", "order_id", "review_score", "review_comment_message"],
-    size: 146,
-  },
-  { name: "products.csv", stem: "products", columns: ["product_id", "product_category_name"], size: 64 },
-  { name: "sellers.csv", stem: "sellers", columns: ["seller_id", "seller_state"], size: 42 },
-];
-
-const olistDemoDbml = `Table olist_customers_dataset {
-  customer_id varchar [pk, not null]
-  customer_unique_id varchar
-  customer_zip_code_prefix int
-  customer_city varchar
-  customer_state varchar
-}
-
-Table olist_orders_dataset {
-  order_id varchar [pk, not null]
-  customer_id varchar [ref: > olist_customers_dataset.customer_id]
-  order_status varchar
-  order_purchase_timestamp timestamp
-  order_approved_at timestamp
-  order_delivered_carrier_date timestamp
-  order_delivered_customer_date timestamp
-  order_estimated_delivery_date timestamp
-}
-
-Table olist_order_items_dataset {
-  order_id varchar [ref: > olist_orders_dataset.order_id]
-  order_item_id int
-  product_id varchar [ref: > olist_products_dataset.product_id]
-  seller_id varchar [ref: > olist_sellers_dataset.seller_id]
-  shipping_limit_date timestamp
-  price float
-  freight_value float
-
-  indexes {
-    (order_id, order_item_id) [pk]
-  }
-}
-
-Table olist_order_payments_dataset {
-  order_id varchar [ref: > olist_orders_dataset.order_id]
-  payment_sequential int
-  payment_type varchar
-  payment_installments int
-  payment_value float
-}
-
-Table olist_order_reviews_dataset {
-  review_id varchar
-  order_id varchar [ref: > olist_orders_dataset.order_id]
-  review_score int
-  review_comment_title varchar
-  review_comment_message varchar
-  review_creation_date timestamp
-  review_answer_timestamp timestamp
-}
-
-Table olist_products_dataset {
-  product_id varchar [pk, not null]
-  product_category_name varchar [ref: > product_category_name_translation.product_category_name]
-  product_name_lenght int
-  product_description_lenght int
-  product_photos_qty int
-  product_weight_g float
-  product_length_cm float
-  product_height_cm float
-  product_width_cm float
-}
-
-Table olist_sellers_dataset {
-  seller_id varchar [pk, not null]
-  seller_zip_code_prefix int
-  seller_city varchar
-  seller_state varchar
-}
-
-Table product_category_name_translation {
-  product_category_name varchar [pk, not null]
-  product_category_name_english varchar
-}
-
-Table olist_geolocation_dataset {
-  geolocation_zip_code_prefix int
-  geolocation_lat float
-  geolocation_lng float
-  geolocation_city varchar
-  geolocation_state varchar
-}`;
-
-const olistDemoCsvs = [
-  {
-    name: "olist_customers_dataset.csv",
-    stem: "olist_customers_dataset",
-    columns: ["customer_id", "customer_unique_id", "customer_zip_code_prefix", "customer_city", "customer_state"],
-    size: 9033957,
-  },
-  {
-    name: "olist_geolocation_dataset.csv",
-    stem: "olist_geolocation_dataset",
-    columns: ["geolocation_zip_code_prefix", "geolocation_lat", "geolocation_lng", "geolocation_city", "geolocation_state"],
-    size: 61273883,
-  },
-  {
-    name: "olist_order_items_dataset.csv",
-    stem: "olist_order_items_dataset",
-    columns: ["order_id", "order_item_id", "product_id", "seller_id", "shipping_limit_date", "price", "freight_value"],
-    size: 15438671,
-  },
-  {
-    name: "olist_order_payments_dataset.csv",
-    stem: "olist_order_payments_dataset",
-    columns: ["order_id", "payment_sequential", "payment_type", "payment_installments", "payment_value"],
-    size: 5777138,
-  },
-  {
-    name: "olist_order_reviews_dataset.csv",
-    stem: "olist_order_reviews_dataset",
-    columns: ["review_id", "order_id", "review_score", "review_comment_title", "review_comment_message", "review_creation_date", "review_answer_timestamp"],
-    size: 14451670,
-  },
-  {
-    name: "olist_orders_dataset.csv",
-    stem: "olist_orders_dataset",
-    columns: ["order_id", "customer_id", "order_status", "order_purchase_timestamp", "order_approved_at", "order_delivered_carrier_date", "order_delivered_customer_date", "order_estimated_delivery_date"],
-    size: 17654914,
-  },
-  {
-    name: "olist_products_dataset.csv",
-    stem: "olist_products_dataset",
-    columns: ["product_id", "product_category_name", "product_name_lenght", "product_description_lenght", "product_photos_qty", "product_weight_g", "product_length_cm", "product_height_cm", "product_width_cm"],
-    size: 2379446,
-  },
-  {
-    name: "olist_sellers_dataset.csv",
-    stem: "olist_sellers_dataset",
-    columns: ["seller_id", "seller_zip_code_prefix", "seller_city", "seller_state"],
-    size: 174703,
-  },
-  {
-    name: "product_category_name_translation.csv",
-    stem: "product_category_name_translation",
-    columns: ["product_category_name", "product_category_name_english"],
-    size: 2613,
-  },
-];
-
-const demoPresets = {
-  small: {
-    label: "Small demo",
-    dbmlName: "demo_schema.dbml",
-    dbmlPath: "data/demo_small/schema.dbml",
-    csvDir: "data/demo_small/csv",
-    rulesPath: "data/demo_small/rules.yaml",
-    target: "order_reviews.review_score",
-    dbmlText: demoDbml,
-    csvs: demoCsvs,
-  },
-  olist: {
-    label: "Legacy Olist sample",
-    dbmlName: "olist_schema.dbml",
-    dbmlPath: "examples/olist/schema.dbml",
-    csvDir: "data/olist",
-    rulesPath: "examples/olist/rules.yaml",
-    target: "olist_order_reviews_dataset.review_score",
-    dbmlText: olistDemoDbml,
-    csvs: olistDemoCsvs,
-  },
-};
-
-const dashboardChartPaths = {
-  risk: "charts/dataset_verdict_risk_summary.json",
-  severity: "charts/issue_counts_by_severity.json",
-  type: "charts/issue_counts_by_type.json",
-  missingTable: "charts/missingness_by_table.json",
-  missingColumns: "charts/missingness_top_columns.json",
-  outliers: "charts/outliers_top_columns.json",
-  relationship: "charts/relationship_fk_health.json",
-  influence: "charts/influence_top_features.json",
-};
-
-const dashboardMachineArtifacts = [
-  "issues.json",
-  "profile_summary.json",
-  "relationship_graph.json",
-  "dataset_verdict.json",
-  "table_assessments.json",
-  "issue_action_plans.json",
-  "issue_llm_enrichments.json",
-  "issue_todos.json",
-  "quality_gates.json",
-  "schema_evaluation.json",
-  "lineage_graph.json",
-  "influence.json",
-  "guardrail_report.json",
-  "run_summary.json",
-];
-
-const graphScopeLabels = {
-  table: "Tables",
-  columns: "Columns",
-  relationships: "Relationships",
-  runtime: "Runtime + artifacts",
-};
-
-const graphDisplayLabels = {
-  overview: "Overview",
-  focus: "Focus",
-  full: "Full",
-};
-
-const lineageTypeToCategory = {
-  source_system: "source",
-  schema: "schema",
-  table: "table",
-  column: "column",
-  relationship: "relationship",
-  profiler_stage: "stage",
-  artifact: "artifact",
-};
-
-const graphCategoryLabels = {
-  source: "Source",
-  schema: "Schema",
-  table: "Table",
-  column: "Column",
-  relationship: "Relationship",
-  stage: "Runtime stage",
-  artifact: "Artifact",
-};
-
-const lineageCategoryOrder = ["source", "schema", "table", "column", "relationship", "stage", "artifact"];
-const relationshipCategoryOrder = ["table", "column", "relationship", "artifact"];
-const relationshipIssueTypes = new Set([
-  "ORPHAN_FOREIGN_KEY",
-  "PARENT_KEY_DUPLICATE",
-  "FOREIGN_KEY_NULL",
-  "CHILD_RELATIONSHIP_DUPLICATE",
-]);
-
-const severityOrder = ["P0", "P1", "P2", "P3"];
+const { demoPresets } = window.VSF_DEMO_DATA;
+const {
+  cloneCsvPreview,
+  parseDbml,
+  readCsvFile,
+} = window.VSF_SOURCE_PARSERS;
+const {
+  dashboardChartPaths,
+  dashboardMachineArtifacts,
+  graphCategoryLabels,
+  graphDisplayLabels,
+  graphScopeLabels,
+  lineageCategoryOrder,
+  lineageTypeToCategory,
+  localDiagramLimits,
+  postRunDiagramArtifacts,
+  relationshipCategoryOrder,
+  relationshipIssueTypes,
+  severityOrder,
+} = window.VSF_DASHBOARD_CONFIG;
 
 function severityRank(severity) {
   const index = severityOrder.indexOf(severity);
   return index === -1 ? severityOrder.length : index;
 }
-
-const localDiagramLimits = {
-  tables: 24,
-  relationships: 60,
-};
-const postRunDiagramArtifacts = ["schema_diagram.json"];
 
 els.profileFlowButton.addEventListener("click", () => {
   setFlowMode("profile");
@@ -621,7 +317,11 @@ els.autoLinkButton.addEventListener("click", () => {
 });
 
 els.loadDemoButton.addEventListener("click", () => {
-  loadDemoState("small");
+  loadDemoState("small", { switchToPath: true });
+});
+
+els.clearUploadButton.addEventListener("click", () => {
+  clearProfileInputs();
 });
 
 els.runnerModeUpload.addEventListener("click", () => {
@@ -1311,6 +1011,13 @@ async function startDatabaseRun() {
 function setRunnerMode(mode) {
   resetPreflightReview();
   state.runnerMode = ["upload", "path", "database"].includes(mode) ? mode : "upload";
+  if (state.runnerMode === "path") {
+    syncDemoPresetFromPathInputs();
+  }
+  if (state.runnerMode === "path" && !state.dbmlText && demoPresets[state.selectedDemoPreset]) {
+    loadDemoState(state.selectedDemoPreset, { switchToPath: true });
+    return;
+  }
   if (state.runnerMode === "database") {
     syncDatabaseSourceControls({ preserveUserValue: true });
   }
@@ -1388,6 +1095,7 @@ function renderRunnerMessage(message, status) {
 
 function loadDemoState(presetName = "small", options = {}) {
   resetPreflightReview();
+  resetRunResultsForInputChange();
   const preset = demoPresets[presetName] || demoPresets.small;
   state.selectedDemoPreset = presetName in demoPresets ? presetName : "small";
   state.dbmlText = preset.dbmlText;
@@ -1396,6 +1104,9 @@ function loadDemoState(presetName = "small", options = {}) {
   state.rulesFile = null;
   state.csvFiles = preset.csvs.map(cloneCsvPreview);
   state.csvReadErrors = [];
+  els.dbmlInput.value = "";
+  els.csvInput.value = "";
+  els.rulesInput.value = "";
   els.dbmlPathInput.value = preset.dbmlPath;
   els.csvDirPathInput.value = preset.csvDir;
   els.rulesPathInput.value = preset.rulesPath;
@@ -1410,13 +1121,52 @@ function loadDemoState(presetName = "small", options = {}) {
   renderDiagram();
 }
 
-function cloneCsvPreview(file) {
-  return {
-    name: file.name,
-    stem: file.stem || file.name.replace(/\.csv$/i, ""),
-    size: file.size,
-    columns: [...file.columns],
-  };
+function clearProfileInputs(options = {}) {
+  resetPreflightReview();
+  resetRunResultsForInputChange();
+  clearDbmlState();
+  state.dbmlFile = null;
+  state.rulesFile = null;
+  state.csvFiles = [];
+  state.csvReadErrors = [];
+  state.mapping = new Map();
+  state.manualMappings = new Set();
+  state.selectedDemoPreset = "custom";
+  els.dbmlInput.value = "";
+  els.csvInput.value = "";
+  els.rulesInput.value = "";
+  if (options.clearPathValues) {
+    els.dbmlPathInput.value = "";
+    els.csvDirPathInput.value = "";
+    els.rulesPathInput.value = "";
+    els.pathTargetInput.value = "";
+  }
+  renderRunnerMessage("Source cleared. Add DBML and CSV files for a new profile run.", "idle");
+  renderAll();
+}
+
+function clearDbmlState() {
+  state.dbmlText = "";
+  state.dbmlName = "";
+  state.tables = [];
+  state.relationships = [];
+  state.dbmlParseError = "";
+  state.diagramSelection = null;
+}
+
+function resetRunResultsForInputChange() {
+  if (state.eventSource) {
+    state.eventSource.close();
+    state.eventSource = null;
+  }
+  state.currentJob = null;
+  state.runEvents = [];
+  resetDashboardState();
+}
+
+function markCustomUploadSource() {
+  state.runnerMode = "upload";
+  state.selectedDemoPreset = "custom";
 }
 
 function syncDemoPresetFromPathInputs() {
@@ -1499,16 +1249,32 @@ function setupDropzone(element, onDrop) {
 
 async function loadDbmlFile(file) {
   resetPreflightReview();
+  resetRunResultsForInputChange();
+  markCustomUploadSource();
+  if (!state.csvFiles.some((csvFile) => csvFile.sourceFile)) {
+    state.csvFiles = [];
+  }
+  state.csvReadErrors = [];
   state.dbmlText = await file.text();
   state.dbmlName = file.name;
   state.dbmlFile = file;
   parseDbmlState();
   autoLinkCsvs();
+  renderRunnerMessage("Custom DBML uploaded. Add matching CSV files, then review preflight.", "idle");
   renderAll();
 }
 
 async function loadCsvFiles(files) {
+  if (!files.length) {
+    return;
+  }
   resetPreflightReview();
+  resetRunResultsForInputChange();
+  const hasUploadedDbml = Boolean(state.dbmlFile);
+  markCustomUploadSource();
+  if (!hasUploadedDbml) {
+    clearDbmlState();
+  }
   const results = await Promise.all(
     files.map(async (file) => {
       try {
@@ -1525,58 +1291,15 @@ async function loadCsvFiles(files) {
   );
   const parsed = results.map((result) => result.file).filter(Boolean);
   state.csvReadErrors = results.map((result) => result.error).filter(Boolean);
-  const existing = new Map(state.csvFiles.map((file) => [file.stem, file]));
-  parsed.forEach((file) => existing.set(file.stem, file));
-  state.csvFiles = [...existing.values()].sort((a, b) => a.name.localeCompare(b.name));
+  state.csvFiles = parsed.sort((a, b) => a.name.localeCompare(b.name));
   autoLinkCsvs();
+  renderRunnerMessage(
+    parsed.length
+      ? "Custom CSV upload replaced the previous source inventory. Review mapping before running."
+      : "No readable CSV files were found in that upload.",
+    parsed.length ? "idle" : "error",
+  );
   renderAll();
-}
-
-async function readCsvFile(file) {
-  const text = await readFilePrefix(file, 64 * 1024);
-  return {
-    name: file.name,
-    stem: file.name.replace(/\.csv$/i, ""),
-    size: file.size,
-    columns: parseCsvHeader(text),
-    sourceFile: file,
-  };
-}
-
-function readFilePrefix(file, bytes) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsText(file.slice(0, bytes));
-  });
-}
-
-function parseCsvHeader(text) {
-  const firstLine = text.split(/\r?\n/)[0] || "";
-  const columns = [];
-  let current = "";
-  let quoted = false;
-  for (let index = 0; index < firstLine.length; index += 1) {
-    const char = firstLine[index];
-    if (char === '"' && firstLine[index + 1] === '"') {
-      current += '"';
-      index += 1;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      columns.push(cleanColumn(current));
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  columns.push(cleanColumn(current));
-  return columns.filter(Boolean);
-}
-
-function cleanColumn(value) {
-  return value.replace(/^\uFEFF/, "").trim();
 }
 
 function parseDbmlState() {
@@ -1585,154 +1308,6 @@ function parseDbmlState() {
   state.relationships = parsed.relationships;
   state.dbmlParseError = parsed.error;
   state.diagramSelection = null;
-}
-
-function parseDbml(text) {
-  const clean = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-  const tables = [];
-  const relationships = [];
-  const errorParts = [];
-  const braceDepth = dbmlBraceDepth(clean);
-  if (text.trim() && braceDepth !== 0) {
-    errorParts.push("DBML has unbalanced table braces.");
-  }
-  const tableRegex = /\bTable\s+([A-Za-z_][\w]*)\s*\{/gi;
-  let match;
-  while ((match = tableRegex.exec(clean))) {
-    const tableName = match[1];
-    const start = match.index + match[0].length;
-    const end = findBlockEnd(clean, start);
-    const body = clean.slice(start, end);
-    const table = parseTable(tableName, body, relationships);
-    tables.push(table);
-    tableRegex.lastIndex = end + 1;
-  }
-
-  const refRegex =
-    /^\s*Ref\s*:\s*([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)\s*>\s*([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)/gim;
-  while ((match = refRegex.exec(clean))) {
-    const rel = {
-      childTable: match[1],
-      childColumn: match[2],
-      parentTable: match[3],
-      parentColumn: match[4],
-    };
-    pushRelationship(relationships, rel);
-    const table = tables.find((item) => item.name === rel.childTable);
-    const column = table?.columns.find((item) => item.name === rel.childColumn);
-    if (column) {
-      column.fk = rel;
-    }
-  }
-
-  if (text.trim() && !tables.length) {
-    errorParts.push("No DBML Table blocks were parsed.");
-  }
-
-  return { tables, relationships, error: errorParts.join(" ") };
-}
-
-function findBlockEnd(text, start) {
-  let depth = 1;
-  for (let index = start; index < text.length; index += 1) {
-    if (text[index] === "{") {
-      depth += 1;
-    }
-    if (text[index] === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return index;
-      }
-    }
-  }
-  return text.length;
-}
-
-function dbmlBraceDepth(text) {
-  let depth = 0;
-  for (let index = 0; index < text.length; index += 1) {
-    if (text[index] === "{") {
-      depth += 1;
-    } else if (text[index] === "}") {
-      depth -= 1;
-    }
-  }
-  return depth;
-}
-
-function parseTable(name, body, relationships) {
-  const table = { name, columns: [], primaryKey: [] };
-  body.split(/\r?\n/).forEach((rawLine) => {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("indexes") || line === "{" || line === "}") {
-      return;
-    }
-
-    const compositePk = line.match(/\(([^)]+)\)\s*\[[^\]]*\bpk\b[^\]]*\]/i);
-    if (compositePk) {
-      compositePk[1]
-        .split(",")
-        .map((column) => column.trim())
-        .filter(Boolean)
-        .forEach((column) => {
-          if (!table.primaryKey.includes(column)) {
-            table.primaryKey.push(column);
-          }
-        });
-      return;
-    }
-
-    const columnMatch = line.match(/^([A-Za-z_][\w]*)\s+([A-Za-z_][\w]*(?:\([^)]*\))?)\s*(?:\[(.*?)\])?$/);
-    if (!columnMatch) {
-      return;
-    }
-    const column = {
-      name: columnMatch[1],
-      type: columnMatch[2],
-      pk: false,
-      notNull: false,
-      unique: false,
-      fk: null,
-    };
-    const attrs = columnMatch[3] || "";
-    if (/\bpk\b/i.test(attrs)) {
-      column.pk = true;
-      column.notNull = true;
-      table.primaryKey.push(column.name);
-    }
-    if (/not\s+null/i.test(attrs)) {
-      column.notNull = true;
-    }
-    if (/\bunique\b/i.test(attrs)) {
-      column.unique = true;
-    }
-    const ref = attrs.match(/ref\s*:\s*>\s*([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)/i);
-    if (ref) {
-      column.fk = {
-        childTable: name,
-        childColumn: column.name,
-        parentTable: ref[1],
-        parentColumn: ref[2],
-      };
-      pushRelationship(relationships, column.fk);
-    }
-    table.columns.push(column);
-  });
-  table.primaryKey = [...new Set(table.primaryKey)];
-  return table;
-}
-
-function pushRelationship(relationships, rel) {
-  const exists = relationships.some(
-    (item) =>
-      item.childTable === rel.childTable &&
-      item.childColumn === rel.childColumn &&
-      item.parentTable === rel.parentTable &&
-      item.parentColumn === rel.parentColumn,
-  );
-  if (!exists) {
-    relationships.push(rel);
-  }
 }
 
 function autoLinkCsvs() {
@@ -1749,6 +1324,7 @@ function autoLinkCsvs() {
 function renderAll() {
   renderFlowShell();
   renderStatus();
+  renderSourceState();
   renderCsvList();
   renderEdges();
   renderMapping();
@@ -2031,6 +1607,56 @@ function renderStatus() {
   } else {
     els.dbmlFileCard.hidden = true;
   }
+}
+
+function renderSourceState() {
+  const uploadedCsvs = state.csvFiles.filter((file) => file.sourceFile);
+  const preset = demoPresets[state.selectedDemoPreset];
+  const modeLabel = {
+    upload: "Upload",
+    path: "Local path",
+    database: "Database",
+  }[state.runnerMode] || "Upload";
+  const dbmlLabel = state.dbmlFile
+    ? state.dbmlFile.name
+    : state.runnerMode === "path" && els.dbmlPathInput.value.trim()
+      ? els.dbmlPathInput.value.trim()
+      : state.dbmlName || "Not selected";
+  const csvLabel = state.runnerMode === "path" && els.csvDirPathInput.value.trim()
+    ? els.csvDirPathInput.value.trim()
+    : state.csvFiles.length
+      ? `${integerText(state.csvFiles.length)} file${state.csvFiles.length === 1 ? "" : "s"}`
+      : "0 files";
+  let badge = "No upload";
+  let status = "";
+  let summary = "Upload a DBML contract and CSV files to profile your own data.";
+  if (state.runnerMode === "database") {
+    badge = "Developer DB";
+    status = "warnings_pending";
+    summary = "Developer database mode is a compatibility source. CSV+DBML upload remains the primary guided path.";
+  } else if (state.runnerMode === "path") {
+    badge = preset ? "Demo paths" : "Custom paths";
+    status = "ready";
+    summary = preset
+      ? `${preset.label} paths are selected for the local runner.`
+      : "Local path mode will read files visible to the backend process.";
+  } else if (state.dbmlFile || uploadedCsvs.length) {
+    badge = "Custom upload";
+    status = state.dbmlFile && uploadedCsvs.length ? "ready" : "warnings_pending";
+    summary = uploadedCsvs.length
+      ? "Browser upload source is active. New CSV selections replace the previous inventory."
+      : "Custom DBML is active. Upload matching CSV files before running.";
+  }
+
+  els.sourceStateBadge.textContent = badge;
+  els.sourceStateBadge.dataset.status = status;
+  els.sourceStateSummary.textContent = summary;
+  els.sourceStateDetails.innerHTML = `
+    <div><span>DBML</span><strong>${escapeHtml(dbmlLabel)}</strong></div>
+    <div><span>CSV</span><strong>${escapeHtml(csvLabel)}</strong></div>
+    <div><span>Run mode</span><strong>${escapeHtml(modeLabel)}</strong></div>
+  `;
+  els.clearUploadButton.disabled = !(state.dbmlFile || uploadedCsvs.length || state.dbmlText || state.csvFiles.length);
 }
 
 function runnerStatusText() {
@@ -6370,8 +5996,8 @@ function renderDiagram() {
   if (!model.hasInput) {
     renderDiagramState(
       "empty",
-      "Preparing demo DBML diagram",
-      "The local preview renders here from browser DBML state. Upload DBML/CSV files or reset the demo.",
+      "Upload DBML to preview schema",
+      "The local preview renders from the current browser DBML state. Use custom files or load demo paths from Advanced options.",
       model,
     );
     return;
@@ -7165,5 +6791,5 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-loadDemoState();
+renderAll();
 checkRunnerHealth();

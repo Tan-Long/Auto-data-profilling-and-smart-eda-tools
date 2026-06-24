@@ -13,7 +13,13 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     design_system = Path(__file__).resolve().parents[1] / ".interface-design" / "system.md"
     html = (root / "index.html").read_text()
     css = (root / "styles.css").read_text()
-    js = (root / "app.js").read_text()
+    app_js = (root / "app.js").read_text()
+    js_modules = [
+        root / "js" / "demo-data.js",
+        root / "js" / "source-parsers.js",
+        root / "js" / "dashboard-config.js",
+    ]
+    js = app_js + "\n" + "\n".join(path.read_text() for path in js_modules)
     design = design_system.read_text()
 
     required_html = [
@@ -45,6 +51,13 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "No arbitrary uploads are accepted in Evaluate.",
         'id="dbmlInput"',
         'id="csvInput"',
+        'id="sourceState"',
+        'id="sourceStateBadge"',
+        'id="sourceStateSummary"',
+        'id="sourceStateDetails"',
+        'id="clearUploadButton"',
+        "Connected source",
+        "Current DBML + CSV source",
         'id="visualizeButton"',
         'id="mappingBody"',
         'id="diagramFrame"',
@@ -164,8 +177,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Legacy Olist sample",
         "Compatibility LLM report",
         "OpenAI",
-        "Preparing demo DBML diagram",
+        "Upload DBML to preview schema",
         "Reset demo",
+        'src="js/demo-data.js"',
+        'src="js/source-parsers.js"',
+        'src="js/dashboard-config.js"',
     ]
     for marker in required_html:
         assert marker in html
@@ -178,6 +194,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "--focus-ring",
         ".flow-chooser",
         ".flow-card",
+        ".profile-flow",
+        ".source-state-panel",
+        ".source-state-grid",
         ".evaluate-flow-surface",
         ".evaluation-dataset-card",
         ".evaluation-summary-strip",
@@ -234,6 +253,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Not covered by baseline",
         "GE unavailable",
         "parseCsvHeader",
+        "VSF_DEMO_DATA",
+        "VSF_SOURCE_PARSERS",
+        "VSF_DASHBOARD_CONFIG",
+        "markCustomUploadSource",
+        "Custom CSV upload replaced the previous source inventory",
         "autoLinkCsvs",
         "manualMappings",
         "preflightAcceptedWarnings",
@@ -316,7 +340,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "localDiagramLimits",
         "Local DBML preview unavailable",
         "Diagram is too large for local preview",
-        "Preparing demo DBML diagram",
+        "Upload DBML to preview schema",
         "schema_diagram.json",
         "schema_parse_report.json",
         "l4_report.md",
@@ -341,7 +365,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderGraphTableColumns",
         "artifact-summary:generated",
         "EventSource",
-        "loadDemoState();",
+        "renderAll();",
         "buildDbdiagramUrl",
         "https://dbdiagram.io/embed?c=",
     ]
@@ -417,7 +441,13 @@ def test_web_review_surfaces_use_single_flow_layouts():
 
 
 def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
-    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    root = Path(__file__).resolve().parents[1] / "web"
+    js = "\n".join(
+        [
+            (root / "app.js").read_text(),
+            (root / "js" / "dashboard-config.js").read_text(),
+        ]
+    )
     assert 'fetch("/api/health"' in js
     assert 'fetch("/api/jobs"' in js
     assert 'fetch("/api/path-jobs"' in js
@@ -498,7 +528,13 @@ def test_web_ui_path_mode_avoids_browser_directory_permission_api():
 
 
 def test_web_dashboard_uses_artifacts_not_raw_csv_fetches():
-    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    root = Path(__file__).resolve().parents[1] / "web"
+    js = "\n".join(
+        [
+            (root / "app.js").read_text(),
+            (root / "js" / "source-parsers.js").read_text(),
+        ]
+    )
 
     assert "fetchCsv" not in js
     assert "fetchRawCsv" not in js

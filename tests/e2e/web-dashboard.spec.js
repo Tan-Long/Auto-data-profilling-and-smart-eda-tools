@@ -72,14 +72,54 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#preflightBlockerList")).toContainText("Uploaded DBML is missing");
   await expect(page.locator("#preflightBlockerList")).toContainText("Uploaded CSV source is missing");
   await expect(page.locator("#runProfilerButton")).toBeDisabled();
+  await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+  await expect(page.locator("#sourceStateSummary")).toContainText("Upload a DBML contract");
   await page.locator("#preflightReview").screenshot({
     path: "outputs/us073_goal3/profile-preflight-blocked.png",
   });
   await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
-  await expect(page.locator("#localDiagram")).toBeVisible();
+  await expect(page.locator("#diagramEmpty")).toBeVisible();
+  await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");
+  await expect(page.locator("#localDiagram")).toBeHidden();
   await expect(page.locator("#diagramFrame")).toBeHidden();
-  await expect(page.locator("#diagramSourceBadge")).toContainText("Browser DBML");
   await expect(page.locator("#diagramMessage")).toContainText("Local preflight");
+  await expect(page.locator("#diagramMessage")).toContainText("empty");
+  await expect(page.locator("#diagramSourceBadge")).toContainText("Browser DBML");
+
+  fs.mkdirSync("outputs/us073_upload_state", { recursive: true });
+  const customDbmlPath = "outputs/us073_upload_state/accounts.dbml";
+  const customCsvPath = "outputs/us073_upload_state/accounts.csv";
+  fs.writeFileSync(
+    customDbmlPath,
+    [
+      "Table accounts {",
+      "  account_id varchar [pk, not null]",
+      "  account_name varchar",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  fs.writeFileSync(customCsvPath, "account_id,account_name\nA-1,Example account\n");
+  await page.locator("#dbmlInput").setInputFiles(customDbmlPath);
+  await expect(page.locator("#sourceStateBadge")).toContainText("Custom upload");
+  await expect(page.locator("#dbmlStatus")).toContainText("accounts.dbml parsed: 1 tables");
+  await page.locator("#csvInput").setInputFiles(customCsvPath);
+  await expect(page.locator("#csvList")).toContainText("accounts.csv");
+  await expect(page.locator("#csvList")).not.toContainText("customers.csv");
+  await expect(page.locator("#mappingStatus")).toContainText("1/1 tables mapped");
+  await expect(page.locator("#runProfilerButton")).toBeEnabled();
+  await page.locator("#clearUploadButton").click();
+  await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+  await expect(page.locator("#csvList")).not.toContainText("accounts.csv");
+
+  await expect(page.locator("#localDiagram")).toBeHidden();
+  await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");
+
+  await page.locator("#runnerModePath").click();
+  await expect(page.locator("#pathRunnerForm")).toBeVisible();
+  await expect(page.locator("#demoPresetStatus")).toContainText("Small demo");
+  await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
+  await expect(page.locator("#localDiagram")).toBeVisible();
   await expect(page.locator("#diagramSvg")).toContainText("orders");
   await expect(page.locator("#diagramSvg")).toContainText("PK order_id");
   await expect(page.locator("#diagramSvg")).toContainText("FK customer_id");
@@ -103,8 +143,6 @@ test("local path run renders the interactive dashboard from generated artifacts"
     /https:\/\/dbdiagram\.io\/embed\?c=/,
   );
 
-  await page.locator("#runnerModePath").click();
-  await expect(page.locator("#pathRunnerForm")).toBeVisible();
   await expect(page.locator("#demoPresetStatus")).toContainText("Small demo");
   await expect(page.locator("#demoPresetSmall")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#llmModeStatus")).toContainText("LLM off");

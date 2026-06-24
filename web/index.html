@@ -19,7 +19,7 @@
 
       <nav class="nav-stack" aria-label="Main sections">
         <a class="nav-item active" href="#flowChooser">Choose workflow</a>
-        <a class="nav-item" href="#runner">Profile my data</a>
+        <a class="nav-item" href="#inputSetup">Profile my data</a>
         <a class="nav-item" href="#evaluateFlow">Evaluate tool</a>
         <a class="nav-item" href="#runHistory">Run history</a>
         <a class="nav-item" href="#qualityGates">Quality gates</a>
@@ -162,6 +162,26 @@
             <p id="runnerStatus">Checking local backend</p>
           </div>
         </article>
+      </section>
+
+      <section class="panel source-state-panel" id="sourceState" aria-labelledby="sourceStateTitle">
+        <div class="panel-heading compact">
+          <div>
+            <p class="eyebrow">Connected source</p>
+            <h3 id="sourceStateTitle">Current DBML + CSV source</h3>
+          </div>
+          <span class="badge" id="sourceStateBadge">No upload</span>
+        </div>
+        <p class="source-state-summary" id="sourceStateSummary">Upload a DBML contract and CSV files to profile your own data.</p>
+        <div class="source-state-grid" id="sourceStateDetails" aria-label="Current source details">
+          <div><span>DBML</span><strong>Not selected</strong></div>
+          <div><span>CSV</span><strong>0 files</strong></div>
+          <div><span>Run mode</span><strong>Upload</strong></div>
+        </div>
+        <div class="source-state-actions">
+          <a class="button secondary" href="#inputSetup">Edit source</a>
+          <button class="button ghost" id="clearUploadButton" type="button" disabled>Clear source</button>
+        </div>
       </section>
 
       <section class="panel preflight-review-panel" id="preflightReview" aria-labelledby="preflightReviewTitle">
@@ -582,7 +602,7 @@
               <p class="eyebrow">Contract</p>
               <h3>Upload DBML contract</h3>
             </div>
-            <span class="badge" id="tableCountBadge">Demo loading</span>
+            <span class="badge" id="tableCountBadge">No DBML</span>
           </div>
           <label class="dropzone" for="dbmlInput" id="dbmlDropzone">
             <span class="dropzone-title">Drop schema.dbml here</span>
@@ -637,8 +657,8 @@
           <div class="diagram-warnings" id="diagramWarnings" hidden></div>
           <div class="diagram-empty" id="diagramEmpty">
             <div class="diagram-glyph" aria-hidden="true"></div>
-            <strong>Preparing demo DBML diagram</strong>
-            <p>The demo contract loads automatically. Upload your own DBML/CSV files to replace it.</p>
+            <strong>Upload DBML to preview schema</strong>
+            <p>Use your own DBML and CSV files, or load demo paths from Advanced options.</p>
           </div>
           <div class="local-diagram" id="localDiagram" hidden>
             <div class="diagram-canvas" id="diagramCanvas">
@@ -716,6 +736,9 @@
     </div>
   </template>
 
+  <script src="js/demo-data.js"></script>
+  <script src="js/source-parsers.js"></script>
+  <script src="js/dashboard-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
