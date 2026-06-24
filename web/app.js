@@ -42,7 +42,7 @@ const state = {
   issueLlmMessageStatus: "",
   diagramSelection: null,
   diagramExpanded: false,
-  diagramShowNonKey: false,
+  diagramShowNonKey: true,
   diagramFit: true,
   diagramZoom: 1,
   diagramManualPositions: new Map(),
@@ -182,7 +182,6 @@ const els = {
   diagramZoomOutButton: document.querySelector("#diagramZoomOutButton"),
   diagramZoomInButton: document.querySelector("#diagramZoomInButton"),
   diagramZoomValue: document.querySelector("#diagramZoomValue"),
-  diagramDensityToggle: document.querySelector("#diagramDensityToggle"),
   diagramColumnsToggle: document.querySelector("#diagramColumnsToggle"),
   diagramResetSelection: document.querySelector("#diagramResetSelection"),
   mappedMetric: document.querySelector("#mappedMetric"),
@@ -316,11 +315,6 @@ els.diagramZoomOutButton.addEventListener("click", () => {
 
 els.diagramZoomInButton.addEventListener("click", () => {
   adjustDiagramZoom(0.15);
-});
-
-els.diagramDensityToggle.addEventListener("click", () => {
-  state.diagramExpanded = !state.diagramExpanded;
-  renderDiagram();
 });
 
 els.diagramColumnsToggle.addEventListener("click", () => {
@@ -5341,8 +5335,6 @@ function updateDiagramControls(model) {
   const disabled = !model.hasInput || Boolean(model.error);
   els.diagramFitButton.setAttribute("aria-pressed", state.diagramFit ? "true" : "false");
   els.diagramZoomValue.textContent = state.diagramFit ? "Fit" : `${Math.round(state.diagramZoom * 100)}%`;
-  els.diagramDensityToggle.setAttribute("aria-pressed", state.diagramExpanded ? "true" : "false");
-  els.diagramDensityToggle.textContent = state.diagramExpanded ? "Cards: expanded" : "Cards: compact";
   els.diagramColumnsToggle.setAttribute("aria-pressed", state.diagramShowNonKey ? "true" : "false");
   els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "Hide full columns" : "Show all columns";
   els.diagramResetSelection.disabled = !state.diagramSelection && state.diagramManualPositions.size === 0;
@@ -5830,22 +5822,20 @@ function diagramTableSvg(record, position, selection) {
   const columns = record.visibleColumns;
   const lines = columns.map((column, index) => diagramColumnRowSvg(column, diagramColumnBaseline(index), position.width)).join("");
   const overflowLine = record.hiddenCount ? diagramOverflowColumnRow(record.hiddenCount, diagramColumnBaseline(columns.length), position.width) : "";
-  const sourceLabel = table.status === "mapped" ? "CSV" : table.status === "missing_csv" ? "No CSV" : table.status || "DBML";
   const sizeLabel = table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(record.totalColumns)} cols`;
   const roleLabel = diagramCompactRoleLabel(record.role.label);
   const statusLabel = table.status === "missing_csv" ? "miss" : table.status === "mapped" ? "ok" : table.status || "db";
   const selectionClass = diagramTableSelectionClass(table.name, selection);
   return `
     <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))} diagram-role-${escapeHtml(record.role.name)} ${selectionClass}" data-diagram-table="${escapeHtml(table.name)}" data-diagram-layer="${position.layer}" transform="translate(${position.x} ${position.y})" tabindex="0" role="button" aria-label="${escapeHtml(`${table.name} table`)}">
-      <title>${escapeHtml(`${table.name} · ${record.role.label} · ${sourceLabel} · ${sizeLabel}`)}</title>
+      <title>${escapeHtml(`${table.name} · ${record.role.label} · ${sizeLabel}`)}</title>
       <rect class="diagram-table-box" width="${position.width}" height="${position.height}" rx="8"></rect>
       <rect class="diagram-table-header" width="${position.width}" height="${DIAGRAM_TABLE_HEADER_HEIGHT}" rx="8"></rect>
       <text class="diagram-table-name" x="14" y="25">${escapeHtml(truncateMiddle(table.name, position.width > 220 ? 24 : 20))}</text>
       <rect class="diagram-status-chip" x="${position.width - 54}" y="14" width="40" height="18" rx="9"></rect>
       <text class="diagram-status-text" x="${position.width - 34}" y="26" text-anchor="middle">${escapeHtml(statusLabel)}</text>
-      ${diagramTableMetricPill(12, DIAGRAM_TABLE_PILL_Y, 60, roleLabel, "role")}
-      ${diagramTableMetricPill(76, DIAGRAM_TABLE_PILL_Y, 50, sourceLabel, "source")}
-      ${diagramTableMetricPill(130, DIAGRAM_TABLE_PILL_Y, Math.max(58, position.width - 142), sizeLabel, "size")}
+      ${diagramTableMetricPill(12, DIAGRAM_TABLE_PILL_Y, 72, roleLabel, "role")}
+      ${diagramTableMetricPill(90, DIAGRAM_TABLE_PILL_Y, Math.max(82, position.width - 102), sizeLabel, "size")}
       ${lines || diagramEmptyColumnRow(DIAGRAM_COLUMN_START_Y, position.width)}
       ${overflowLine}
     </g>
@@ -6260,7 +6250,6 @@ function renderDiagramOverview(model, layout) {
       <div><dt>Source</dt><dd>${escapeHtml(model.sourceBadge)}</dd></div>
       <div><dt>Layers</dt><dd>${integerText(new Set(layout.tableRecords.map((record) => record.layer)).size)}</dd></div>
       <div><dt>Columns</dt><dd>${state.diagramShowNonKey ? "key + non-key" : "key only"}</dd></div>
-      <div><dt>Density</dt><dd>${state.diagramExpanded ? "expanded" : "compact"}</dd></div>
     </dl>
     <div class="diagram-detail-section">
       <strong>Layer roles</strong>

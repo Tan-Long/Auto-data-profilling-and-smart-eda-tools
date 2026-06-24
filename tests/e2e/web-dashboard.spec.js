@@ -199,10 +199,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramZoomValue")).toContainText("115%");
   await page.locator("#diagramZoomOutButton").click();
   await expect(page.locator("#diagramZoomValue")).toContainText("100%");
-  await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("#diagramDensityToggle")).toContainText("Cards: compact");
-  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("#diagramColumnsToggle")).toContainText("Show all columns");
+  await expect(page.locator("#diagramDensityToggle")).toHaveCount(0);
+  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramColumnsToggle")).toContainText("Hide full columns");
+  await expect(page.locator("#diagramSvg")).toContainText("order_status");
+  await expect(page.locator("#diagramSvg .diagram-table-metric-source")).toHaveCount(0);
   await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="order_items"]')).toHaveCount(1);
   await page.locator('#diagramSvg [data-diagram-table="orders"]').click();
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
@@ -210,10 +211,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramInspector")).toContainText("Fact/event");
   await expect(page.locator("#diagramInspector")).toContainText("All columns");
   await page.locator("#diagramColumnsToggle").click();
-  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#diagramColumnsToggle")).toContainText("Hide full columns");
+  await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramColumnsToggle")).toContainText("Show all columns");
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("#diagramSvg")).toContainText("order_status");
+  await expect(page.locator("#diagramSvg")).not.toContainText("order_status");
   const ordersTable = page.locator('#diagramSvg [data-diagram-table="orders"]');
   const ordersRelationshipPath = page.locator(
     '#diagramSvg [data-diagram-relationship="order_items.order_id->orders.order_id"] .diagram-edge',
@@ -369,9 +370,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramInspector")).toContainText("Relationship");
   await expect(page.locator("#diagramInspector")).toContainText("FOREIGN_KEY_NULL");
   await expect(page.locator("#diagramInspector")).toContainText("relationship_graph.json");
-  await page.locator("#diagramDensityToggle").click();
-  await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#diagramDensityToggle")).toContainText("Cards: expanded");
+  await expect(page.locator("#diagramDensityToggle")).toHaveCount(0);
 
   await goToProfileStep(page, "run");
   await expect(page.getByText("Issue review snapshot")).toBeVisible();

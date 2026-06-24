@@ -1529,10 +1529,6 @@ h3 {
   fill: rgba(15, 118, 100, 0.08);
 }
 
-.diagram-table-metric-source .diagram-table-metric-bg {
-  fill: rgba(49, 101, 150, 0.07);
-}
-
 .diagram-table-metric-text {
   fill: var(--foreground-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
