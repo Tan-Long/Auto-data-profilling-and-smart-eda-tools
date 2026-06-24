@@ -48,7 +48,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'data-profile-step-card="review"',
         'data-profile-step-section="connect"',
         'data-profile-step-section="preflight"',
-        'data-profile-step-section="connect run"',
+        'data-profile-step-section="run"',
         'data-profile-step-section="review"',
         "Profile my data",
         "Evaluate tool",

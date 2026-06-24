@@ -343,7 +343,10 @@ els.autoLinkButton.addEventListener("click", () => {
 });
 
 els.loadDemoButton.addEventListener("click", () => {
-  loadDemoState("small", { switchToPath: true });
+  loadDemoState("small", {
+    switchToPath: true,
+    preserveStep: state.flowMode === "profile" && ["preflight", "run"].includes(state.profileStep),
+  });
 });
 
 els.clearUploadButton.addEventListener("click", () => {
@@ -872,13 +875,12 @@ async function startPathRun() {
 function setRunnerMode(mode) {
   resetPreflightReview();
   state.runnerMode = ["upload", "path"].includes(mode) ? mode : "upload";
-  state.profileStep = "connect";
   if (state.runnerMode === "path") {
     syncDemoPresetFromPathInputs();
   }
   if (state.runnerMode === "path" && !state.dbmlText) {
     const presetName = demoPresets[state.selectedDemoPreset] ? state.selectedDemoPreset : "small";
-    loadDemoState(presetName, { switchToPath: true });
+    loadDemoState(presetName, { switchToPath: true, preserveStep: true });
     return;
   }
   const messages = {
@@ -993,10 +995,11 @@ function renderRunnerMessage(message, status) {
 }
 
 function loadDemoState(presetName = "small", options = {}) {
+  const previousProfileStep = state.profileStep;
   resetPreflightReview();
   resetRunResultsForInputChange();
   resetDiagramLayoutState();
-  state.profileStep = "connect";
+  state.profileStep = options.preserveStep ? previousProfileStep : "connect";
   const preset = demoPresets[presetName] || demoPresets.small;
   state.selectedDemoPreset = presetName in demoPresets ? presetName : "small";
   state.dbmlText = preset.dbmlText;

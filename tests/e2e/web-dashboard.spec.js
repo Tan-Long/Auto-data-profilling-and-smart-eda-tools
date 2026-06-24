@@ -75,6 +75,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#evaluateFlow")).toBeHidden();
   fs.mkdirSync("outputs/us073_goal3", { recursive: true });
   await expect(page.locator("#sourceState")).toBeVisible();
+  await expect(page.locator("#runner")).toBeHidden();
   await expect(page.locator("#preflightReview")).toBeHidden();
   await expect(page.locator("#preflightGateBadge")).toContainText("Run locked");
   await expect(page.locator("#preflightBlockerList")).toContainText("Uploaded DBML is missing");
@@ -96,6 +97,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("orders");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
+  await expect(page.locator("#runner")).toBeHidden();
   await page.locator("#clearUploadButton").click();
   await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
   await expect(page.locator("#csvList")).not.toContainText("customers.csv");
@@ -140,8 +142,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#localDiagram")).toBeHidden();
   await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");
 
-  await page.locator("#runnerModePath").click();
-  await expect(page.locator("#pathRunnerForm")).toBeVisible();
+  await page.locator("#quickDemoButton").click();
+  await expect(page.locator("#runner")).toBeHidden();
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
   await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
   await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
@@ -249,8 +251,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: "outputs/us073_goal3/profile-preflight-warnings-accepted.png",
   });
   await goToProfileStep(page, "run");
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+  await expect(page.locator("#runner")).toBeVisible();
   await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
   await page.locator("#loadDemoButton").click();
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+  await expect(page.locator("#runner")).toBeVisible();
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
   await page.locator("#profileDeveloperOptions > summary").click();
@@ -270,7 +276,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   await page.setViewportSize({ width: 1280, height: 720 });
 
+  await page.locator("#runnerModeUpload").click();
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
   await page.locator("#runnerModePath").click();
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
   await expect(page.locator("#demoPresetOlist")).toHaveCount(0);
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
@@ -286,11 +295,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
 
   await page.locator("#loadDemoButton").click();
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
   await page.locator("#dbmlPathInput").fill("data/demo_small/schema.dbml");
   await page.locator("#csvDirPathInput").fill("data/demo_small/csv");
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
 
   await goToProfileStep(page, "preflight");
   await goToProfileStep(page, "run");

@@ -183,11 +183,13 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     );
 
     await page.locator("#runnerModePath").click();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
     await expect(page.locator("#pathRunnerForm")).toBeVisible();
     await openDetails(page, "#profileDeveloperOptions");
     await expect(page.locator("#demoPresetOlist")).toHaveCount(0);
     await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
     await page.locator("#loadDemoButton").click();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
     await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
     await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
     await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
@@ -203,8 +205,9 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#pathTargetInput")).toHaveCount(0);
     await page.locator("#dbmlPathInput").fill("data/demo_small/schema.dbml");
     await page.locator("#csvDirPathInput").fill("data/demo_small/csv");
-    await expect(page.locator("#profileStepNext")).toBeEnabled();
-    await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+    await expect(page.locator("#profileStepNext")).toBeDisabled();
+    await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
     record(
       matrix,
       "Input contract",
