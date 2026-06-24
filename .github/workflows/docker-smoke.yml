@@ -28,7 +28,8 @@ jobs:
       - name: Verify health endpoint
         run: |
           for attempt in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8765/api/health | tee health.json; then
+            if curl -fsS http://127.0.0.1:8765/api/health -o health.json; then
+              cat health.json
               grep -q '"status": "ok"' health.json
               grep -q '"host": "0.0.0.0"' health.json
               exit 0
