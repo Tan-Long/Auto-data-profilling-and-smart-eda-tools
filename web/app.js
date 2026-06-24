@@ -282,6 +282,14 @@ els.profileFlow.addEventListener("keydown", (event) => {
   }
 });
 
+els.stageList.addEventListener("toggle", (event) => {
+  const stage = event.target.closest?.(".runtime-stage-item");
+  if (event.target !== stage || !stage.open) {
+    return;
+  }
+  ensureRuntimeStageDetailVisible(stage);
+}, true);
+
 els.startEvaluationButton.addEventListener("click", async () => {
   await startEvaluationRun();
 });
@@ -2644,6 +2652,37 @@ function renderRuntimeStageDropdown(stage, purpose) {
       </dl>
     </div>
   `;
+}
+
+function ensureRuntimeStageDetailVisible(stageElement) {
+  window.requestAnimationFrame(() => {
+    if (!stageElement.open) {
+      return;
+    }
+    const container = els.stageList;
+    const dropdown = stageElement.querySelector(".stage-dropdown");
+    if (!container || !dropdown) {
+      return;
+    }
+    const padding = 8;
+    const containerRect = container.getBoundingClientRect();
+    const stageRect = stageElement.getBoundingClientRect();
+    const dropdownRect = dropdown.getBoundingClientRect();
+    let nextScrollTop = container.scrollTop;
+
+    if (dropdownRect.bottom > containerRect.bottom - padding) {
+      nextScrollTop += dropdownRect.bottom - (containerRect.bottom - padding);
+    }
+    if (stageRect.top < containerRect.top + padding) {
+      nextScrollTop -= (containerRect.top + padding) - stageRect.top;
+    }
+
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    const boundedScrollTop = Math.min(maxScrollTop, Math.max(0, nextScrollTop));
+    if (Math.abs(boundedScrollTop - container.scrollTop) > 1) {
+      container.scrollTop = boundedScrollTop;
+    }
+  });
 }
 
 function runtimeStageDetailRows(stage, purpose) {

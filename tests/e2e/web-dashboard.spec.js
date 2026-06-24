@@ -402,6 +402,21 @@ test("local path run renders the interactive dashboard from generated artifacts"
   expect(await reportStage.evaluate((element) => element.hasAttribute("open"))).toBe(true);
   await expect(reportStage.locator(".stage-detail-grid")).toContainText("report_count");
   await expect(reportStage.locator(".stage-detail-grid")).toContainText("formats");
+  await page.waitForFunction(() => {
+    const list = document.querySelector("#stageList");
+    const stage = [...document.querySelectorAll("#stageList .runtime-stage-item")]
+      .find((element) => element.textContent.includes("Render Markdown and HTML reports"));
+    const detail = stage?.querySelector(".stage-detail-grid");
+    if (!list || !detail) {
+      return false;
+    }
+    const listRect = list.getBoundingClientRect();
+    const detailRect = detail.getBoundingClientRect();
+    return detailRect.top >= listRect.top && detailRect.bottom <= listRect.bottom + 1;
+  });
+  await page.screenshot({
+    path: "outputs/us073_stage3/runtime-stage-report-detail-visible.png",
+  });
   await page.mouse.move(20, 20);
   await reportStage.screenshot({
     path: "outputs/us073_stage3/runtime-stage-info-dropdown.png",
