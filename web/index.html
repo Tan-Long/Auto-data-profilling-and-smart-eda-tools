@@ -277,8 +277,16 @@
                   <span>OpenAI</span>
                 </div>
                 <button class="llm-toggle-button" id="llmModeToggle" type="button" role="switch" aria-checked="false">
-                  <span>Use LLM enrichment for this run</span>
-                  <strong id="llmModeStatus">Off</strong>
+                  <span class="llm-toggle-copy">
+                    <span class="llm-toggle-title">Use LLM enrichment with OpenAI</span>
+                    <span class="llm-toggle-subtext">Adds the optional LLM summary artifact after deterministic checks.</span>
+                  </span>
+                  <span class="llm-switch-control">
+                    <span class="llm-switch-track" aria-hidden="true">
+                      <span class="llm-switch-thumb"></span>
+                    </span>
+                    <strong class="llm-switch-status" id="llmModeStatus">Off</strong>
+                  </span>
                 </button>
                 <p class="option-note">OpenAI calls run only when this is on and <code>OPENAI_API_KEY</code> is configured; report rendering stays local.</p>
               </div>

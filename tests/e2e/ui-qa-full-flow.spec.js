@@ -203,10 +203,13 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
     await expect(page.locator("#llmModeStatus")).toContainText("Off");
     await expect(page.locator("#profileDeveloperOptions")).toBeVisible();
+    await expect(page.locator("#llmModeToggle .llm-switch-track")).toBeVisible();
+    await expect(page.locator("#llmModeToggle .llm-switch-thumb")).toBeVisible();
     await expect(page.locator("#llmModeFake")).toHaveCount(0);
     await page.locator("#llmModeToggle").click();
     await expect(page.locator("#llmModeStatus")).toContainText("On");
     await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator("#llmModeToggle")).toHaveClass(/active/);
     await page.locator("#llmModeToggle").click();
     await expect(page.locator("#llmModeStatus")).toContainText("Off");
     await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");

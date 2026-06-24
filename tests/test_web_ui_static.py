@@ -123,6 +123,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="llmModeToggle"',
         'role="switch"',
         'aria-checked="false"',
+        'class="llm-switch-track"',
+        'class="llm-switch-thumb"',
         'id="llmModeStatus"',
         'id="runProfilerButton"',
         'id="runPathProfilerButton"',
