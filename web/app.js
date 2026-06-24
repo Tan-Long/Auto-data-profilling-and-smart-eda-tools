@@ -121,8 +121,8 @@ const els = {
   runnerModePath: document.querySelector("#runnerModePath"),
   runnerForm: document.querySelector("#runnerForm"),
   pathRunnerForm: document.querySelector("#pathRunnerForm"),
+  profileDeveloperOptions: document.querySelector("#profileDeveloperOptions"),
   llmModeOff: document.querySelector("#llmModeOff"),
-  llmModeFake: document.querySelector("#llmModeFake"),
   llmModeOpenAI: document.querySelector("#llmModeOpenAI"),
   llmModeStatus: document.querySelector("#llmModeStatus"),
   runProfilerButton: document.querySelector("#runProfilerButton"),
@@ -381,10 +381,6 @@ els.runnerModePath.addEventListener("click", () => {
 
 els.llmModeOff.addEventListener("click", () => {
   setLlmMode("off");
-});
-
-els.llmModeFake.addEventListener("click", () => {
-  setLlmMode("fake");
 });
 
 els.llmModeOpenAI.addEventListener("click", () => {
@@ -954,7 +950,7 @@ function moveProfileStep(direction) {
 }
 
 function setLlmMode(mode) {
-  state.llmMode = ["off", "fake", "openai"].includes(mode) ? mode : "off";
+  state.llmMode = mode === "openai" ? "openai" : "off";
   renderControls();
 }
 
@@ -1134,10 +1130,9 @@ function llmRunSuffix() {
 
 function llmModeLabel(mode) {
   return {
-    off: "LLM off",
-    fake: "Fake",
-    openai: "OpenAI",
-  }[mode] || "LLM off";
+    off: "Off",
+    openai: "On",
+  }[mode] || "Off";
 }
 
 function setupDropzone(element, onDrop) {
@@ -2529,6 +2524,7 @@ function renderControls() {
   els.runnerModePath.setAttribute("aria-selected", state.runnerMode === "path" ? "true" : "false");
   els.runnerForm.hidden = state.runnerMode !== "upload";
   els.pathRunnerForm.hidden = state.runnerMode !== "path";
+  els.profileDeveloperOptions.open = true;
   renderLlmModeControls();
 }
 
@@ -2536,7 +2532,6 @@ function renderLlmModeControls() {
   els.llmModeStatus.textContent = llmModeLabel(state.llmMode);
   [
     [els.llmModeOff, state.llmMode === "off"],
-    [els.llmModeFake, state.llmMode === "fake"],
     [els.llmModeOpenAI, state.llmMode === "openai"],
   ].forEach(([button, active]) => {
     button.classList.toggle("active", active);

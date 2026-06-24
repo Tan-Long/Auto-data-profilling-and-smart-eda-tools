@@ -264,7 +264,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
   await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
-  await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
+  await expect(page.locator("#llmModeStatus")).toContainText("Off");
   await expect(page.locator("#llmModeOff")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
@@ -303,7 +303,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#runner")).toBeVisible();
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
-  await page.locator("#profileDeveloperOptions > summary").click();
+  await expect(page.locator("#profileDeveloperOptions")).toHaveAttribute("open", "");
   await expect(page.locator("#runnerModeDatabase")).toHaveCount(0);
   await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
   await expect(page.locator("#runDatabaseProfilerButton")).toHaveCount(0);
@@ -332,11 +332,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
-  await page.locator("#llmModeFake").click();
-  await expect(page.locator("#llmModeStatus")).toContainText("Fake");
-  await expect(page.locator("#llmModeFake")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#profileDeveloperOptions")).toHaveAttribute("open", "");
+  await expect(page.locator("#llmModeFake")).toHaveCount(0);
+  await page.locator("#llmModeOpenAI").click();
+  await expect(page.locator("#llmModeStatus")).toContainText("On");
+  await expect(page.locator("#llmModeOpenAI")).toHaveAttribute("aria-pressed", "true");
   await page.locator("#llmModeOff").click();
-  await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
+  await expect(page.locator("#llmModeStatus")).toContainText("Off");
 
   await page.locator("#loadDemoButton").click();
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");

@@ -201,13 +201,13 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
     await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
     await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
-    await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
-    await page.locator("#llmModeFake").click();
-    await expect(page.locator("#llmModeStatus")).toContainText("Fake");
+    await expect(page.locator("#llmModeStatus")).toContainText("Off");
+    await expect(page.locator("#profileDeveloperOptions")).toHaveAttribute("open", "");
+    await expect(page.locator("#llmModeFake")).toHaveCount(0);
     await page.locator("#llmModeOpenAI").click();
-    await expect(page.locator("#llmModeStatus")).toContainText("OpenAI");
+    await expect(page.locator("#llmModeStatus")).toContainText("On");
     await page.locator("#llmModeOff").click();
-    await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
+    await expect(page.locator("#llmModeStatus")).toContainText("Off");
     await expect(page.locator("#runnerModeDatabase")).toHaveCount(0);
     await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
     await expect(page.locator("#rulesPathInput")).toHaveCount(0);

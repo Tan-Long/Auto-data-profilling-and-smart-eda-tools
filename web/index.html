@@ -248,18 +248,17 @@
               <button class="mode-button" id="runnerModePath" type="button" role="tab" aria-selected="false" aria-controls="pathRunnerForm">Local CSV path</button>
             </div>
 
-            <details class="developer-options" id="profileDeveloperOptions">
-              <summary>LLM options</summary>
+            <details class="developer-options" id="profileDeveloperOptions" open>
+              <summary>LLM enrichment</summary>
               <div class="developer-options-grid">
-                <div class="runner-option-block" aria-label="Optional LLM report mode">
+                <div class="runner-option-block" aria-label="LLM report enrichment mode">
                   <div class="option-heading">
-                    <strong>Optional LLM report</strong>
-                    <span id="llmModeStatus">LLM off</span>
+                    <strong>LLM report enrichment</strong>
+                    <span id="llmModeStatus">Off</span>
                   </div>
-                  <div class="runner-mode-switch llm-mode-switch" role="group" aria-label="Optional LLM report mode">
+                  <div class="runner-mode-switch llm-mode-switch" role="group" aria-label="LLM report enrichment mode">
                     <button class="mode-button active" id="llmModeOff" type="button" aria-pressed="true">Off</button>
-                    <button class="mode-button" id="llmModeFake" type="button" aria-pressed="false">Fake</button>
-                    <button class="mode-button" id="llmModeOpenAI" type="button" aria-pressed="false">OpenAI</button>
+                    <button class="mode-button" id="llmModeOpenAI" type="button" aria-pressed="false">On</button>
                   </div>
                   <p class="option-note">OpenAI calls only run when selected and <code>OPENAI_API_KEY</code> is configured; report rendering stays local.</p>
                 </div>
