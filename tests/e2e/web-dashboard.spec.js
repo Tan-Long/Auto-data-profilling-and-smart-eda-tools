@@ -360,6 +360,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#qualityGates")).toContainText("Blocked");
   await expect(page.locator("#qualityGates")).toContainText("Open Todos");
   await page.locator("#qualityGates").scrollIntoViewIfNeeded();
+  await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="review"]')).toContainText("Current");
+  await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="preflight"]')).toContainText("Done");
+  await expect(page.locator('#workflowNav .nav-subitem[data-workflow-nav-target="qualityGates"]')).toHaveAttribute("aria-current", "step");
   await page.locator("#qualityGates").screenshot({
     path: "outputs/us073_goal7/quality-gates-summary.png",
   });
@@ -530,6 +533,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#todos")).toContainText("Fix data");
   await expect(page.locator("#todos")).toContainText("Verify after fix");
   await expect(page.locator("#todos")).toContainText("source=deterministic");
+  await page.locator('#workflowNav .nav-subitem[data-workflow-nav-target="todos"]').click();
+  await expect(page.locator('#workflowNav .nav-subitem[data-workflow-nav-target="todos"]')).toHaveAttribute("aria-current", "step");
   await expect(page.locator("#todos")).toContainText("Parent Key Duplicate on orders.order_id");
   await expect(page.locator("#todos")).toContainText("Evidence:");
   const parentDuplicateTodo = page.locator(".todo-occurrence").filter({ hasText: "Parent Key Duplicate on orders.order_id" }).first();

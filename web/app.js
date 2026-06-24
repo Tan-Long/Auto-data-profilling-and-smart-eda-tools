@@ -4,6 +4,7 @@ const state = {
   dbmlFile: null,
   flowMode: "choose",
   profileStep: "connect",
+  activeWorkflowTarget: "flowChooser",
   evaluationCatalog: [],
   evaluationCatalogLoading: false,
   evaluationCatalogError: "",
@@ -64,6 +65,7 @@ const DIAGRAM_COLUMN_START_Y = 90;
 const DIAGRAM_COLUMN_ROW_HEIGHT = 21;
 
 const els = {
+  workflowNav: document.querySelector("#workflowNav"),
   flowChooser: document.querySelector("#flowChooser"),
   profileFlow: document.querySelector("#profileFlow"),
   evaluateFlow: document.querySelector("#evaluateFlow"),
@@ -205,6 +207,10 @@ const {
   postRunDiagramArtifacts,
   severityOrder,
 } = window.VSF_DASHBOARD_CONFIG;
+const {
+  profileWorkflowStages,
+  evaluateWorkflowSteps,
+} = window.VSF_WORKFLOW_NAV_CONFIG;
 
 const profileSteps = ["connect", "preflight", "run", "review"];
 const profileStepLabels = {
@@ -214,10 +220,16 @@ const profileStepLabels = {
   review: "Review",
 };
 
+let workflowNavScrollFrame = 0;
+
 function severityRank(severity) {
   const index = severityOrder.indexOf(severity);
   return index === -1 ? severityOrder.length : index;
 }
+
+els.workflowNav.addEventListener("click", (event) => {
+  handleWorkflowNavClick(event);
+});
 
 els.profileFlowButton.addEventListener("click", () => {
   setFlowMode("profile");
@@ -891,14 +903,15 @@ function runnerHostLabel() {
   return state.runnerHost || window.location.host || "configured host";
 }
 
-function setFlowMode(mode) {
+function setFlowMode(mode, options = {}) {
   state.flowMode = ["choose", "profile", "evaluate"].includes(mode) ? mode : "choose";
+  state.activeWorkflowTarget = defaultWorkflowTarget();
   if (state.flowMode === "evaluate") {
     loadEvaluationCatalog();
   }
   renderAll();
   const target = state.flowMode === "evaluate" ? els.evaluateFlow : els.profileFlow;
-  if (state.flowMode !== "choose" && target) {
+  if (state.flowMode !== "choose" && target && options.focus !== false) {
     target.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 }
@@ -907,6 +920,9 @@ function setProfileStep(step, options = {}) {
   const nextStep = profileSteps.includes(step) ? step : "connect";
   const changed = state.profileStep !== nextStep;
   state.profileStep = nextStep;
+  if (changed) {
+    state.activeWorkflowTarget = defaultWorkflowTarget();
+  }
   if (options.render !== false) {
     renderAll();
   }
@@ -1225,6 +1241,7 @@ function renderAll() {
   renderDashboard();
   renderControls();
   renderProfileStepper();
+  renderSidebarNavigation();
 }
 
 function renderFlowShell() {
@@ -1282,6 +1299,284 @@ function renderProfileStepper() {
     : "Review ready";
   els.profileStepHint.textContent = guard.message;
   els.profileStepHint.dataset.status = guard.allowed ? "ready" : "blocked";
+}
+
+function renderSidebarNavigation() {
+  if (!els.workflowNav) {
+    return;
+  }
+  const activeTarget = resolvedWorkflowActiveTarget();
+  els.workflowNav.innerHTML = [
+    renderChooseWorkflowNavItem(activeTarget),
+    renderProfileWorkflowNav(activeTarget),
+    renderEvaluateWorkflowNav(activeTarget),
+  ].join("");
+}
+
+function renderChooseWorkflowNavItem(activeTarget) {
+  const active = state.flowMode === "choose" || activeTarget === "flowChooser";
+  return `
+    <section class="nav-section" aria-label="Start">
+      <a class="nav-item ${active ? "active" : ""}" href="#flowChooser" data-nav-flow="choose" data-workflow-nav-target="flowChooser"${active ? ' aria-current="step"' : ""}>
+        <span class="nav-step-index">00</span>
+        <span class="nav-item-body">
+          <strong>Choose workflow</strong>
+          <small>Profile data or evaluate tool</small>
+        </span>
+      </a>
+    </section>
+  `;
+}
+
+function renderProfileWorkflowNav(activeTarget) {
+  return `
+    <section class="nav-section" aria-label="Profile stages">
+      <p class="nav-section-title">Profile flow</p>
+      ${profileWorkflowStages.map((stage) => renderProfileStageNavItem(stage, activeTarget)).join("")}
+    </section>
+  `;
+}
+
+function renderProfileStageNavItem(stage, activeTarget) {
+  const isProfileFlow = state.flowMode === "profile";
+  const isCurrent = isProfileFlow && state.profileStep === stage.step;
+  const complete = profileStageCompleteForSidebar(stage.step);
+  const canOpen = canOpenProfileStepFromSidebar(stage.step);
+  const status = isCurrent ? "Current" : complete ? "Done" : canOpen ? "Ready" : "Locked";
+  const target = isCurrent ? workflowStageActiveSubtarget(stage, activeTarget) : stage.target;
+  const stageClasses = [
+    "nav-item",
+    "nav-stage-item",
+    isCurrent ? "active" : "",
+    complete ? "complete" : "",
+    !canOpen ? "unavailable" : "",
+  ].filter(Boolean).join(" ");
+  return `
+    <div class="nav-stage-group">
+      <a class="${stageClasses}" href="#${escapeHtml(target)}" data-nav-flow="profile" data-nav-profile-step="${escapeHtml(stage.step)}" data-workflow-nav-target="${escapeHtml(target)}"${!canOpen ? ' aria-disabled="true"' : ""}>
+        <span class="nav-step-index">${escapeHtml(stage.number)}</span>
+        <span class="nav-item-body">
+          <strong>${escapeHtml(stage.label)}</strong>
+          <small>${escapeHtml(stage.detail)}</small>
+        </span>
+        <span class="nav-status-pill">${escapeHtml(status)}</span>
+      </a>
+      ${isCurrent ? renderWorkflowSubsteps(stage, activeTarget) : ""}
+    </div>
+  `;
+}
+
+function renderWorkflowSubsteps(stage, activeTarget) {
+  const activeSubtarget = workflowStageActiveSubtarget(stage, activeTarget);
+  return `
+    <div class="nav-substep-list" aria-label="${escapeHtml(stage.label)} substeps">
+      ${stage.substeps.map((substep) => {
+        const active = substep.target === activeSubtarget;
+        return `
+          <a class="nav-subitem ${active ? "active" : ""}" href="#${escapeHtml(substep.target)}" data-nav-flow="profile" data-nav-profile-step="${escapeHtml(stage.step)}" data-workflow-nav-target="${escapeHtml(substep.target)}"${active ? ' aria-current="step"' : ""}>
+            <strong>${escapeHtml(substep.label)}</strong>
+            <small>${escapeHtml(substep.detail)}</small>
+          </a>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderEvaluateWorkflowNav(activeTarget) {
+  const active = state.flowMode === "evaluate";
+  const activeStep = evaluateWorkflowSteps.some((step) => step.target === activeTarget)
+    ? activeTarget
+    : "evaluateFlow";
+  return `
+    <section class="nav-section" aria-label="Evaluate flow">
+      <p class="nav-section-title">Evaluate flow</p>
+      <a class="nav-item ${active ? "active" : ""}" href="#evaluateFlow" data-nav-flow="evaluate" data-workflow-nav-target="${escapeHtml(activeStep)}">
+        <span class="nav-step-index">EV</span>
+        <span class="nav-item-body">
+          <strong>Evaluate tool</strong>
+          <small>Curated faulty dataset benchmark</small>
+        </span>
+      </a>
+      ${active ? `
+        <div class="nav-substep-list" aria-label="Evaluate substeps">
+          ${evaluateWorkflowSteps.map((step) => {
+            const stepActive = step.target === activeStep;
+            return `
+              <a class="nav-subitem ${stepActive ? "active" : ""}" href="#${escapeHtml(step.target)}" data-nav-flow="evaluate" data-workflow-nav-target="${escapeHtml(step.target)}"${stepActive ? ' aria-current="step"' : ""}>
+                <strong>${escapeHtml(step.label)}</strong>
+                <small>${escapeHtml(step.detail)}</small>
+              </a>
+            `;
+          }).join("")}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function workflowStageActiveSubtarget(stage, activeTarget) {
+  return stage.substeps.some((substep) => substep.target === activeTarget)
+    ? activeTarget
+    : stage.substeps[0]?.target || stage.target;
+}
+
+function profileStageCompleteForSidebar(step) {
+  if (profileStepComplete(step)) {
+    return true;
+  }
+  if (state.flowMode !== "profile") {
+    return false;
+  }
+  const currentIndex = profileSteps.indexOf(state.profileStep);
+  const stepIndex = profileSteps.indexOf(step);
+  return currentIndex > -1 && stepIndex > -1 && stepIndex < currentIndex;
+}
+
+function canOpenProfileStepFromSidebar(step) {
+  if (canOpenProfileStep(step)) {
+    return true;
+  }
+  if (step === "connect") {
+    return true;
+  }
+  if (state.flowMode !== "profile") {
+    return false;
+  }
+  const currentIndex = profileSteps.indexOf(state.profileStep);
+  const stepIndex = profileSteps.indexOf(step);
+  return currentIndex > -1 && stepIndex > -1 && stepIndex < currentIndex;
+}
+
+function resolvedWorkflowActiveTarget() {
+  const visibleTargets = workflowVisibleTargets();
+  if (
+    state.activeWorkflowTarget &&
+    visibleTargets.includes(state.activeWorkflowTarget) &&
+    isWorkflowTargetVisible(state.activeWorkflowTarget)
+  ) {
+    return state.activeWorkflowTarget;
+  }
+  return defaultWorkflowTarget();
+}
+
+function workflowVisibleTargets() {
+  if (state.flowMode === "evaluate") {
+    return evaluateWorkflowSteps.map((step) => step.target);
+  }
+  if (state.flowMode === "profile") {
+    const stage = activeProfileWorkflowStage();
+    return stage ? stage.substeps.map((substep) => substep.target) : [];
+  }
+  return ["flowChooser"];
+}
+
+function activeProfileWorkflowStage() {
+  return profileWorkflowStages.find((stage) => stage.step === state.profileStep) || profileWorkflowStages[0];
+}
+
+function defaultWorkflowTarget() {
+  if (state.flowMode === "evaluate") {
+    return "evaluateFlow";
+  }
+  if (state.flowMode === "profile") {
+    const stage = activeProfileWorkflowStage();
+    return stage?.substeps?.[0]?.target || "sourceState";
+  }
+  return "flowChooser";
+}
+
+function isWorkflowTargetVisible(targetId) {
+  const target = document.getElementById(targetId);
+  if (!target || target.hidden || target.offsetParent === null) {
+    return false;
+  }
+  const rect = target.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function handleWorkflowNavClick(event) {
+  const item = event.target.closest("[data-workflow-nav-target]");
+  if (!item) {
+    return;
+  }
+  event.preventDefault();
+  const targetId = item.dataset.workflowNavTarget || defaultWorkflowTarget();
+  const flow = item.dataset.navFlow || state.flowMode;
+  const profileStep = item.dataset.navProfileStep || "";
+
+  if (profileStep && !canOpenProfileStepFromSidebar(profileStep)) {
+    renderProfileStepper();
+    renderSidebarNavigation();
+    return;
+  }
+
+  if (flow && flow !== state.flowMode) {
+    setFlowMode(flow, { focus: false });
+  }
+  if (flow === "profile" && profileStep && profileStep !== state.profileStep) {
+    setProfileStep(profileStep, { focus: false });
+  } else {
+    renderAll();
+  }
+  state.activeWorkflowTarget = targetId;
+  renderSidebarNavigation();
+  scrollToWorkflowTarget(targetId);
+}
+
+function scrollToWorkflowTarget(targetId) {
+  window.requestAnimationFrame(() => {
+    const target = document.getElementById(targetId);
+    if (!target || target.hidden) {
+      return;
+    }
+    target.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  });
+}
+
+function scheduleWorkflowNavViewportUpdate() {
+  if (workflowNavScrollFrame) {
+    return;
+  }
+  workflowNavScrollFrame = window.requestAnimationFrame(() => {
+    workflowNavScrollFrame = 0;
+    updateWorkflowNavFromViewport();
+  });
+}
+
+function updateWorkflowNavFromViewport() {
+  const targetId = workflowTargetFromViewport();
+  if (!targetId || targetId === state.activeWorkflowTarget) {
+    return;
+  }
+  state.activeWorkflowTarget = targetId;
+  renderSidebarNavigation();
+}
+
+function workflowTargetFromViewport() {
+  const probeY = Math.min(window.innerHeight * 0.32, 320);
+  const candidates = workflowVisibleTargets()
+    .map((targetId) => {
+      const target = document.getElementById(targetId);
+      if (!target || target.hidden || target.offsetParent === null) {
+        return null;
+      }
+      const rect = target.getBoundingClientRect();
+      if (rect.bottom < 96 || rect.top > window.innerHeight * 0.82) {
+        return null;
+      }
+      return {
+        targetId,
+        distance: Math.abs(rect.top - probeY),
+        top: rect.top,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.distance - b.distance || a.top - b.top);
+  return candidates[0]?.targetId || defaultWorkflowTarget();
 }
 
 function profileStepGuard(step) {
@@ -6094,6 +6389,9 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+window.addEventListener("scroll", scheduleWorkflowNavViewportUpdate, { passive: true });
+window.addEventListener("resize", scheduleWorkflowNavViewportUpdate);
 
 renderAll();
 checkRunnerHealth();

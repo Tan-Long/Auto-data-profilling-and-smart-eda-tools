@@ -18,6 +18,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         root / "js" / "demo-data.js",
         root / "js" / "source-parsers.js",
         root / "js" / "dashboard-config.js",
+        root / "js" / "workflow-nav-config.js",
     ]
     js = app_js + "\n" + "\n".join(path.read_text() for path in js_modules)
     design = design_system.read_text()
@@ -27,6 +28,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'rel="icon"',
         'href="favicon.svg"',
         'id="flowChooser"',
+        'id="workflowNav"',
+        'aria-label="Workflow navigator"',
+        'src="js/workflow-nav-config.js"',
         'id="profileFlow"',
         'data-profile-step="connect"',
         'id="evaluateFlow"',
@@ -258,6 +262,10 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".issue-llm-enrichment",
         ".issue-llm-controls",
         ".issue-llm-section",
+        ".workflow-nav",
+        ".nav-stage-item",
+        ".nav-substep-list",
+        ".nav-subitem",
         ".todo-occurrence-heading",
         ".todo-occurrence-finding",
         ".todo-occurrence-evidence",
@@ -504,6 +512,7 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
         [
             (root / "app.js").read_text(),
             (root / "js" / "dashboard-config.js").read_text(),
+            (root / "js" / "workflow-nav-config.js").read_text(),
         ]
     )
     assert 'fetch("/api/health"' in js
@@ -515,6 +524,12 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "run_events.jsonl" in js
     assert "run_summary.json" in js
     assert "renderRunHistory" in js
+    assert "renderSidebarNavigation" in js
+    assert "profileStageCompleteForSidebar" in js
+    assert "workflowTargetFromViewport" in js
+    assert "data-workflow-nav-target" in js
+    assert "Quality Gates" in js
+    assert "Table -> Column -> Issue" in js
     assert "selectedRunTimeline" in js
     assert "data-run-history-job-id" in js
     assert "charts/issue_counts_by_severity.json" in js

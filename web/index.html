@@ -18,16 +18,8 @@
         </div>
       </div>
 
-      <nav class="nav-stack" aria-label="Main sections">
-        <a class="nav-item active" href="#flowChooser">Choose workflow</a>
-        <a class="nav-item" href="#inputSetup">Profile my data</a>
-        <a class="nav-item" href="#evaluateFlow">Evaluate tool</a>
-        <a class="nav-item" href="#runHistory">Run history</a>
-        <a class="nav-item" href="#qualityGates">Quality gates</a>
-        <a class="nav-item" href="#dashboard">Review issues</a>
-        <a class="nav-item" href="#todos">Todos</a>
-        <a class="nav-item" href="#reportExport">Report / Export</a>
-        <a class="nav-item" href="#tableImpact">Table readiness</a>
+      <nav class="nav-stack workflow-nav" id="workflowNav" aria-label="Workflow navigator">
+        <a class="nav-item active" href="#flowChooser" aria-current="step">Choose workflow</a>
       </nav>
 
       <div class="sidebar-card">
@@ -630,6 +622,7 @@
   <script src="js/demo-data.js"></script>
   <script src="js/source-parsers.js"></script>
   <script src="js/dashboard-config.js"></script>
+  <script src="js/workflow-nav-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
