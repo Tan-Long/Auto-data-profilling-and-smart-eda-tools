@@ -3423,14 +3423,43 @@ function renderGeneratedL4Preview(artifacts) {
   const violationCount = Array.isArray(guardrail.violations) ? guardrail.violations.length : 0;
   const fallback = guardrail.fallback_reason || "";
   const displayStatus = guardrailDisplayStatus(status);
+  const providerLabel = `${provider}${model ? ` · ${model}` : ""}`;
+  const details = [
+    ["What this means", "The optional LLM report text passed validation for supported numbers, references, and safety constraints."],
+    ["What it does not mean", "It does not mark the dataset ready. Data readiness still comes from Quality Gates, issues, and table readiness."],
+    ["Provider", providerLabel],
+    ["Evidence checked", `${integerText(checkedNumbers)} numbers · ${integerText(checkedRefs)} refs · ${integerText(violationCount)} violations`],
+    ["Raw CSV sent to LLM", guardrail.raw_csv_included ? "yes" : "no"],
+    ["Fallback", fallback || "none"],
+  ];
   const body = `
     <div class="generated-result-kpi">
       <strong>${escapeHtml(displayStatus)}</strong>
-      <span>${escapeHtml(provider)}${model ? ` · ${escapeHtml(model)}` : ""}</span>
+      <span>${escapeHtml(providerLabel)}</span>
     </div>
     <p>${guardrailScopeText()} ${integerText(checkedNumbers)} numbers · ${integerText(checkedRefs)} refs · ${integerText(violationCount)} violations${fallback ? ` · ${escapeHtml(fallback)}` : ""}</p>
+    <details class="generated-result-details" data-generated-details="llm-validation">
+      <summary>Why this is not a readiness pass</summary>
+      <dl class="generated-result-detail-grid">
+        ${details.map(([label, value]) => generatedResultDetailRow(label, value)).join("")}
+      </dl>
+    </details>
   `;
-  return generatedResultCard("LLM output validation", "guardrail_report.json", body, artifacts);
+  return generatedResultCard(
+    "LLM output validation",
+    "guardrail_report.json",
+    body,
+    artifacts,
+    {
+      className: "llm-validation-card",
+      headingExtraHtml: `
+        <span class="stage-info generated-result-info" tabindex="0" aria-label="${escapeHtml(guardrailScopeText())}" aria-describedby="llmValidationInfoTip">
+          <span class="stage-info-icon" aria-hidden="true">i</span>
+          <span class="stage-info-tooltip" id="llmValidationInfoTip" role="tooltip">${escapeHtml(guardrailScopeText())}</span>
+        </span>
+      `,
+    },
+  );
 }
 
 function renderGeneratedIssueLlmPreview(artifacts) {
@@ -3495,15 +3524,29 @@ function renderGeneratedReportLinks(artifacts) {
   `;
 }
 
-function generatedResultCard(title, artifactPath, body, artifacts) {
+function generatedResultCard(title, artifactPath, body, artifacts, options = {}) {
+  const className = options.className ? ` ${escapeHtml(options.className)}` : "";
+  const headingExtraHtml = options.headingExtraHtml || "";
   return `
-    <article class="generated-result-card">
+    <article class="generated-result-card${className}">
       <div class="generated-result-heading">
-        <strong>${escapeHtml(title)}</strong>
+        <div class="generated-result-title-row">
+          <strong>${escapeHtml(title)}</strong>
+          ${headingExtraHtml}
+        </div>
         <span>generated</span>
       </div>
       ${body}
     </article>
+  `;
+}
+
+function generatedResultDetailRow(label, value) {
+  return `
+    <div>
+      <dt>${escapeHtml(label)}</dt>
+      <dd>${escapeHtml(value)}</dd>
+    </div>
   `;
 }
 

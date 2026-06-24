@@ -294,6 +294,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".stage-info-tooltip",
         ".stage-dropdown",
         ".stage-detail-grid",
+        ".generated-result-info",
+        ".generated-result-details",
+        ".generated-result-detail-grid",
         ".todo-occurrence-heading",
         ".todo-occurrence-finding",
         ".todo-occurrence-evidence",
@@ -590,6 +593,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "LLM output validation" in js
     assert "LLM text valid" in js
     assert "Validates LLM text only; data readiness still comes from quality gates." in js
+    assert 'data-generated-details="llm-validation"' in js
+    assert "Why this is not a readiness pass" in js
+    assert "What it does not mean" in js
     assert "Optional LLM guardrail" not in js
     assert "data-run-history-job-id" in js
     assert "charts/issue_counts_by_severity.json" in js
