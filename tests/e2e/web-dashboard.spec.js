@@ -542,7 +542,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#qualityGates")).toContainText("Needs cleanup before sharing");
   await expect(page.locator("#qualityGates")).toContainText("Outliers need review");
   await expect(page.locator("#qualityGates")).toContainText("Blocked");
-  await expect(page.locator("#qualityGates")).toContainText("Open Todos");
+  await expect(page.locator("#qualityGates .quality-gate-card")).toHaveCount(4);
+  await expect(page.locator("#qualityGates .quality-gate-card[open]")).toHaveCount(0);
   await page.locator("#qualityGates").scrollIntoViewIfNeeded();
   await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="review"]')).toContainText("Current");
   await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="preflight"]')).toContainText("Done");
@@ -550,6 +551,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#qualityGates").screenshot({
     path: "outputs/us073_goal7/quality-gates-summary.png",
   });
+  const firstQualityGate = page.locator("#qualityGates .quality-gate-card").first();
+  await expect(firstQualityGate.locator(".quality-gate-evidence")).toBeHidden();
+  await firstQualityGate.locator(".quality-gate-summary").click();
+  await expect(firstQualityGate).toHaveAttribute("open", "");
+  await expect(firstQualityGate.locator(".quality-gate-evidence")).toBeVisible();
+  await expect(firstQualityGate).toContainText("Dataset verdict");
+  await expect(firstQualityGate).toContainText("Open Review Issues");
   fs.mkdirSync("outputs/us073_goal9", { recursive: true });
   const reportExport = page.locator("#reportExport");
   await expect(reportExport).toContainText("Report / Export");

@@ -3563,25 +3563,34 @@ function renderQualityGateCard(gate) {
   const evidence = Array.isArray(gate.evidence_values) ? gate.evidence_values : [];
   const contexts = Array.isArray(gate.contexts) ? gate.contexts : [];
   const nextAction = gate.recommended_next_action || {};
+  const contextCount = contexts.length;
+  const evidenceCount = evidence.length;
   return `
-    <article class="quality-gate-card" data-status="${escapeHtml(status)}">
-      <div class="quality-gate-heading">
-        <div>
+    <details class="quality-gate-card" data-status="${escapeHtml(status)}">
+      <summary class="quality-gate-summary">
+        <span class="quality-gate-summary-main">
           <strong>${escapeHtml(gate.label || "Quality gate")}</strong>
+          <small>${integerText(evidenceCount)} evidence values · ${integerText(contextCount)} linked contexts</small>
+        </span>
+        <span class="pill-status ${issueStatusClass(status)}" title="${escapeHtml(gate.explanation || status)}">${escapeHtml(status)}</span>
+        <span class="quality-gate-expand" aria-hidden="true">Details</span>
+      </summary>
+      <div class="quality-gate-body">
+        <div class="quality-gate-heading">
+          <strong>Why this gate is ${escapeHtml(status)}</strong>
           <p>${escapeHtml(gate.explanation || "Gate evidence needs review.")}</p>
         </div>
-        <span class="pill-status ${issueStatusClass(status)}" title="${escapeHtml(gate.explanation || status)}">${escapeHtml(status)}</span>
-      </div>
-      <div class="quality-gate-evidence" aria-label="${escapeHtml(gate.label || "Quality gate")} evidence">
-        ${evidence.slice(0, 4).map(renderQualityGateEvidence).join("")}
-      </div>
-      ${contexts.length ? `
-        <div class="quality-gate-contexts">
-          ${contexts.slice(0, 5).map(renderQualityGateContext).join("")}
+        <div class="quality-gate-evidence" aria-label="${escapeHtml(gate.label || "Quality gate")} evidence">
+          ${evidence.slice(0, 4).map(renderQualityGateEvidence).join("")}
         </div>
-      ` : `<p class="muted">No linked table, column, or issue context for this gate.</p>`}
-      <a class="quality-gate-action" href="${escapeHtml(nextAction.anchor || "#dashboardPanelGrid")}">${escapeHtml(nextAction.label || "Open Review Issues.")}</a>
-    </article>
+        ${contexts.length ? `
+          <div class="quality-gate-contexts">
+            ${contexts.slice(0, 5).map(renderQualityGateContext).join("")}
+          </div>
+        ` : `<p class="muted">No linked table, column, or issue context for this gate.</p>`}
+        <a class="quality-gate-action" href="${escapeHtml(nextAction.anchor || "#dashboardPanelGrid")}">${escapeHtml(nextAction.label || "Open Review Issues.")}</a>
+      </div>
+    </details>
   `;
 }
 
