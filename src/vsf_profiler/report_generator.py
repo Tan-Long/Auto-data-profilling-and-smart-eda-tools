@@ -772,8 +772,12 @@ def _visual_report_context(
 
 
 def _visual_issue_card(*, out_dir: Path, issue: Issue, plan: dict[str, Any]) -> dict[str, Any]:
-    sample_preview = _sample_rows_preview(out_dir, issue.sample_bad_rows_path)
     columns = issue.columns or []
+    sample_preview = _sample_rows_preview(
+        out_dir,
+        issue.sample_bad_rows_path,
+        highlighted_columns=columns,
+    )
     return {
         "issue_id": issue.issue_id,
         "issue_type": issue.issue_type,
@@ -802,27 +806,87 @@ def _visual_issue_card(*, out_dir: Path, issue: Issue, plan: dict[str, Any]) -> 
     }
 
 
-def _sample_rows_preview(out_dir: Path, sample_path: str | None, *, row_limit: int = 3) -> dict[str, Any]:
+def _sample_rows_preview(
+    out_dir: Path,
+    sample_path: str | None,
+    *,
+    highlighted_columns: list[str] | None = None,
+    row_limit: int = 3,
+) -> dict[str, Any]:
+    empty = {
+        "available": False,
+        "headers": [],
+        "highlight_headers": [],
+        "rows": [],
+        "path": sample_path or "",
+    }
     if not sample_path:
-        return {"available": False, "headers": [], "rows": [], "path": ""}
+        return empty
     path = (out_dir / sample_path).resolve()
     try:
         path.relative_to(out_dir.resolve())
     except ValueError:
-        return {"available": False, "headers": [], "rows": [], "path": sample_path}
+        return empty
     if not path.is_file():
-        return {"available": False, "headers": [], "rows": [], "path": sample_path}
+        return empty
     try:
         with path.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
-            headers = list(reader.fieldnames or [])[:8]
+            headers = _sample_preview_headers(
+                list(reader.fieldnames or []),
+                highlighted_columns=highlighted_columns or [],
+                limit=8,
+            )
+            highlight_headers = [
+                header
+                for header in headers
+                if _normalized_header(header) in {_normalized_header(column) for column in highlighted_columns or []}
+            ]
             rows = [
                 {header: str(row.get(header, ""))[:120] for header in headers}
                 for _, row in zip(range(row_limit), reader)
             ]
     except (OSError, csv.Error, UnicodeDecodeError):
-        return {"available": False, "headers": [], "rows": [], "path": sample_path}
-    return {"available": bool(headers), "headers": headers, "rows": rows, "path": sample_path}
+        return empty
+    return {
+        "available": bool(headers),
+        "headers": headers,
+        "highlight_headers": highlight_headers,
+        "rows": rows,
+        "path": sample_path,
+    }
+
+
+def _sample_preview_headers(
+    fieldnames: list[str],
+    *,
+    highlighted_columns: list[str],
+    limit: int,
+) -> list[str]:
+    if limit <= 0:
+        return []
+    selected = list(fieldnames[:limit])
+    highlighted = {_normalized_header(column) for column in highlighted_columns if column}
+    for field in fieldnames:
+        if _normalized_header(field) not in highlighted or field in selected:
+            continue
+        selected.append(field)
+    while len(selected) > limit:
+        removable_index = next(
+            (
+                index
+                for index in range(len(selected) - 1, -1, -1)
+                if _normalized_header(selected[index]) not in highlighted
+            ),
+            len(selected) - 1,
+        )
+        selected.pop(removable_index)
+    selected_set = set(selected)
+    return [field for field in fieldnames if field in selected_set]
+
+
+def _normalized_header(value: str) -> str:
+    return str(value or "").strip().lower()
 
 
 def _issue_type_label(issue_type: str) -> str:

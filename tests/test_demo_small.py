@@ -225,6 +225,9 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         assert visual_report_text in report_html
     assert report_md.count("Sample row preview:") >= 1
     assert report_html.count("sample-table") >= 1
+    assert "sample-preview-row" in report_html
+    assert "Highlighted:" in report_html
+    assert 'class="highlighted"' in report_html
     assert "issue_action_plans.json" in report_md
     assert "Full deterministic action-plan evidence remains" in report_html
     assert "issue_action_plans.json" in report_html

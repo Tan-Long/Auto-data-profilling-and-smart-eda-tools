@@ -135,22 +135,63 @@
     th { background: var(--surface-inset); color: var(--foreground-secondary); font-size: 12px; font-weight: 900; text-transform: uppercase; }
     .fix-table td { font-size: 15px; }
     .fix-table td:nth-child(5) { min-width: 260px; }
-    .sample-table { font-size: 13px; }
-    .sample-table th, .sample-table td { padding: 7px; }
-    .sample-link { font-size: 13px; }
+    .sample-table { font-size: 13px; table-layout: auto; }
+    .sample-table th, .sample-table td { padding: 8px 9px; }
+    .sample-table th.highlighted,
+    .sample-table td.highlighted {
+      border-left: 2px solid rgba(178, 59, 50, 0.45);
+      border-right: 2px solid rgba(178, 59, 50, 0.18);
+      background: rgba(178, 59, 50, 0.09);
+    }
+    .sample-table th.highlighted {
+      color: var(--destructive);
+      background: rgba(178, 59, 50, 0.13);
+    }
+    .sample-link { margin: 0; font-size: 13px; }
+    .sample-preview-row > td {
+      padding: 0 11px 14px;
+      border-bottom: 1px solid var(--border-default);
+      background: var(--surface-panel);
+    }
     .sample-preview {
-      margin-top: 2px;
-      padding: 8px 10px;
-      border: 1px solid var(--border-subtle);
+      margin: 0;
+      padding: 10px 12px 12px;
+      border: 1px solid var(--border-default);
       border-radius: 8px;
       background: var(--surface-overlay);
     }
     .sample-preview > summary {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
       cursor: pointer;
       font-size: 13px;
       font-weight: 900;
     }
     .sample-preview > summary:focus-visible { outline: 3px solid rgba(15, 118, 100, 0.28); outline-offset: 3px; }
+    .sample-preview-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0 10px;
+      color: var(--foreground-secondary);
+      font-size: 12px;
+    }
+    .sample-preview-meta span {
+      display: inline-flex;
+      min-height: 24px;
+      align-items: center;
+      padding: 2px 8px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      background: var(--surface-panel);
+    }
+    .sample-preview-meta .highlight-note {
+      color: var(--destructive);
+      border-color: rgba(178, 59, 50, 0.28);
+      background: rgba(178, 59, 50, 0.07);
+      font-weight: 800;
+    }
     .checklist { margin: 0; padding-left: 18px; }
     .checklist li + li { margin-top: 4px; }
     details.report-details {
@@ -274,25 +315,48 @@
               <td>{{ card.fix }}</td>
               <td>
                 {% if card.sample_preview.available %}
-                <details class="sample-preview">
-                  <summary>Sample row preview</summary>
-                  <p class="sample-link"><a href="{{ card.sample_preview.path }}">{{ card.sample_preview.path }}</a></p>
-                  <div class="table-wrap">
-                    <table class="sample-table">
-                      <thead><tr>{% for header in card.sample_preview.headers %}<th>{{ header }}</th>{% endfor %}</tr></thead>
-                      <tbody>
-                        {% for row in card.sample_preview.rows %}
-                        <tr>{% for header in card.sample_preview.headers %}<td>{{ row[header] }}</td>{% endfor %}</tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
+                <span class="pill P2">Preview below</span>
                 {% else %}
                 <span class="muted">No sample rows</span>
                 {% endif %}
               </td>
             </tr>
+            {% if card.sample_preview.available %}
+            <tr class="sample-preview-row">
+              <td colspan="6">
+                <details class="sample-preview" open>
+                  <summary><span>Sample row preview</span><span>{{ card.field }}</span></summary>
+                  <div class="sample-preview-meta">
+                    <span><a href="{{ card.sample_preview.path }}">{{ card.sample_preview.path }}</a></span>
+                    <span>{{ card.sample_preview.rows|length }} bounded row{{ "" if card.sample_preview.rows|length == 1 else "s" }}</span>
+                    {% if card.sample_preview.highlight_headers %}
+                    <span class="highlight-note">Highlighted: {{ card.sample_preview.highlight_headers|join(", ") }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="table-wrap">
+                    <table class="sample-table">
+                      <thead>
+                        <tr>
+                          {% for header in card.sample_preview.headers %}
+                          <th class="{{ 'highlighted' if header in card.sample_preview.highlight_headers else '' }}">{{ header }}</th>
+                          {% endfor %}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for row in card.sample_preview.rows %}
+                        <tr>
+                          {% for header in card.sample_preview.headers %}
+                          <td class="{{ 'highlighted' if header in card.sample_preview.highlight_headers else '' }}">{{ row[header] }}</td>
+                          {% endfor %}
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
         </table>

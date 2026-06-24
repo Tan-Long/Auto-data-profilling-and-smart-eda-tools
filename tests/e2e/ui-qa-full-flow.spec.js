@@ -321,6 +321,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(reportPage.locator("h2", { hasText: "Where are the problems?" })).toBeVisible();
     await expect(reportPage.locator("h2", { hasText: "What should be fixed first?" })).toBeVisible();
     await expect(reportPage.getByText("Sample row preview").first()).toBeVisible();
+    await expect(reportPage.locator(".sample-preview-row").first()).toBeVisible();
+    await expect(reportPage.locator(".sample-table td.highlighted").first()).toBeVisible();
     await expect(reportPage.locator("h2", { hasText: "Quality Gates" })).toBeVisible();
     await expect(reportPage.locator("h2", { hasText: "Issue Action Plans" })).toBeVisible();
     await reportPage.close();
