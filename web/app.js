@@ -17,6 +17,7 @@ const state = {
   selectedDemoPreset: "small",
   llmMode: "off",
   runnerAvailable: false,
+  runnerHost: "",
   currentJob: null,
   runEvents: [],
   runHistory: [],
@@ -909,12 +910,14 @@ async function checkRunnerHealth() {
   try {
     const response = await fetch("/api/health", { cache: "no-store" });
     const payload = await response.json();
-    state.runnerAvailable = response.ok && payload.host === "127.0.0.1";
+    state.runnerAvailable = response.ok && payload.status === "ok";
+    state.runnerHost = typeof payload.host === "string" && payload.host ? payload.host : window.location.host;
     els.runnerMessage.textContent = state.runnerAvailable
-      ? "Local backend is ready on 127.0.0.1."
+      ? `Local backend is ready on ${runnerHostLabel()}.`
       : "Open this page with vsf-profiler web to run the backend pipeline.";
   } catch (error) {
     state.runnerAvailable = false;
+    state.runnerHost = "";
     els.runnerMessage.textContent = "Open this page with vsf-profiler web to run the backend pipeline.";
   }
   renderAll();
@@ -1202,7 +1205,7 @@ async function startPathRun() {
   state.currentJob = { status: "queued", input_mode: "path", artifacts: [] };
   resetDashboardState();
   renderJob();
-  renderRunnerMessage(`Starting local path job on 127.0.0.1${llmRunSuffix()}...`, "pending");
+  renderRunnerMessage(`Starting local path job on ${runnerHostLabel()}${llmRunSuffix()}...`, "pending");
   els.runPathProfilerButton.disabled = true;
 
   try {
@@ -1280,7 +1283,7 @@ async function startDatabaseRun() {
   resetDashboardState();
   renderJob();
   renderRunnerMessage(
-    `Starting ${databaseSourceLabel(sourceType)} database job on 127.0.0.1${llmRunSuffix()}...`,
+    `Starting ${databaseSourceLabel(sourceType)} database job on ${runnerHostLabel()}${llmRunSuffix()}...`,
     "pending",
   );
   els.runDatabaseProfilerButton.disabled = true;
@@ -1313,11 +1316,15 @@ function setRunnerMode(mode) {
   }
   const messages = {
     upload: "Start with files uploaded from this browser session.",
-    path: "Start with local paths visible to the 127.0.0.1 runner.",
-    database: "Start with a developer database source visible to the 127.0.0.1 runner.",
+    path: `Start with local paths visible to the ${runnerHostLabel()} runner.`,
+    database: `Start with a developer database source visible to the ${runnerHostLabel()} runner.`,
   };
   renderRunnerMessage(messages[state.runnerMode], "idle");
   renderAll();
+}
+
+function runnerHostLabel() {
+  return state.runnerHost || window.location.host || "configured host";
 }
 
 function setFlowMode(mode) {

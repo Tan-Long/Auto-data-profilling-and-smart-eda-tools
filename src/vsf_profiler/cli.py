@@ -234,23 +234,32 @@ def demo_run_olist(
 
 @app.command("web")
 def web(
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help=(
+            "Host interface for the web runner. Defaults to 127.0.0.1 for local-only use; "
+            "use 0.0.0.0 only inside a trusted container or behind your own auth/reverse proxy."
+        ),
+    ),
     port: int = typer.Option(
         8765,
         "--port",
         min=1,
         max=65535,
-        help="Local web runner port. The server always binds 127.0.0.1.",
+        help="Local web runner port.",
     ),
     run_root: Path = typer.Option(
         Path("outputs/web_runs"),
         "--run-root",
+        envvar="VSF_PROFILER_OUTPUT_DIR",
         help="Directory for uploaded inputs and generated web-run artifacts.",
     ),
 ) -> None:
     """Start the local-only browser runner for uploaded DBML/CSV jobs."""
     from vsf_profiler.web_runner import run_web_server
 
-    run_web_server(port=port, run_root=run_root)
+    run_web_server(host=host, port=port, run_root=run_root)
 
 
 @app.command("doctor")

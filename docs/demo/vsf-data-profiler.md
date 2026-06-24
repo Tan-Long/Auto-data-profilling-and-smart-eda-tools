@@ -59,6 +59,22 @@ PATH="$PWD/.venv/bin:$PATH" vsf-profiler web --port 8765
 open http://127.0.0.1:8765
 ```
 
+The default runner binds to `127.0.0.1`. For a trusted container or local
+self-host smoke, use an explicit host and keep public auth/reverse proxying out
+of this demo:
+
+```bash
+PATH="$PWD/.venv/bin:$PATH" vsf-profiler web --host 0.0.0.0 --port 8765
+```
+
+Docker runs the same web runner and writes artifacts to host `outputs/`:
+
+```bash
+docker compose up --build
+curl http://127.0.0.1:8765/api/health
+open http://127.0.0.1:8765
+```
+
 Export the report package after `make demo-small`:
 
 ```bash

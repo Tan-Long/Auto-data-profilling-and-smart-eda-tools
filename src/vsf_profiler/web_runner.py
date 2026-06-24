@@ -778,12 +778,13 @@ class WebRunStore:
 class WebRunnerHandler(BaseHTTPRequestHandler):
     store: WebRunStore
     static_dir: Path
+    bound_host: str = LOCAL_WEB_HOST
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = parsed.path
         if path == "/api/health":
-            self._send_json({"status": "ok", "host": LOCAL_WEB_HOST})
+            self._send_json({"status": "ok", "host": self.bound_host})
             return
         if path == "/api/history":
             self._send_json(self.store.history_payload())
@@ -1121,9 +1122,14 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
-def run_web_server(*, port: int = DEFAULT_WEB_PORT, run_root: Path = DEFAULT_RUN_ROOT) -> None:
-    server = create_web_server(port=port, run_root=run_root)
-    print(f"VSF Data Profiler web runner: http://{LOCAL_WEB_HOST}:{port}")
+def run_web_server(
+    *,
+    host: str = LOCAL_WEB_HOST,
+    port: int = DEFAULT_WEB_PORT,
+    run_root: Path = DEFAULT_RUN_ROOT,
+) -> None:
+    server = create_web_server(host=host, port=port, run_root=run_root)
+    print(f"VSF Data Profiler web runner: http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -1134,6 +1140,7 @@ def run_web_server(*, port: int = DEFAULT_WEB_PORT, run_root: Path = DEFAULT_RUN
 
 def create_web_server(
     *,
+    host: str = LOCAL_WEB_HOST,
     port: int = DEFAULT_WEB_PORT,
     run_root: Path = DEFAULT_RUN_ROOT,
 ) -> ThreadingHTTPServer:
@@ -1145,7 +1152,8 @@ def create_web_server(
 
     Handler.store = store
     Handler.static_dir = static_dir
-    return ThreadingHTTPServer((LOCAL_WEB_HOST, port), Handler)
+    Handler.bound_host = host
+    return ThreadingHTTPServer((host, port), Handler)
 
 
 def _web_static_dir() -> Path:

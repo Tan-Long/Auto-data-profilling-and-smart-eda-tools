@@ -33,7 +33,7 @@
 
       <div class="sidebar-card">
         <p class="eyebrow">Boundary</p>
-        <p>Full profiling runs only through the local <code>127.0.0.1</code> Python/DuckDB backend. Hosted previews do not run profiler jobs.</p>
+        <p>Full profiling runs through the Python/DuckDB backend: local <code>127.0.0.1</code> by default, or an explicit trusted self-host bind. Hosted previews do not run profiler jobs.</p>
       </div>
     </aside>
 
@@ -42,7 +42,7 @@
         <div>
           <p class="eyebrow">Guided data-quality workflow</p>
           <h2>Choose whether to profile your CSV+DBML data or evaluate the tool on built-in faulty datasets.</h2>
-          <p class="topbar-note">Profile runs use the local <code>127.0.0.1</code> runner. Evaluation runs curated local faulty datasets only and compares VSF output with seeded ground truth and the Great Expectations baseline state.</p>
+          <p class="topbar-note">Profile runs use the Python/DuckDB runner started from this repo. Evaluation runs curated local faulty datasets only and compares VSF output with seeded ground truth and the Great Expectations baseline state.</p>
         </div>
         <div class="topbar-actions" id="topbarActions" hidden>
           <button class="button ghost" id="loadDemoButton" type="button">Reset demo</button>

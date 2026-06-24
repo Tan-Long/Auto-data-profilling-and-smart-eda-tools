@@ -111,7 +111,7 @@ Target roadmap scope:
 | CLI | Run the full profiler and write artifacts to an output directory. | v0.2 local RC. |
 | Static reports | Let users inspect findings without running an app server. | v0.2 local RC. |
 | Static web workspace | Historical browser-only DBML/CSV mapping preview. It is retained for compatibility and is not the product-facing guided workflow. | Compatibility preview. |
-| Local web runner | Run CSV+DBML jobs through a `127.0.0.1` backend using browser upload mode or local path mode, then expose quality gates, issue evidence, deterministic action plans, todos, table readiness, report/export links, selected-issue LLM enrichment, developer artifact links, persistent run history, and per-run stage timelines. Legacy rule config, association fields, database source mode, compatibility LLM report artifacts, and graph artifacts remain compatibility controls. | Guided local runner. |
+| Local web runner | Run CSV+DBML jobs through the Python/DuckDB backend, binding to `127.0.0.1` by default and allowing an explicit trusted self-host bind such as `--host 0.0.0.0`, then expose quality gates, issue evidence, deterministic action plans, todos, table readiness, report/export links, selected-issue LLM enrichment, developer artifact links, persistent run history, and per-run stage timelines. Legacy rule config, association fields, database source mode, compatibility LLM report artifacts, and graph artifacts remain compatibility controls. | Guided local runner. |
 | Evaluate tool | Run built-in faulty dataset comparisons against seeded ground truth and the available Great Expectations baseline state without accepting arbitrary uploads. | Local demo/release surface. |
 | Runtime trace files | Make each run debuggable through log, JSONL events, and summary metadata. | v0.2 hardening. |
 | Optional LLM artifacts | Produce guarded evidence summaries from artifact JSON after deterministic checks finish. | Compatibility surface. |
@@ -189,7 +189,7 @@ default demo path.
 | Rules config | YAML | Human-editable data-quality rules. |
 | Reports | Jinja2 Markdown/HTML templates | Deterministic, testable output. |
 | Runtime logging | Python logging + JSONL events; optional Rich console | Near-term hardening for human-readable progress and machine-readable run trace. |
-| Web workspace | Plain HTML/CSS/JavaScript plus Python stdlib local runner | Static DBML/CSV mapping without a build step; full profiling only through the local `127.0.0.1` backend. |
+| Web workspace | Plain HTML/CSS/JavaScript plus Python stdlib local runner | Static DBML/CSV mapping without a build step; full profiling only through the configured Python backend, local `127.0.0.1` by default. |
 | pandas | Bounded analysis frames only | Allowed only after an explicit row and column guard. |
 | LLM provider | Optional adapter | The core profiler must run without internet or model credentials. |
 
@@ -807,11 +807,17 @@ The historical static deployment serves only this browser preview. It does not
 run the Python/DuckDB backend, database connectors, local path mode, LLM summary
 generation, package/PDF export, or review jobs.
 
+Container/local self-host packaging may bind the same runner to `0.0.0.0` so
+the host can reach it through a mapped port. That mode is for local review and
+trusted internal smoke only. Public exposure requires external authentication,
+TLS, and reverse proxy/gateway controls; those controls are outside this
+product repo.
+
 Local runner:
 
 ```text
 browser workspace
-  -> 127.0.0.1 backend job API
+  -> configured backend job API (`127.0.0.1` by default)
   -> same application pipeline used by CLI
   -> outputs/web_runs/<job_id>/artifacts
   -> run_events.jsonl and run_summary.json

@@ -17,9 +17,13 @@ for the default CSV plus DBML workflow.
 This repository still carries Harness docs under `docs/` for agent workflow.
 The product implemented here is `VSF Data Profiler`.
 
-## Setup
+## Clone and Run Locally
+
+Clone the repository and install the Python package in a virtual environment:
 
 ```bash
+git clone https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools.git
+cd Auto-data-profilling-and-smart-eda-tools
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
@@ -27,6 +31,69 @@ python -m pip install -e ".[dev]"
 
 Use `python -m venv .venv` instead if your system provides `python` as Python
 3.11 or newer.
+
+Start the full local Python/DuckDB web runner:
+
+```bash
+vsf-profiler demo create-small --out data/demo_small
+vsf-profiler web --port 8765
+open http://127.0.0.1:8765
+```
+
+The default web runner binds to `127.0.0.1` for local-only use. For a trusted
+container or LAN self-host smoke, pass an explicit host:
+
+```bash
+vsf-profiler web --host 0.0.0.0 --port 8765
+```
+
+Do not expose that process directly to the public internet. Public hosting
+needs an authentication layer, TLS, and a reverse proxy or gateway; this
+repository does not implement public auth.
+
+In the browser, choose **Profile my data**, keep the **Small demo** local path
+preset, and run the profile. Then choose **Evaluate tool** and run a built-in
+faulty dataset comparison. Profile and Evaluate artifacts are written under
+`outputs/web_runs/<job_id>/artifacts` by default, or under the directory set by
+`--run-root` / `VSF_PROFILER_OUTPUT_DIR`.
+
+Optional OpenAI, Great Expectations, Postgres, MySQL/MariaDB, Kaggle, Node, and
+Playwright paths are not required for the default local demo. They either stay
+hidden, show explicit unavailable states, or skip in release checks when their
+dependencies or credentials are missing.
+
+## Docker Local Runner
+
+Docker runs the same Python web runner inside a container and publishes it on
+the host at `http://127.0.0.1:8765`. The container creates the small demo data
+on startup so the Profile preset works immediately.
+
+```bash
+docker build -t vsf-profiler-local .
+docker run --rm \
+  -p 8765:8765 \
+  -v "$PWD/outputs:/app/outputs" \
+  -v "$PWD/data:/app/data" \
+  --env-file .env.example \
+  vsf-profiler-local
+curl http://127.0.0.1:8765/api/health
+open http://127.0.0.1:8765
+```
+
+Docker Compose uses the same image and host port convention:
+
+```bash
+docker compose up --build
+```
+
+Use `.env.example` as a starting point for optional local settings. Do not
+commit `.env`, generated `data/`, generated `outputs/`, `.venv`, or
+`node_modules`.
+
+Vercel configuration in this repo is a static preview only. It can serve the
+browser-side DBML/CSV mapping UI from `web/`, but it does not start the
+Python/DuckDB backend, run Profile jobs, run Evaluate jobs, or write artifacts
+unless a separate backend host is configured outside this repo.
 
 ## Guided CSV + DBML Demo
 
@@ -311,13 +378,15 @@ make web-runner
 open http://127.0.0.1:8765
 ```
 
-The local runner binds only to `127.0.0.1`. It preserves CLI artifact contracts
-and can run upload-mode jobs for demo/small-medium CSV+DBML inputs or local
-path mode jobs where browser-entered DBML and CSV directory paths are validated
-locally without uploading CSV bytes through the browser. Legacy controls for
-rule config, association fields, database sources, and optional compatibility
-LLM report artifacts remain available for compatibility but are not the main
-workflow.
+The runner binds to `127.0.0.1` by default. Use `vsf-profiler web --host
+0.0.0.0 --port 8765` only for a trusted container or local self-host smoke, and
+put your own authentication/reverse proxy in front before any public exposure.
+The runner preserves CLI artifact contracts and can run upload-mode jobs for
+demo/small-medium CSV+DBML inputs or local path mode jobs where browser-entered
+DBML and CSV directory paths are validated locally without uploading CSV bytes
+through the browser. Legacy controls for rule config, association fields,
+database sources, and optional compatibility LLM report artifacts remain
+available for compatibility but are not the main workflow.
 After a run completes, the local runner can show an interactive dashboard from
 generated artifact URLs such as
 `charts/*.json`, `issues.json`, `profile_summary.json`,
@@ -342,7 +411,7 @@ available.
   existing Python/DuckDB pipeline directly against those paths. Use it for
   larger local datasets when the CSV directory is visible to the server process.
 - Developer database source mode sends a local Postgres or MySQL/MariaDB
-  connection URL to the `127.0.0.1` backend, introspects selected tables,
+  connection URL to the configured backend, introspects selected tables,
   generates schema/DBML evidence, extracts temporary chunked CSV material for
   DuckDB scanning, and removes those temporary extracts after artifacts are
   written.

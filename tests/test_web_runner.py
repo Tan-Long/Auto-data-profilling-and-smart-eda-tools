@@ -6,7 +6,9 @@ import urllib.error
 import urllib.request
 
 import pytest
+from typer.testing import CliRunner
 
+from vsf_profiler.cli import app
 from vsf_profiler.demo_data import create_small_demo
 from vsf_profiler.models import CatalogTable, ColumnSchema, CsvCatalog, Schema, TableSchema
 from vsf_profiler import web_runner
@@ -1129,12 +1131,41 @@ def test_web_runner_rejects_artifact_path_traversal(tmp_path):
         raise AssertionError("path traversal was not rejected")
 
 
-def test_web_server_binds_localhost_only(tmp_path):
+def test_web_server_defaults_to_localhost_and_reports_health_host(tmp_path):
     server = create_web_server(port=0, run_root=tmp_path / "web_runs")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
     try:
         assert server.server_address[0] == LOCAL_WEB_HOST
+        payload = _get_json(f"http://{LOCAL_WEB_HOST}:{server.server_address[1]}/api/health")
+        assert payload == {"status": "ok", "host": LOCAL_WEB_HOST}
     finally:
+        server.shutdown()
+        thread.join(timeout=5)
         server.server_close()
+
+
+def test_web_server_can_bind_explicit_self_host_interface(tmp_path):
+    server = create_web_server(host="0.0.0.0", port=0, run_root=tmp_path / "web_runs")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        assert server.server_address[0] == "0.0.0.0"
+        payload = _get_json(f"http://{LOCAL_WEB_HOST}:{server.server_address[1]}/api/health")
+        assert payload == {"status": "ok", "host": "0.0.0.0"}
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+
+
+def test_web_cli_help_documents_explicit_host_option():
+    result = CliRunner().invoke(app, ["web", "--help"])
+
+    assert result.exit_code == 0
+    assert "--host" in result.output
+    assert "127.0.0.1" in result.output
+    assert "0.0.0.0" in result.output
 
 
 class FakeWebDatabaseConnector:
