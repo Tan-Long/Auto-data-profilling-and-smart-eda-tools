@@ -320,6 +320,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".severity-priority-panel",
         ".severity-priority-card",
         ".issue-severity-token",
+        ".sample-preview-button",
         ".issue-focus-map",
         ".developer-options",
         ".runner-source-switch",

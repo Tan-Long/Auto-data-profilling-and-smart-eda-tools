@@ -684,7 +684,11 @@ def issue_rows_html(issues: list[dict[str, Any]], artifact_index: dict[str, dict
     rows = []
     for issue in issues[:25]:
         sample_path = issue.get("sample_bad_rows_path") or ""
-        sample_html = _artifact_link(sample_path, sample_path, artifact_index) if sample_path else "none"
+        sample_html = (
+            f'<code>{_h(sample_path)}</code><br><span class="meta">preview in report.html</span>'
+            if sample_path
+            else "none"
+        )
         fixes = issue.get("suggested_fix") or []
         rows.append(
             "<tr>"
@@ -1170,8 +1174,15 @@ def package_developer_artifact_links_html(
         seen.add(path)
         links.append(_artifact_link(label, path, artifact_index))
     links.extend(_artifact_link(Path(path).name, path, artifact_index) for path in chart_paths)
-    links.extend(_artifact_link(Path(path).name, path, artifact_index) for path in sample_paths[:20])
     html_links = "".join(link for link in links if link)
+    sample_note = (
+        f'<p class="meta">{_h(len(sample_paths))} bounded sample CSV files are included for '
+        "report previews and manifest audit; report.html previews rows inline without direct CSV links.</p>"
+        if sample_paths
+        else ""
+    )
+    if html_links or sample_note:
+        return html_links + sample_note
     return html_links or '<p class="meta">No developer artifacts were included.</p>'
 
 

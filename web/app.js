@@ -484,6 +484,7 @@ els.dashboardDrilldown.addEventListener("click", async (event) => {
   }
   const target = event.target.closest("[data-action-plan-export]");
   if (!target) {
+    handleDashboardSelectionClick(event);
     return;
   }
   await handleIssueActionPlanExport(target);
@@ -6553,7 +6554,6 @@ function renderIssueRows(issues) {
   return `
     <div class="dashboard-issue-list">
       ${issues.slice(0, 12).map((issue) => {
-        const sampleUrl = issue.sample_bad_rows_path ? artifactUrlFor(issue.sample_bad_rows_path) : "";
         return `
           <article class="dashboard-issue-row">
             <div>
@@ -6565,7 +6565,9 @@ function renderIssueRows(issues) {
               <span>${integerText(issue.bad_count)} rows</span>
               <span>${percentText(issue.bad_rate)}</span>
             </div>
-            ${sampleUrl ? `<a href="${escapeHtml(sampleUrl)}" target="_blank" rel="noopener">sample CSV</a>` : `<span class="muted">no sample</span>`}
+            ${issue.sample_bad_rows_path
+              ? `<button class="sample-preview-button" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueGuid(issue))}" data-dashboard-label="${escapeHtml(issueGuid(issue))}" data-dashboard-scroll="drilldown">Preview rows</button>`
+              : `<span class="muted">no sample</span>`}
           </article>
         `;
       }).join("")}

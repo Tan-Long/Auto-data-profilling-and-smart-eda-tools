@@ -3550,11 +3550,29 @@ h3 {
   font-size: 12px;
 }
 
+.sample-preview-button,
 .dashboard-issue-row a,
 .drilldown-artifacts a {
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 800;
+}
+
+.sample-preview-button {
+  justify-self: start;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  cursor: pointer;
+}
+
+.sample-preview-button:hover,
+.sample-preview-button:focus-visible {
+  border-color: var(--accent);
+  background: #f6fbf8;
+  outline: none;
 }
 
 .issue-counts {

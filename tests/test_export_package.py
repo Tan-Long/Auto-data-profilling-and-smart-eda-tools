@@ -88,6 +88,10 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert "Data Quality Package" in index_html
     assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in index_html
     assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in packaged_report_html
+    assert 'href="samples/' not in index_html
+    assert 'href="samples/' not in packaged_report_html
+    assert "report.html previews rows inline without direct CSV links" in index_html
+    assert "Sample row preview" in packaged_report_html
     assert 'href="favicon.svg"' not in index_html
     assert 'href="favicon.svg"' not in packaged_report_html
     for section in [

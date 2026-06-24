@@ -407,7 +407,7 @@
                 <details class="sample-preview" open>
                   <summary><span>Sample row preview</span><span>{{ card.field }}</span></summary>
                   <div class="sample-preview-meta">
-                    <span><a href="{{ card.sample_preview.path }}">{{ card.sample_preview.path }}</a></span>
+                    <span><code>{{ card.sample_preview.path }}</code></span>
                     <span>{{ card.sample_preview.rows|length }} bounded row{{ "" if card.sample_preview.rows|length == 1 else "s" }}</span>
                     {% if card.sample_preview.highlight_headers %}
                     <span class="highlight-note">Highlighted: {{ card.sample_preview.highlight_headers|join(", ") }}</span>
@@ -519,7 +519,7 @@
           <thead><tr><th>Table</th><th>Column</th><th>Status</th><th>Issue</th><th>Bad rows</th><th>Sample</th><th>What should be fixed?</th></tr></thead>
           <tbody>
             {% for row in visual_report.column_issue_rows %}
-            <tr><td><code>{{ row.table }}</code></td><td><code>{{ row.column }}</code></td><td><span class="pill {{ row.status }}">{{ row.status }}</span></td><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td>{{ row.bad_rows }}</td><td>{% if row.sample %}<a href="{{ row.sample }}">sample rows</a>{% else %}none{% endif %}</td><td>{{ row.fix }}</td></tr>
+            <tr><td><code>{{ row.table }}</code></td><td><code>{{ row.column }}</code></td><td><span class="pill {{ row.status }}">{{ row.status }}</span></td><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td>{{ row.bad_rows }}</td><td>{% if row.sample %}<code>{{ row.sample }}</code>{% else %}none{% endif %}</td><td>{{ row.fix }}</td></tr>
             {% endfor %}
           </tbody>
         </table>

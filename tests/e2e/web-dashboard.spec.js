@@ -663,6 +663,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: `${goal12Dir}/profile-post-run-review-surface.png`,
   });
 
+  await expect(page.locator("#dashboardDrilldown .sample-preview-button").first()).toContainText("Preview rows");
+  const samplePreviewDownload = page.waitForEvent("download", { timeout: 1000 }).catch(() => null);
+  await page.locator("#dashboardDrilldown .sample-preview-button").first().click();
+  expect(await samplePreviewDownload).toBeNull();
+  await expect(page.locator("#dashboardDrilldown .issue-row-evidence")).toContainText("Previewing sample");
+
   await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Where");

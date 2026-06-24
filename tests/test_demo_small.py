@@ -233,6 +233,8 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert "sample-preview-row" in report_html
     assert "Highlighted:" in report_html
     assert 'class="highlighted"' in report_html
+    assert 'href="samples/' not in report_html
+    assert "HTML report expands bounded sample rows inline" in report_md
     assert "issue_action_plans.json" in report_md
     assert "Full deterministic action-plan evidence remains" in report_html
     assert "issue_action_plans.json" in report_html
