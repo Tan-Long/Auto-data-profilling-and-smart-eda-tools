@@ -307,7 +307,10 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     );
 
     await page.locator("#todosFilterVerify").click();
-    await expect(page.locator("#todos")).toContainText("Rerun the profiler on the corrected CSV + DBML inputs.");
+    await expect(page.locator("#todos")).toContainText("Verify after fix focus");
+    await expect(page.locator("#todos .todo-visual-summary")).toBeVisible();
+    await expect(page.locator("#todos .todo-visual-card").first()).toBeVisible();
+    await expect(page.locator("#todos .todo-issue-chip").first()).toBeVisible();
     await page.locator('[data-todo-export="fix_data"]').click();
     await expect(page.locator("#reportExportMessage")).toContainText("Copied Fix data Markdown.");
     await page.locator('[data-todo-export="verify_after_fix"]').click();

@@ -299,9 +299,14 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".generated-result-info",
         ".generated-result-details",
         ".generated-result-detail-grid",
-        ".todo-occurrence-heading",
-        ".todo-occurrence-finding",
-        ".todo-occurrence-evidence",
+        ".todo-visual-summary",
+        ".todo-summary-card",
+        ".todo-signal-card",
+        ".todo-card-grid",
+        ".todo-visual-card",
+        ".todo-issue-chip",
+        ".todo-more-groups",
+        ".todo-compact-row",
         ".quality-gates-section",
         ".quality-gate-card",
         ".quality-gate-evidence-value",
@@ -546,9 +551,6 @@ def test_web_review_surfaces_use_single_flow_layouts():
         ".evidence-value",
         ".action-plan-metrics",
         ".issue-fix-todo-grid",
-        ".todo-summary-strip",
-        ".todo-group-heading",
-        ".todo-occurrence",
         ".runner-grid",
         ".preflight-review-grid",
         ".preflight-item",
@@ -563,6 +565,15 @@ def test_web_review_surfaces_use_single_flow_layouts():
     assert "position: absolute;" in _css_block(css, ".dashboard-risk-breakdown")
     assert ".dashboard-risk-meter[open] .dashboard-risk-breakdown" in css
     assert ".dashboard-risk-meter:hover .dashboard-risk-breakdown" in css
+    assert ".todo-visual-summary" in css
+    assert ".todo-card-grid" in css
+    assert ".todo-visual-card" in css
+    assert ".todo-issue-chip" in css
+    assert ".todo-more-groups" in css
+    assert ".todo-distribution-row" in css
+    assert ".todo-summary-strip" not in css
+    assert ".todo-group-heading" not in css
+    assert ".todo-occurrence" not in css
     assert "Avoid primary two-column split layouts for review surfaces" in design
 
 
@@ -636,7 +647,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "issueForTodoOccurrence" in js
     assert "todoOccurrenceEvidenceText" in js
     assert "data-dashboard-scroll=\"drilldown\"" in js
-    assert "open issue detail" in js
+    assert "todo-issue-chip" in js
+    assert "Linked issues" in js
+    assert "open issue detail" not in js
     assert "Copy Fix data Markdown" in js
     assert "Copy Verify after fix Markdown" in js
     assert "Reports and todo exports are ready for review." in js

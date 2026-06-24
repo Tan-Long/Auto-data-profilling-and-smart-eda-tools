@@ -4322,44 +4322,101 @@ h3 {
 }
 
 .todo-grid,
-.todo-type-section,
-.todo-group-list {
+.todo-type-section {
   display: grid;
   gap: 10px;
 }
 
-.todo-summary-strip {
+.todo-visual-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
 }
 
-.todo-summary-strip div,
+.todo-summary-card,
+.todo-signal-card,
 .todo-empty,
-.todo-group-card {
+.todo-visual-card,
+.todo-compact-row {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
 }
 
-.todo-summary-strip div {
-  padding: 10px;
+.todo-summary-card,
+.todo-signal-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
 }
 
-.todo-summary-strip span {
-  display: block;
-  color: var(--foreground-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 20px;
-  font-weight: 900;
-}
-
-.todo-summary-strip p {
-  margin: 2px 0 0;
-  color: var(--foreground-secondary);
+.todo-summary-card span,
+.todo-signal-card > strong {
+  color: var(--foreground-tertiary);
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.todo-summary-card strong {
+  display: block;
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.todo-summary-card p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.todo-distribution-list {
+  display: grid;
+  gap: 7px;
+}
+
+.todo-distribution-row {
+  display: grid;
+  grid-template-columns: minmax(58px, 0.8fr) minmax(64px, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.todo-distribution-row > span:first-child {
+  min-width: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-distribution-row code {
+  color: var(--foreground-primary);
+  font-size: 11px;
+  text-align: right;
+}
+
+.todo-distribution-track {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-inset);
+}
+
+.todo-distribution-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
 }
 
 .todo-type-section h4 {
@@ -4367,6 +4424,37 @@ h3 {
   color: var(--foreground-primary);
   font-size: 14px;
   line-height: 1.2;
+}
+
+.todo-type-section.visual {
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.todo-type-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.todo-type-heading p {
+  margin: 3px 0 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+}
+
+.todo-type-heading > span {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .todo-empty {
@@ -4379,118 +4467,183 @@ h3 {
   color: var(--foreground-primary);
 }
 
-.todo-group-card {
+.todo-card-grid {
   display: grid;
-  gap: 9px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.todo-visual-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
   padding: 12px;
 }
 
-.todo-group-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+.todo-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  align-items: start;
+  min-width: 0;
 }
 
-.todo-type-label {
-  display: block;
-  margin-bottom: 4px;
+.todo-card-head code {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.todo-card-head span,
+.todo-issue-more {
   color: var(--foreground-tertiary);
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.todo-group-heading strong {
-  display: block;
+.todo-visual-card > strong {
+  min-width: 0;
   color: var(--foreground-primary);
   font-size: 13px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.todo-meta-row {
+.todo-card-meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-inset);
+}
+
+.todo-card-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.todo-card-tags,
+.todo-linked-issues {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  align-items: center;
-  color: var(--foreground-tertiary);
-  font-size: 11px;
-  font-weight: 900;
+  min-width: 0;
 }
 
-.todo-meta-row code {
-  padding: 2px 6px;
+.todo-card-tags span {
+  padding: 3px 7px;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-inset);
+  border-radius: 999px;
+  background: var(--surface-overlay);
   color: var(--foreground-secondary);
   font-size: 11px;
+  font-weight: 800;
 }
 
-.todo-occurrence-list {
-  display: grid;
-  gap: 6px;
+.todo-linked-issues {
+  padding-top: 2px;
 }
 
-.todo-occurrence {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
-  align-items: start;
-  width: 100%;
-  padding: 7px 8px;
+.todo-issue-chip {
+  display: inline-grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 3px 6px;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-overlay);
+  border-radius: 999px;
+  background: var(--surface-panel);
   color: var(--foreground-primary);
-  text-align: left;
   cursor: pointer;
 }
 
-.todo-occurrence:hover,
-.todo-occurrence:focus-visible {
+.todo-issue-chip:hover,
+.todo-issue-chip:focus-visible {
   border-color: var(--accent);
   background: #f6fbf8;
   outline: none;
 }
 
-.todo-occurrence:focus-visible {
+.todo-issue-chip:focus-visible {
   box-shadow: 0 0 0 3px rgba(15, 118, 100, 0.16);
 }
 
-.todo-occurrence-heading {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.todo-occurrence-heading strong {
-  min-width: 0;
+.todo-issue-chip code {
   color: var(--foreground-primary);
-  font-size: 12px;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
+  font-size: 11px;
 }
 
-.todo-occurrence-finding,
-.todo-occurrence-evidence,
-.todo-occurrence small {
+.todo-issue-chip > span:last-child {
   min-width: 0;
   color: var(--foreground-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-more-groups {
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.todo-more-groups > summary {
+  padding: 10px 12px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  list-style-position: inside;
+}
+
+.todo-more-groups > summary:focus-visible {
+  outline: 3px solid rgba(15, 118, 100, 0.28);
+  outline-offset: 3px;
+}
+
+.todo-compact-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.todo-compact-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+}
+
+.todo-compact-row > code {
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.todo-compact-row > strong {
+  min-width: 0;
+  color: var(--foreground-primary);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.todo-occurrence-evidence {
+.todo-compact-row > span {
   color: var(--foreground-tertiary);
   font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
-.todo-occurrence code {
-  color: var(--foreground-primary);
-  font-size: 11px;
+.todo-compact-issues {
+  grid-column: 1 / -1;
 }
 
 .artifact-list.compact {
@@ -6173,7 +6326,8 @@ details.runtime-stage-item:focus-within {
   .upload-grid,
   .status-strip,
   .dashboard-summary-strip,
-  .todo-summary-strip,
+  .todo-visual-summary,
+  .todo-card-grid,
   .dashboard-layout,
   .dashboard-panel-grid,
   .generated-result-grid,
@@ -6208,8 +6362,8 @@ details.runtime-stage-item:focus-within {
   .quality-gate-context,
   .quality-gate-context-groups,
   .issue-inbox-row,
-  .todo-group-heading,
-  .todo-occurrence,
+  .todo-compact-row,
+  .todo-issue-chip,
   .evidence-value {
     grid-template-columns: 1fr;
   }

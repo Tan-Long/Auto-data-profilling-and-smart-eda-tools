@@ -4245,6 +4245,7 @@ function renderTodosSection() {
   const artifact = getIssueTodosArtifact();
   const loaded = Boolean(state.dashboardArtifactIndex);
   const groups = getTodoGroupsForFilter();
+  const allGroups = Array.isArray(artifact?.groups) ? artifact.groups : [];
   syncTodoFilterButtons();
 
   if (!loaded) {
@@ -4268,7 +4269,7 @@ function renderTodosSection() {
 
   const summary = artifact.summary || {};
   els.todosStatus.textContent = `${integerText(summary.todo_group_count)} grouped todos · ${integerText(summary.todo_occurrence_count)} occurrences · source=deterministic`;
-  if (!groups.length) {
+  if (!allGroups.length) {
     els.todosGrid.innerHTML = `
       <section class="todo-empty">
         <strong>No todos generated.</strong>
@@ -4277,15 +4278,29 @@ function renderTodosSection() {
     `;
     return;
   }
+  if (!groups.length) {
+    els.todosGrid.innerHTML = `
+      ${renderTodoVisualSummary(groups, allGroups, summary)}
+      <section class="todo-empty">
+        <strong>No ${escapeHtml(todoTypeLabel(state.todoFilter).toLowerCase())} todos match this run.</strong>
+        <p>Switch back to All to review the other todo groups generated for this profile.</p>
+      </section>
+    `;
+    return;
+  }
+
+  const todoSections = state.todoFilter === "fix_data"
+    ? [["Fix data", groups]]
+    : state.todoFilter === "verify_after_fix"
+      ? [["Verify after fix", groups]]
+      : [
+          ["Fix data", groups.filter((group) => group.todo_type === "fix_data")],
+          ["Verify after fix", groups.filter((group) => group.todo_type === "verify_after_fix")],
+        ];
 
   els.todosGrid.innerHTML = `
-    <div class="todo-summary-strip" aria-label="Todo summary">
-      <div><span>${integerText(summary.fix_data_group_count)}</span><p>Fix data groups</p></div>
-      <div><span>${integerText(summary.verify_after_fix_group_count)}</span><p>Verify after fix groups</p></div>
-      <div><span>${integerText(summary.todo_occurrence_count)}</span><p>Occurrences</p></div>
-    </div>
-    ${renderTodoGroupSection("Fix data", groups.filter((group) => group.todo_type === "fix_data"))}
-    ${renderTodoGroupSection("Verify after fix", groups.filter((group) => group.todo_type === "verify_after_fix"))}
+    ${renderTodoVisualSummary(groups, allGroups, summary)}
+    ${todoSections.map(([title, sectionGroups]) => renderTodoGroupSection(title, sectionGroups)).join("")}
   `;
 }
 
@@ -4572,62 +4587,266 @@ function renderTodoGroupSection(title, groups) {
   if (!groups.length) {
     return "";
   }
+  const orderedGroups = todoGroupsForVisualDisplay(groups);
+  const visibleGroups = orderedGroups.slice(0, 4);
+  const remainingGroups = orderedGroups.slice(visibleGroups.length);
+  const maxOccurrences = Math.max(...visibleGroups.map((group) => Number(group.occurrence_count || 0)), 1);
   return `
-    <section class="todo-type-section">
-      <h4>${escapeHtml(title)}</h4>
-      <div class="todo-group-list">
-        ${groups.map(renderTodoGroup).join("")}
+    <section class="todo-type-section visual">
+      <div class="todo-type-heading">
+        <div>
+          <h4>${escapeHtml(title)} focus</h4>
+          <p>${integerText(groups.length)} groups · ${integerText(todoOccurrenceTotal(groups))} occurrences</p>
+        </div>
+        <span>${escapeHtml(title)}</span>
       </div>
+      <div class="todo-card-grid">
+        ${visibleGroups.map((group) => renderTodoVisualCard(group, maxOccurrences)).join("")}
+      </div>
+      ${remainingGroups.length ? renderTodoRemainingGroups(remainingGroups) : ""}
     </section>
   `;
 }
 
-function renderTodoGroup(group) {
-  const occurrenceCount = Number(group.occurrence_count || 0);
-  const priorities = Array.isArray(group.priorities) ? group.priorities : [];
-  const occurrences = Array.isArray(group.occurrences) ? group.occurrences : [];
+function renderTodoVisualSummary(groups, allGroups, summary) {
+  const visibleGroups = groups.length ? groups : allGroups;
+  const fixGroups = visibleGroups.filter((group) => group.todo_type === "fix_data");
+  const verifyGroups = visibleGroups.filter((group) => group.todo_type === "verify_after_fix");
+  const priorityRows = todoPriorityRows(visibleGroups, 4);
+  const tableRows = todoTableRows(visibleGroups, 5);
+  const summaryCards = state.todoFilter === "fix_data"
+    ? [renderTodoSummaryCard("Fix data", summary.fix_data_group_count, summary.fix_data_occurrence_count, fixGroups)]
+    : state.todoFilter === "verify_after_fix"
+      ? [renderTodoSummaryCard("Verify after fix", summary.verify_after_fix_group_count, summary.verify_after_fix_occurrence_count, verifyGroups)]
+      : [
+          renderTodoSummaryCard("Fix data", summary.fix_data_group_count, summary.fix_data_occurrence_count, fixGroups),
+          renderTodoSummaryCard("Verify after fix", summary.verify_after_fix_group_count, summary.verify_after_fix_occurrence_count, verifyGroups),
+        ];
   return `
-    <article class="todo-group-card">
-      <div class="todo-group-heading">
-        <div>
-          <span class="todo-type-label">${escapeHtml(group.todo_type_label || group.todo_type || "Todo")}</span>
-          <strong>${escapeHtml(group.text || "Todo needs human review.")}</strong>
-        </div>
-        <span class="pill-status mapped">${integerText(occurrenceCount)} occurrence${occurrenceCount === 1 ? "" : "s"}</span>
-      </div>
-      <div class="todo-meta-row">
-        <span>source=deterministic</span>
-        ${priorities.slice(0, 4).map((priority) => `<code>${escapeHtml(priority)}</code>`).join("")}
-      </div>
-      <div class="todo-occurrence-list">
-        ${occurrences.slice(0, 8).map(renderTodoOccurrence).join("")}
-      </div>
-      ${occurrences.length > 8 ? `<p class="muted">${integerText(occurrences.length - 8)} more occurrence${occurrences.length - 8 === 1 ? "" : "s"} in issue_todos.json.</p>` : ""}
+    <div class="todo-visual-summary" aria-label="Todo visual summary">
+      ${summaryCards.join("")}
+      ${renderTodoDistributionCard("Priority mix", priorityRows, "No priorities")}
+      ${renderTodoDistributionCard("Top tables", tableRows, "No table context")}
+    </div>
+  `;
+}
+
+function renderTodoSummaryCard(label, groupCount, occurrenceCount, groups) {
+  const activeGroupCount = state.todoFilter === "all" ? groupCount : groups.length;
+  const activeOccurrenceCount = state.todoFilter === "all" ? occurrenceCount : todoOccurrenceTotal(groups);
+  const topPriority = todoPriorityRows(groups, 1)[0]?.label || "none";
+  return `
+    <article class="todo-summary-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${integerText(activeGroupCount)}</strong>
+      <p>${integerText(activeOccurrenceCount)} occurrences · top ${escapeHtml(topPriority)}</p>
     </article>
   `;
 }
 
-function renderTodoOccurrence(occurrence) {
+function renderTodoDistributionCard(title, rows, emptyText) {
+  const maxValue = Math.max(...rows.map((row) => Number(row.value || 0)), 1);
+  return `
+    <article class="todo-signal-card">
+      <strong>${escapeHtml(title)}</strong>
+      <div class="todo-distribution-list">
+        ${rows.length ? rows.map((row) => {
+          const width = Math.max(5, Math.round(Number(row.value || 0) / maxValue * 100));
+          return `
+            <div class="todo-distribution-row">
+              <span>${escapeHtml(row.label)}</span>
+              <span class="todo-distribution-track" aria-hidden="true"><span style="width: ${width}%"></span></span>
+              <code>${integerText(row.value)}</code>
+            </div>
+          `;
+        }).join("") : `<p class="muted">${escapeHtml(emptyText)}</p>`}
+      </div>
+    </article>
+  `;
+}
+
+function renderTodoVisualCard(group, maxOccurrences) {
+  const occurrenceCount = Number(group.occurrence_count || 0);
+  const occurrences = Array.isArray(group.occurrences) ? group.occurrences : [];
+  const width = Math.max(5, Math.round(occurrenceCount / Math.max(maxOccurrences, 1) * 100));
+  const priorityTags = todoPriorityTags(group);
+  const tableTags = todoTableTags(group);
+  return `
+    <article class="todo-visual-card">
+      <div class="todo-card-head">
+        <code>${escapeHtml(group.todo_id || "TODO")}</code>
+        <span>${integerText(occurrenceCount)} occurrence${occurrenceCount === 1 ? "" : "s"}</span>
+      </div>
+      <strong>${escapeHtml(todoShortText(group.text || "Todo needs human review.", 116))}</strong>
+      <div class="todo-card-meter" aria-label="${integerText(occurrenceCount)} occurrences">
+        <span style="width: ${width}%"></span>
+      </div>
+      <div class="todo-card-tags">
+        ${tableTags.map((table) => `<span>${escapeHtml(table)}</span>`).join("")}
+        ${priorityTags.map((priority) => `<span>${escapeHtml(priority)}</span>`).join("")}
+      </div>
+      ${renderTodoLinkedIssues(occurrences)}
+    </article>
+  `;
+}
+
+function renderTodoRemainingGroups(groups) {
+  return `
+    <details class="todo-more-groups">
+      <summary>Show ${integerText(groups.length)} more todo group${groups.length === 1 ? "" : "s"}</summary>
+      <div class="todo-compact-list">
+        ${groups.map(renderTodoCompactGroup).join("")}
+      </div>
+    </details>
+  `;
+}
+
+function renderTodoCompactGroup(group) {
+  const occurrenceCount = Number(group.occurrence_count || 0);
+  return `
+    <article class="todo-compact-row">
+      <code>${escapeHtml(group.todo_id || "TODO")}</code>
+      <strong>${escapeHtml(todoShortText(group.text || "Todo needs human review.", 88))}</strong>
+      <span>${integerText(occurrenceCount)}</span>
+      <div class="todo-compact-issues">
+        ${renderTodoLinkedIssues(Array.isArray(group.occurrences) ? group.occurrences.slice(0, 3) : [], { compact: true })}
+      </div>
+    </article>
+  `;
+}
+
+function renderTodoLinkedIssues(occurrences, options = {}) {
+  const limit = options.compact ? 3 : 4;
+  const visibleOccurrences = (Array.isArray(occurrences) ? occurrences : [])
+    .slice()
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || String(a.issue_id || "").localeCompare(String(b.issue_id || "")))
+    .slice(0, limit);
+  if (!visibleOccurrences.length) {
+    return "";
+  }
+  const remaining = Math.max(0, occurrences.length - visibleOccurrences.length);
+  return `
+    <div class="${options.compact ? "todo-linked-issues compact" : "todo-linked-issues"}" aria-label="Linked issues">
+      ${visibleOccurrences.map(renderTodoIssueChip).join("")}
+      ${remaining ? `<span class="todo-issue-more">+${integerText(remaining)}</span>` : ""}
+    </div>
+  `;
+}
+
+function renderTodoIssueChip(occurrence) {
   const issue = issueForTodoOccurrence(occurrence);
+  const issueId = occurrence.issue_id || "UNKNOWN";
+  const table = occurrence.table || issue?.table || "unknown";
   const columns = Array.isArray(occurrence.columns) && occurrence.columns.length
     ? occurrence.columns.join(", ")
-    : "table scope";
-  const scope = `${occurrence.table || "unknown"}.${columns}`;
-  const issueId = occurrence.issue_id || "UNKNOWN";
-  const issueType = issue ? issueTypeLabel(issue) : todoIssueTypeLabel(occurrence.issue_type || "UNKNOWN");
-  const finding = occurrence.finding_summary || todoFindingFromIssue(issue) || `${issueType} on ${scope}.`;
+    : "table";
+  const severity = occurrence.severity || issue?.severity || "P?";
   const evidence = todoOccurrenceEvidenceText(occurrence, issue);
   return `
-    <button class="todo-occurrence" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
-      <span class="todo-occurrence-heading">
-        <code>${escapeHtml(issueId)}</code>
-        <strong>${escapeHtml(issueType)}</strong>
-      </span>
-      <span class="todo-occurrence-finding">${escapeHtml(finding)}</span>
-      <span class="todo-occurrence-evidence">${escapeHtml(evidence)}</span>
-      <small>${escapeHtml(occurrence.priority || "Needs human review")} · open issue detail</small>
+    <button class="todo-issue-chip" type="button" title="${escapeHtml(evidence)}" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
+      <span class="issue-pill ${issueStatusClass(issueStatus(issue || occurrence))}">${escapeHtml(severity)}</span>
+      <code>${escapeHtml(issueId)}</code>
+      <span>${escapeHtml(table)}.${escapeHtml(columns)}</span>
     </button>
   `;
+}
+
+function todoGroupsForVisualDisplay(groups) {
+  const sorted = groups.slice().sort(todoGroupVisualSort);
+  const nonRoutine = sorted.filter((group) => !isRoutineTodoGroup(group));
+  return nonRoutine.length ? [...nonRoutine, ...sorted.filter((group) => isRoutineTodoGroup(group))] : sorted;
+}
+
+function todoGroupVisualSort(a, b) {
+  return todoGroupPriorityRank(a) - todoGroupPriorityRank(b) ||
+    Number(b.occurrence_count || 0) - Number(a.occurrence_count || 0) ||
+    String(a.todo_id || a.text || "").localeCompare(String(b.todo_id || b.text || ""));
+}
+
+function todoGroupPriorityRank(group) {
+  const priorities = todoPriorityTags(group);
+  return Math.min(...priorities.map(severityRank), severityOrder.length);
+}
+
+function todoPriorityRows(groups, limit) {
+  const counts = new Map();
+  groups.forEach((group) => {
+    const occurrences = Array.isArray(group.occurrences) ? group.occurrences : [];
+    if (occurrences.length) {
+      occurrences.forEach((occurrence) => {
+        const key = todoPriorityToken(occurrence.severity || occurrence.priority || "");
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      return;
+    }
+    const key = todoPriorityTags(group)[0] || "P?";
+    counts.set(key, (counts.get(key) || 0) + Number(group.occurrence_count || 1));
+  });
+  return [...counts.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => severityRank(a.label) - severityRank(b.label) || b.value - a.value)
+    .slice(0, limit);
+}
+
+function todoTableRows(groups, limit) {
+  const counts = new Map();
+  groups.forEach((group) => {
+    const occurrences = Array.isArray(group.occurrences) ? group.occurrences : [];
+    if (occurrences.length) {
+      occurrences.forEach((occurrence) => {
+        const key = occurrence.table || "unknown";
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      return;
+    }
+    todoTableTags(group).forEach((table) => {
+      counts.set(table, (counts.get(table) || 0) + Number(group.occurrence_count || 1));
+    });
+  });
+  return [...counts.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .slice(0, limit);
+}
+
+function todoPriorityTags(group) {
+  const priorities = [
+    ...arrayOfStrings(group.priorities).map(todoPriorityToken),
+    ...(Array.isArray(group.occurrences) ? group.occurrences.map((occurrence) => todoPriorityToken(occurrence.severity || occurrence.priority || "")) : []),
+  ].filter(Boolean);
+  return uniqueSorted(priorities, severityOrder).slice(0, 4);
+}
+
+function todoPriorityToken(value) {
+  const match = String(value || "").toUpperCase().match(/P[0-3]/);
+  return match ? match[0] : "P?";
+}
+
+function todoTableTags(group) {
+  const tables = [
+    ...arrayOfStrings(group.tables),
+    ...(Array.isArray(group.occurrences) ? group.occurrences.map((occurrence) => occurrence.table || "") : []),
+  ].filter(Boolean);
+  return uniqueSorted(tables).slice(0, 4);
+}
+
+function todoOccurrenceTotal(groups) {
+  return groups.reduce((sum, group) => sum + Number(group.occurrence_count || 0), 0);
+}
+
+function todoShortText(value, maxLength) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  const cutoff = text.lastIndexOf(" ", maxLength - 3);
+  return `${text.slice(0, cutoff > 48 ? cutoff : maxLength - 3).trim()}...`;
+}
+
+function isRoutineTodoGroup(group) {
+  const text = String(group.text || "").toLowerCase();
+  return text.includes("do not edit generated artifacts") ||
+    text.includes("rerun the profiler on the corrected csv + dbml inputs");
 }
 
 function issueForTodoOccurrence(occurrence) {

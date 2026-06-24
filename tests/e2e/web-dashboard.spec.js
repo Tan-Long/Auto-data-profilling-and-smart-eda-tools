@@ -764,20 +764,23 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#todosStatus")).toContainText("source=deterministic");
   await expect(page.locator("#todos")).toContainText("Fix data");
   await expect(page.locator("#todos")).toContainText("Verify after fix");
+  await expect(page.locator("#todos")).toContainText("Priority mix");
+  await expect(page.locator("#todos")).toContainText("Top tables");
   await expect(page.locator("#todos")).toContainText("source=deterministic");
   await page.locator('#workflowNav .nav-subitem[data-workflow-nav-target="todos"]').click();
   await expect(page.locator('#workflowNav .nav-subitem[data-workflow-nav-target="todos"]')).toHaveAttribute("aria-current", "step");
-  await expect(page.locator("#todos")).toContainText("Parent Key Duplicate on orders.order_id");
-  await expect(page.locator("#todos")).toContainText("Evidence:");
-  const parentDuplicateTodo = page.locator(".todo-occurrence").filter({ hasText: "Parent Key Duplicate on orders.order_id" }).first();
-  await parentDuplicateTodo.click();
+  await expect(page.locator("#todos .todo-visual-summary")).toBeVisible();
+  await expect(page.locator("#todos .todo-visual-card").first()).toBeVisible();
+  const linkedTodoIssue = page.locator("#todos .todo-issue-chip").first();
+  await expect(linkedTodoIssue).toBeVisible();
+  await linkedTodoIssue.click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText(/ISSUE-/);
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Parent Key Duplicate");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence facts");
   await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todosFilterVerify").click();
-  await expect(page.locator("#todos")).toContainText("Rerun the profiler on the corrected CSV + DBML inputs.");
-  await expect(page.locator("#todos")).toContainText("12 occurrences");
+  await expect(page.locator("#todos")).toContainText("Verify after fix focus");
+  await expect(page.locator("#todos .todo-visual-card").first()).toBeVisible();
+  await expect(page.locator("#todos .todo-issue-chip").first()).toBeVisible();
   await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todos").screenshot({
     path: "outputs/us073_goal6/global-todos-tab.png",
