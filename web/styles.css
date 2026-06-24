@@ -1323,16 +1323,27 @@ h3 {
 .diagram-column-icon {
   fill: none;
   stroke: var(--foreground-tertiary);
-  stroke-width: 1.2;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
+.diagram-column-icon * {
+  vector-effect: non-scaling-stroke;
+}
+
+.diagram-column-icon .diagram-icon-fill {
+  fill: currentColor;
+  stroke: none;
+}
+
 .diagram-column-icon-key {
+  color: var(--accent-strong);
   stroke: var(--accent-strong);
 }
 
 .diagram-column-icon-link {
+  color: var(--info);
   stroke: var(--info);
 }
 

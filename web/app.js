@@ -6848,7 +6848,7 @@ function diagramColumnRowSvg(column, y, width) {
   const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
   const typeLabel = String(column.type || "");
   const typeWidth = typeLabel ? Math.min(78, Math.max(34, typeLabel.length * 6 + 10)) : 0;
-  const nameX = column.isPk && column.isFk ? 50 : column.isPk || column.isFk ? 36 : 18;
+  const nameX = column.isPk || column.isFk ? 36 : 18;
   const typeX = width - 18;
   const nameLimit = Math.max(9, Math.floor((typeX - nameX - typeWidth - 8) / 6));
   return `
@@ -6863,30 +6863,33 @@ function diagramColumnRowSvg(column, y, width) {
 }
 
 function diagramColumnIconSvg(column, y) {
-  const icons = [];
+  if (column.isPk && column.isFk) {
+    return `${diagramKeyIconSvg(14, y, 0.34)}${diagramLinkIconSvg(24, y, 0.34)}`;
+  }
   if (column.isPk) {
-    icons.push(diagramKeyIconSvg(16, y));
+    return diagramKeyIconSvg(15, y, 0.43);
   }
   if (column.isFk) {
-    icons.push(diagramLinkIconSvg(column.isPk ? 30 : 16, y));
+    return diagramLinkIconSvg(15, y, 0.43);
   }
-  return icons.join("");
+  return "";
 }
 
-function diagramKeyIconSvg(x, y) {
+function diagramKeyIconSvg(x, y, scale) {
   return `
-    <g class="diagram-column-icon diagram-column-icon-key" aria-hidden="true">
-      <circle cx="${x + 4}" cy="${y - 7}" r="3"></circle>
-      <path d="M ${x + 7} ${y - 7} H ${x + 17} M ${x + 12} ${y - 7} V ${y - 4} M ${x + 16} ${y - 7} V ${y - 4}"></path>
+    <g class="diagram-column-icon diagram-column-icon-key" transform="translate(${x} ${y - 14}) scale(${scale})" aria-hidden="true">
+      <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"></path>
+      <circle class="diagram-icon-fill" cx="16.5" cy="7.5" r=".5"></circle>
     </g>
   `;
 }
 
-function diagramLinkIconSvg(x, y) {
+function diagramLinkIconSvg(x, y, scale) {
   return `
-    <g class="diagram-column-icon diagram-column-icon-link" aria-hidden="true">
-      <rect x="${x + 1}" y="${y - 11}" width="10" height="6" rx="3" transform="rotate(-25 ${x + 6} ${y - 8})"></rect>
-      <rect x="${x + 8}" y="${y - 8}" width="10" height="6" rx="3" transform="rotate(-25 ${x + 13} ${y - 5})"></rect>
+    <g class="diagram-column-icon diagram-column-icon-link" transform="translate(${x} ${y - 14}) scale(${scale})" aria-hidden="true">
+      <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
+      <line x1="8" x2="16" y1="12" y2="12"></line>
     </g>
   `;
 }
