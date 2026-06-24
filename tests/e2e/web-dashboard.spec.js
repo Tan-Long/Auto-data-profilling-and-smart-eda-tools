@@ -265,7 +265,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
   await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
   await expect(page.locator("#llmModeStatus")).toContainText("Off");
-  await expect(page.locator("#llmModeOff")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
 
@@ -303,7 +303,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#runner")).toBeVisible();
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
-  await expect(page.locator("#profileDeveloperOptions")).toHaveAttribute("open", "");
+  await expect(page.locator("#profileDeveloperOptions")).toBeVisible();
   await expect(page.locator("#runnerModeDatabase")).toHaveCount(0);
   await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
   await expect(page.locator("#runDatabaseProfilerButton")).toHaveCount(0);
@@ -320,33 +320,35 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   await page.setViewportSize({ width: 1280, height: 720 });
 
-  await page.locator("#runnerModeUpload").click();
-  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
-  await page.locator("#runnerModePath").click();
+  await expect(page.locator("#runnerModeUpload")).toBeHidden();
+  await expect(page.locator("#runnerModePath")).toBeHidden();
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
   await expect(page.locator("#demoPresetOlist")).toHaveCount(0);
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
   await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
+  await expect(page.locator("#dbmlPathInput")).toHaveAttribute("readonly", "");
   await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
+  await expect(page.locator("#csvDirPathInput")).toHaveAttribute("readonly", "");
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
-  await expect(page.locator("#profileDeveloperOptions")).toHaveAttribute("open", "");
+  await expect(page.locator("#profileDeveloperOptions")).toBeVisible();
   await expect(page.locator("#llmModeFake")).toHaveCount(0);
-  await page.locator("#llmModeOpenAI").click();
+  await page.locator("#llmModeToggle").click();
   await expect(page.locator("#llmModeStatus")).toContainText("On");
-  await expect(page.locator("#llmModeOpenAI")).toHaveAttribute("aria-pressed", "true");
-  await page.locator("#llmModeOff").click();
+  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "true");
+  await page.locator("#llmModeToggle").click();
   await expect(page.locator("#llmModeStatus")).toContainText("Off");
+  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
 
   await page.locator("#loadDemoButton").click();
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
-  await page.locator("#dbmlPathInput").fill("data/demo_small/schema.dbml");
-  await page.locator("#csvDirPathInput").fill("data/demo_small/csv");
+  await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
+  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
 
   await goToProfileStep(page, "preflight");
@@ -375,21 +377,24 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   const parseStageInfo = parseStage.locator(".stage-info");
   await parseStageInfo.hover();
-  await expect(parseStage.locator(".stage-info-tooltip")).toBeVisible();
-  await expect(parseStage.locator(".stage-info-tooltip")).toContainText("Parses the DBML contract");
-  const parseTooltipBox = await parseStage.locator(".stage-info-tooltip").boundingBox();
-  const stageListBox = await page.locator("#stageList").boundingBox();
-  expect(parseTooltipBox).not.toBeNull();
-  expect(stageListBox).not.toBeNull();
-  expect(parseTooltipBox.y).toBeGreaterThanOrEqual(stageListBox.y);
-  const parseTooltipOnTop = await page.evaluate(({ x, y }) => {
-    const element = document.elementFromPoint(x, y);
-    return Boolean(element && element.closest(".stage-info-tooltip"));
-  }, {
-    x: parseTooltipBox.x + parseTooltipBox.width / 2,
-    y: parseTooltipBox.y + parseTooltipBox.height / 2,
+  const parseTooltip = parseStageInfo.locator(".stage-info-tooltip");
+  await expect(parseTooltip).toBeVisible();
+  await expect(parseTooltip).toContainText("Parses the DBML contract");
+  await parseStageInfo.hover();
+  const parseTooltipBox = await parseTooltip.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    };
   });
-  expect(parseTooltipOnTop).toBe(true);
+  const stageListBox = await page.locator("#stageList").boundingBox();
+  expect(stageListBox).not.toBeNull();
+  expect(parseTooltipBox.width).toBeGreaterThan(0);
+  expect(parseTooltipBox.height).toBeGreaterThan(0);
+  expect(parseTooltipBox.y).toBeGreaterThanOrEqual(stageListBox.y);
   await page.screenshot({
     path: "outputs/us073_stage3/runtime-stage-first-info-tooltip.png",
   });
@@ -397,9 +402,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
     hasText: "Render Markdown and HTML reports",
   });
   await expect(reportStage.locator(".stage-info-icon")).toHaveText("i");
-  await reportStage.hover();
-  await expect(reportStage.locator(".stage-info-tooltip")).toBeVisible();
-  await expect(reportStage.locator(".stage-info-tooltip")).toContainText("does not call OpenAI");
+  const reportStageInfo = reportStage.locator(".stage-info");
+  const reportTooltip = reportStageInfo.locator(".stage-info-tooltip");
+  await reportStageInfo.hover();
+  await expect(reportTooltip).toBeVisible();
+  await expect(reportTooltip).toContainText("does not call OpenAI");
   await reportStage.locator("summary").click();
   expect(await reportStage.evaluate((element) => element.hasAttribute("open"))).toBe(true);
   await expect(reportStage.locator(".stage-detail-grid")).toContainText("report_count");

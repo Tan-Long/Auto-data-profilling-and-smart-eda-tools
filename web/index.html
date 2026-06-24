@@ -243,27 +243,10 @@
 
         <div class="runner-grid">
           <div class="runner-controls">
-            <div class="runner-mode-switch runner-source-switch" role="tablist" aria-label="Runner mode">
+            <div class="runner-mode-switch runner-source-switch" role="tablist" aria-label="Runner mode" hidden>
               <button class="mode-button active" id="runnerModeUpload" type="button" role="tab" aria-selected="true" aria-controls="runnerForm">Upload CSV + DBML</button>
               <button class="mode-button" id="runnerModePath" type="button" role="tab" aria-selected="false" aria-controls="pathRunnerForm">Local CSV path</button>
             </div>
-
-            <details class="developer-options" id="profileDeveloperOptions" open>
-              <summary>LLM enrichment</summary>
-              <div class="developer-options-grid">
-                <div class="runner-option-block" aria-label="LLM report enrichment mode">
-                  <div class="option-heading">
-                    <strong>LLM report enrichment</strong>
-                    <span id="llmModeStatus">Off</span>
-                  </div>
-                  <div class="runner-mode-switch llm-mode-switch" role="group" aria-label="LLM report enrichment mode">
-                    <button class="mode-button active" id="llmModeOff" type="button" aria-pressed="true">Off</button>
-                    <button class="mode-button" id="llmModeOpenAI" type="button" aria-pressed="false">On</button>
-                  </div>
-                  <p class="option-note">OpenAI calls only run when selected and <code>OPENAI_API_KEY</code> is configured; report rendering stays local.</p>
-                </div>
-              </div>
-            </details>
 
             <form class="runner-form" id="runnerForm">
               <button class="button primary" id="runProfilerButton" type="submit" disabled>Run full profiler</button>
@@ -272,12 +255,23 @@
             <form class="runner-form" id="pathRunnerForm" hidden>
               <label class="field-label" for="dbmlPathInput">
                 DBML file path
-                <input id="dbmlPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/schema.dbml">
+                <input id="dbmlPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/schema.dbml" readonly aria-readonly="true">
               </label>
               <label class="field-label" for="csvDirPathInput">
                 CSV directory path
-                <input id="csvDirPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/csv">
+                <input id="csvDirPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/csv" readonly aria-readonly="true">
               </label>
+              <div class="developer-options fixed-llm-options" id="profileDeveloperOptions">
+                <div class="option-heading">
+                  <strong>LLM report enrichment</strong>
+                  <span>OpenAI</span>
+                </div>
+                <button class="llm-toggle-button" id="llmModeToggle" type="button" role="switch" aria-checked="false">
+                  <span>Use LLM enrichment for this run</span>
+                  <strong id="llmModeStatus">Off</strong>
+                </button>
+                <p class="option-note">OpenAI calls run only when this is on and <code>OPENAI_API_KEY</code> is configured; report rendering stays local.</p>
+              </div>
               <button class="button primary" id="runPathProfilerButton" type="submit" disabled>Run path job</button>
             </form>
 

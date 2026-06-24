@@ -262,6 +262,7 @@ h3 {
 .nav-item:focus-visible,
 .button:focus-visible,
 .mode-button:focus-visible,
+.llm-toggle-button:focus-visible,
 .dropzone:focus-within,
 .mapping-select:focus-visible {
   outline: 3px solid rgba(11, 107, 95, 0.28);
@@ -3424,12 +3425,12 @@ h3 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.demo-preset-switch {
-  grid-template-columns: 1fr 1fr;
+.runner-source-switch[hidden] {
+  display: none;
 }
 
-.llm-mode-switch {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.demo-preset-switch {
+  grid-template-columns: 1fr 1fr;
 }
 
 .runner-option-block {
@@ -3460,6 +3461,66 @@ h3 {
 
 .developer-options[open] > summary {
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.fixed-llm-options {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.fixed-llm-options .option-heading {
+  padding: 0 2px;
+  cursor: default;
+}
+
+.llm-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+}
+
+.llm-toggle-button:hover {
+  border-color: var(--border-strong);
+  background: #f6fbf8;
+  color: var(--foreground-primary);
+}
+
+.llm-toggle-button.active {
+  border-color: rgba(15, 118, 100, 0.58);
+  background: rgba(15, 118, 100, 0.08);
+  color: var(--accent-strong);
+}
+
+.llm-toggle-button strong {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 4px 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-inset);
+  color: var(--foreground-secondary);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.llm-toggle-button.active strong {
+  border-color: rgba(15, 118, 100, 0.3);
+  background: rgba(15, 118, 100, 0.14);
+  color: var(--accent-strong);
 }
 
 .developer-options-grid {
@@ -3714,6 +3775,12 @@ h3 {
 .field-label input[type="number"] {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
+}
+
+.field-label input[readonly] {
+  background: var(--surface-inset);
+  color: var(--foreground-secondary);
+  cursor: default;
 }
 
 .field-label input:focus-visible,
@@ -4607,7 +4674,6 @@ details.runtime-stage-item:focus-within {
 
   .flow-grid,
   .runner-source-switch,
-  .llm-mode-switch,
   .database-source-grid,
   .flow-card {
     grid-template-columns: 1fr;

@@ -122,8 +122,7 @@ const els = {
   runnerForm: document.querySelector("#runnerForm"),
   pathRunnerForm: document.querySelector("#pathRunnerForm"),
   profileDeveloperOptions: document.querySelector("#profileDeveloperOptions"),
-  llmModeOff: document.querySelector("#llmModeOff"),
-  llmModeOpenAI: document.querySelector("#llmModeOpenAI"),
+  llmModeToggle: document.querySelector("#llmModeToggle"),
   llmModeStatus: document.querySelector("#llmModeStatus"),
   runProfilerButton: document.querySelector("#runProfilerButton"),
   runPathProfilerButton: document.querySelector("#runPathProfilerButton"),
@@ -379,12 +378,8 @@ els.runnerModePath.addEventListener("click", () => {
   setRunnerMode("path");
 });
 
-els.llmModeOff.addEventListener("click", () => {
-  setLlmMode("off");
-});
-
-els.llmModeOpenAI.addEventListener("click", () => {
-  setLlmMode("openai");
+els.llmModeToggle.addEventListener("click", () => {
+  setLlmMode(state.llmMode === "openai" ? "off" : "openai");
 });
 
 els.runnerForm.addEventListener("submit", async (event) => {
@@ -1125,14 +1120,7 @@ function appendLlmFormFields(form) {
 }
 
 function llmRunSuffix() {
-  return state.llmMode === "off" ? "" : ` with ${llmModeLabel(state.llmMode)} compatibility LLM report`;
-}
-
-function llmModeLabel(mode) {
-  return {
-    off: "Off",
-    openai: "On",
-  }[mode] || "Off";
+  return state.llmMode === "off" ? "" : " with LLM report enrichment";
 }
 
 function setupDropzone(element, onDrop) {
@@ -2524,19 +2512,20 @@ function renderControls() {
   els.runnerModePath.setAttribute("aria-selected", state.runnerMode === "path" ? "true" : "false");
   els.runnerForm.hidden = state.runnerMode !== "upload";
   els.pathRunnerForm.hidden = state.runnerMode !== "path";
-  els.profileDeveloperOptions.open = true;
+  els.dbmlPathInput.readOnly = true;
+  els.csvDirPathInput.readOnly = true;
   renderLlmModeControls();
 }
 
 function renderLlmModeControls() {
-  els.llmModeStatus.textContent = llmModeLabel(state.llmMode);
-  [
-    [els.llmModeOff, state.llmMode === "off"],
-    [els.llmModeOpenAI, state.llmMode === "openai"],
-  ].forEach(([button, active]) => {
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", active ? "true" : "false");
-  });
+  const enabled = state.llmMode === "openai";
+  els.llmModeStatus.textContent = enabled ? "On" : "Off";
+  els.llmModeToggle.classList.toggle("active", enabled);
+  els.llmModeToggle.setAttribute("aria-checked", enabled ? "true" : "false");
+  els.llmModeToggle.setAttribute(
+    "aria-label",
+    enabled ? "Disable LLM report enrichment" : "Enable LLM report enrichment",
+  );
 }
 
 function renderRunner() {

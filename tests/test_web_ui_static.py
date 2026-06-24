@@ -118,15 +118,17 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Warnings need review.",
         "LLM enrichment",
         "LLM report enrichment",
-        "OpenAI calls only run when selected",
+        "OpenAI calls run only when this is on",
         "report rendering stays local",
-        'id="llmModeOff"',
-        'id="llmModeOpenAI"',
+        'id="llmModeToggle"',
+        'role="switch"',
+        'aria-checked="false"',
         'id="llmModeStatus"',
         'id="runProfilerButton"',
         'id="runPathProfilerButton"',
         'id="dbmlPathInput"',
         'id="csvDirPathInput"',
+        'readonly aria-readonly="true"',
         'id="stageList"',
         'id="artifactList"',
         'id="runHistory"',
@@ -174,7 +176,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Local CSV path",
         "LLM report enrichment",
         "OPENAI_API_KEY",
-        "On",
         "Upload DBML to preview schema",
         "Reset demo",
         'src="js/demo-data.js"',
@@ -486,8 +487,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     source_switch_start = html.index('class="runner-mode-switch runner-source-switch"')
     source_switch_end = html.index('id="profileDeveloperOptions"', source_switch_start)
     primary_source_switch = html[source_switch_start:source_switch_end]
+    assert 'aria-label="Runner mode" hidden' in primary_source_switch
     assert "Upload CSV + DBML" in primary_source_switch
     assert "Local CSV path" in primary_source_switch
+    assert 'id="llmModeOff"' not in html
+    assert 'id="llmModeOpenAI"' not in html
     assert "Developer DB source" not in primary_source_switch
     assert "Legacy Olist sample" not in primary_source_switch
     assert "Legacy Olist sample" not in html
