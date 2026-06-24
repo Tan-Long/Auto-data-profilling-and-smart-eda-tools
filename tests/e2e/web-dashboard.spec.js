@@ -112,7 +112,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(orderItemsMappingRow.locator(".fk-row")).toHaveCount(3);
   await expect(orderItemsMappingRow.locator(".fk-column").first()).toContainText("order_id");
   await expect(orderItemsMappingRow.locator(".fk-target").first()).toContainText("orders.order_id");
-  await expect(orderItemsMappingRow.locator(".selected-csv-file-name")).toContainText("order_items.csv");
+  await expect(orderItemsMappingRow.locator(".selected-csv-file-name")).toHaveCount(0);
+  await expect(orderItemsMappingRow.locator(".mapping-select")).toHaveValue("order_items");
+  await expect(orderItemsMappingRow.locator(".mapping-select")).toHaveAttribute("title", "order_items.csv");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
   await expect(page.locator("#runner")).toBeHidden();

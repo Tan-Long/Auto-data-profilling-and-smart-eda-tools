@@ -3859,27 +3859,7 @@ h3 {
 
 .csv-file-cell {
   display: grid;
-  gap: 6px;
   min-width: 240px;
-}
-
-.selected-csv-file-name {
-  display: block;
-  max-width: 100%;
-  padding: 6px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-panel);
-  color: var(--foreground-primary);
-  font-size: 12px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.selected-csv-file-name.empty {
-  color: var(--foreground-tertiary);
-  font-family: inherit;
 }
 
 .header-meter {

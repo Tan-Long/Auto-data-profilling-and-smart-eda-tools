@@ -2083,8 +2083,7 @@ function csvSelect(tableName, selectedStem) {
   const selectedName = selectedFile?.name || "No CSV selected";
   return `
     <div class="csv-file-cell">
-      <code class="selected-csv-file-name ${selectedFile ? "" : "empty"}" title="${escapeHtml(selectedName)}">${escapeHtml(selectedName)}</code>
-      <select class="mapping-select" data-table="${escapeHtml(tableName)}" aria-label="CSV for ${escapeHtml(tableName)}">${options.join("")}</select>
+      <select class="mapping-select" data-table="${escapeHtml(tableName)}" aria-label="CSV for ${escapeHtml(tableName)}" title="${escapeHtml(selectedName)}">${options.join("")}</select>
     </div>
   `;
 }
