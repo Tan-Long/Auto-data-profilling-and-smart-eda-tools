@@ -280,6 +280,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".nav-stage-item",
         ".nav-substep-list",
         ".nav-subitem",
+        ".runtime-stage-item",
+        ".stage-info-icon",
+        ".stage-info-tooltip",
+        ".stage-dropdown",
+        ".stage-detail-grid",
         ".todo-occurrence-heading",
         ".todo-occurrence-finding",
         ".todo-occurrence-evidence",
@@ -548,6 +553,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "new EventSource" in js
     assert "run_events.jsonl" in js
     assert "run_summary.json" in js
+    assert "runtimeStageDescriptions" in js
+    assert "renderRuntimeStage" in js
+    assert "renderRuntimeStageDropdown" in js
     assert "renderRunHistory" in js
     assert "sourceStageStatusText" in js
     assert "compactPreflightStatusText" in js

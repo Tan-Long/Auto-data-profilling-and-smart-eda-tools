@@ -3930,6 +3930,162 @@ h3 {
   font-size: 12px;
 }
 
+details.runtime-stage-item {
+  display: block;
+  padding: 0;
+  overflow: visible;
+}
+
+.stage-summary {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.stage-summary::-webkit-details-marker {
+  display: none;
+}
+
+.stage-summary::marker {
+  content: "";
+}
+
+.stage-summary:focus-visible {
+  outline: 3px solid rgba(15, 118, 100, 0.22);
+  outline-offset: 2px;
+}
+
+.stage-main {
+  display: grid;
+  min-width: 0;
+}
+
+.stage-main strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.stage-main span {
+  margin-top: 2px;
+  color: var(--foreground-tertiary);
+  font-size: 12px;
+}
+
+.stage-info {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.stage-info-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--info);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  opacity: 0;
+  transition: opacity 120ms ease, border-color 120ms ease;
+}
+
+.runtime-stage-item:hover .stage-info-icon,
+.runtime-stage-item:focus-within .stage-info-icon {
+  border-color: rgba(49, 101, 150, 0.35);
+  opacity: 1;
+}
+
+.stage-info-tooltip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  display: none;
+  width: min(320px, 72vw);
+  padding: 9px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  box-shadow: 0 8px 20px rgba(18, 24, 23, 0.12);
+}
+
+.stage-info:hover .stage-info-tooltip,
+.stage-info:focus-within .stage-info-tooltip,
+.runtime-stage-item:hover .stage-info-tooltip {
+  display: block;
+}
+
+.stage-expand-label {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.runtime-stage-item[open] .stage-expand-label {
+  color: var(--foreground-tertiary);
+}
+
+.stage-dropdown {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px 30px;
+}
+
+.stage-detail-grid {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.stage-detail-grid div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.28fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+}
+
+.stage-detail-grid dt,
+.stage-detail-grid dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.stage-detail-grid dt {
+  color: var(--foreground-tertiary);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.stage-detail-grid dd code,
+.stage-detail-grid dd span,
+.stage-detail-grid dd li {
+  font-size: 12px;
+}
+
+.stage-detail-grid ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
 .artifact-link {
   display: grid;
   gap: 4px;
@@ -4462,10 +4618,19 @@ h3 {
   .table-assessment-row,
   .table-impact-card,
   .dashboard-issue-row,
+  .stage-summary,
   .issue-visual-grid,
   .issue-focus-map,
   .drilldown-summary {
     grid-template-columns: 1fr;
+  }
+
+  .stage-detail-grid div {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-dropdown {
+    padding-left: 10px;
   }
 
   .dashboard-bar-value,

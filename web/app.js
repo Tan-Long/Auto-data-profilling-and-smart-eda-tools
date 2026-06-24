@@ -218,6 +218,16 @@ const profileStepLabels = {
   review: "Review",
 };
 const runnerUiDemoPresets = new Set(["small"]);
+const runtimeStageDescriptions = {
+  parse_dbml_schema: "Parses the DBML contract, counts tables and relationships, and records schema diagnostics before any CSV data is trusted.",
+  catalog_csv_files: "Builds the CSV inventory, matches CSV files to DBML tables, and records missing or extra source files.",
+  profile_csv_tables: "Profiles mapped CSV tables and columns, including row counts, column counts, nulls, type casts, distributions, and outlier evidence.",
+  data_quality_checks: "Runs deterministic column and table checks from the DBML contract, then writes issue rows for missing, duplicate, invalid, and outlier findings.",
+  relationship_checks: "Validates DBML foreign-key relationships against the CSV data, including orphan child rows, null keys, and duplicate parent keys.",
+  write_machine_artifacts: "Writes the machine-readable artifacts used by Review: issues, table readiness, action plans, todos, quality gates, charts, and schema evidence.",
+  llm_narrative: "Optionally generates the compatibility LLM summary artifact and guardrail report without changing deterministic issue results.",
+  render_reports: "Renders the human-readable Markdown and HTML reports from the deterministic artifacts generated earlier in the run.",
+};
 
 let workflowNavScrollFrame = 0;
 
@@ -2590,18 +2600,106 @@ function renderStages(job) {
     return;
   }
   visibleStages.forEach((stage) => {
-    const item = document.createElement("div");
-    item.className = `stage-item ${escapeHtml(stage.status || "running")}`;
-    item.innerHTML = `
-      <span class="stage-dot" aria-hidden="true"></span>
-      <div>
-        <strong>${escapeHtml(stage.displayName || stage.name)}</strong>
-        <p><code>${escapeHtml(stage.name)}</code>${stage.duration ? ` · ${Number(stage.duration).toFixed(3)}s` : ""}</p>
-      </div>
-      <span class="pill-status ${stage.status === "failed" ? "missing" : "mapped"}">${escapeHtml(stage.status || "running")}</span>
-    `;
-    els.stageList.appendChild(item);
+    els.stageList.insertAdjacentHTML("beforeend", renderRuntimeStage(stage));
   });
+}
+
+function renderRuntimeStage(stage) {
+  const status = stage.status || "running";
+  const purpose = stagePurpose(stage);
+  const duration = stage.duration === null || stage.duration === undefined
+    ? ""
+    : ` · ${Number(stage.duration).toFixed(3)}s`;
+  return `
+    <details class="stage-item runtime-stage-item ${escapeHtml(status)}">
+      <summary class="stage-summary">
+        <span class="stage-dot" aria-hidden="true"></span>
+        <span class="stage-main">
+          <strong>${escapeHtml(stage.displayName || stage.name)}</strong>
+          <span><code>${escapeHtml(stage.name || "stage")}</code>${duration}</span>
+        </span>
+        <span class="stage-info" aria-label="${escapeHtml(purpose)}">
+          <span class="stage-info-icon" aria-hidden="true">i</span>
+          <span class="stage-info-tooltip" role="tooltip">${escapeHtml(purpose)}</span>
+        </span>
+        <span class="pill-status ${stage.status === "failed" ? "missing" : "mapped"}">${escapeHtml(status)}</span>
+        <span class="stage-expand-label">Details</span>
+      </summary>
+      ${renderRuntimeStageDropdown(stage, purpose)}
+    </details>
+  `;
+}
+
+function renderRuntimeStageDropdown(stage, purpose) {
+  const detailRows = runtimeStageDetailRows(stage, purpose);
+  return `
+    <div class="stage-dropdown">
+      <dl class="stage-detail-grid">
+        ${detailRows.map(([label, value]) => `
+          <div>
+            <dt>${escapeHtml(label)}</dt>
+            <dd>${stageDetailValueHtml(value)}</dd>
+          </div>
+        `).join("")}
+      </dl>
+    </div>
+  `;
+}
+
+function runtimeStageDetailRows(stage, purpose) {
+  const rows = [
+    ["What this step does", purpose],
+    ["Stage id", stage.name || "stage"],
+    ["Status", stage.status || "running"],
+  ];
+  if (stage.duration !== null && stage.duration !== undefined) {
+    rows.push(["Duration", `${Number(stage.duration).toFixed(3)}s`]);
+  }
+  if (stage.skipReason) {
+    rows.push(["Skip reason", stage.skipReason]);
+  }
+  if (stage.error_type || stage.error_message) {
+    rows.push(["Error", [stage.error_type, stage.error_message].filter(Boolean).join(": ")]);
+  }
+  Object.entries(stage.details || {})
+    .filter(([key, value]) => key !== "display_name" && value !== null && value !== undefined && value !== "")
+    .forEach(([key, value]) => {
+      rows.push([key, value]);
+    });
+  return rows;
+}
+
+function stagePurpose(stage) {
+  return runtimeStageDescriptions[stage.name] || "Runs this profiler step and records runtime evidence in run_events.jsonl and run_summary.json.";
+}
+
+function stageDetailValueHtml(value) {
+  if (Array.isArray(value)) {
+    if (!value.length) {
+      return `<span class="muted">none</span>`;
+    }
+    return `<ul>${value.map((item) => `<li>${escapeHtml(stageDetailValueText(item))}</li>`).join("")}</ul>`;
+  }
+  if (value && typeof value === "object") {
+    return `<code>${escapeHtml(JSON.stringify(value))}</code>`;
+  }
+  if (typeof value === "boolean") {
+    return `<code>${value ? "true" : "false"}</code>`;
+  }
+  if (typeof value === "number") {
+    return `<code>${scoreOrIntegerText(value)}</code>`;
+  }
+  return `<span>${escapeHtml(stageDetailValueText(value))}</span>`;
+}
+
+function stageDetailValueText(value) {
+  if (value === null || value === undefined || value === "") {
+    return "none";
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
 }
 
 function renderArtifacts(artifacts) {

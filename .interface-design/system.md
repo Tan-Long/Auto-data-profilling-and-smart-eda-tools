@@ -137,6 +137,16 @@ Data style: monospace with tabular numbers.
 - Evidence values render as label, raw value, then meaning in one vertical
   sequence so users do not need to scan left and right to understand a finding.
 
+### Runtime Stage Inspection
+
+- Stage 3 runtime rows should stay compact by default but expose an `i` affordance
+  on hover/focus that explains what the step does.
+- Each runtime stage row can expand in place to show deterministic details from
+  `run_events.jsonl` and `run_summary.json`, including purpose, status,
+  duration, skip/error information, and stage-specific key/value evidence.
+- Expanded details should use compact key/value rows, not a separate developer
+  artifact pane.
+
 ### Compact Report Layering
 
 - Human-facing reports and package indexes should summarize first, then expand
@@ -216,3 +226,4 @@ Data style: monospace with tabular numbers.
 | Use ERD endpoint glyphs for relationship cardinality | Text labels like `1` and `*` felt detached from the FK line; crow's-foot endpoints attach cardinality to the relationship itself | 2026-06-24 |
 | Add compact visual issue review | Stage 4 text-only issue review was hard to scan; compact charts, an issue table, and a selected-issue focus map make table, column, type, and affected rows visible before detailed text | 2026-06-24 |
 | Keep Run-to-Review transition manual | Demo users need to see all runtime stages and generated artifacts before entering Stage 4; successful runs unlock Review but do not auto-navigate away from Stage 3 | 2026-06-24 |
+| Add runtime stage explainability | Demo users need to understand what each Stage 3 runtime step does without reading raw artifacts, so rows expose hover help and expandable deterministic details in place | 2026-06-24 |
