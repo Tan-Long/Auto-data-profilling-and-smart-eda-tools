@@ -113,10 +113,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Review connection and mapping readiness",
         "Blockers stop the run.",
         "Warnings need review.",
-        "Demo and LLM options",
-        'id="demoPresetSmall"',
-        'id="demoPresetOlist"',
-        'id="demoPresetStatus"',
+        "Optional LLM report",
         'id="llmModeOff"',
         'id="llmModeFake"',
         'id="llmModeOpenAI"',
@@ -173,8 +170,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Hosted previews do not run profiler jobs",
         "Upload CSV + DBML",
         "Local CSV path",
-        "Small demo",
-        "Legacy Olist sample",
         "Optional LLM report",
         "OpenAI",
         "Upload DBML to preview schema",
@@ -342,10 +337,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "manualMappings",
         "preflightAcceptedWarnings",
         "demoPresets",
-        "loadDemoState(\"olist\"",
+        "runnerUiDemoPresets",
         "quickDemo",
-        "examples/olist/schema.dbml",
-        "data/olist",
         "mappingOverridesForRun",
         "buildPreflightReview",
         "buildPreflightReviewPayload",
@@ -474,6 +467,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     assert "Local CSV path" in primary_source_switch
     assert "Developer DB source" not in primary_source_switch
     assert "Legacy Olist sample" not in primary_source_switch
+    assert "Legacy Olist sample" not in html
+    assert "examples/olist/schema.dbml" not in html
+    assert "data/olist" not in html
 
     assert "restrained guided data-quality console" in design
     assert "Single-Flow Review Stack" in design

@@ -88,7 +88,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: "outputs/us073_goal3/profile-preflight-blocked.png",
   });
   await page.locator("#quickDemoButton").click();
-  await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
+  await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
   await expect(page.locator("#sourceStateSummary")).toContainText("DBML + CSV demo is loaded");
   await expect(page.locator("#runnerMessage")).toContainText("DBML + CSV demo is loaded");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
@@ -142,8 +142,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page.locator("#runnerModePath").click();
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
-  await expect(page.locator("#demoPresetStatus")).toContainText("Small demo");
-  await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
+  await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
+  await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
+  await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
+  await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
+  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
   await expect(page.locator("#localDiagram")).toBeVisible();
   await expect(page.locator("#diagramSvg")).toContainText("orders");
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="order_id"] .diagram-column-icon-key')).toHaveCount(1);
@@ -216,8 +219,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
     /https:\/\/dbdiagram\.io\/embed\?c=/,
   );
 
-  await expect(page.locator("#demoPresetStatus")).toContainText("Small demo");
-  await expect(page.locator("#demoPresetSmall")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
+  await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
   await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
   await expect(page.locator("#llmModeOff")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
@@ -269,13 +272,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page.locator("#runnerModePath").click();
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
-
-  await page.locator("#demoPresetOlist").click();
-  await expect(page.locator("#demoPresetStatus")).toContainText("Legacy Olist sample");
-  await expect(page.locator("#dbmlPathInput")).toHaveValue("examples/olist/schema.dbml");
-  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/olist");
-  await expect(page.locator("#diagramSvg")).toContainText("olist_orders_dataset");
-  await expect(page.locator("#mappingStatus")).toContainText("9/9 tables mapped");
+  await expect(page.locator("#demoPresetOlist")).toHaveCount(0);
+  await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
+  await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
+  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
+  await expect(page.locator("#diagramSvg")).toContainText("order_payments");
+  await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
   await page.locator("#llmModeFake").click();
   await expect(page.locator("#llmModeStatus")).toContainText("Fake");
@@ -283,8 +285,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#llmModeOff").click();
   await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
 
-  await page.locator("#demoPresetSmall").click();
-  await expect(page.locator("#demoPresetStatus")).toContainText("Small demo");
+  await page.locator("#loadDemoButton").click();
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 

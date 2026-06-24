@@ -87,7 +87,7 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     );
 
     await page.locator("#quickDemoButton").click();
-    await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
+    await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
     await expect(page.locator("#sourceStateSummary")).toContainText("DBML + CSV demo is loaded");
     await expect(page.locator("#runnerMessage")).toContainText("DBML + CSV demo is loaded");
     await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
@@ -185,8 +185,10 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await page.locator("#runnerModePath").click();
     await expect(page.locator("#pathRunnerForm")).toBeVisible();
     await openDetails(page, "#profileDeveloperOptions");
-    await page.locator("#demoPresetSmall").click();
-    await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
+    await expect(page.locator("#demoPresetOlist")).toHaveCount(0);
+    await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
+    await page.locator("#loadDemoButton").click();
+    await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
     await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
     await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
     await page.locator("#llmModeFake").click();

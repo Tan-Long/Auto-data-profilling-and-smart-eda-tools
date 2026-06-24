@@ -119,9 +119,6 @@ const els = {
   runnerModePath: document.querySelector("#runnerModePath"),
   runnerForm: document.querySelector("#runnerForm"),
   pathRunnerForm: document.querySelector("#pathRunnerForm"),
-  demoPresetSmall: document.querySelector("#demoPresetSmall"),
-  demoPresetOlist: document.querySelector("#demoPresetOlist"),
-  demoPresetStatus: document.querySelector("#demoPresetStatus"),
   llmModeOff: document.querySelector("#llmModeOff"),
   llmModeFake: document.querySelector("#llmModeFake"),
   llmModeOpenAI: document.querySelector("#llmModeOpenAI"),
@@ -219,6 +216,7 @@ const profileStepLabels = {
   run: "Run",
   review: "Review",
 };
+const runnerUiDemoPresets = new Set(["small"]);
 
 let workflowNavScrollFrame = 0;
 
@@ -362,14 +360,6 @@ els.runnerModeUpload.addEventListener("click", () => {
 
 els.runnerModePath.addEventListener("click", () => {
   setRunnerMode("path");
-});
-
-els.demoPresetSmall.addEventListener("click", () => {
-  loadDemoState("small", { switchToPath: true });
-});
-
-els.demoPresetOlist.addEventListener("click", () => {
-  loadDemoState("olist", { switchToPath: true });
 });
 
 els.llmModeOff.addEventListener("click", () => {
@@ -1098,7 +1088,8 @@ function markCustomUploadSource() {
 function syncDemoPresetFromPathInputs() {
   const dbmlPath = els.dbmlPathInput.value.trim();
   const csvDir = els.csvDirPathInput.value.trim();
-  const match = Object.entries(demoPresets).find(([, preset]) => (
+  const match = Object.entries(demoPresets).find(([presetName, preset]) => (
+    runnerUiDemoPresets.has(presetName) &&
     preset.dbmlPath === dbmlPath &&
     preset.csvDir === csvDir
   ));
@@ -1912,7 +1903,9 @@ function renderStatus() {
 
 function renderSourceState() {
   const uploadedCsvs = state.csvFiles.filter((file) => file.sourceFile);
-  const preset = demoPresets[state.selectedDemoPreset];
+  const preset = runnerUiDemoPresets.has(state.selectedDemoPreset)
+    ? demoPresets[state.selectedDemoPreset]
+    : null;
   const modeLabel = {
     upload: "Upload",
     path: "Local path",
@@ -1931,7 +1924,7 @@ function renderSourceState() {
   let status = "";
   let summary = "Upload a DBML contract and CSV files to profile your own data.";
   if (state.runnerMode === "path") {
-    badge = preset ? "Demo paths" : "Custom paths";
+    badge = preset ? "Sample data" : "Custom paths";
     status = "ready";
     summary = preset
       ? `${preset.label} DBML + CSV demo is loaded for the local runner.`
@@ -2494,20 +2487,7 @@ function renderControls() {
   els.runnerModePath.setAttribute("aria-selected", state.runnerMode === "path" ? "true" : "false");
   els.runnerForm.hidden = state.runnerMode !== "upload";
   els.pathRunnerForm.hidden = state.runnerMode !== "path";
-  renderDemoPresetControls();
   renderLlmModeControls();
-}
-
-function renderDemoPresetControls() {
-  const preset = demoPresets[state.selectedDemoPreset];
-  els.demoPresetStatus.textContent = preset ? preset.label : "Custom paths";
-  [
-    [els.demoPresetSmall, state.selectedDemoPreset === "small"],
-    [els.demoPresetOlist, state.selectedDemoPreset === "olist"],
-  ].forEach(([button, active]) => {
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", active ? "true" : "false");
-  });
 }
 
 function renderLlmModeControls() {
