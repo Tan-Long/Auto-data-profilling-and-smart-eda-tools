@@ -65,6 +65,12 @@ const state = {
   preflightAcceptedWarnings: new Set(),
 };
 
+const DIAGRAM_TABLE_HEADER_HEIGHT = 50;
+const DIAGRAM_TABLE_PILL_Y = 56;
+const DIAGRAM_TABLE_PILL_TEXT_Y = 68;
+const DIAGRAM_COLUMN_START_Y = 90;
+const DIAGRAM_COLUMN_ROW_HEIGHT = 21;
+
 const els = {
   flowChooser: document.querySelector("#flowChooser"),
   profileFlow: document.querySelector("#profileFlow"),
@@ -6593,7 +6599,7 @@ function layoutLocalDiagram(model) {
       hiddenCount: columnSet.hiddenCount,
       totalColumns: columnSet.totalColumns,
       width: nodeWidth,
-      height: Math.max(state.diagramExpanded ? 144 : 116, 62 + rowCount * 20 + 14),
+      height: Math.max(state.diagramExpanded ? 154 : 132, DIAGRAM_COLUMN_START_Y + Math.max(rowCount - 1, 0) * DIAGRAM_COLUMN_ROW_HEIGHT + 26),
     };
   });
   const originalLayers = [...new Set(tableRecords.map((record) => record.role.layer))].sort((a, b) => a - b);
@@ -6622,7 +6628,7 @@ function layoutLocalDiagram(model) {
     records.forEach((record) => {
       const columnY = new Map();
       record.visibleColumns.forEach((column, index) => {
-        columnY.set(column.name, y + 68 + index * 20);
+        columnY.set(column.name, y + diagramColumnBaseline(index));
       });
       positions.set(record.table.name, {
         x: margin + layer * (nodeWidth + xGap),
@@ -6651,9 +6657,13 @@ function applyDiagramManualPositions(positions, tableRecords, layoutWidth, layou
     position.x = nextPosition.x;
     position.y = nextPosition.y;
     record.visibleColumns.forEach((column, index) => {
-      position.columnY.set(column.name, position.y + 68 + index * 20);
+      position.columnY.set(column.name, position.y + diagramColumnBaseline(index));
     });
   });
+}
+
+function diagramColumnBaseline(index) {
+  return DIAGRAM_COLUMN_START_Y + index * DIAGRAM_COLUMN_ROW_HEIGHT;
 }
 
 function clampDiagramPosition(x, y, width, height, layoutWidth, layoutHeight) {
@@ -6781,32 +6791,90 @@ function diagramTableSvg(record, position, selection) {
     return "";
   }
   const columns = record.visibleColumns;
-  const lines = columns.map((column, index) => diagramColumnTspan(column, 66 + index * 20)).join("");
-  const overflowLine = record.hiddenCount ? `<text class="diagram-column overflow" x="12" y="${66 + columns.length * 20}">+${integerText(record.hiddenCount)} columns</text>` : "";
-  const meta = [
-    table.status === "mapped" ? "mapped CSV" : table.status === "missing_csv" ? "missing CSV" : table.status || "schema",
-    table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(record.totalColumns)} columns`,
-  ].filter(Boolean).join(" · ");
+  const lines = columns.map((column, index) => diagramColumnRowSvg(column, diagramColumnBaseline(index), position.width)).join("");
+  const overflowLine = record.hiddenCount ? diagramOverflowColumnRow(record.hiddenCount, diagramColumnBaseline(columns.length), position.width) : "";
+  const sourceLabel = table.status === "mapped" ? "CSV" : table.status === "missing_csv" ? "No CSV" : table.status || "DBML";
+  const sizeLabel = table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(record.totalColumns)} cols`;
+  const roleLabel = diagramCompactRoleLabel(record.role.label);
+  const statusLabel = table.status === "missing_csv" ? "miss" : table.status === "mapped" ? "ok" : table.status || "db";
   const selectionClass = diagramTableSelectionClass(table.name, selection);
   return `
     <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))} diagram-role-${escapeHtml(record.role.name)} ${selectionClass}" data-diagram-table="${escapeHtml(table.name)}" data-diagram-layer="${position.layer}" transform="translate(${position.x} ${position.y})" tabindex="0" role="button" aria-label="${escapeHtml(`${table.name} table`)}">
-      <title>${escapeHtml(`${table.name} · ${record.role.label} · ${meta}`)}</title>
+      <title>${escapeHtml(`${table.name} · ${record.role.label} · ${sourceLabel} · ${sizeLabel}`)}</title>
       <rect class="diagram-table-box" width="${position.width}" height="${position.height}" rx="8"></rect>
-      <rect class="diagram-table-header" width="${position.width}" height="46" rx="8"></rect>
-      <text class="diagram-table-name" x="12" y="20">${escapeHtml(truncateMiddle(table.name, 22))}</text>
-      <text class="diagram-table-meta" x="12" y="38">${escapeHtml(truncateMiddle(`${record.role.label} · ${meta}`, 32))}</text>
-      <rect class="diagram-status-chip" x="${position.width - 58}" y="13" width="44" height="18" rx="9"></rect>
-      <text class="diagram-status-text" x="${position.width - 36}" y="25" text-anchor="middle">${escapeHtml(table.status === "missing_csv" ? "miss" : table.status === "mapped" ? "ok" : table.status || "db")}</text>
-      ${lines || `<text class="diagram-column empty" x="12" y="66">No key columns</text>`}
+      <rect class="diagram-table-header" width="${position.width}" height="${DIAGRAM_TABLE_HEADER_HEIGHT}" rx="8"></rect>
+      <text class="diagram-table-name" x="14" y="25">${escapeHtml(truncateMiddle(table.name, position.width > 220 ? 24 : 20))}</text>
+      <rect class="diagram-status-chip" x="${position.width - 54}" y="14" width="40" height="18" rx="9"></rect>
+      <text class="diagram-status-text" x="${position.width - 34}" y="26" text-anchor="middle">${escapeHtml(statusLabel)}</text>
+      ${diagramTableMetricPill(12, DIAGRAM_TABLE_PILL_Y, 60, roleLabel, "role")}
+      ${diagramTableMetricPill(76, DIAGRAM_TABLE_PILL_Y, 50, sourceLabel, "source")}
+      ${diagramTableMetricPill(130, DIAGRAM_TABLE_PILL_Y, Math.max(58, position.width - 142), sizeLabel, "size")}
+      ${lines || diagramEmptyColumnRow(DIAGRAM_COLUMN_START_Y, position.width)}
       ${overflowLine}
     </g>
   `;
 }
 
-function diagramColumnTspan(column, y) {
+function diagramTableMetricPill(x, y, width, label, kind) {
+  return `
+    <g class="diagram-table-metric diagram-table-metric-${escapeHtml(kind)}">
+      <rect class="diagram-table-metric-bg" x="${x}" y="${y}" width="${width}" height="18" rx="9"></rect>
+      <text class="diagram-table-metric-text" x="${x + width / 2}" y="${DIAGRAM_TABLE_PILL_TEXT_Y}" text-anchor="middle">${escapeHtml(truncateMiddle(label, Math.max(5, Math.floor(width / 7))))}</text>
+    </g>
+  `;
+}
+
+function diagramCompactRoleLabel(label) {
+  const normalized = String(label || "");
+  if (normalized === "Reference") {
+    return "Ref";
+  }
+  if (normalized === "Fact/event") {
+    return "Fact";
+  }
+  if (normalized === "Child/detail") {
+    return "Child";
+  }
+  if (normalized === "Schema table") {
+    return "Table";
+  }
+  return normalized || "Table";
+}
+
+function diagramColumnRowSvg(column, y, width) {
   const role = column.isPk && column.isFk ? "PK/FK" : column.isPk ? "PK" : column.isFk ? "FK" : "COL";
+  const roleWidth = role.length > 2 ? 40 : 28;
+  const rowWidth = Math.max(120, width - 20);
+  const nameLimit = width > 220 ? 25 : 21;
+  const tone = column.isPk ? "pk" : column.isFk ? "fk" : "non-key";
   const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
-  return `<text class="diagram-column ${column.isPk ? "pk" : ""} ${column.isFk ? "fk" : ""} ${!column.isPk && !column.isFk ? "non-key" : ""}" x="12" y="${y}" data-diagram-column="${escapeHtml(column.name)}"><tspan class="diagram-column-role">${escapeHtml(role)}</tspan> ${escapeHtml(truncateMiddle(`${column.name}${target}`, 28))}</text>`;
+  return `
+    <g class="diagram-column-row diagram-column-row-${tone}" data-diagram-column="${escapeHtml(column.name)}" data-diagram-column-y="${y}">
+      <title>${escapeHtml(`${role} ${column.name}${target}`)}</title>
+      <rect class="diagram-column-row-bg" x="10" y="${y - 14}" width="${rowWidth}" height="18" rx="6"></rect>
+      <rect class="diagram-column-role-bg" x="14" y="${y - 12}" width="${roleWidth}" height="14" rx="5"></rect>
+      <text class="diagram-column-role" x="${14 + roleWidth / 2}" y="${y - 2}" text-anchor="middle">${escapeHtml(role)}</text>
+      <text class="diagram-column-name" x="${20 + roleWidth}" y="${y - 2}">${escapeHtml(truncateMiddle(column.name, nameLimit))}</text>
+    </g>
+  `;
+}
+
+function diagramOverflowColumnRow(hiddenCount, y, width) {
+  return `
+    <g class="diagram-column-row diagram-column-row-overflow" data-diagram-column-y="${y}">
+      <rect class="diagram-column-row-bg" x="10" y="${y - 14}" width="${Math.max(120, width - 20)}" height="18" rx="6"></rect>
+      <text class="diagram-column overflow" x="18" y="${y - 2}">+${integerText(hiddenCount)} more columns</text>
+    </g>
+  `;
+}
+
+function diagramEmptyColumnRow(y, width) {
+  return `
+    <g class="diagram-column-row diagram-column-row-empty" data-diagram-column-y="${y}">
+      <rect class="diagram-column-row-bg" x="10" y="${y - 14}" width="${Math.max(120, width - 20)}" height="18" rx="6"></rect>
+      <text class="diagram-column empty" x="18" y="${y - 2}">No key columns</text>
+    </g>
+  `;
 }
 
 function diagramStatusTone(status) {
@@ -6989,7 +7057,7 @@ function diagramRelationshipTablePosition(tableElement, columnName) {
 function diagramColumnAbsoluteY(tableElement, position, columnName) {
   const columnElement = [...tableElement.querySelectorAll("[data-diagram-column]")]
     .find((element) => element.dataset.diagramColumn === columnName);
-  return position.y + Number(columnElement?.getAttribute("y") || 80);
+  return position.y + Number(columnElement?.dataset.diagramColumnY || columnElement?.getAttribute("y") || DIAGRAM_COLUMN_START_Y);
 }
 
 function diagramSelectionContext(model) {
