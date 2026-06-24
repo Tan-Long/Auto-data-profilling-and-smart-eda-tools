@@ -1661,7 +1661,6 @@ h3 {
   gap: 16px;
 }
 
-.dashboard-filters,
 .dashboard-detail,
 .dashboard-card {
   min-width: 0;
@@ -1676,77 +1675,7 @@ h3 {
   overflow: auto;
 }
 
-.dashboard-filters {
-  display: grid;
-  grid-template-columns: minmax(154px, 0.72fr) repeat(3, minmax(132px, 1fr)) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border-color: var(--border-default);
-  background: var(--surface-panel);
-}
-
-.dashboard-filter-heading {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  margin: 0;
-}
-
-.dashboard-filter-heading strong {
-  color: var(--foreground-primary);
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.dashboard-filter-heading span {
-  width: max-content;
-  max-width: 100%;
-  padding: 3px 7px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--surface-overlay);
-  color: var(--foreground-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.dashboard-filter-field {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  color: var(--foreground-tertiary);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1.15;
-  text-transform: uppercase;
-}
-
-.dashboard-filter-field select {
-  width: 100%;
-  min-height: 36px;
-  padding: 7px 10px;
-  border-color: var(--border-default);
-  border-radius: var(--radius-sm);
-  background-color: var(--surface-overlay);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.dashboard-filters #dashboardResetFilters {
-  align-self: end;
-  min-height: 36px;
-  padding: 0 12px;
-  white-space: nowrap;
-}
-
-.dashboard-filters #dashboardMessage {
-  grid-column: 1 / -1;
+.dashboard-message {
   margin: 0;
 }
 
@@ -1903,6 +1832,14 @@ h3 {
   gap: 12px;
 }
 
+.issue-visual-heading-side {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .issue-visual-heading h4 {
   margin: 0;
   color: var(--foreground-primary);
@@ -1924,6 +1861,52 @@ h3 {
   font-size: 24px;
   font-weight: 900;
   line-height: 1;
+}
+
+.issue-active-lens {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  max-width: 360px;
+  padding: 4px 6px 4px 9px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.issue-active-lens span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-active-lens strong {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-active-lens button {
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.issue-active-lens button:hover,
+.issue-active-lens button:focus-visible {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .issue-visual-grid {
@@ -5526,10 +5509,6 @@ details.runtime-stage-item:focus-within {
   .panel-heading {
     display: grid;
     justify-content: stretch;
-  }
-
-  .dashboard-filters {
-    grid-template-columns: 1fr;
   }
 
   .dashboard-readiness-card {

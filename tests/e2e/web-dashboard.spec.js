@@ -439,24 +439,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   await page.locator("#profileStepNext").click();
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
-  const reviewHeaderOrder = await page.locator("#dashboard").evaluate((element) => {
-    const summary = element.querySelector("#dashboardSummaryStrip")?.getBoundingClientRect();
-    const filters = element.querySelector(".dashboard-filters")?.getBoundingClientRect();
-    return Boolean(summary && filters && summary.top < filters.top);
-  });
-  expect(reviewHeaderOrder).toBeTruthy();
-  const filterToolbarLayout = await page.locator("#dashboard .dashboard-filters").evaluate((element) => {
-    const controls = [...element.querySelectorAll("#dashboardSeverityFilter, #dashboardIssueTypeFilter, #dashboardTableFilter, #dashboardResetFilters")]
-      .map((control) => control.getBoundingClientRect());
-    return {
-      controlCount: controls.length,
-      overflow: element.scrollWidth - element.clientWidth,
-      ySpread: Math.max(...controls.map((rect) => rect.top)) - Math.min(...controls.map((rect) => rect.top)),
-    };
-  });
-  expect(filterToolbarLayout.controlCount).toBe(4);
-  expect(filterToolbarLayout.overflow).toBeLessThanOrEqual(1);
-  expect(filterToolbarLayout.ySpread).toBeLessThan(12);
+  await expect(page.locator("#dashboard .dashboard-filters")).toHaveCount(0);
+  await expect(page.locator("#dashboard")).not.toContainText("Review filters");
+  await expect(page.locator("#dashboardSeverityFilter")).toHaveCount(0);
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("readiness");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("NOT_READY");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("100/100");
@@ -467,12 +452,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardPanelGrid .issue-visual-chart")).toHaveCount(3);
   expect(await page.locator("#dashboardPanelGrid .issue-visual-row").count()).toBeGreaterThan(3);
   await page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="severity"][data-dashboard-value="P1"]').click();
-  await expect(page.locator("#dashboardSeverityFilter")).toHaveValue("P1");
+  await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("severity P1");
   await expect(page.locator("#dashboardIssueCount")).toContainText("8/12 issues");
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");
   await expect(page.locator("#dashboardDrilldown")).toContainText("8");
-  await page.locator("#dashboardResetFilters").click();
+  await page.locator("#dashboardPanelGrid [data-dashboard-reset-filters]").click();
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
+  await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toHaveCount(0);
 
   await goToProfileStep(page, "connect");
   await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
@@ -563,6 +549,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await firstQualityGate.screenshot({
     path: "outputs/us073_goal7/quality-gate-expanded-detail.png",
   });
+  await firstQualityGate.locator(".quality-gate-summary").click();
+  await expect(firstQualityGate).not.toHaveAttribute("open", "");
   fs.mkdirSync("outputs/us073_goal9", { recursive: true });
   const reportExport = page.locator("#reportExport");
   await expect(reportExport).toContainText("Report / Export");
@@ -763,8 +751,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboard")).not.toContainText("Graph drilldown");
   await expect(page.locator("#dashboard")).not.toContainText("Developer artifact sources");
 
-  await page.locator("#dashboardSeverityFilter").selectOption("P1");
-  await expect(page.locator("#dashboardIssueCount")).toContainText("/12 issues");
+  await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("table order_reviews");
+  await page.locator("#dashboardPanelGrid [data-dashboard-reset-filters]").click();
+  await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#dashboardPanelGrid")).toContainText("Blocked");
   await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"]').first().click();
   await expect(page.locator("#dashboardDrilldown")).toContainText("Sample rows");

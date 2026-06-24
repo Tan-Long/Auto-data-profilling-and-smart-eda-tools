@@ -336,33 +336,8 @@
               <div><span>issues</span><strong>0</strong></div>
               <div><span>tables</span><strong>0</strong></div>
             </div>
-
-            <div class="dashboard-filters" role="group" aria-label="Issue review filters">
-              <div class="dashboard-filter-heading">
-                <strong>Review filters</strong>
-                <span id="dashboardIssueCount">0 issues</span>
-              </div>
-              <label class="field-label dashboard-filter-field" for="dashboardSeverityFilter">
-                Severity
-                <select id="dashboardSeverityFilter">
-                  <option value="all">All severities</option>
-                </select>
-              </label>
-              <label class="field-label dashboard-filter-field" for="dashboardIssueTypeFilter">
-                Issue type
-                <select id="dashboardIssueTypeFilter">
-                  <option value="all">All issue types</option>
-                </select>
-              </label>
-              <label class="field-label dashboard-filter-field" for="dashboardTableFilter">
-                Table
-                <select id="dashboardTableFilter">
-                  <option value="all">All tables</option>
-                </select>
-              </label>
-              <button class="button secondary" id="dashboardResetFilters" type="button">Reset</button>
-              <p class="form-message" id="dashboardMessage" role="status">Issue review loads after a completed backend job.</p>
-            </div>
+            <span class="sr-only" id="dashboardIssueCount">0 issues</span>
+            <p class="form-message dashboard-message" id="dashboardMessage" role="status">Issue review loads after a completed backend job.</p>
 
             <section class="dashboard-section quality-gates-section" id="qualityGates" aria-labelledby="qualityGatesTitle">
               <div class="runtime-heading">

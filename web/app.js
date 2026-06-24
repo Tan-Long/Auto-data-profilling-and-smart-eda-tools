@@ -148,10 +148,6 @@ const els = {
   selectedRunTimeline: document.querySelector("#selectedRunTimeline"),
   dashboardStatusBadge: document.querySelector("#dashboardStatusBadge"),
   dashboardIssueCount: document.querySelector("#dashboardIssueCount"),
-  dashboardSeverityFilter: document.querySelector("#dashboardSeverityFilter"),
-  dashboardIssueTypeFilter: document.querySelector("#dashboardIssueTypeFilter"),
-  dashboardTableFilter: document.querySelector("#dashboardTableFilter"),
-  dashboardResetFilters: document.querySelector("#dashboardResetFilters"),
   dashboardMessage: document.querySelector("#dashboardMessage"),
   dashboardSummaryStrip: document.querySelector("#dashboardSummaryStrip"),
   qualityGatesStatus: document.querySelector("#qualityGatesStatus"),
@@ -435,28 +431,6 @@ els.runHistoryList.addEventListener("click", async (event) => {
 });
 
 [
-  els.dashboardSeverityFilter,
-  els.dashboardIssueTypeFilter,
-  els.dashboardTableFilter,
-].forEach((select) => {
-  select.addEventListener("change", () => {
-    state.dashboardFilters = {
-      severity: els.dashboardSeverityFilter.value,
-      issueType: els.dashboardIssueTypeFilter.value,
-      table: els.dashboardTableFilter.value,
-    };
-    state.dashboardSelection = null;
-    renderDashboard();
-  });
-});
-
-els.dashboardResetFilters.addEventListener("click", () => {
-  state.dashboardFilters = { severity: "all", issueType: "all", table: "all" };
-  state.dashboardSelection = null;
-  renderDashboard();
-});
-
-[
   [els.todosFilterAll, "all"],
   [els.todosFilterFix, "fix_data"],
   [els.todosFilterVerify, "verify_after_fix"],
@@ -515,6 +489,13 @@ els.dashboardDrilldown.addEventListener("click", async (event) => {
 });
 
 function handleDashboardSelectionClick(event) {
+  const resetTarget = event.target.closest("[data-dashboard-reset-filters]");
+  if (resetTarget) {
+    resetDashboardFilters();
+    state.dashboardSelection = { kind: "overview", value: "", label: "Review Issues" };
+    renderDashboard();
+    return;
+  }
   const target = event.target.closest("[data-dashboard-kind]");
   if (!target) {
     return;
@@ -548,10 +529,13 @@ function handleDashboardSelectionClick(event) {
 function applyDashboardSelectionFilter(kind, value) {
   const previous = { ...state.dashboardFilters };
   if (kind === "severity") {
+    resetDashboardFilters();
     state.dashboardFilters.severity = value || "all";
   } else if (kind === "issue_type") {
+    resetDashboardFilters();
     state.dashboardFilters.issueType = value || "all";
   } else if (kind === "table" || kind === "table_assessment") {
+    resetDashboardFilters();
     state.dashboardFilters.table = value || "all";
   } else {
     return false;
@@ -561,6 +545,10 @@ function applyDashboardSelectionFilter(kind, value) {
     previous.issueType !== state.dashboardFilters.issueType ||
     previous.table !== state.dashboardFilters.table
   );
+}
+
+function resetDashboardFilters() {
+  state.dashboardFilters = { severity: "all", issueType: "all", table: "all" };
 }
 
 els.diagramSvg.addEventListener("click", (event) => {
@@ -3424,7 +3412,6 @@ function renderDashboard() {
   els.dashboardIssueCount.textContent = `${filteredIssues.length}/${issues.length} issues`;
 
   renderDashboardSummary(issues);
-  renderDashboardFilters(issues);
   renderQualityGatesSection();
   renderTableImpactSection();
   renderTodosSection();
@@ -4216,39 +4203,6 @@ function todoOccurrenceEvidenceText(occurrence, issue) {
     : "Evidence: open the issue detail drawer for generated sample rows and query context.";
 }
 
-function renderDashboardFilters(issues) {
-  const severities = uniqueSorted(issues.map((issue) => issue.severity), severityOrder);
-  const issueTypes = uniqueSorted(issues.map((issue) => issue.issue_type));
-  const tables = uniqueSorted([
-    ...issues.map((issue) => issue.table).filter(Boolean),
-    ...getDashboardTableAssessments().map((assessment) => assessment.table).filter(Boolean),
-  ]);
-
-  setSelectOptions(els.dashboardSeverityFilter, "all", "All severities", severities, state.dashboardFilters.severity);
-  setSelectOptions(els.dashboardIssueTypeFilter, "all", "All issue types", issueTypes, state.dashboardFilters.issueType);
-  setSelectOptions(els.dashboardTableFilter, "all", "All tables", tables, state.dashboardFilters.table);
-}
-
-function setSelectOptions(select, allValue, allLabel, values, selected) {
-  const normalizedSelected = values.includes(selected) ? selected : allValue;
-  select.innerHTML = [
-    `<option value="${escapeHtml(allValue)}">${escapeHtml(allLabel)}</option>`,
-    ...values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
-  ].join("");
-  select.value = normalizedSelected;
-  if (selected !== normalizedSelected) {
-    if (select === els.dashboardSeverityFilter) {
-      state.dashboardFilters.severity = normalizedSelected;
-    }
-    if (select === els.dashboardIssueTypeFilter) {
-      state.dashboardFilters.issueType = normalizedSelected;
-    }
-    if (select === els.dashboardTableFilter) {
-      state.dashboardFilters.table = normalizedSelected;
-    }
-  }
-}
-
 function objectOrEmpty(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -4425,9 +4379,12 @@ function renderIssueVisualSummary(filteredIssues) {
           <p class="eyebrow">Visual summary</p>
           <h4>Issue map</h4>
         </div>
-        <div class="issue-visual-total">
-          <strong>${integerText(filteredIssues.length)}</strong>
-          <span>issues · ${integerText(badRows)} bad rows</span>
+        <div class="issue-visual-heading-side">
+          ${renderIssueActiveLens(filteredIssues.length)}
+          <div class="issue-visual-total">
+            <strong>${integerText(filteredIssues.length)}</strong>
+            <span>issues · ${integerText(badRows)} bad rows</span>
+          </div>
         </div>
       </div>
       <div class="issue-visual-grid">
@@ -4437,6 +4394,34 @@ function renderIssueVisualSummary(filteredIssues) {
       </div>
     </section>
   `;
+}
+
+function renderIssueActiveLens(filteredCount) {
+  const label = dashboardActiveFilterLabel();
+  if (!label) {
+    return "";
+  }
+  return `
+    <div class="issue-active-lens" role="status">
+      <span>Showing ${escapeHtml(label)}</span>
+      <strong>${integerText(filteredCount)}/${integerText(getDashboardIssues().length)}</strong>
+      <button type="button" data-dashboard-reset-filters>Clear</button>
+    </div>
+  `;
+}
+
+function dashboardActiveFilterLabel() {
+  const filters = state.dashboardFilters;
+  if (filters.severity !== "all") {
+    return `severity ${filters.severity}`;
+  }
+  if (filters.issueType !== "all") {
+    return issueTypeText(filters.issueType);
+  }
+  if (filters.table !== "all") {
+    return `table ${filters.table}`;
+  }
+  return "";
 }
 
 function renderIssueVisualChart(title, subtitle, rows, emptyText) {
