@@ -572,9 +572,10 @@ Allowed implementation pattern:
 - compute association metrics with SQL or bounded in-memory frames;
 - label every result as association only.
 
-The default behavior should still produce a successful run when no association
-field is provided. In that case `influence.json` should record `skipped` with a
-clear reason rather than crashing the pipeline.
+The default CSV+DBML flow should still produce a successful run when no
+association field is provided. In that case the legacy `influence.json`
+compatibility artifact records a no-target note, but the primary runtime flow
+does not create or display an `influence_analysis` stage.
 
 The legacy `tanlong` branch may contain useful ideas for safe joins, fact-table
 selection, and cross-table correlation. Those ideas must be rewritten to use
@@ -741,7 +742,7 @@ The output directory is the run contract.
 | --- | --- |
 | `profile_summary.json` | Table and column statistics, including numeric percentiles and IQR outlier evidence. |
 | `issues.json` | Normalized data-quality, schema, and relationship findings. |
-| `influence.json` | Legacy association analysis or skipped status. |
+| `influence.json` | Legacy association compatibility artifact; populated only when an explicit target is provided, otherwise records a no-target note. |
 | `samples/` | Bounded evidence rows for findings. |
 | `connector_metadata.json` | Optional connector source metadata, selected tables, row estimates, extraction status, warnings, and redaction status. |
 | `schema_parse_report.json` | DBML parsed object counts, warnings, unsupported constructs, and parse diagnostics. |
@@ -877,8 +878,12 @@ execution stages:
 3. Profile CSV tables and columns.
 4. Run data quality checks.
 5. Check relationships.
-6. Run legacy association analysis or record why it was skipped.
-7. Generate artifacts and reports.
+6. Generate artifacts and reports.
+
+The legacy `influence_analysis` runtime stage is not part of the primary
+CSV+DBML flow. Compatibility runs may still produce `influence.json` for an
+explicit target field, but Stage 3 should not present that as a skipped demo
+step.
 
 Console output should show stage start, stage success/failure, duration, and key
 metrics. File outputs should include:

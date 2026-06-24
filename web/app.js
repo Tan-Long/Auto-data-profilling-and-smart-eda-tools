@@ -3008,12 +3008,7 @@ function visibleRuntimeStages(stages) {
 }
 
 function isHiddenCompatibilityStage(stage) {
-  if (!stage || stage.name !== "influence_analysis") {
-    return false;
-  }
-  const details = stage.details || {};
-  const skipReason = String(stage.skipReason || stage.skip_reason || details.skip_reason || "");
-  return stage.status === "skipped" && /no target column was provided/i.test(skipReason);
+  return stage?.name === "influence_analysis";
 }
 
 function selectedRunHistoryEntry() {

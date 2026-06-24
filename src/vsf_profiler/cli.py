@@ -47,6 +47,7 @@ from vsf_profiler.llm_narrative import (
     OpenAINarrativeProvider,
     generate_l4_narrative,
 )
+from vsf_profiler.models import InfluenceResult
 from vsf_profiler.profiler import profile_dataset
 from vsf_profiler.quality_gates import build_quality_gates
 from vsf_profiler.quality_rules import run_quality_checks
@@ -149,7 +150,7 @@ def run(
         help="Optional LLM summary provider: 'fake' for local validation or 'openai'.",
     ),
 ) -> None:
-    """Run CSV+DBML profiling, validation, legacy association analysis, and report generation."""
+    """Run the guided CSV+DBML data-quality profile and report generation."""
     dbml_path = dbml or dbml_arg
     if llm_provider and not use_llm:
         raise typer.BadParameter("--llm-provider requires --use-llm.")
@@ -470,21 +471,21 @@ def run_pipeline(
                     len(issue_catalog.issues) - issue_count_before,
                 )
 
-            with runtime.stage("influence_analysis", "Run influence analysis") as stage:
-                influence = analyze_influence(
-                    con=con,
-                    schema=schema,
-                    catalog=catalog,
-                    target=target,
-                    max_analysis_rows=max_analysis_rows,
-                    max_feature_columns=max_feature_columns,
-                )
-                stage.add_detail("row_count", influence.row_count)
-                stage.add_detail("feature_count", len(influence.top_features))
-                if not target:
-                    stage.mark_skipped("No target column was provided.")
-                elif influence.notes and not influence.top_features:
-                    stage.add_detail("notes", influence.notes)
+            influence = InfluenceResult(notes=["No target column was provided."])
+            if target:
+                with runtime.stage("influence_analysis", "Run influence analysis") as stage:
+                    influence = analyze_influence(
+                        con=con,
+                        schema=schema,
+                        catalog=catalog,
+                        target=target,
+                        max_analysis_rows=max_analysis_rows,
+                        max_feature_columns=max_feature_columns,
+                    )
+                    stage.add_detail("row_count", influence.row_count)
+                    stage.add_detail("feature_count", len(influence.top_features))
+                    if influence.notes and not influence.top_features:
+                        stage.add_detail("notes", influence.notes)
         finally:
             if con is not None:
                 con.close()

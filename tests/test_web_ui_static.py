@@ -586,6 +586,7 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderIssueVisualSummary" in js
     assert "renderIssueFocusMap" in js
     assert "selectedRunTimeline" in js
+    assert 'return stage?.name === "influence_analysis";' in js
     assert "data-run-history-job-id" in js
     assert "charts/issue_counts_by_severity.json" in js
     assert "charts/issue_counts_by_type.json" in js
