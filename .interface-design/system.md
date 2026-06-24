@@ -162,8 +162,11 @@ Data style: monospace with tabular numbers.
 - Table cards show all DBML columns by default with monospace table names,
   status pills, PK/FK/key rows, and a `+N columns` indicator only after the
   user intentionally hides non-key columns.
-- Relationship edges are orthogonal elbow paths. Default edges are muted;
-  amber/red appears only for warning or invalid relationship evidence.
+- Relationship edges are orthogonal elbow paths with ERD endpoint glyphs:
+  a vertical one-bar on the parent side and a crow's-foot fork on the child
+  side. Avoid loose text markers such as `1` and `*` on the line.
+  Default edges are muted; amber/red appears only for warning or invalid
+  relationship evidence.
 - Edge labels stay hidden until hover/focus/selection so the diagram reads as
   structure first and diagnostics second.
 - Diagram controls are compact evidence-tool controls: Fit view, zoom,
@@ -190,3 +193,4 @@ Data style: monospace with tabular numbers.
 | Remove developer graph and artifact-source panes from the primary dashboard | Demo feedback rejected the extra developer schema context, graph drilldown, and raw artifact source panes because they distract from issue review and next actions | 2026-06-24 |
 | Default DBML preview to full-column reading | Demo feedback needs the ERD to behave more like dbdiagram.io: columns are visible immediately, while optional controls reduce clutter only when requested | 2026-06-24 |
 | Remove visible DBML inspector rail | Demo feedback found the selected-table inspector too verbose and duplicative; the ERD should use the full available width and keep detailed evidence in the review/report flow | 2026-06-24 |
+| Use ERD endpoint glyphs for relationship cardinality | Text labels like `1` and `*` felt detached from the FK line; crow's-foot endpoints attach cardinality to the relationship itself | 2026-06-24 |

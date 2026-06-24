@@ -1316,52 +1316,23 @@ h3 {
   pointer-events: none;
 }
 
-.diagram-edge-terminal {
+.diagram-cardinality-glyph {
   fill: none;
-  stroke: rgba(104, 115, 111, 0.66);
-  stroke-width: 1.35;
+  stroke: rgba(104, 115, 111, 0.76);
+  stroke-width: 1.7;
   stroke-linecap: round;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 
 .diagram-relationship-danger .diagram-edge,
-.diagram-relationship-danger .diagram-edge-terminal {
+.diagram-relationship-danger .diagram-cardinality-glyph {
   stroke: rgba(178, 59, 50, 0.7);
 }
 
 .diagram-relationship-warn .diagram-edge,
-.diagram-relationship-warn .diagram-edge-terminal {
+.diagram-relationship-warn .diagram-cardinality-glyph {
   stroke: rgba(154, 95, 0, 0.72);
-}
-
-.diagram-port-dot {
-  fill: #ffffff;
-  stroke: rgba(104, 115, 111, 0.42);
-  stroke-width: 1;
-}
-
-.diagram-relationship-danger .diagram-port-dot,
-.diagram-relationship-danger .diagram-cardinality-marker {
-  stroke: rgba(178, 59, 50, 0.74);
-  fill: rgba(178, 59, 50, 0.9);
-}
-
-.diagram-relationship-warn .diagram-port-dot,
-.diagram-relationship-warn .diagram-cardinality-marker {
-  stroke: rgba(154, 95, 0, 0.74);
-  fill: rgba(154, 95, 0, 0.9);
-}
-
-.diagram-cardinality-marker {
-  fill: var(--foreground-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 10px;
-  font-weight: 950;
-  paint-order: stroke;
-  pointer-events: none;
-  stroke: #ffffff;
-  stroke-width: 3px;
-  text-anchor: middle;
 }
 
 .diagram-edge-label {
@@ -1395,9 +1366,7 @@ h3 {
 }
 
 .diagram-relationship.dimmed .diagram-edge,
-.diagram-relationship.dimmed .diagram-edge-terminal,
-.diagram-relationship.dimmed .diagram-port-dot,
-.diagram-relationship.dimmed .diagram-cardinality-marker {
+.diagram-relationship.dimmed .diagram-cardinality-glyph {
   opacity: 0.18;
 }
 

@@ -5741,7 +5741,7 @@ function diagramRelationshipSvg(rel, layout, index) {
   const geometry = diagramRelationshipGeometry(child, parent, childColumn, parentColumn, index);
   const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
   const statusLabel = rel.status || rel.cardinality || rel.relationshipType || "";
-  const directionLabel = `${rel.parentTable}.${(rel.parentColumns || []).join(",")} 1 -> * ${rel.childTable}.${(rel.childColumns || []).join(",")}${statusLabel ? ` · ${statusLabel}` : ""}`;
+  const directionLabel = `${rel.parentTable}.${(rel.parentColumns || []).join(",")} one-to-many ${rel.childTable}.${(rel.childColumns || []).join(",")}${statusLabel ? ` · ${statusLabel}` : ""}`;
   const selectionClass = diagramRelationshipSelectionClass(rel, layout.selection);
   return `
     <g class="diagram-relationship diagram-relationship-${escapeHtml(diagramStatusTone(rel.status))} ${selectionClass}" data-diagram-relationship="${escapeHtml(rel.id)}" data-diagram-child-table="${escapeHtml(rel.childTable)}" data-diagram-parent-table="${escapeHtml(rel.parentTable)}" data-diagram-child-column="${escapeHtml(childColumn)}" data-diagram-parent-column="${escapeHtml(parentColumn)}" data-diagram-edge-index="${index}" tabindex="0" role="button" aria-label="${escapeHtml(directionLabel)}">
@@ -5749,13 +5749,9 @@ function diagramRelationshipSvg(rel, layout, index) {
       <path class="diagram-edge-hit" d="${geometry.path}"></path>
       <path class="diagram-edge" d="${geometry.path}"></path>
       <path class="diagram-edge-flow" d="${geometry.path}"></path>
-      <path class="diagram-edge-terminal diagram-edge-terminal-parent" d="${geometry.parentCapPath}"></path>
-      <path class="diagram-edge-terminal diagram-edge-terminal-child" d="${geometry.childCapPath}"></path>
-      <circle class="diagram-port-dot diagram-port-source diagram-port-child" cx="${geometry.childX}" cy="${geometry.childY}" r="2.4"></circle>
-      <circle class="diagram-port-dot diagram-port-target diagram-port-parent" cx="${geometry.parentX}" cy="${geometry.parentY}" r="2.4"></circle>
-      <text class="diagram-cardinality-marker diagram-cardinality-one" x="${geometry.parentMarkerX}" y="${geometry.parentMarkerY}">1</text>
-      <text class="diagram-cardinality-marker diagram-cardinality-many" x="${geometry.childMarkerX}" y="${geometry.childMarkerY}">*</text>
-      <text class="diagram-edge-label" x="${geometry.labelX}" y="${geometry.labelY}">1 -> *</text>
+      <path class="diagram-cardinality-glyph diagram-cardinality-one" d="${geometry.parentOnePath}"></path>
+      <path class="diagram-cardinality-glyph diagram-cardinality-many" d="${geometry.childManyPath}"></path>
+      <text class="diagram-edge-label" x="${geometry.labelX}" y="${geometry.labelY}">one-to-many</text>
     </g>
   `;
 }
@@ -5791,8 +5787,9 @@ function diagramRelationshipGeometry(child, parent, childColumn, parentColumn, i
     parentSegmentDirection = midX >= parentX ? 1 : -1;
     childSegmentDirection = childX >= midX ? 1 : -1;
   }
-  const parentMarkerX = parentX + parentSegmentDirection * 9;
-  const childMarkerX = childX - childSegmentDirection * 9;
+  const parentOneX = parentX + parentSegmentDirection * 9;
+  const childForkX = childX - childSegmentDirection * 12;
+  const childTipX = childX - childSegmentDirection * 2;
   return {
     path,
     x1: childX,
@@ -5803,12 +5800,8 @@ function diagramRelationshipGeometry(child, parent, childColumn, parentColumn, i
     childY,
     parentX,
     parentY,
-    parentMarkerX,
-    parentMarkerY: parentY + 3,
-    childMarkerX,
-    childMarkerY: childY + 4,
-    parentCapPath: `M ${parentX} ${parentY - 5} L ${parentX} ${parentY + 5}`,
-    childCapPath: `M ${childX} ${childY - 5} L ${childX} ${childY + 5}`,
+    parentOnePath: `M ${parentOneX} ${parentY - 7} L ${parentOneX} ${parentY + 7}`,
+    childManyPath: `M ${childForkX} ${childY} L ${childTipX} ${childY - 7} M ${childForkX} ${childY} L ${childTipX} ${childY} M ${childForkX} ${childY} L ${childTipX} ${childY + 7}`,
     labelX,
     labelY,
   };
@@ -6118,16 +6111,8 @@ function syncDiagramRelationshipGeometry(tableName = "") {
     relationshipElement.querySelectorAll(".diagram-edge-hit, .diagram-edge, .diagram-edge-flow").forEach((pathElement) => {
       pathElement.setAttribute("d", geometry.path);
     });
-    relationshipElement.querySelector(".diagram-edge-terminal-parent")?.setAttribute("d", geometry.parentCapPath);
-    relationshipElement.querySelector(".diagram-edge-terminal-child")?.setAttribute("d", geometry.childCapPath);
-    relationshipElement.querySelector(".diagram-port-source")?.setAttribute("cx", geometry.childX);
-    relationshipElement.querySelector(".diagram-port-source")?.setAttribute("cy", geometry.childY);
-    relationshipElement.querySelector(".diagram-port-target")?.setAttribute("cx", geometry.parentX);
-    relationshipElement.querySelector(".diagram-port-target")?.setAttribute("cy", geometry.parentY);
-    relationshipElement.querySelector(".diagram-cardinality-one")?.setAttribute("x", geometry.parentMarkerX);
-    relationshipElement.querySelector(".diagram-cardinality-one")?.setAttribute("y", geometry.parentMarkerY);
-    relationshipElement.querySelector(".diagram-cardinality-many")?.setAttribute("x", geometry.childMarkerX);
-    relationshipElement.querySelector(".diagram-cardinality-many")?.setAttribute("y", geometry.childMarkerY);
+    relationshipElement.querySelector(".diagram-cardinality-one")?.setAttribute("d", geometry.parentOnePath);
+    relationshipElement.querySelector(".diagram-cardinality-many")?.setAttribute("d", geometry.childManyPath);
     relationshipElement.querySelector(".diagram-edge-label")?.setAttribute("x", geometry.labelX);
     relationshipElement.querySelector(".diagram-edge-label")?.setAttribute("y", geometry.labelY);
   });

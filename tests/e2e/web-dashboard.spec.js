@@ -227,9 +227,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   const ordersRelationship = page.locator(
     '#diagramSvg [data-diagram-relationship="order_items.order_id->orders.order_id"]',
   );
-  await expect(ordersRelationship).toHaveAttribute("aria-label", /orders\.order_id 1 -> \* order_items\.order_id/);
-  await expect(ordersRelationship.locator(".diagram-cardinality-one")).toContainText("1");
-  await expect(ordersRelationship.locator(".diagram-cardinality-many")).toContainText("*");
+  await expect(ordersRelationship).toHaveAttribute("aria-label", /orders\.order_id one-to-many order_items\.order_id/);
+  await expect(ordersRelationship.locator(".diagram-cardinality-one")).toHaveCount(1);
+  await expect(ordersRelationship.locator(".diagram-cardinality-many")).toHaveCount(1);
+  await expect(ordersRelationship.locator(".diagram-cardinality-one")).toHaveAttribute("d", /M .+ L /);
+  await expect(ordersRelationship.locator(".diagram-cardinality-many")).toHaveAttribute("d", /M .+ L .+ M .+ L .+ M .+ L /);
+  await expect(ordersRelationship).not.toContainText("1");
+  await expect(ordersRelationship).not.toContainText("*");
   await expect(ordersRelationship.locator(".diagram-edge-flow")).toHaveCount(1);
   const relationshipPathBeforeDrag = await ordersRelationshipPath.getAttribute("d");
   const ordersTransformBeforeDrag = await ordersTable.getAttribute("transform");
