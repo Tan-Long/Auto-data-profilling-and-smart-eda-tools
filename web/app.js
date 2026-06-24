@@ -442,14 +442,6 @@ els.runHistoryList.addEventListener("click", async (event) => {
   });
 });
 
-els.reportExportTodos.addEventListener("click", async (event) => {
-  const target = event.target.closest("[data-todo-export]");
-  if (!target) {
-    return;
-  }
-  await handleTodoExport(target);
-});
-
 els.reportExportGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
 });
@@ -4463,10 +4455,6 @@ function renderReportExportSection() {
       <strong>Todo exports</strong>
       <span>${integerText(groups.length)} groups</span>
     </div>
-    <div class="report-export-actions">
-      <button class="button secondary compact" type="button" data-todo-export="fix_data">Copy Fix data Markdown</button>
-      <button class="button secondary compact" type="button" data-todo-export="verify_after_fix">Copy Verify after fix Markdown</button>
-    </div>
     <div class="report-export-todo-split" aria-label="Todo export summary">
       ${renderReportExportTodoSummary("Fix data", fixGroups)}
       ${renderReportExportTodoSummary("Verify after fix", verifyGroups)}
@@ -4618,46 +4606,6 @@ function renderReportExportTodoSummary(title, groups) {
       <p>${integerText(groups.length)} groups · ${integerText(occurrenceCount)} occurrences</p>
     </article>
   `;
-}
-
-async function handleTodoExport(target) {
-  const todoType = target.dataset.todoExport || "";
-  const artifact = getIssueTodosArtifact();
-  const groups = Array.isArray(artifact?.groups)
-    ? artifact.groups.filter((group) => group.todo_type === todoType)
-    : [];
-  if (!groups.length) {
-    setReportExportMessage(`No ${todoTypeLabel(todoType)} todos are available to copy.`, "error");
-    return;
-  }
-  try {
-    await copyText(issueTodoGroupsMarkdown(todoType, groups));
-    setReportExportMessage(`Copied ${todoTypeLabel(todoType)} Markdown.`, "success");
-  } catch (error) {
-    setReportExportMessage("Copy failed in this browser.", "error");
-  }
-}
-
-function issueTodoGroupsMarkdown(todoType, groups) {
-  const lines = [`# ${todoTypeLabel(todoType)} Todos`, ""];
-  groups.forEach((group) => {
-    const occurrenceCount = Number(group.occurrence_count || 0);
-    lines.push(`- ${group.text || "Todo needs review."}`);
-    lines.push(`  - Todo ID: ${group.todo_id || "unknown"}`);
-    lines.push(`  - Occurrences: ${integerText(occurrenceCount)}`);
-    const priorities = Array.isArray(group.priorities) ? group.priorities.filter(Boolean) : [];
-    if (priorities.length) {
-      lines.push(`  - Priorities: ${priorities.join(", ")}`);
-    }
-    const occurrences = Array.isArray(group.occurrences) ? group.occurrences : [];
-    occurrences.slice(0, 10).forEach((occurrence) => {
-      const columns = Array.isArray(occurrence.columns) && occurrence.columns.length
-        ? occurrence.columns.join(", ")
-        : "table scope";
-      lines.push(`  - ${occurrence.issue_id || "UNKNOWN"}: ${occurrence.table || "unknown"}.${columns}`);
-    });
-  });
-  return `${lines.join("\n")}\n`;
 }
 
 function todoTypeLabel(todoType) {

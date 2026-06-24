@@ -4650,12 +4650,6 @@ h3 {
   overflow-wrap: anywhere;
 }
 
-.report-export-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .todos-toolbar {
   display: inline-grid;
   grid-template-columns: repeat(3, minmax(0, max-content));

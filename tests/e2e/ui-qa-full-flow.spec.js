@@ -318,11 +318,9 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#todos .todo-visual-summary")).toBeVisible();
     await expect(page.locator("#todos .todo-visual-card").first()).toBeVisible();
     await expect(page.locator("#todos .todo-issue-chip").first()).toBeVisible();
-    await page.locator('[data-todo-export="fix_data"]').click();
-    await expect(page.locator("#reportExportMessage")).toContainText("Copied Fix data Markdown.");
-    await page.locator('[data-todo-export="verify_after_fix"]').click();
-    await expect(page.locator("#reportExportMessage")).toContainText("Copied Verify after fix Markdown.");
     await expect(page.locator("#reportExport")).toContainText("Report preview");
+    await expect(page.locator("#reportExport")).toContainText("Todo exports");
+    await expect(page.locator("#reportExport [data-todo-export]")).toHaveCount(0);
     await expect(page.locator("#reportExport")).toContainText("Issue types");
     await expect(page.locator("#reportExport")).toContainText("Missing values");
     const reportHref = await page.locator('#reportExport a[href*="report.html"]').first().getAttribute("href");

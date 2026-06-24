@@ -608,8 +608,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportExport).toContainText("Todo exports");
   await expect(reportExport).toContainText("Fix data");
   await expect(reportExport).toContainText("Verify after fix");
-  await expect(reportExport).toContainText("Copy Fix data Markdown");
-  await expect(reportExport).toContainText("Copy Verify after fix Markdown");
+  await expect(reportExport).not.toContainText("Copy Fix data Markdown");
+  await expect(reportExport).not.toContainText("Copy Verify after fix Markdown");
+  await expect(reportExport.locator("[data-todo-export]")).toHaveCount(0);
   await expect(reportExport).toContainText("Report preview");
   await expect(reportExport).toContainText("Issue types");
   await expect(reportExport).toContainText("Missing values");

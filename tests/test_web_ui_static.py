@@ -409,8 +409,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderGeneratedReportLinks",
         "renderReportExportSection",
         "renderReportExportLinks",
-        "handleTodoExport",
-        "issueTodoGroupsMarkdown",
         "artifactUrlFromArtifacts",
         "loadDashboard",
         "renderDashboard",
@@ -660,8 +658,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "todo-issue-chip" in js
     assert "Linked issues" in js
     assert "open issue detail" not in js
-    assert "Copy Fix data Markdown" in js
-    assert "Copy Verify after fix Markdown" in js
+    assert "Copy Fix data Markdown" not in js
+    assert "Copy Verify after fix Markdown" not in js
+    assert "data-todo-export" not in js
     assert "Reports and todo exports are ready for review." in js
     assert "Developer artifacts below" not in js
     assert "getIssueTodosArtifact" in js
