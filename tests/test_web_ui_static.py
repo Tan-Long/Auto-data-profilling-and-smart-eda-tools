@@ -106,6 +106,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="preflightWarningList"',
         'aria-label="What are preflight blockers?"',
         'aria-label="What are preflight warnings?"',
+        'id="preflightBlockersInfo"',
+        'id="preflightWarningsInfo"',
+        'role="tooltip"',
         "Preflight Review",
         "Review connection and mapping readiness",
         "Blockers stop the run.",
@@ -228,6 +231,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Developer artifacts",
         "Reset graph view",
         "Invalid/warning only",
+        '<details class="info-popover">',
     ]
     for marker in forbidden_html:
         assert marker not in html
@@ -256,6 +260,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".preflight-review-panel",
         ".preflight-heading-label",
         ".info-popover",
+        ".info-popover-trigger",
         ".info-popover-card",
         ".preflight-item",
         ".issue-inbox-grid",

@@ -197,13 +197,13 @@
             <div class="runtime-heading">
               <div class="preflight-heading-label">
                 <strong>Blockers</strong>
-                <details class="info-popover">
-                  <summary aria-label="What are preflight blockers?">i</summary>
-                  <div class="info-popover-card">
+                <div class="info-popover">
+                  <button class="info-popover-trigger" type="button" aria-label="What are preflight blockers?" aria-describedby="preflightBlockersInfo">i</button>
+                  <div class="info-popover-card" id="preflightBlockersInfo" role="tooltip">
                     <strong>Blockers stop the run.</strong>
                     <p>They mean the DBML, CSV source, or table mapping is missing or invalid. Fix blockers in Connect before continuing.</p>
                   </div>
-                </details>
+                </div>
               </div>
               <span id="preflightBlockerCount">0 blockers</span>
             </div>
@@ -215,13 +215,13 @@
             <div class="runtime-heading">
               <div class="preflight-heading-label">
                 <strong>Warnings</strong>
-                <details class="info-popover">
-                  <summary aria-label="What are preflight warnings?">i</summary>
-                  <div class="info-popover-card">
+                <div class="info-popover">
+                  <button class="info-popover-trigger" type="button" aria-label="What are preflight warnings?" aria-describedby="preflightWarningsInfo">i</button>
+                  <div class="info-popover-card" id="preflightWarningsInfo" role="tooltip">
                     <strong>Warnings need review.</strong>
                     <p>They flag risky but runnable choices, such as manual or imperfect mappings. Accepting a warning only lets the demo run continue.</p>
                   </div>
-                </details>
+                </div>
               </div>
               <span id="preflightWarningCount">0 warnings</span>
             </div>
