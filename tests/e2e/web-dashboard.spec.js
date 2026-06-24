@@ -585,8 +585,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#reportExportStatus")).toContainText("Reports ready");
   await expect(reportExport).toContainText("HTML report");
   await expect(reportExport).toContainText("report.html");
-  await expect(reportExport).toContainText("Markdown report");
-  await expect(reportExport).toContainText("report.md");
+  await expect(reportExport).not.toContainText("Markdown report");
+  await expect(reportExport).not.toContainText("report.md");
   await expect(reportExport).toContainText("Todo exports");
   await expect(reportExport).toContainText("Fix data");
   await expect(reportExport).toContainText("Verify after fix");

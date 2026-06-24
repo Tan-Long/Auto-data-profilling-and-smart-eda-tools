@@ -3502,7 +3502,6 @@ function renderGeneratedRuntimePreview(artifacts) {
 function renderGeneratedReportLinks(artifacts) {
   const reportLinks = [
     ["report.html", "Report HTML"],
-    ["report.md", "Report Markdown"],
   ]
     .map(([path, label]) => {
       const url = artifactUrlFromArtifacts(path, artifacts);
@@ -4126,7 +4125,7 @@ function renderReportExportSection() {
   els.reportExportGrid.innerHTML = reportLinks ? `${reportPreview}${reportLinks}` : `
     <section class="report-export-empty">
       <strong>Reports are missing.</strong>
-      <p>Expected HTML and Markdown reports were not found for this run.</p>
+      <p>Expected HTML report was not found for this run.</p>
     </section>
   `;
   els.reportExportStatus.textContent = reportLinks ? "Reports ready" : "Reports missing";
@@ -4171,11 +4170,6 @@ function renderReportExportLinks() {
       path: "report.html",
       label: "HTML report",
       detail: "Open the fixed-section report for review.",
-    },
-    {
-      path: "report.md",
-      label: "Markdown report",
-      detail: "Use the same deterministic report in Markdown.",
     },
   ];
   if (artifactUrlFor("issue_llm_enrichments.json")) {
