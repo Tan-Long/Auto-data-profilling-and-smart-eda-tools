@@ -3169,12 +3169,12 @@ h3 {
 .report-visual-preview {
   display: grid;
   grid-column: 1 / -1;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   padding: 12px;
   border: 1px solid rgba(35, 118, 77, 0.28);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, #f8fbfa 0%, #ffffff 100%);
+  background: var(--surface-panel);
 }
 
 .report-preview-heading {
@@ -3187,7 +3187,7 @@ h3 {
 
 .report-preview-heading h4 {
   margin: 2px 0 0;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.25;
 }
 
@@ -3204,52 +3204,40 @@ h3 {
   overflow-wrap: anywhere;
 }
 
-.report-kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+.report-preview-summary {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.report-kpi-strip article {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 9px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-overlay);
-}
-
-.report-kpi-strip strong {
-  min-width: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
+.report-preview-summary strong {
+  font-size: 22px;
+  line-height: 1;
   overflow-wrap: anywhere;
 }
 
-.report-kpi-strip span {
+.report-preview-summary span {
   color: var(--foreground-secondary);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.report-preview-grid {
+.report-preview-signal-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
 
 .report-preview-chart {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-panel);
+  padding: 0;
 }
 
 .report-preview-chart-heading {
@@ -3264,7 +3252,7 @@ h3 {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .report-preview-bar > span:first-child {
@@ -3297,29 +3285,25 @@ h3 {
   font-weight: 800;
 }
 
-.report-fix-preview {
+.report-fix-list {
   display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.report-fix-preview > strong {
-  font-size: 13px;
-}
-
-.report-fix-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.report-fix-card {
-  display: grid;
-  align-content: start;
   gap: 6px;
   min-width: 0;
-  min-height: 132px;
-  padding: 10px;
+  padding-top: 2px;
+}
+
+.report-fix-list > strong {
+  font-size: 14px;
+}
+
+.report-fix-row {
+  display: grid;
+  grid-template-columns: max-content minmax(120px, 1fr) minmax(120px, 0.8fr) max-content;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-overlay);
@@ -3328,35 +3312,35 @@ h3 {
   cursor: pointer;
 }
 
-.report-fix-card:hover,
-.report-fix-card:focus-visible {
+.report-fix-row:hover,
+.report-fix-row:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
   outline: none;
 }
 
-.report-fix-card strong,
-.report-fix-card span,
-.report-fix-card small {
+.report-fix-row strong,
+.report-fix-row span,
+.report-fix-row code {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.report-fix-card strong {
-  font-size: 13px;
+.report-fix-row strong {
+  font-size: 14px;
   line-height: 1.25;
 }
 
-.report-fix-card > span:not(.issue-pill) {
+.report-fix-row > span:not(.issue-pill) {
   color: var(--foreground-secondary);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.3;
 }
 
-.report-fix-card small {
+.report-fix-row code {
   color: var(--foreground-tertiary);
   font-size: 11px;
-  line-height: 1.35;
+  font-weight: 800;
+  text-align: right;
 }
 
 .report-export-card,
@@ -4855,9 +4839,8 @@ details.runtime-stage-item:focus-within {
   .dashboard-panel-grid,
   .generated-result-grid,
   .generated-report-links,
-  .report-kpi-strip,
-  .report-preview-grid,
-  .report-fix-grid,
+  .report-preview-signal-grid,
+  .report-fix-row,
   .report-export-grid,
   .report-export-todo-split,
   .quality-gate-grid,

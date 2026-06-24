@@ -3738,10 +3738,10 @@ function renderReportVisualPreview() {
     state.dashboardArtifacts[dashboardChartPaths.type]?.data || issueTypeCountsForPreview(issues),
     "issue_type",
     "count",
-    5,
+    4,
   );
-  const missingRows = topChartRows(missingSpec.data || [], "field", "null_count", 4);
-  const outlierRows = topChartRows(outlierSpec.data || [], "field", "outlier_count", 4);
+  const missingRows = topChartRows(missingSpec.data || [], "field", "null_count", 3);
+  const outlierRows = topChartRows(outlierSpec.data || [], "field", "outlier_count", 3);
   const topIssues = issues
     .slice()
     .sort((a, b) => (
@@ -3749,7 +3749,7 @@ function renderReportVisualPreview() {
       Number(b.bad_count || 0) - Number(a.bad_count || 0) ||
       issueGuid(a).localeCompare(issueGuid(b))
     ))
-    .slice(0, 4);
+    .slice(0, 3);
   const issueCount = verdict.issue_counts?.total ?? issues.length;
   const riskScore = verdict.risk_score ?? verdict.summary?.risk_score;
   const verdictText = verdict.verdict || verdict.summary?.verdict || "Review required";
@@ -3758,38 +3758,22 @@ function renderReportVisualPreview() {
       <div class="report-preview-heading">
         <div>
           <p class="eyebrow">Report preview</p>
-          <h4>Readable summary before opening the report</h4>
+          <h4>Summary before opening the report</h4>
         </div>
         <span>${escapeHtml(verdictText)}</span>
       </div>
-      <div class="report-kpi-strip">
-        <article>
-          <strong>${escapeHtml(verdictText)}</strong>
-          <span>Dataset usability</span>
-        </article>
-        <article>
-          <strong>${integerText(issueCount)}</strong>
-          <span>Issues found</span>
-        </article>
-        <article>
-          <strong>${riskScore === undefined ? "--" : `${integerText(riskScore)}/100`}</strong>
-          <span>Risk score</span>
-        </article>
-        <article>
-          <strong>${integerText(missingRows.length + outlierRows.length)}</strong>
-          <span>Previewed columns</span>
-        </article>
+      <div class="report-preview-summary">
+        <strong>${escapeHtml(verdictText)}</strong>
+        <span>${integerText(issueCount)} issues · ${riskScore === undefined ? "--" : `${integerText(riskScore)}/100`} risk · ${integerText(missingRows.length + outlierRows.length)} previewed columns</span>
       </div>
-      <div class="report-preview-grid">
+      <div class="report-preview-signal-grid">
         ${renderReportPreviewBars("Issue types", issueTypeRows, (row) => issueTypeText(row.label), "No issue counts available yet.")}
         ${renderReportPreviewBars("Missing values", missingRows, (row) => row.label, "No missing-value columns in the report preview.")}
         ${renderReportPreviewBars("Outliers", outlierRows, (row) => row.label, "No outlier columns in the report preview.")}
       </div>
-      <div class="report-fix-preview">
-        <strong>Click a fix card to inspect the exact table, column, evidence, and action plan.</strong>
-        <div class="report-fix-grid">
-          ${topIssues.length ? topIssues.map(renderReportFixPreviewCard).join("") : `<p class="muted">No issue cards are available for this run.</p>`}
-        </div>
+      <div class="report-fix-list">
+        <strong>Inspect first</strong>
+        ${topIssues.length ? topIssues.map(renderReportFixPreviewCard).join("") : `<p class="muted">No issues are available for this run.</p>`}
       </div>
     </section>
   `;
@@ -3814,7 +3798,7 @@ function issueTypeCountsForPreview(issues) {
 function renderReportPreviewBars(title, rows, labelFormatter, emptyText) {
   const maxValue = Math.max(...rows.map((row) => Number(row.value || 0)), 1);
   return `
-    <article class="report-preview-chart">
+    <div class="report-preview-chart">
       <div class="report-preview-chart-heading">
         <strong>${escapeHtml(title)}</strong>
       </div>
@@ -3830,7 +3814,7 @@ function renderReportPreviewBars(title, rows, labelFormatter, emptyText) {
           </div>
         `;
       }).join("") : `<p class="muted">${escapeHtml(emptyText)}</p>`}
-    </article>
+    </div>
   `;
 }
 
@@ -3839,16 +3823,12 @@ function renderReportFixPreviewCard(issue) {
   const table = issue.table || "Schema / dataset";
   const column = issuePrimaryColumn(issue);
   const displayColumn = column === "__table__" ? "table-level" : column;
-  const plan = getIssueActionPlan(issue);
-  const fix = Array.isArray(plan?.fix_data_checklist) && plan.fix_data_checklist.length
-    ? plan.fix_data_checklist[0]
-    : (Array.isArray(issue.suggested_fix) && issue.suggested_fix.length ? issue.suggested_fix[0] : "Review generated evidence and choose the cleanup action.");
   return `
-    <button class="report-fix-card" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
+    <button class="report-fix-row" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
       <span class="issue-pill ${issueStatusClass(issueStatus(issue))}">${escapeHtml(issue.severity || "P?")}</span>
       <strong>${escapeHtml(table)}.${escapeHtml(displayColumn)}</strong>
       <span>${escapeHtml(issueTypeLabel(issue))}</span>
-      <small>${integerText(issue.bad_count || 0)} rows · ${escapeHtml(fix)}</small>
+      <code>${integerText(issue.bad_count || 0)} rows</code>
     </button>
   `;
 }

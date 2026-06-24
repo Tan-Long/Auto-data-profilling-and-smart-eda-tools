@@ -50,28 +50,12 @@ Run status: {{ fixed_report.run_summary.status }}. Runtime seconds: {{ fixed_rep
 
 ## What Should Be Fixed First?
 
-{% for card in visual_report.top_fix_cards %}
-### {{ card.issue_id }} {{ card.issue_label }}
+Sample row preview: open the linked bounded sample CSV for each issue.
 
-- Severity: {{ card.severity }}
-- Category: {{ card.category }}
-- Where: {{ card.field }}
-- Bad rows: {{ card.bad_count }}/{{ card.total_count }} ({{ card.bad_rate_text }})
-- Sample rows: {{ "`" ~ card.sample_bad_rows_path ~ "`" if card.sample_bad_rows_path else "not available" }}
-- Why it matters: {{ card.why_it_matters }}
-- Fix data: {{ card.fix }}
-- Verify after fix: {{ card.verify }}
-
-{% if card.sample_preview.available -%}
-Sample row preview:
-
-| {% for header in card.sample_preview.headers %}{{ header }}{% if not loop.last %} | {% endif %}{% endfor %} |
-| {% for header in card.sample_preview.headers %}---{% if not loop.last %} | {% endif %}{% endfor %} |
-{% for row in card.sample_preview.rows -%}
-| {% for header in card.sample_preview.headers %}{{ row[header] }}{% if not loop.last %} | {% endif %}{% endfor %} |
-{% endfor %}
-{% endif %}
-
+| Priority | Where | Problem | Affected | First fix | Sample |
+| --- | --- | --- | ---: | --- | --- |
+{% for card in visual_report.top_fix_cards -%}
+| {{ card.severity }} {{ card.issue_id }} | {{ card.field }} | {{ card.issue_label }} | {{ card.bad_count }}/{{ card.total_count }} ({{ card.bad_rate_text }}) | {{ card.fix }} | {{ card.sample_bad_rows_path or "not available" }} |
 {% endfor %}
 
 ## Quality Gates
