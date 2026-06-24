@@ -149,6 +149,19 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="order_id"] .diagram-column-icon-key')).toHaveCount(1);
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="customer_id"] .diagram-column-icon-link')).toHaveCount(1);
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="order_id"]')).toContainText("varchar");
+  const orderIdColumnTypePosition = await page
+    .locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="order_id"]')
+    .evaluate((row) => {
+      const name = row.querySelector(".diagram-column-name");
+      const type = row.querySelector(".diagram-column-type");
+      return {
+        nameX: Number(name?.getAttribute("x") || 0),
+        typeX: Number(type?.getAttribute("x") || 0),
+        typeAnchor: type?.getAttribute("text-anchor") || "",
+      };
+    });
+  expect(orderIdColumnTypePosition.typeX).toBeGreaterThan(orderIdColumnTypePosition.nameX);
+  expect(orderIdColumnTypePosition.typeAnchor).toBe("");
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveCount(1);
   await expect(page.locator("#diagramFitButton")).toBeVisible();
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");

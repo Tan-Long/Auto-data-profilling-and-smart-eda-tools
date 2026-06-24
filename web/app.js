@@ -5845,20 +5845,23 @@ function diagramColumnRowSvg(column, y, width) {
   const tone = column.isPk ? "pk" : column.isFk ? "fk" : "non-key";
   const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
   const typeLabel = String(column.type || "");
-  const typeWidth = typeLabel ? Math.min(78, Math.max(34, typeLabel.length * 6 + 10)) : 0;
-  const nameX = 18;
-  const typeX = width - 18;
   const iconWidth = diagramColumnInlineIconWidth(column);
-  const nameLimit = Math.max(9, Math.floor((typeX - nameX - typeWidth - iconWidth - 14) / 6));
+  const iconX = 18;
+  const nameX = iconWidth ? iconX + iconWidth + 8 : iconX;
+  const rightLimit = width - 18;
+  const typeWidth = typeLabel ? Math.min(74, Math.max(30, typeLabel.length * 5.5 + 8)) : 0;
+  const typeGap = typeLabel ? 8 : 0;
+  const nameLimit = Math.max(8, Math.floor((rightLimit - nameX - typeWidth - typeGap) / 5.8));
   const displayName = truncateMiddle(column.name, nameLimit);
-  const iconX = Math.min(nameX + displayName.length * 5.7 + 6, typeX - typeWidth - iconWidth - 8);
+  const typeX = Math.min(nameX + displayName.length * 5.8 + typeGap, rightLimit - typeWidth);
+  const titleType = typeLabel ? ` ${typeLabel}` : "";
   return `
     <g class="diagram-column-row diagram-column-row-${tone}" data-diagram-column="${escapeHtml(column.name)}" data-diagram-column-y="${y}">
-      <title>${escapeHtml(`${role} ${column.name}${target}`)}</title>
+      <title>${escapeHtml(`${role} ${column.name}${titleType}${target}`)}</title>
       <rect class="diagram-column-row-bg" x="10" y="${y - 14}" width="${rowWidth}" height="18" rx="6"></rect>
-      <text class="diagram-column-name" x="${nameX}" y="${y - 2}">${escapeHtml(displayName)}</text>
       ${diagramColumnIconSvg(column, iconX, y)}
-      ${typeLabel ? `<text class="diagram-column-type" x="${typeX}" y="${y - 2}" text-anchor="end">${escapeHtml(truncateMiddle(typeLabel, 12))}</text>` : ""}
+      <text class="diagram-column-name" x="${nameX}" y="${y - 2}">${escapeHtml(displayName)}</text>
+      ${typeLabel ? `<text class="diagram-column-type" x="${typeX}" y="${y - 2}">${escapeHtml(truncateMiddle(typeLabel, 12))}</text>` : ""}
     </g>
   `;
 }

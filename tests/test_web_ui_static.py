@@ -416,6 +416,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "diagramColumnIconSvg",
         "diagramKeyIconSvg",
         "diagramLinkIconSvg",
+        "const rightLimit",
+        "titleType",
         "renderDiagramColumnList",
         "handleDiagramSelectionEvent",
         "renderDiagramInspector",
