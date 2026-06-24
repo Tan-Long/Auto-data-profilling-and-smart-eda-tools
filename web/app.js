@@ -577,7 +577,6 @@ async function checkRunnerHealth() {
   }
   renderAll();
   if (state.runnerAvailable) {
-    await loadRunHistory();
     if (state.flowMode === "evaluate") {
       await loadEvaluationCatalog();
     }
@@ -705,7 +704,6 @@ async function pollEvaluationJob(jobId) {
       await loadEvaluationArtifacts(payload);
       state.evaluationLoadingJobId = "";
       renderEvaluationMessage("Evaluation complete. Comparison Summary is ready.", "success");
-      await loadRunHistory({ preferredJobId: payload.job_id });
       renderEvaluation();
       return;
     }
@@ -971,7 +969,6 @@ function connectEventStream(eventsUrl) {
           : state.currentJob.error || "Run failed.",
         state.currentJob.status === "succeeded" ? "success" : "error",
       );
-      loadRunHistory({ preferredJobId: state.currentJob.job_id });
       if (state.currentJob.status === "succeeded") {
         loadDashboard(state.currentJob.job_id)
           .then(() => setProfileStep("review"))
@@ -1606,7 +1603,7 @@ function profileStepGuard(step) {
   }
   return {
     allowed: false,
-    message: "Review generated quality gates, issues, todos, reports, and run history.",
+    message: "Review generated quality gates, issues, todos, reports, and table readiness.",
   };
 }
 
@@ -1636,7 +1633,7 @@ function canOpenProfileStep(step) {
     return buildPreflightReview().runAllowed;
   }
   if (step === "review") {
-    return profileRunComplete() || Boolean(state.dashboardArtifactIndex) || state.runHistory.length > 0;
+    return profileRunComplete() || Boolean(state.dashboardArtifactIndex);
   }
   return false;
 }

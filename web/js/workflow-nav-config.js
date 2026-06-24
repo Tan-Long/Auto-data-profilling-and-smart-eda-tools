@@ -42,9 +42,8 @@ window.VSF_WORKFLOW_NAV_CONFIG = {
       number: "04",
       label: "Review",
       detail: "Gates, issues, todos, reports",
-      target: "runHistory",
+      target: "qualityGates",
       substeps: [
-        { target: "runHistory", label: "Run History", detail: "Select prior run and timeline" },
         { target: "qualityGates", label: "Quality Gates", detail: "Can run, trust, and share" },
         { target: "dashboardPanelGrid", label: "Review Issues", detail: "Table -> Column -> Issue" },
         { target: "todos", label: "Todos", detail: "Fix data and verify after fix" },

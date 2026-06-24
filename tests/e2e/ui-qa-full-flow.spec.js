@@ -304,28 +304,15 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       await screenshot(page.locator("#dashboard"), "12-dashboard-without-developer-surfaces.png"),
     );
 
-    await page.reload();
-    await page.locator("#profileFlowButton").click();
-    await expect(page.locator('[data-profile-step-card="review"]')).toHaveAttribute("aria-disabled", "false", {
-      timeout: 10_000,
-    });
-    await page.locator('[data-profile-step-card="review"]').click();
-    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
-    await expect(page.locator("#runHistoryStatus")).toContainText("History ready", {
-      timeout: 10_000,
-    });
-    await page.locator("[data-run-history-job-id]").first().click();
-    await expect(page.locator("#dashboardStatusBadge")).toContainText("succeeded dashboard", {
-      timeout: 20_000,
-    });
-    await expect(page.locator("#selectedRunTimelineStatus")).toContainText("7 stages");
-    await expect(page.locator("#selectedRunTimeline")).not.toContainText("influence_analysis");
+    await expect(page.locator("#runHistory")).toBeHidden();
+    await expect(page.locator("#workflowNav")).not.toContainText("Run History");
+    await expect(page.locator("#workflowNav")).not.toContainText("Previous runs");
     record(
       matrix,
-      "Run history reload",
-      "A clean reload can select a persisted run and restore dashboard/timeline state.",
-      "History listed generated runs; selecting one restored the succeeded dashboard and 8-stage timeline.",
-      await screenshot(page.locator("#runHistory"), "13-run-history-reload.png"),
+      "Run history removed from demo",
+      "The post-run review surface does not expose Previous runs during demos.",
+      "Run history stayed hidden while quality gates, issues, todos, and reports remained usable.",
+      await screenshot(page.locator("#dashboard"), "13-run-history-hidden.png"),
     );
 
     const rawCsvArtifactRequests = artifactRequests.filter(

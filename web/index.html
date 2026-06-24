@@ -307,34 +307,12 @@
         </div>
       </section>
 
-      <section class="panel run-history-panel" id="runHistory" data-profile-step-section="review" aria-labelledby="runHistoryTitle">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">Persisted runs</p>
-            <h3 id="runHistoryTitle">Run History</h3>
-          </div>
-          <span class="badge" id="runHistoryStatus">Loading</span>
-        </div>
-        <div class="run-history-layout">
-          <div class="run-history-column">
-            <div class="runtime-heading">
-              <strong>Previous runs</strong>
-              <span id="runHistoryCount">0 runs</span>
-            </div>
-            <div class="run-history-list" id="runHistoryList">
-              <p class="muted">Run history loads from <code>outputs/web_runs</code> when the local backend is available.</p>
-            </div>
-          </div>
-          <div class="run-history-column">
-            <div class="runtime-heading">
-              <strong>Selected Stage Timeline</strong>
-              <span id="selectedRunTimelineStatus">No selection</span>
-            </div>
-            <div class="selected-run-timeline" id="selectedRunTimeline">
-              <p class="muted">Select a run to inspect stage status, duration, and failure or skip details.</p>
-            </div>
-          </div>
-        </div>
+      <section id="runHistory" hidden aria-hidden="true">
+        <span id="runHistoryStatus">Hidden</span>
+        <span id="runHistoryCount">0 runs</span>
+        <div id="runHistoryList"></div>
+        <span id="selectedRunTimelineStatus">No selection</span>
+        <div id="selectedRunTimeline"></div>
       </section>
 
       <section class="panel dashboard-panel" id="dashboard" data-profile-step-section="review">

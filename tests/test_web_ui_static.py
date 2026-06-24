@@ -129,8 +129,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="runHistoryStatus"',
         'id="selectedRunTimeline"',
         'id="selectedRunTimelineStatus"',
-        "Run History",
-        "Selected Stage Timeline",
         'id="dashboard"',
         'id="dashboardPanelGrid"',
         'aria-label="Review Issues by table and column"',
@@ -180,6 +178,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     ]
     for marker in required_html:
         assert marker in html
+    assert "Previous runs" not in html
+    assert "Run History" not in html
+    assert "Select prior run and timeline" not in js
 
     forbidden_html = [
         'id="databaseRunnerForm"',

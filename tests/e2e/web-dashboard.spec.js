@@ -432,46 +432,15 @@ test("local path run renders the interactive dashboard from generated artifacts"
     fullPage: true,
   });
   await reportPage.close();
-  fs.mkdirSync("outputs/us073_goal8", { recursive: true });
-  await expect(page.locator("#runHistoryStatus")).toContainText("History ready", {
-    timeout: 10_000,
-  });
-  await expect(page.locator("#runHistoryList")).toContainText("12 issues");
-  await expect(page.locator("#runHistoryList")).toContainText("7 stages");
-  await expect(page.locator("#selectedRunTimelineStatus")).toContainText("7 stages");
-  await expect(page.locator("#selectedRunTimeline")).not.toContainText("influence_analysis");
-
-  await page.reload();
-  await expect(page.locator("#flowChooser")).toBeVisible();
-  await page.locator("#profileFlowButton").click();
-  await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
-  await expect(page.locator('[data-profile-step-card="review"]')).toHaveAttribute("aria-disabled", "false", {
-    timeout: 10_000,
-  });
-  await page.locator('[data-profile-step-card="review"]').click();
-  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
-  await expect(page.locator("#runHistoryStatus")).toContainText("History ready", {
-    timeout: 10_000,
-  });
-  await expect(page.locator("#runHistoryList")).toContainText("12 issues");
-  await expect(page.locator("#runHistoryList")).toContainText("gates");
-  await page.locator("#runHistory").scrollIntoViewIfNeeded();
-  await page.locator("#runHistory").screenshot({
-    path: "outputs/us073_goal8/run-history-after-refresh.png",
-  });
-  await page.locator("[data-run-history-job-id]").first().click();
+  await expect(page.locator("#runHistory")).toBeHidden();
+  await expect(page.locator("#workflowNav")).not.toContainText("Run History");
+  await expect(page.locator("#workflowNav")).not.toContainText("Previous runs");
   await expect(page.locator("#dashboardStatusBadge")).toContainText("succeeded dashboard", {
     timeout: 20_000,
   });
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#qualityGatesStatus")).toContainText("source=deterministic");
   await expect(page.locator("#todosStatus")).toContainText("grouped todos");
-  await expect(page.locator("#selectedRunTimelineStatus")).toContainText("7 stages");
-  await expect(page.locator("#selectedRunTimeline")).toContainText("Parse DBML schema");
-  await expect(page.locator("#selectedRunTimeline")).not.toContainText("Run influence analysis");
-  await page.locator("#selectedRunTimeline").screenshot({
-    path: "outputs/us073_goal8/selected-run-stage-timeline.png",
-  });
   fs.mkdirSync("outputs/us073_goal4", { recursive: true });
   await page.locator("#dashboard").scrollIntoViewIfNeeded();
   await page.locator("#dashboard").screenshot({
