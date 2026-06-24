@@ -16,6 +16,7 @@
       --border-subtle: #e3e8e4;
       --border-default: #cfd8d2;
       --accent: #0f7664;
+      --accent-soft: rgba(15, 118, 100, 0.1);
       --success: #23764d;
       --warning: #9a5f00;
       --destructive: #b23b32;
@@ -26,48 +27,68 @@
       margin: 0;
       background: var(--surface-canvas);
       color: var(--foreground-primary);
-      font: 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 15px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+    main { width: min(1200px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 56px; }
     header, section {
       margin-bottom: 16px;
       padding: 18px;
       border: 1px solid var(--border-default);
       border-radius: 12px;
       background: var(--surface-panel);
+      box-shadow: 0 1px 0 rgba(18, 24, 23, 0.04);
     }
     h1, h2, h3, p { margin-top: 0; }
-    h1 { margin-bottom: 8px; font-size: 32px; line-height: 1.08; letter-spacing: 0; }
-    h2 { margin-bottom: 12px; font-size: 20px; line-height: 1.2; }
-    h3 { margin: 18px 0 8px; font-size: 15px; }
+    h1 { margin-bottom: 8px; font-size: 34px; line-height: 1.05; letter-spacing: 0; }
+    h2 { margin-bottom: 12px; font-size: 21px; line-height: 1.2; }
+    h3 { margin: 0 0 8px; font-size: 15px; }
     a { color: var(--accent); font-weight: 800; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
-    .eyebrow { margin-bottom: 6px; color: var(--foreground-tertiary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .eyebrow { margin-bottom: 6px; color: var(--foreground-tertiary); font-size: 12px; font-weight: 900; text-transform: uppercase; }
     .muted { color: var(--foreground-secondary); }
-    .answer-grid, .summary-grid, .artifact-grid {
+    .hero-grid, .answer-grid, .visual-grid, .fix-grid, .report-metric-grid, .artifact-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
-    .answer-card, .metric-card, .artifact-link {
+    .hero-grid { grid-template-columns: 1.15fr repeat(3, minmax(150px, 0.55fr)); align-items: stretch; }
+    .hero-title { min-width: 0; }
+    .metric-card, .answer-card, .chart-card, .fix-card, .mini-card, .artifact-link, .todo-block {
       min-width: 0;
       padding: 12px;
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
       background: var(--surface-overlay);
     }
-    .answer-card strong, .metric-card strong { display: block; font-size: 22px; line-height: 1.05; overflow-wrap: anywhere; }
-    .answer-card span, .metric-card span {
+    .metric-card strong {
+      display: block;
+      font-size: 27px;
+      line-height: 1;
+      overflow-wrap: anywhere;
+    }
+    .metric-card span, .answer-card span, .chart-card > span, .fix-meta span, .mini-card span {
       color: var(--foreground-tertiary);
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 900;
       text-transform: uppercase;
     }
-    .answer-card p, .metric-card p { margin: 6px 0 0; color: var(--foreground-secondary); font-size: 12px; }
-    .answer-card.Blocked { border-left: 4px solid var(--destructive); }
-    .answer-card.Clean { border-left: 4px solid var(--success); }
-    .answer-card.Needs { border-left: 4px solid var(--warning); }
-    .answer-card.Usable { border-left: 4px solid var(--warning); }
+    .metric-card p, .answer-card p, .mini-card p, .fix-card p {
+      margin: 6px 0 0;
+      color: var(--foreground-secondary);
+      font-size: 13px;
+    }
+    .answer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .answer-card strong { display: block; margin-top: 2px; font-size: 22px; line-height: 1.1; }
+    .visual-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .chart-card { display: grid; gap: 9px; background: var(--surface-panel); }
+    .bar-list { display: grid; gap: 7px; }
+    .bar-row { display: grid; grid-template-columns: minmax(118px, 0.58fr) minmax(90px, 1fr) minmax(44px, auto); gap: 8px; align-items: center; }
+    .bar-label { min-width: 0; color: var(--foreground-primary); font-weight: 800; overflow-wrap: anywhere; }
+    .bar-track { height: 10px; border-radius: 999px; background: var(--surface-inset); overflow: hidden; }
+    .bar-fill { height: 100%; min-width: 3px; border-radius: 999px; background: var(--accent); }
+    .bar-fill.warn { background: var(--warning); }
+    .bar-fill.danger { background: var(--destructive); }
+    .bar-value { color: var(--foreground-secondary); font: 800 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: right; }
+    .chart-empty { margin: 0; padding: 10px; border: 1px dashed var(--border-default); border-radius: 8px; color: var(--foreground-secondary); background: var(--surface-overlay); }
     .pill {
       display: inline-flex;
       min-height: 24px;
@@ -76,113 +97,226 @@
       border: 1px solid var(--border-default);
       border-radius: 999px;
       background: var(--surface-panel);
-      font: 800 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font: 900 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       white-space: nowrap;
     }
     .P0, .P1, .Blocked, .NOT_READY, .failed, .invalid { color: var(--destructive); border-color: rgba(178, 59, 50, 0.35); }
     .P2, .Needs, .WARN, .warning { color: var(--warning); border-color: rgba(154, 95, 0, 0.35); }
     .P3, .Clean, .READY, .valid, .completed { color: var(--success); border-color: rgba(35, 118, 77, 0.35); }
+    .report-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .mini-card strong { display: block; margin-top: 2px; font-size: 18px; }
+    .table-wrap { overflow-x: auto; }
     table { width: 100%; border: 1px solid var(--border-default); border-collapse: collapse; background: var(--surface-panel); }
     th, td { padding: 8px 9px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
-    th { background: var(--surface-inset); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; text-transform: uppercase; }
-    .table-wrap { overflow-x: auto; }
-    .plan-card, .todo-block {
-      margin-top: 10px;
-      padding: 12px;
+    th { background: var(--surface-inset); color: var(--foreground-secondary); font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .fix-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .fix-card { display: grid; gap: 10px; border-left: 4px solid var(--destructive); background: var(--surface-panel); }
+    .fix-card.P2, .fix-card.P3 { border-left-color: var(--warning); }
+    .fix-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: flex-start; }
+    .fix-head h3 { margin: 0; font-size: 17px; }
+    .fix-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+    .fix-meta code { padding: 2px 6px; border-radius: 6px; background: var(--surface-inset); }
+    .sample-table { font-size: 12px; }
+    .sample-table th, .sample-table td { padding: 6px; }
+    .sample-link { font-size: 12px; }
+    .sample-preview {
+      margin-top: 2px;
+      padding: 8px 10px;
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
       background: var(--surface-overlay);
     }
-    .plan-card summary {
+    .sample-preview > summary {
       cursor: pointer;
-      font-weight: 800;
-      color: var(--foreground-primary);
+      font-size: 13px;
+      font-weight: 900;
     }
-    .plan-card summary:focus-visible {
-      outline: 3px solid rgba(15, 118, 100, 0.28);
-      outline-offset: 3px;
-    }
-    .plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .todo-stack { display: grid; gap: 10px; }
+    .sample-preview > summary:focus-visible { outline: 3px solid rgba(15, 118, 100, 0.28); outline-offset: 3px; }
     .checklist { margin: 0; padding-left: 18px; }
     .checklist li + li { margin-top: 4px; }
-    .artifact-link { display: grid; gap: 3px; text-decoration: none; }
+    details.report-details {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--surface-overlay);
+    }
+    details.report-details > summary { cursor: pointer; font-weight: 900; }
+    details.report-details > summary:focus-visible { outline: 3px solid rgba(15, 118, 100, 0.28); outline-offset: 3px; }
+    .todo-stack { display: grid; gap: 10px; }
+    .artifact-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .artifact-link { display: grid; gap: 3px; color: var(--foreground-primary); text-decoration: none; }
     .artifact-link code { color: var(--foreground-tertiary); overflow-wrap: anywhere; }
-    @media (max-width: 880px) {
-      main { width: min(100% - 20px, 1180px); padding-top: 12px; }
-      .answer-grid, .summary-grid, .artifact-grid, .plan-grid { grid-template-columns: 1fr; }
+    @media (max-width: 900px) {
+      main { width: min(100% - 20px, 1200px); padding-top: 12px; }
+      .hero-grid, .answer-grid, .visual-grid, .fix-grid, .report-metric-grid, .artifact-grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: minmax(0, 1fr); }
+      .bar-value { text-align: left; }
     }
   </style>
 </head>
 <body>
   <main>
     <header>
-      <p class="eyebrow">VSF Data Profiler</p>
-      <h1>Data Quality Report</h1>
-      <p class="muted">Deterministic CSV+DBML report generated from structured local artifacts.</p>
-      <div class="summary-grid" aria-label="Run summary metrics">
-        <article class="metric-card"><span>Readiness</span><strong>{{ fixed_report.run_summary.readiness }}</strong><p>risk {{ fixed_report.run_summary.risk_score }}</p></article>
-        <article class="metric-card"><span>Issues</span><strong>{{ fixed_report.run_summary.issue_count }}</strong><p>{{ fixed_report.run_summary.p0_p1_count }} P0/P1 blockers</p></article>
-        <article class="metric-card"><span>Tables</span><strong>{{ fixed_report.run_summary.table_count }}</strong><p>{{ fixed_report.run_summary.row_count }} rows · {{ fixed_report.run_summary.column_count }} columns</p></article>
+      <div class="hero-grid">
+        <div class="hero-title">
+          <p class="eyebrow">VSF Data Profiler</p>
+          <h1>Data Quality Report</h1>
+          <p class="muted">Visual CSV+DBML readiness report generated from deterministic local artifacts.</p>
+        </div>
+        <article class="metric-card"><span>Can use dataset?</span><strong>{{ visual_report.verdict }}</strong><p>Risk {{ visual_report.risk_score }}/100</p></article>
+        <article class="metric-card"><span>Issues</span><strong>{{ visual_report.issue_count }}</strong><p>{{ visual_report.p0_p1_count }} P0/P1 blockers</p></article>
+        <article class="metric-card"><span>Scope</span><strong>{{ visual_report.table_count }}</strong><p>{{ visual_report.table_count }} tables · {{ visual_report.column_count }} columns</p></article>
       </div>
     </header>
 
     <section id="run-summary">
       <h2>Run Summary</h2>
       <div class="answer-grid">
-        <article class="answer-card {{ fixed_report.run_summary.can_run_analysis.status | replace(' ', '-') }}">
+        <article class="answer-card {{ visual_report.can_run_analysis.status | replace(' ', '-') }}">
           <span>Can this dataset run analysis?</span>
-          <strong>{{ fixed_report.run_summary.can_run_analysis.answer or "Needs review." }}</strong>
-          <p>{{ fixed_report.run_summary.can_run_analysis.explanation or "Gate evidence was unavailable." }}</p>
+          <strong>{{ visual_report.can_run_analysis.answer or "Needs review." }}</strong>
+          <p>{{ visual_report.can_run_analysis.explanation or "Gate evidence was unavailable." }}</p>
         </article>
-        <article class="answer-card {{ fixed_report.run_summary.can_trust_joins.status | replace(' ', '-') }}">
+        <article class="answer-card {{ visual_report.can_trust_joins.status | replace(' ', '-') }}">
           <span>Can joins be trusted?</span>
-          <strong>{{ fixed_report.run_summary.can_trust_joins.answer or "Needs review." }}</strong>
-          <p>{{ fixed_report.run_summary.can_trust_joins.explanation or "Gate evidence was unavailable." }}</p>
+          <strong>{{ visual_report.can_trust_joins.answer or "Needs review." }}</strong>
+          <p>{{ visual_report.can_trust_joins.explanation or "Gate evidence was unavailable." }}</p>
         </article>
         <article class="answer-card">
-          <span>Preflight review</span>
-          <strong>{{ fixed_report.run_summary.preflight_status }}</strong>
-          <p>{{ fixed_report.run_summary.preflight_message }}</p>
+          <span>Fix first</span>
+          <strong>{{ visual_report.p0_p1_count }} blockers</strong>
+          <p>Start with the issue cards below. They show table, column, bad rows, sample rows, and first fix.</p>
         </article>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Run ID</th><th>Status</th><th>Duration seconds</th><th>Tables</th><th>Columns</th><th>Rows</th></tr></thead>
-          <tbody><tr><td><code>{{ fixed_report.run_summary.run_id or "unknown" }}</code></td><td>{{ fixed_report.run_summary.status }}</td><td>{{ fixed_report.run_summary.duration_seconds or "unknown" }}</td><td>{{ fixed_report.run_summary.table_count }}</td><td>{{ fixed_report.run_summary.column_count }}</td><td>{{ fixed_report.run_summary.row_count }}</td></tr></tbody>
-        </table>
+      <div class="report-metric-grid" style="margin-top: 10px;">
+        <article class="mini-card"><span>Run status</span><strong>{{ fixed_report.run_summary.status }}</strong><p>{{ fixed_report.run_summary.duration_seconds or "unknown" }} seconds</p></article>
+        <article class="mini-card"><span>Rows checked</span><strong>{{ fixed_report.run_summary.row_count }}</strong><p>Across {{ fixed_report.run_summary.table_count }} tables</p></article>
+        <article class="mini-card"><span>Preflight</span><strong>{{ fixed_report.run_summary.preflight_status }}</strong><p>{{ fixed_report.run_summary.preflight_message }}</p></article>
+        <article class="mini-card"><span>Run ID</span><strong><code>{{ fixed_report.run_summary.run_id or "unknown" }}</code></strong><p>Local deterministic run</p></article>
+      </div>
+    </section>
+
+    <section id="visual-overview">
+      <h2>Where are the problems?</h2>
+      <div class="visual-grid">
+        <article class="chart-card">
+          <span>Issue severity</span>
+          <div class="bar-list">
+            {% for row in visual_report.severity_chart %}
+            <div class="bar-row"><div class="bar-label">{{ row.severity }}</div><div class="bar-track"><div class="bar-fill {{ 'danger' if row.severity in ['P0','P1'] else 'warn' }}" style="width: {{ row.bar_width_pct }}%"></div></div><div class="bar-value">{{ row.count }}</div></div>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="chart-card">
+          <span>Issue types</span>
+          <div class="bar-list">
+            {% for row in visual_report.issue_type_chart %}
+            <div class="bar-row"><div class="bar-label">{{ row.issue_type }}</div><div class="bar-track"><div class="bar-fill danger" style="width: {{ row.bar_width_pct }}%"></div></div><div class="bar-value">{{ row.count }}</div></div>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="chart-card">
+          <span>Missing values by column</span>
+          {% if visual_report.missingness_chart %}
+          <div class="bar-list">
+            {% for row in visual_report.missingness_chart %}
+            <div class="bar-row"><div class="bar-label">{{ row.field }}</div><div class="bar-track"><div class="bar-fill warn" style="width: {{ row.bar_width_pct }}%"></div></div><div class="bar-value">{{ row.null_rate | pct }}</div></div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="chart-empty">No missing-value columns were detected in the chart evidence.</p>
+          {% endif %}
+        </article>
+        <article class="chart-card">
+          <span>Outliers by column</span>
+          {% if visual_report.outlier_chart %}
+          <div class="bar-list">
+            {% for row in visual_report.outlier_chart %}
+            <div class="bar-row"><div class="bar-label">{{ row.field }}</div><div class="bar-track"><div class="bar-fill warn" style="width: {{ row.bar_width_pct }}%"></div></div><div class="bar-value">{{ row.outlier_count }}</div></div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="chart-empty">No IQR outlier columns were detected for this run.</p>
+          {% endif %}
+        </article>
+      </div>
+    </section>
+
+    <section id="fix-first">
+      <h2>What should be fixed first?</h2>
+      <div class="fix-grid">
+        {% for card in visual_report.top_fix_cards %}
+        <article class="fix-card {{ card.severity }}">
+          <div class="fix-head">
+            <div>
+              <h3>{{ card.issue_label }}</h3>
+              <p><code>{{ card.field }}</code></p>
+            </div>
+            <span class="pill {{ card.severity }}">{{ card.severity }}</span>
+          </div>
+          <div class="fix-meta">
+            <code>{{ card.issue_id }}</code>
+            <code>{{ card.category }}</code>
+            <code>{{ card.bad_count }}/{{ card.total_count }} rows</code>
+            <code>{{ card.bad_rate_text }}</code>
+          </div>
+          <p><strong>Why it matters:</strong> {{ card.why_it_matters }}</p>
+          <p><strong>First fix:</strong> {{ card.fix }}</p>
+          <p><strong>Verify:</strong> {{ card.verify }}</p>
+          {% if card.sample_preview.available %}
+          <details class="sample-preview">
+            <summary>Sample row preview</summary>
+            <p class="sample-link"><strong>Sample rows:</strong> <a href="{{ card.sample_preview.path }}">{{ card.sample_preview.path }}</a></p>
+            <div class="table-wrap">
+              <table class="sample-table">
+                <thead><tr>{% for header in card.sample_preview.headers %}<th>{{ header }}</th>{% endfor %}</tr></thead>
+                <tbody>
+                  {% for row in card.sample_preview.rows %}
+                  <tr>{% for header in card.sample_preview.headers %}<td>{{ row[header] }}</td>{% endfor %}</tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </details>
+          {% else %}
+          <p class="muted">Sample rows were not available for this issue.</p>
+          {% endif %}
+        </article>
+        {% endfor %}
       </div>
     </section>
 
     <section id="quality-gates">
       <h2>Quality Gates</h2>
       {% if fixed_report.quality_gates.available %}
-      <p class="muted">Source: deterministic. Blocked gates: {{ fixed_report.quality_gates.summary.blocked_count or 0 }} of {{ fixed_report.quality_gates.summary.gate_count or fixed_report.quality_gates.gates|length }}.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Gate</th><th>Status</th><th>Answer</th><th>Explanation</th><th>Next action</th></tr></thead>
-          <tbody>
-            {% for gate in fixed_report.quality_gates.gates %}
-            <tr><td>{{ gate.label }}</td><td><span class="pill {{ gate.status }}">{{ gate.status }}</span></td><td>{{ fixed_report.quality_gates.answers[gate.gate_id].answer }}</td><td>{{ gate.explanation }}</td><td>{{ gate.recommended_next_action.label if gate.recommended_next_action else "" }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="answer-grid">
+        {% for gate in fixed_report.quality_gates.gates %}
+        <article class="answer-card {{ gate.status | replace(' ', '-') }}">
+          <span>{{ gate.label }}</span>
+          <strong>{{ gate.status }}</strong>
+          <p>{{ fixed_report.quality_gates.answers[gate.gate_id].answer }} {{ gate.explanation }}</p>
+        </article>
+        {% endfor %}
       </div>
-      {% for gate in fixed_report.quality_gates.gates %}
-      <h3>{{ gate.label }} Evidence Values</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Label</th><th>Raw value</th><th>Meaning</th></tr></thead>
-          <tbody>
-            {% for value in gate.evidence_values %}
-            <tr><td>{{ value.label }}</td><td>{{ value.raw_value }}</td><td>{{ value.meaning }}</td></tr>
-            {% else %}
-            <tr><td>none</td><td>none</td><td>No evidence values were present for this gate.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% endfor %}
+      <details class="report-details">
+        <summary>Gate evidence values</summary>
+        {% for gate in fixed_report.quality_gates.gates %}
+        <h3>{{ gate.label }}</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Label</th><th>Raw value</th><th>Meaning</th></tr></thead>
+            <tbody>
+              {% for value in gate.evidence_values %}
+              <tr><td>{{ value.label }}</td><td>{{ value.raw_value }}</td><td>{{ value.meaning }}</td></tr>
+              {% else %}
+              <tr><td>none</td><td>none</td><td>No evidence values were present for this gate.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+      </details>
       {% else %}
       <p>{{ fixed_report.quality_gates.message }}</p>
       {% endif %}
@@ -191,16 +325,29 @@
     <section id="table-overview">
       <h2>Table Overview</h2>
       {% if fixed_report.table_overview.available %}
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Rows</th><th>Columns</th><th>Issues</th><th>Relationship risks</th><th>Affected columns</th><th>First fix step</th></tr></thead>
-          <tbody>
-            {% for row in fixed_report.table_overview.rows %}
-            <tr><td><code>{{ row.table }}</code></td><td>{{ row.role }}</td><td><span class="pill {{ row.readiness }}">{{ row.readiness }}</span></td><td>{{ row.health_score }}</td><td>{{ row.row_count }}</td><td>{{ row.column_count }}</td><td>{{ row.issue_total }}</td><td>{{ row.relationship_risk_count }}</td><td>{{ row.affected_columns_text }}</td><td>{{ row.next_step }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="visual-grid">
+        {% for row in visual_report.table_hotspots %}
+        <article class="chart-card">
+          <span>{{ row.table }}</span>
+          <h3><span class="pill {{ row.readiness }}">{{ row.readiness }}</span> {{ row.health_score }} health</h3>
+          <div class="bar-row"><div class="bar-label">issues</div><div class="bar-track"><div class="bar-fill danger" style="width: {{ row.bar_width_pct }}%"></div></div><div class="bar-value">{{ row.issue_total }}</div></div>
+          <p class="muted">{{ row.affected_columns_text }} · {{ row.relationship_risk_count }} relationship risks</p>
+        </article>
+        {% endfor %}
       </div>
+      <details class="report-details">
+        <summary>Table overview details</summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Rows</th><th>Columns</th><th>Issues</th><th>Relationship risks</th><th>Affected columns</th><th>First fix step</th></tr></thead>
+            <tbody>
+              {% for row in fixed_report.table_overview.rows %}
+              <tr><td><code>{{ row.table }}</code></td><td>{{ row.role }}</td><td><span class="pill {{ row.readiness }}">{{ row.readiness }}</span></td><td>{{ row.health_score }}</td><td>{{ row.row_count }}</td><td>{{ row.column_count }}</td><td>{{ row.issue_total }}</td><td>{{ row.relationship_risk_count }}</td><td>{{ row.affected_columns_text }}</td><td>{{ row.next_step }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
       {% else %}
       <p>Table overview is unavailable because table profile evidence was missing.</p>
       {% endif %}
@@ -211,10 +358,10 @@
       {% if fixed_report.column_issue_matrix.rows %}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Field</th><th>Status</th><th>Issue</th><th>Severity</th><th>Bad rows</th><th>Meaning</th><th>What should be fixed?</th></tr></thead>
+          <thead><tr><th>Table</th><th>Column</th><th>Status</th><th>Issue</th><th>Bad rows</th><th>Sample</th><th>What should be fixed?</th></tr></thead>
           <tbody>
-            {% for row in fixed_report.column_issue_matrix.rows %}
-            <tr><td><code>{{ row.field }}</code></td><td>{{ row.status }}</td><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td><span class="pill {{ row.severity }}">{{ row.severity }}</span></td><td>{{ row.bad_rows }}</td><td>{{ row.meaning }}</td><td>{{ row.fix }}</td></tr>
+            {% for row in visual_report.column_issue_rows %}
+            <tr><td><code>{{ row.table }}</code></td><td><code>{{ row.column }}</code></td><td><span class="pill {{ row.status }}">{{ row.status }}</span></td><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td>{{ row.bad_rows }}</td><td>{% if row.sample %}<a href="{{ row.sample }}">sample rows</a>{% else %}none{% endif %}</td><td>{{ row.fix }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -228,49 +375,23 @@
       <h2>Issue Action Plans</h2>
       {% if fixed_report.issue_action_plans.available and fixed_report.issue_action_plans.summary_rows %}
       <p class="muted">Plans: {{ fixed_report.issue_action_plans.summary.plan_count }} · human review: {{ fixed_report.issue_action_plans.summary.human_review_count }} · average actionability: {{ fixed_report.issue_action_plans.summary.average_actionability_score }}/100.</p>
-      <p class="muted">Main report expands the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans. Full deterministic action-plan evidence remains in <code>{{ fixed_report.issue_action_plans.path }}</code>.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Issue</th><th>Priority</th><th>Table</th><th>Columns</th><th>First fix</th><th>First verification</th><th>Metrics</th></tr></thead>
-          <tbody>
-            {% for row in fixed_report.issue_action_plans.summary_rows %}
-            <tr><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td>{{ row.priority }}</td><td><code>{{ row.table }}</code></td><td>{{ row.columns }}</td><td>{{ row.first_fix }}</td><td>{{ row.first_verify }}</td><td>coverage {{ row.evidence_coverage }}/100 · actionability {{ row.actionability }}/100</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      <p class="muted">Main report expands the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans as visual fix cards above. Full deterministic action-plan evidence remains in <code>{{ fixed_report.issue_action_plans.path }}</code>.</p>
       {% if fixed_report.issue_action_plans.remaining_count > 0 %}
       <p class="muted">{{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in <code>{{ fixed_report.issue_action_plans.path }}</code> and the todo exports.</p>
       {% endif %}
-      {% for plan in fixed_report.issue_action_plans.display_plans %}
-      <details class="plan-card">
-        <summary>{{ plan.issue_id }} {{ plan.issue_type }} · {{ plan.priority }}</summary>
-        <p><strong>Finding:</strong> {{ plan.finding_summary }}</p>
-        <p><strong>Source:</strong> {{ plan.source }} · <strong>Table:</strong> <code>{{ plan.table }}</code></p>
-        <h3>Finding Values</h3>
+      <details class="report-details">
+        <summary>Action plan table</summary>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Finding value</th><th>Raw value</th><th>Meaning</th></tr></thead>
+            <thead><tr><th>Issue</th><th>Priority</th><th>Table</th><th>Columns</th><th>First fix</th><th>First verification</th><th>Metrics</th></tr></thead>
             <tbody>
-              {% for value in plan.evidence_values %}
-              <tr><td>{{ value.label }}</td><td>{{ value.raw_value }}</td><td>{{ value.meaning }}</td></tr>
-              {% else %}
-              <tr><td>none</td><td>none</td><td>No finding values were available.</td></tr>
+              {% for row in fixed_report.issue_action_plans.summary_rows %}
+              <tr><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td>{{ row.priority }}</td><td><code>{{ row.table }}</code></td><td>{{ row.columns }}</td><td>{{ row.first_fix }}</td><td>{{ row.first_verify }}</td><td>coverage {{ row.evidence_coverage }}/100 · actionability {{ row.actionability }}/100</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-        {% if plan.hidden_evidence_value_count > 0 %}
-        <p class="muted">{{ plan.hidden_evidence_value_count }} additional finding values are available in <code>{{ fixed_report.issue_action_plans.path }}</code>.</p>
-        {% endif %}
-        <div class="plan-grid">
-          <div><h3>Fix data checklist</h3><ul class="checklist">{% for item in plan.fix_data_checklist %}<li>{{ item }}</li>{% else %}<li>No deterministic fix checklist was generated.</li>{% endfor %}</ul></div>
-          <div><h3>Verify after fix checklist</h3><ul class="checklist">{% for item in plan.verify_after_fix_checklist %}<li>{{ item }}</li>{% else %}<li>No deterministic verification checklist was generated.</li>{% endfor %}</ul></div>
-          <div><h3>Guidelines</h3><ul class="checklist">{% for item in plan.guidelines %}<li>{{ item }}</li>{% else %}<li>No deterministic guidelines were generated.</li>{% endfor %}</ul></div>
-          <div><h3>Metrics</h3><p>Evidence coverage: {{ plan.evidence_coverage.score }}/100. {{ plan.evidence_coverage.explanation }}</p><p>Actionability: {{ plan.actionability_score.score }}/100. {{ plan.actionability_score.explanation }}</p></div>
-        </div>
       </details>
-      {% endfor %}
       {% else %}
       <p>{{ fixed_report.issue_action_plans.message }}</p>
       {% endif %}
@@ -279,7 +400,6 @@
     <section id="todos">
       <h2>Todos</h2>
       {% if fixed_report.todos.available %}
-      <p class="muted">Todo groups: {{ fixed_report.todos.summary.todo_group_count }} · Fix data: {{ fixed_report.todos.summary.fix_data_group_count }} · Verify after fix: {{ fixed_report.todos.summary.verify_after_fix_group_count }}.</p>
       <p class="muted">This report shows the first {{ fixed_report.todos.display_limit }} todo groups per type. Full grouped todos remain in <code>{{ fixed_report.todos.path }}</code>.</p>
       <div class="todo-stack">
         <article class="todo-block">
@@ -317,35 +437,17 @@
     <section id="developer-artifacts">
       <h2>Developer Artifacts</h2>
       <p class="muted">Raw JSON and runtime artifacts are listed here for debugging and package compatibility. Normal report reading should use the sections above.</p>
-      {% if connector_metadata.available or lineage_graph.available or schema_evaluation.available or relationship_graph.available or execution_flow.available %}
-      <article class="report-card">
-        <h3>Developer Evidence Summary</h3>
+      <details class="report-details">
+        <summary>Developer evidence summary</summary>
         <ul class="checklist">
-          {% if connector_metadata.available %}
-          <li><strong>Connector Metadata</strong>: {{ connector_metadata.source_type }} source; tables={{ connector_metadata.table_count }}; raw_extracts_persisted={{ connector_metadata.raw_extracts_persisted }}; secrets_redacted={{ connector_metadata.secrets_redacted }} (<code>{{ connector_metadata.path }}</code>)</li>
-          {% endif %}
-          {% if lineage_graph.available %}
-          <li><strong>Developer Runtime Context</strong>: {{ lineage_graph.artifact_count }} artifacts, {{ lineage_graph.stage_count }} stages, {{ lineage_graph.edge_count }} edges (<code>{{ lineage_graph.path }}</code>)</li>
-          {% endif %}
-          {% if schema_evaluation.available %}
-          <li><strong>Schema Mapping Summary</strong>: mapped={{ schema_evaluation.mapped_table_count }}, missing={{ schema_evaluation.missing_table_count }}, methods={{ schema_evaluation.mapping_method_counts_text }} (<code>{{ schema_evaluation.path }}</code>)</li>
-          {% endif %}
-          {% if relationship_graph.available %}
-          <li><strong>Relationship Cardinality Summary</strong>: {{ relationship_graph.cardinality_counts_text }}; junction tables={{ relationship_graph.junction_tables_text }} (<code>{{ relationship_graph.path }}</code>)</li>
-          {% endif %}
-          {% if execution_flow.available %}
-          <li><strong>Execution Flow</strong>: {{ execution_flow.stages|length }} stages; status={{ execution_flow.status }} (<code>run_summary.json</code>, <code>run_events.jsonl</code>)</li>
-          {% endif %}
+          {% if connector_metadata.available %}<li><strong>Connector Metadata</strong>: {{ connector_metadata.source_type }} source; tables={{ connector_metadata.table_count }}; raw_extracts_persisted={{ connector_metadata.raw_extracts_persisted }}; secrets_redacted={{ connector_metadata.secrets_redacted }} (<code>{{ connector_metadata.path }}</code>)</li>{% endif %}
+          {% if lineage_graph.available %}<li><strong>Developer Runtime Context</strong>: {{ lineage_graph.artifact_count }} artifacts, {{ lineage_graph.stage_count }} stages, {{ lineage_graph.edge_count }} edges (<code>{{ lineage_graph.path }}</code>)</li>{% endif %}
+          {% if schema_evaluation.available %}<li><strong>Schema Mapping Summary</strong>: mapped={{ schema_evaluation.mapped_table_count }}, missing={{ schema_evaluation.missing_table_count }}, methods={{ schema_evaluation.mapping_method_counts_text }} (<code>{{ schema_evaluation.path }}</code>)</li>{% endif %}
+          {% if relationship_graph.available %}<li><strong>Relationship Cardinality Summary</strong>: {{ relationship_graph.cardinality_counts_text }}; junction tables={{ relationship_graph.junction_tables_text }} (<code>{{ relationship_graph.path }}</code>)</li>{% endif %}
+          {% if execution_flow.available %}<li><strong>Execution Flow</strong>: {{ execution_flow.stages|length }} stages; status={{ execution_flow.status }} (<code>run_summary.json</code>, <code>run_events.jsonl</code>)</li>{% endif %}
+          {% if l4_report.available %}<li><strong>Compatibility LLM Guardrail Artifact</strong>: status={{ l4_report.status }}; provider={{ l4_report.provider }}{% if l4_report.model %}; model={{ l4_report.model }}{% endif %}{% if l4_report.fallback_reason %}; fallback={{ l4_report.fallback_reason }}{% endif %}</li>{% endif %}
         </ul>
-      </article>
-      {% endif %}
-      {% if l4_report.available %}
-      <article class="report-card">
-        <h3>Compatibility LLM Guardrail Artifact</h3>
-        <p>LLM guardrail status: <strong>{{ l4_report.status }}</strong> · provider={{ l4_report.provider }}{% if l4_report.model %} · model={{ l4_report.model }}{% endif %}{% if l4_report.fallback_reason %} · fallback={{ l4_report.fallback_reason }}{% endif %}</p>
-        <p class="muted">Optional compatibility LLM report artifacts: <code>{{ l4_report.path }}</code>{% if l4_report.guardrail_path %}, <code>{{ l4_report.guardrail_path }}</code>{% endif %}.</p>
-      </article>
-      {% endif %}
+      </details>
       <div class="artifact-grid">
         {% for artifact in fixed_report.developer_artifacts.artifacts %}
         <a class="artifact-link" href="{{ artifact.path }}"><strong>{{ artifact.name }}</strong><code>{{ artifact.path }}</code></a>

@@ -1,56 +1,88 @@
 # VSF Data Quality Report
 
-Deterministic CSV+DBML data-quality report generated from structured VSF artifacts.
+Visual CSV+DBML readiness report generated from deterministic local artifacts.
 
 ## Run Summary
 
-| Signal | Value |
-| --- | --- |
-| Run ID | `{{ fixed_report.run_summary.run_id or "unknown" }}` |
-| Run status | {{ fixed_report.run_summary.status }} |
-| Runtime seconds | {{ fixed_report.run_summary.duration_seconds or "unknown" }} |
-| Readiness | {{ fixed_report.run_summary.readiness }} |
-| Risk score | {{ fixed_report.run_summary.risk_score }} |
-| Tables | {{ fixed_report.run_summary.table_count }} |
-| Columns | {{ fixed_report.run_summary.column_count }} |
-| Rows | {{ fixed_report.run_summary.row_count }} |
-| Issues | {{ fixed_report.run_summary.issue_count }} |
-| P0/P1 blockers | {{ fixed_report.run_summary.p0_p1_count }} |
-| Preflight review | {{ fixed_report.run_summary.preflight_status }} |
+| Question | Answer | Evidence |
+| --- | --- | --- |
+| Can this dataset be used? | {{ visual_report.verdict }} | risk {{ visual_report.risk_score }}/100 |
+| How many issues? | {{ visual_report.issue_count }} | {{ visual_report.p0_p1_count }} P0/P1 blockers |
+| What was checked? | {{ visual_report.table_count }} tables | {{ visual_report.row_count }} rows, {{ visual_report.column_count }} columns |
+| Can this dataset run analysis? | {{ visual_report.can_run_analysis.answer or "Needs review." }} | {{ visual_report.can_run_analysis.explanation or "Gate evidence was unavailable." }} |
+| Can joins be trusted? | {{ visual_report.can_trust_joins.answer or "Needs review." }} | {{ visual_report.can_trust_joins.explanation or "Gate evidence was unavailable." }} |
 
-{% if fixed_report.run_summary.can_run_analysis %}
-**Can this dataset run analysis?** {{ fixed_report.run_summary.can_run_analysis.answer }} {{ fixed_report.run_summary.can_run_analysis.explanation }}
+Run status: {{ fixed_report.run_summary.status }}. Runtime seconds: {{ fixed_report.run_summary.duration_seconds or "unknown" }}. Preflight: {{ fixed_report.run_summary.preflight_status }}.
 
-**Can joins be trusted?** {{ fixed_report.run_summary.can_trust_joins.answer }} {{ fixed_report.run_summary.can_trust_joins.explanation }}
-{% else %}
-Run readiness answers are partial because quality gate evidence was not available.
+## Visual Overview
+
+### Issue severity
+
+{% for row in visual_report.severity_chart -%}
+- **{{ row.severity }}**: {{ row.count }} {{ row.bar_text }}
+{% endfor %}
+
+### Issue types
+
+{% for row in visual_report.issue_type_chart -%}
+- **{{ row.issue_type }}**: {{ row.count }} {{ row.bar_text }}
+{% endfor %}
+
+### Missing values
+
+{% if visual_report.missingness_chart -%}
+{% for row in visual_report.missingness_chart -%}
+- **{{ row.field }}**: {{ row.null_count }} missing rows ({{ row.null_rate | pct }})
+{% endfor %}
+{% else -%}
+- No missing-value columns were detected in the chart evidence.
 {% endif %}
 
-{{ fixed_report.run_summary.preflight_message }}
+### Outliers
+
+{% if visual_report.outlier_chart -%}
+{% for row in visual_report.outlier_chart -%}
+- **{{ row.field }}**: {{ row.outlier_count }} IQR outliers
+{% endfor %}
+{% else -%}
+- No IQR outlier columns were detected for this run.
+{% endif %}
+
+## What Should Be Fixed First?
+
+{% for card in visual_report.top_fix_cards %}
+### {{ card.issue_id }} {{ card.issue_label }}
+
+- Severity: {{ card.severity }}
+- Category: {{ card.category }}
+- Where: {{ card.field }}
+- Bad rows: {{ card.bad_count }}/{{ card.total_count }} ({{ card.bad_rate_text }})
+- Sample rows: {{ "`" ~ card.sample_bad_rows_path ~ "`" if card.sample_bad_rows_path else "not available" }}
+- Why it matters: {{ card.why_it_matters }}
+- Fix data: {{ card.fix }}
+- Verify after fix: {{ card.verify }}
+
+{% if card.sample_preview.available -%}
+Sample row preview:
+
+| {% for header in card.sample_preview.headers %}{{ header }}{% if not loop.last %} | {% endif %}{% endfor %} |
+| {% for header in card.sample_preview.headers %}---{% if not loop.last %} | {% endif %}{% endfor %} |
+{% for row in card.sample_preview.rows -%}
+| {% for header in card.sample_preview.headers %}{{ row[header] }}{% if not loop.last %} | {% endif %}{% endfor %} |
+{% endfor %}
+{% endif %}
+
+{% endfor %}
 
 ## Quality Gates
 
 {% if fixed_report.quality_gates.available -%}
 Source: deterministic. Gate count: {{ fixed_report.quality_gates.summary.gate_count or fixed_report.quality_gates.gates|length }}. Blocked: {{ fixed_report.quality_gates.summary.blocked_count or 0 }}.
 
-| Gate | Status | Answer | Explanation | Next action |
-| --- | --- | --- | --- | --- |
+| Gate | Status | Answer | Next action |
+| --- | --- | --- | --- |
 {% for gate in fixed_report.quality_gates.gates -%}
-| {{ gate.label }} | {{ gate.status }} | {{ fixed_report.quality_gates.answers[gate.gate_id].answer }} | {{ gate.explanation }} | {{ gate.recommended_next_action.label if gate.recommended_next_action else "" }} |
-{% endfor %}
-
-### Gate Evidence Values
-
-{% for gate in fixed_report.quality_gates.gates %}
-#### {{ gate.label }}
-
-| Label | Raw value | Meaning |
-| --- | --- | --- |
-{% for value in gate.evidence_values -%}
-| {{ value.label }} | {{ value.raw_value }} | {{ value.meaning }} |
-{% else -%}
-| none | none | No evidence values were present for this gate. |
-{% endfor %}
+| {{ gate.label }} | {{ gate.status }} | {{ fixed_report.quality_gates.answers[gate.gate_id].answer }} | {{ gate.recommended_next_action.label if gate.recommended_next_action else "" }} |
 {% endfor %}
 {% else -%}
 {{ fixed_report.quality_gates.message }}
@@ -61,10 +93,10 @@ Source: deterministic. Gate count: {{ fixed_report.quality_gates.summary.gate_co
 {% if fixed_report.table_overview.available -%}
 Tables: {{ fixed_report.table_overview.summary.table_count }}. Not ready: {{ fixed_report.table_overview.summary.not_ready_count }}. Warnings: {{ fixed_report.table_overview.summary.warn_count }}. Ready: {{ fixed_report.table_overview.summary.ready_count }}.
 
-| Table | Role | Readiness | Health | Rows | Columns | Issues | Relationship risks | Affected columns | First fix step |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| Table | Readiness | Health | Issues | Affected columns | First fix step |
+| --- | --- | ---: | ---: | --- | --- |
 {% for row in fixed_report.table_overview.rows -%}
-| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.health_score }} | {{ row.row_count }} | {{ row.column_count }} | {{ row.issue_total }} | {{ row.relationship_risk_count }} | {{ row.affected_columns_text }} | {{ row.next_step }} |
+| {{ row.table }} | {{ row.readiness }} | {{ row.health_score }} | {{ row.issue_total }} | {{ row.affected_columns_text }} | {{ row.next_step }} |
 {% endfor %}
 {% else -%}
 Table overview is unavailable because table profile evidence was missing.
@@ -73,10 +105,10 @@ Table overview is unavailable because table profile evidence was missing.
 ## Column Issue Matrix
 
 {% if fixed_report.column_issue_matrix.rows -%}
-| Field | Status | Issue | Severity | Bad rows | Meaning | What should be fixed? |
+| Table | Column | Status | Issue | Bad rows | Sample | Fix |
 | --- | --- | --- | --- | ---: | --- | --- |
-{% for row in fixed_report.column_issue_matrix.rows -%}
-| {{ row.field }} | {{ row.status }} | {{ row.issue_id }} {{ row.issue_type }} | {{ row.severity }} | {{ row.bad_rows }} | {{ row.meaning }} | {{ row.fix }} |
+{% for row in visual_report.column_issue_rows -%}
+| {{ row.table }} | {{ row.column }} | {{ row.status }} | {{ row.issue_id }} {{ row.issue_type }} | {{ row.bad_rows }} | {{ row.sample or "none" }} | {{ row.fix }} |
 {% endfor %}
 {% else -%}
 No column or table issues were generated for this run.
@@ -87,75 +119,11 @@ No column or table issues were generated for this run.
 {% if fixed_report.issue_action_plans.available and fixed_report.issue_action_plans.summary_rows -%}
 Plans: {{ fixed_report.issue_action_plans.summary.plan_count }}. Human review required: {{ fixed_report.issue_action_plans.summary.human_review_count }}. Average actionability: {{ fixed_report.issue_action_plans.summary.average_actionability_score }}/100.
 
-Main report expands the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans. Full deterministic action-plan evidence remains in `{{ fixed_report.issue_action_plans.path }}`.
-
-| Issue | Priority | Table | Columns | First fix | First verification | Metrics |
-| --- | --- | --- | --- | --- | --- | --- |
-{% for row in fixed_report.issue_action_plans.summary_rows -%}
-| {{ row.issue_id }} {{ row.issue_type }} | {{ row.priority }} | {{ row.table }} | {{ row.columns }} | {{ row.first_fix }} | {{ row.first_verify }} | coverage {{ row.evidence_coverage }}/100; actionability {{ row.actionability }}/100 |
-{% endfor %}
+Main report shows the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans as visual fix cards above. Full deterministic action-plan evidence remains in `{{ fixed_report.issue_action_plans.path }}`.
 
 {% if fixed_report.issue_action_plans.remaining_count > 0 -%}
 {{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in `{{ fixed_report.issue_action_plans.path }}` and the todo exports.
 {% endif %}
-
-### Expanded action plans
-
-{% for plan in fixed_report.issue_action_plans.display_plans %}
-#### {{ plan.issue_id }} {{ plan.issue_type }}
-
-- Priority: {{ plan.priority }}
-- Source: {{ plan.source }}
-- Table: {{ plan.table }}
-- Columns: {{ plan.columns | join(", ") if plan.columns else "table-level" }}
-- Finding: {{ plan.finding_summary }}
-- Human review: {{ "required" if plan.human_review_required else "not required" }}{% if plan.human_review_reason %} ({{ plan.human_review_reason }}){% endif %}
-
-##### Finding Values
-
-| Label | Raw value | Meaning |
-| --- | --- | --- |
-{% for value in plan.evidence_values -%}
-| {{ value.label }} | {{ value.raw_value }} | {{ value.meaning }} |
-{% else -%}
-| none | none | No finding values were available. |
-{% endfor %}
-{% if plan.hidden_evidence_value_count > 0 -%}
-
-{{ plan.hidden_evidence_value_count }} additional finding values are available in `{{ fixed_report.issue_action_plans.path }}`.
-{% endif %}
-
-##### Fix data checklist
-
-{% for item in plan.fix_data_checklist -%}
-- {{ item }}
-{% else -%}
-- No deterministic fix checklist was generated.
-{% endfor %}
-
-##### Verify after fix checklist
-
-{% for item in plan.verify_after_fix_checklist -%}
-- {{ item }}
-{% else -%}
-- No deterministic verification checklist was generated.
-{% endfor %}
-
-##### Guidelines
-
-{% for item in plan.guidelines -%}
-- {{ item }}
-{% else -%}
-- No deterministic guidelines were generated.
-{% endfor %}
-
-##### Metrics
-
-| Metric | Value | Explanation |
-| --- | --- | --- |
-| Evidence coverage | {{ plan.evidence_coverage.score }}/100 | {{ plan.evidence_coverage.explanation }} |
-| Actionability | {{ plan.actionability_score.score }}/100 | {{ plan.actionability_score.explanation }} |
-{% endfor %}
 {% else -%}
 {{ fixed_report.issue_action_plans.message }}
 {% endif %}
@@ -163,14 +131,12 @@ Main report expands the first {{ fixed_report.issue_action_plans.display_limit }
 ## Todos
 
 {% if fixed_report.todos.available -%}
-Todo groups: {{ fixed_report.todos.summary.todo_group_count }}. Fix data: {{ fixed_report.todos.summary.fix_data_group_count }}. Verify after fix: {{ fixed_report.todos.summary.verify_after_fix_group_count }}.
-
 This report shows the first {{ fixed_report.todos.display_limit }} todo groups per type. Full grouped todos remain in `{{ fixed_report.todos.path }}`.
 
 ### Fix data
 
 {% for group in fixed_report.todos.fix_display_groups -%}
-- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}; priorities: {{ group.priorities | join(", ") }})
+- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})
 {% else -%}
 - No Fix data todos were generated.
 {% endfor %}
@@ -181,7 +147,7 @@ This report shows the first {{ fixed_report.todos.display_limit }} todo groups p
 ### Verify after fix
 
 {% for group in fixed_report.todos.verify_display_groups -%}
-- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}; priorities: {{ group.priorities | join(", ") }})
+- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})
 {% else -%}
 - No Verify after fix todos were generated.
 {% endfor %}
@@ -196,34 +162,6 @@ This report shows the first {{ fixed_report.todos.display_limit }} todo groups p
 
 Raw JSON and runtime artifacts are listed here for debugging and package compatibility. Normal report reading should use the sections above.
 
-{% if connector_metadata.available or lineage_graph.available or schema_evaluation.available or relationship_graph.available or execution_flow.available -%}
-### Developer Evidence Summary
-
-{% if connector_metadata.available -%}
-- **Connector Metadata**: {{ connector_metadata.source_type }} source; tables={{ connector_metadata.table_count }}; raw_extracts_persisted={{ connector_metadata.raw_extracts_persisted }}; secrets_redacted={{ connector_metadata.secrets_redacted }} (`{{ connector_metadata.path }}`)
-{% endif -%}
-{% if lineage_graph.available -%}
-- **Developer Runtime Context**: {{ lineage_graph.artifact_count }} artifacts, {{ lineage_graph.stage_count }} stages, {{ lineage_graph.edge_count }} edges (`{{ lineage_graph.path }}`)
-{% endif -%}
-{% if schema_evaluation.available -%}
-- **Schema Mapping Summary**: mapped={{ schema_evaluation.mapped_table_count }}, missing={{ schema_evaluation.missing_table_count }}, methods={{ schema_evaluation.mapping_method_counts_text }} (`{{ schema_evaluation.path }}`)
-{% endif -%}
-{% if relationship_graph.available -%}
-- **Relationship Cardinality Summary**: {{ relationship_graph.cardinality_counts_text }}; junction tables={{ relationship_graph.junction_tables_text }} (`{{ relationship_graph.path }}`)
-{% endif -%}
-{% if execution_flow.available -%}
-- **Execution Flow**: {{ execution_flow.stages|length }} stages; status={{ execution_flow.status }} (`run_summary.json`, `run_events.jsonl`)
-{% endif %}
-
-{% endif -%}
-{% if l4_report.available -%}
-### Compatibility LLM Guardrail Artifact
-
-LLM guardrail status: **{{ l4_report.status }}** (provider={{ l4_report.provider }}{% if l4_report.model %}, model={{ l4_report.model }}{% endif %}{% if l4_report.fallback_reason %}, fallback={{ l4_report.fallback_reason }}{% endif %}).
-
-Optional compatibility LLM report artifacts: `{{ l4_report.path }}`{% if l4_report.guardrail_path %}, `{{ l4_report.guardrail_path }}`{% endif %}.
-{% endif %}
-
 | Artifact | Path |
 | --- | --- |
 {% for artifact in fixed_report.developer_artifacts.artifacts -%}
@@ -236,10 +174,6 @@ Optional compatibility LLM report artifacts: `{{ l4_report.path }}`{% if l4_repo
 
 {% if fixed_report.evaluation_summary.available -%}
 Evaluation status: {{ fixed_report.evaluation_summary.status }}
-
-```json
-{{ fixed_report.evaluation_summary.summary }}
-```
 {% else -%}
 {{ fixed_report.evaluation_summary.message }}
 {% endif %}

@@ -194,6 +194,10 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     ]:
         assert section in report_md
         assert section in report_html
+    assert "Visual Overview" in report_md
+    assert "What Should Be Fixed First?" in report_md
+    assert "Where are the problems?" in report_html
+    assert "What should be fixed first?" in report_html
     for answer in [
         "Can this dataset run analysis?",
         "Can joins be trusted?",
@@ -205,24 +209,23 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     ]:
         assert answer in report_md
         assert answer in report_html
-    for action_plan_text in [
-        "Finding Values",
-        "Fix data checklist",
-        "Verify after fix checklist",
-        "Guidelines",
-        "Evidence coverage",
-        "Actionability",
-        "What should be fixed?",
+    for visual_report_text in [
+        "Issue severity",
+        "Issue types",
+        "Missing values",
+        "Outliers",
+        "Sample row preview",
+        "Fix data",
+        "Verify after fix",
     ]:
-        assert action_plan_text in report_md
-        assert action_plan_text in report_html
-    expanded_plan_count = min(5, len(issue_action_plans["plans"]))
-    assert "Main report expands the first 5 highest-priority plans" in report_md
-    assert "Main report expands the first 5 highest-priority plans" in report_html
-    assert "additional plans are available in `issue_action_plans.json`" in report_md
-    assert report_md.count("##### Finding Values") == expanded_plan_count
-    assert report_html.count("<summary>") == expanded_plan_count
-    assert len(report_md.splitlines()) < 550
+        assert visual_report_text in report_md
+        assert visual_report_text in report_html
+    assert report_md.count("Sample row preview:") >= 1
+    assert report_html.count("sample-table") >= 1
+    assert "issue_action_plans.json" in report_md
+    assert "Full deterministic action-plan evidence remains" in report_html
+    assert "issue_action_plans.json" in report_html
+    assert len(report_md.splitlines()) < 360
     assert "Fix data" in report_md
     assert "Verify after fix" in report_md
     assert "This report shows the first 10 todo groups per type" in report_md

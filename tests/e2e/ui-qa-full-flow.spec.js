@@ -301,9 +301,15 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#reportExportMessage")).toContainText("Copied Fix data Markdown.");
     await page.locator('[data-todo-export="verify_after_fix"]').click();
     await expect(page.locator("#reportExportMessage")).toContainText("Copied Verify after fix Markdown.");
+    await expect(page.locator("#reportExport")).toContainText("Report preview");
+    await expect(page.locator("#reportExport")).toContainText("Issue types");
+    await expect(page.locator("#reportExport")).toContainText("Missing values");
     const reportHref = await page.locator('#reportExport a[href*="report.html"]').first().getAttribute("href");
     const reportPage = await context.newPage();
     await reportPage.goto(new URL(reportHref, page.url()).toString());
+    await expect(reportPage.locator("h2", { hasText: "Where are the problems?" })).toBeVisible();
+    await expect(reportPage.locator("h2", { hasText: "What should be fixed first?" })).toBeVisible();
+    await expect(reportPage.getByText("Sample row preview").first()).toBeVisible();
     await expect(reportPage.locator("h2", { hasText: "Quality Gates" })).toBeVisible();
     await expect(reportPage.locator("h2", { hasText: "Issue Action Plans" })).toBeVisible();
     await reportPage.close();

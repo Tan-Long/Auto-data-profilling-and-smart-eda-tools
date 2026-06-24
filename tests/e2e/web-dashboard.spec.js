@@ -551,6 +551,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportExport).toContainText("Verify after fix");
   await expect(reportExport).toContainText("Copy Fix data Markdown");
   await expect(reportExport).toContainText("Copy Verify after fix Markdown");
+  await expect(reportExport).toContainText("Report preview");
+  await expect(reportExport).toContainText("Issue types");
+  await expect(reportExport).toContainText("Missing values");
+  await expect(reportExport.locator('[data-dashboard-kind="issue"]').first()).toBeVisible();
   await reportExport.scrollIntoViewIfNeeded();
   await reportExport.screenshot({
     path: "outputs/us073_goal9/report-export-surface.png",
@@ -562,6 +566,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   const reportPage = await context.newPage();
   await reportPage.goto(new URL(reportHref, page.url()).toString());
   await expect(reportPage.locator("h2", { hasText: "Run Summary" })).toBeVisible();
+  await expect(reportPage.locator("h2", { hasText: "Where are the problems?" })).toBeVisible();
+  await expect(reportPage.locator("h2", { hasText: "What should be fixed first?" })).toBeVisible();
+  await expect(reportPage.getByText("Sample row preview").first()).toBeVisible();
   await expect(reportPage.locator("h2", { hasText: "Quality Gates" })).toBeVisible();
   await expect(reportPage.locator("h2", { hasText: "Column Issue Matrix" })).toBeVisible();
   await expect(reportPage.locator("h2", { hasText: "Issue Action Plans" })).toBeVisible();

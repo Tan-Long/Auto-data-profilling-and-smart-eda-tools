@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+import csv
 import json
 from pathlib import Path
 from typing import Any
@@ -160,6 +161,14 @@ def _build_context(
         ),
         "evaluation_summary": evaluation_context,
     }
+    visual_report = _visual_report_context(
+        out_dir=out_dir,
+        profile=profile,
+        issues=sorted_issues,
+        fixed_report=fixed_report,
+        chart_context=chart_context,
+        action_plans=action_plans_context,
+    )
     return {
         "summary": {
             "table_count": table_count,
@@ -211,6 +220,7 @@ def _build_context(
         "issue_llm_enrichments": issue_enrichments_context,
         "issue_todos": todos_context,
         "fixed_report": fixed_report,
+        "visual_report": visual_report,
         "recommended_actions": _recommended_actions(sorted_issues, verdict_context),
     }
 
@@ -700,6 +710,141 @@ def _fixed_run_summary_context(
         "can_run_analysis": quality_gates.get("answers", {}).get("can_run_analysis", {}),
         "can_trust_joins": quality_gates.get("answers", {}).get("can_trust_joins", {}),
     }
+
+
+def _visual_report_context(
+    *,
+    out_dir: Path,
+    profile: ProfileSummary,
+    issues: list[Issue],
+    fixed_report: dict[str, Any],
+    chart_context: dict[str, Any],
+    action_plans: dict[str, Any],
+) -> dict[str, Any]:
+    run_summary = fixed_report.get("run_summary") or {}
+    table_overview = fixed_report.get("table_overview") or {}
+    column_matrix = fixed_report.get("column_issue_matrix") or {}
+    plan_by_issue = {
+        str(plan.get("issue_id") or ""): plan
+        for plan in action_plans.get("plans", [])
+        if isinstance(plan, dict)
+    }
+    severity_counts = Counter(normalize_severity(issue.severity) for issue in issues)
+    top_fix_cards = [
+        _visual_issue_card(out_dir=out_dir, issue=issue, plan=plan_by_issue.get(issue.issue_id, {}))
+        for issue in issues[:5]
+    ]
+    table_hotspots = []
+    for row in (table_overview.get("rows") or [])[:8]:
+        issue_total = int(row.get("issue_total") or 0)
+        relationship_risks = int(row.get("relationship_risk_count") or 0)
+        table_hotspots.append(
+            {
+                **row,
+                "bar_width_pct": min(100, max(issue_total * 12, relationship_risks * 16, 4)),
+            }
+        )
+    return {
+        "verdict": run_summary.get("readiness", "unknown"),
+        "risk_score": run_summary.get("risk_score", "unknown"),
+        "issue_count": run_summary.get("issue_count", 0),
+        "p0_p1_count": run_summary.get("p0_p1_count", 0),
+        "table_count": run_summary.get("table_count", 0),
+        "column_count": run_summary.get("column_count", 0),
+        "row_count": run_summary.get("row_count", 0),
+        "severity_counts": {
+            severity: severity_counts.get(severity, 0)
+            for severity in SEVERITIES
+        },
+        "issue_type_chart": (chart_context.get("issue_type") or {}).get("data", [])[:8],
+        "severity_chart": (chart_context.get("issue_severity") or {}).get("data", [])[:4],
+        "missingness_chart": [
+            row for row in (chart_context.get("missingness_columns") or {}).get("data", [])
+            if _numeric(row.get("null_count")) > 0
+        ][:6],
+        "outlier_chart": (chart_context.get("outlier_columns") or {}).get("data", [])[:6],
+        "table_hotspots": table_hotspots,
+        "column_issue_rows": (column_matrix.get("rows") or [])[:16],
+        "top_fix_cards": top_fix_cards,
+        "can_run_analysis": run_summary.get("can_run_analysis", {}),
+        "can_trust_joins": run_summary.get("can_trust_joins", {}),
+    }
+
+
+def _visual_issue_card(*, out_dir: Path, issue: Issue, plan: dict[str, Any]) -> dict[str, Any]:
+    sample_preview = _sample_rows_preview(out_dir, issue.sample_bad_rows_path)
+    columns = issue.columns or []
+    return {
+        "issue_id": issue.issue_id,
+        "issue_type": issue.issue_type,
+        "issue_label": _issue_type_label(issue.issue_type),
+        "category": _issue_category(issue.issue_type),
+        "severity": normalize_severity(issue.severity),
+        "table": issue.table,
+        "columns": columns,
+        "field": f"{issue.table}.{', '.join(columns)}" if columns else issue.table,
+        "bad_count": issue.bad_count,
+        "total_count": issue.total_count,
+        "bad_rate": issue.bad_rate,
+        "bad_rate_text": _percent_text(issue.bad_rate),
+        "sample_bad_rows_path": issue.sample_bad_rows_path or "",
+        "sample_preview": sample_preview,
+        "fix": (
+            (plan.get("fix_data_checklist") or [None])[0]
+            or (issue.suggested_fix[0] if issue.suggested_fix else "")
+            or "Review generated evidence and choose a cleanup path."
+        ),
+        "verify": (
+            (plan.get("verify_after_fix_checklist") or [None])[0]
+            or f"Rerun and confirm {issue.issue_id} no longer appears."
+        ),
+        "why_it_matters": _analysis_consequence(issue),
+    }
+
+
+def _sample_rows_preview(out_dir: Path, sample_path: str | None, *, row_limit: int = 3) -> dict[str, Any]:
+    if not sample_path:
+        return {"available": False, "headers": [], "rows": [], "path": ""}
+    path = (out_dir / sample_path).resolve()
+    try:
+        path.relative_to(out_dir.resolve())
+    except ValueError:
+        return {"available": False, "headers": [], "rows": [], "path": sample_path}
+    if not path.is_file():
+        return {"available": False, "headers": [], "rows": [], "path": sample_path}
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            headers = list(reader.fieldnames or [])[:8]
+            rows = [
+                {header: str(row.get(header, ""))[:120] for header in headers}
+                for _, row in zip(range(row_limit), reader)
+            ]
+    except (OSError, csv.Error, UnicodeDecodeError):
+        return {"available": False, "headers": [], "rows": [], "path": sample_path}
+    return {"available": bool(headers), "headers": headers, "rows": rows, "path": sample_path}
+
+
+def _issue_type_label(issue_type: str) -> str:
+    return issue_type.replace("_", " ").title()
+
+
+def _issue_category(issue_type: str) -> str:
+    if issue_type in {"REQUIRED_FIELD_NULL", "PRIMARY_KEY_NULL", "FOREIGN_KEY_NULL", "EMPTY_STRING"}:
+        return "Missing"
+    if issue_type in {"NUMERIC_OUTLIER", "VALUE_OUT_OF_RANGE", "NEGATIVE_VALUE_NOT_ALLOWED"}:
+        return "Outlier / range"
+    if issue_type in RELATIONSHIP_ISSUES:
+        return "Relationship"
+    if issue_type in {"DUPLICATE_PRIMARY_KEY", "UNIQUE_DUPLICATE"}:
+        return "Key uniqueness"
+    if issue_type in {"TYPE_CAST_INVALID", "DATE_ORDER_INVALID", "REGEX_MISMATCH"}:
+        return "Format / type"
+    return "Data quality"
+
+
+def _percent_text(value: Any) -> str:
+    return f"{_numeric(value) * 100:.2f}%"
 
 
 def _scorecard_context(

@@ -473,6 +473,10 @@ els.reportExportTodos.addEventListener("click", async (event) => {
   await handleTodoExport(target);
 });
 
+els.reportExportGrid.addEventListener("click", (event) => {
+  handleDashboardSelectionClick(event);
+});
+
 els.dashboardPanelGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
 });
@@ -3647,7 +3651,8 @@ function renderReportExportSection() {
   }
 
   const reportLinks = renderReportExportLinks();
-  els.reportExportGrid.innerHTML = reportLinks || `
+  const reportPreview = renderReportVisualPreview();
+  els.reportExportGrid.innerHTML = reportLinks ? `${reportPreview}${reportLinks}` : `
     <section class="report-export-empty">
       <strong>Reports are missing.</strong>
       <p>Expected HTML and Markdown reports were not found for this run.</p>
@@ -3722,6 +3727,130 @@ function renderReportExportLinks() {
       </a>
     `;
   }).filter(Boolean).join("");
+}
+
+function renderReportVisualPreview() {
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const issues = getDashboardIssues();
+  const missingSpec = state.dashboardArtifacts[dashboardChartPaths.missingColumns] || {};
+  const outlierSpec = state.dashboardArtifacts[dashboardChartPaths.outliers] || {};
+  const issueTypeRows = topChartRows(
+    state.dashboardArtifacts[dashboardChartPaths.type]?.data || issueTypeCountsForPreview(issues),
+    "issue_type",
+    "count",
+    5,
+  );
+  const missingRows = topChartRows(missingSpec.data || [], "field", "null_count", 4);
+  const outlierRows = topChartRows(outlierSpec.data || [], "field", "outlier_count", 4);
+  const topIssues = issues
+    .slice()
+    .sort((a, b) => (
+      severityRank(a.severity) - severityRank(b.severity) ||
+      Number(b.bad_count || 0) - Number(a.bad_count || 0) ||
+      issueGuid(a).localeCompare(issueGuid(b))
+    ))
+    .slice(0, 4);
+  const issueCount = verdict.issue_counts?.total ?? issues.length;
+  const riskScore = verdict.risk_score ?? verdict.summary?.risk_score;
+  const verdictText = verdict.verdict || verdict.summary?.verdict || "Review required";
+  return `
+    <section class="report-visual-preview" aria-label="Report visual preview">
+      <div class="report-preview-heading">
+        <div>
+          <p class="eyebrow">Report preview</p>
+          <h4>Readable summary before opening the report</h4>
+        </div>
+        <span>${escapeHtml(verdictText)}</span>
+      </div>
+      <div class="report-kpi-strip">
+        <article>
+          <strong>${escapeHtml(verdictText)}</strong>
+          <span>Dataset usability</span>
+        </article>
+        <article>
+          <strong>${integerText(issueCount)}</strong>
+          <span>Issues found</span>
+        </article>
+        <article>
+          <strong>${riskScore === undefined ? "--" : `${integerText(riskScore)}/100`}</strong>
+          <span>Risk score</span>
+        </article>
+        <article>
+          <strong>${integerText(missingRows.length + outlierRows.length)}</strong>
+          <span>Previewed columns</span>
+        </article>
+      </div>
+      <div class="report-preview-grid">
+        ${renderReportPreviewBars("Issue types", issueTypeRows, (row) => issueTypeText(row.label), "No issue counts available yet.")}
+        ${renderReportPreviewBars("Missing values", missingRows, (row) => row.label, "No missing-value columns in the report preview.")}
+        ${renderReportPreviewBars("Outliers", outlierRows, (row) => row.label, "No outlier columns in the report preview.")}
+      </div>
+      <div class="report-fix-preview">
+        <strong>Click a fix card to inspect the exact table, column, evidence, and action plan.</strong>
+        <div class="report-fix-grid">
+          ${topIssues.length ? topIssues.map(renderReportFixPreviewCard).join("") : `<p class="muted">No issue cards are available for this run.</p>`}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function topChartRows(rows, labelKey, valueKey, limit) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      label: String(row[labelKey] || row.label || row.field || "unknown"),
+      value: Number(row[valueKey] ?? row.count ?? row.value ?? 0),
+    }))
+    .filter((row) => row.value > 0)
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .slice(0, limit);
+}
+
+function issueTypeCountsForPreview(issues) {
+  return [...countBy(issues, (issue) => issue.issue_type || "UNKNOWN").entries()]
+    .map(([issue_type, count]) => ({ issue_type, count }));
+}
+
+function renderReportPreviewBars(title, rows, labelFormatter, emptyText) {
+  const maxValue = Math.max(...rows.map((row) => Number(row.value || 0)), 1);
+  return `
+    <article class="report-preview-chart">
+      <div class="report-preview-chart-heading">
+        <strong>${escapeHtml(title)}</strong>
+      </div>
+      ${rows.length ? rows.map((row) => {
+        const width = Math.max(5, Math.round(Number(row.value || 0) / maxValue * 100));
+        return `
+          <div class="report-preview-bar">
+            <span>${escapeHtml(labelFormatter(row))}</span>
+            <span class="report-preview-track" aria-hidden="true">
+              <span style="width: ${width}%"></span>
+            </span>
+            <code>${integerText(row.value)}</code>
+          </div>
+        `;
+      }).join("") : `<p class="muted">${escapeHtml(emptyText)}</p>`}
+    </article>
+  `;
+}
+
+function renderReportFixPreviewCard(issue) {
+  const issueId = issueGuid(issue);
+  const table = issue.table || "Schema / dataset";
+  const column = issuePrimaryColumn(issue);
+  const displayColumn = column === "__table__" ? "table-level" : column;
+  const plan = getIssueActionPlan(issue);
+  const fix = Array.isArray(plan?.fix_data_checklist) && plan.fix_data_checklist.length
+    ? plan.fix_data_checklist[0]
+    : (Array.isArray(issue.suggested_fix) && issue.suggested_fix.length ? issue.suggested_fix[0] : "Review generated evidence and choose the cleanup action.");
+  return `
+    <button class="report-fix-card" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
+      <span class="issue-pill ${issueStatusClass(issueStatus(issue))}">${escapeHtml(issue.severity || "P?")}</span>
+      <strong>${escapeHtml(table)}.${escapeHtml(displayColumn)}</strong>
+      <span>${escapeHtml(issueTypeLabel(issue))}</span>
+      <small>${integerText(issue.bad_count || 0)} rows · ${escapeHtml(fix)}</small>
+    </button>
+  `;
 }
 
 function renderReportExportTodoSummary(title, groups) {
