@@ -1,0 +1,43 @@
+name: Docker local runner smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build local runner image
+        run: docker build -t vsf-profiler-local .
+
+      - name: Run local runner container
+        run: |
+          mkdir -p data outputs
+          docker run --rm -d \
+            --name vsf-profiler-local-smoke \
+            -p 8765:8765 \
+            -v "$PWD/outputs:/app/outputs" \
+            -v "$PWD/data:/app/data" \
+            vsf-profiler-local
+
+      - name: Verify health endpoint
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8765/api/health | tee health.json; then
+              grep -q '"status": "ok"' health.json
+              grep -q '"host": "0.0.0.0"' health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs vsf-profiler-local-smoke
+          exit 1
+
+      - name: Stop local runner container
+        if: always()
+        run: docker stop vsf-profiler-local-smoke || true
