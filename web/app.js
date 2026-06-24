@@ -4,6 +4,7 @@ const state = {
   dbmlFile: null,
   flowMode: "choose",
   profileStep: "connect",
+  profileVisitedSteps: ["connect"],
   activeWorkflowTarget: "flowChooser",
   evaluationCatalog: [],
   evaluationCatalogLoading: false,
@@ -739,12 +740,14 @@ async function pollEvaluationJob(jobId) {
       state.evaluationLoadingJobId = "";
       renderEvaluationMessage("Evaluation complete. Comparison Summary is ready.", "success");
       renderEvaluation();
+      renderSidebarNavigation();
       return;
     }
     if (payload.status === "failed") {
       state.evaluationLoadingJobId = "";
       renderEvaluationMessage(payload.error || "Evaluation run failed.", "error");
       renderEvaluation();
+      renderSidebarNavigation();
       return;
     }
   }
@@ -792,6 +795,7 @@ async function selectRunHistory(jobId) {
     renderJob();
     await loadDashboard(jobId, { force: true });
     state.profileStep = "review";
+    markProfileStepVisited("review");
     renderRunnerMessage(`Loaded run ${jobId} from history.`, "success");
   } catch (error) {
     renderRunnerMessage(error.message || "Unable to load the selected run.", "error");
@@ -802,6 +806,7 @@ async function selectRunHistory(jobId) {
 
 async function startProfilerRun() {
   state.profileStep = "run";
+  markProfileStepVisited("run");
   const preflightReview = buildPreflightReview();
   if (!preflightReview.runAllowed) {
     renderRunnerMessage(preflightGateMessage(preflightReview), "error");
@@ -849,6 +854,7 @@ async function startProfilerRun() {
 
 async function startPathRun() {
   state.profileStep = "run";
+  markProfileStepVisited("run");
   const preflightReview = buildPreflightReview();
   if (!preflightReview.runAllowed) {
     renderRunnerMessage(preflightGateMessage(preflightReview), "error");
@@ -929,6 +935,9 @@ function runnerHostLabel() {
 
 function setFlowMode(mode, options = {}) {
   state.flowMode = ["choose", "profile", "evaluate"].includes(mode) ? mode : "choose";
+  if (state.flowMode === "profile") {
+    markProfileStepVisited(state.profileStep || "connect");
+  }
   state.activeWorkflowTarget = defaultWorkflowTarget();
   if (state.flowMode === "evaluate") {
     loadEvaluationCatalog();
@@ -944,6 +953,7 @@ function setProfileStep(step, options = {}) {
   const nextStep = profileSteps.includes(step) ? step : "connect";
   const changed = state.profileStep !== nextStep;
   state.profileStep = nextStep;
+  markProfileStepVisited(nextStep);
   if (changed) {
     state.activeWorkflowTarget = defaultWorkflowTarget();
   }
@@ -953,6 +963,19 @@ function setProfileStep(step, options = {}) {
   if (changed && options.focus !== false && state.flowMode === "profile") {
     els.profileFlow.scrollIntoView({ block: "start", behavior: "smooth" });
   }
+}
+
+function markProfileStepVisited(step) {
+  if (!profileSteps.includes(step)) {
+    return;
+  }
+  if (!state.profileVisitedSteps.includes(step)) {
+    state.profileVisitedSteps = [...state.profileVisitedSteps, step];
+  }
+}
+
+function resetProfileVisitedSteps(step = "connect") {
+  state.profileVisitedSteps = [profileSteps.includes(step) ? step : "connect"];
 }
 
 function moveProfileStep(direction) {
@@ -1031,6 +1054,11 @@ function loadDemoState(presetName = "small", options = {}) {
   resetRunResultsForInputChange();
   resetDiagramLayoutState();
   state.profileStep = options.preserveStep ? previousProfileStep : "connect";
+  if (!options.preserveStep) {
+    resetProfileVisitedSteps("connect");
+  } else {
+    markProfileStepVisited(state.profileStep);
+  }
   const preset = demoPresets[presetName] || demoPresets.small;
   state.selectedDemoPreset = presetName in demoPresets ? presetName : "small";
   state.dbmlText = preset.dbmlText;
@@ -1062,6 +1090,7 @@ function clearProfileInputs(options = {}) {
   resetRunResultsForInputChange();
   resetDiagramLayoutState();
   state.profileStep = "connect";
+  resetProfileVisitedSteps("connect");
   clearDbmlState();
   state.dbmlFile = null;
   state.csvFiles = [];
@@ -1170,6 +1199,7 @@ async function loadDbmlFile(file) {
   resetRunResultsForInputChange();
   resetDiagramLayoutState();
   state.profileStep = "connect";
+  resetProfileVisitedSteps("connect");
   markCustomUploadSource();
   if (!state.csvFiles.some((csvFile) => csvFile.sourceFile)) {
     state.csvFiles = [];
@@ -1192,6 +1222,7 @@ async function loadCsvFiles(files) {
   resetRunResultsForInputChange();
   resetDiagramLayoutState();
   state.profileStep = "connect";
+  resetProfileVisitedSteps("connect");
   const hasUploadedDbml = Boolean(state.dbmlFile);
   markCustomUploadSource();
   if (!hasUploadedDbml) {
@@ -1302,6 +1333,13 @@ function renderProfileStepper() {
   els.upload.hidden = els.upload.hidden || hideUploadSetup;
   document.querySelectorAll("[data-profile-step-card]").forEach((card) => {
     const cardStep = card.dataset.profileStepCard;
+    const visible = profileStageVisibleForSidebar(cardStep);
+    card.hidden = !visible;
+    if (!visible) {
+      card.tabIndex = -1;
+      card.setAttribute("aria-disabled", "true");
+      return;
+    }
     const cardIndex = profileSteps.indexOf(cardStep);
     const canOpen = canOpenProfileStep(cardStep);
     card.classList.toggle("active", cardStep === currentStep);
@@ -1326,11 +1364,15 @@ function renderSidebarNavigation() {
     return;
   }
   const activeTarget = resolvedWorkflowActiveTarget();
-  els.workflowNav.innerHTML = [
-    renderChooseWorkflowNavItem(activeTarget),
-    renderProfileWorkflowNav(activeTarget),
-    renderEvaluateWorkflowNav(activeTarget),
-  ].join("");
+  if (state.flowMode === "profile") {
+    els.workflowNav.innerHTML = renderProfileWorkflowNav(activeTarget);
+    return;
+  }
+  if (state.flowMode === "evaluate") {
+    els.workflowNav.innerHTML = renderEvaluateWorkflowNav(activeTarget);
+    return;
+  }
+  els.workflowNav.innerHTML = renderChooseWorkflowNavItem(activeTarget);
 }
 
 function renderChooseWorkflowNavItem(activeTarget) {
@@ -1349,10 +1391,11 @@ function renderChooseWorkflowNavItem(activeTarget) {
 }
 
 function renderProfileWorkflowNav(activeTarget) {
+  const visibleStages = profileWorkflowStages.filter((stage) => profileStageVisibleForSidebar(stage.step));
   return `
     <section class="nav-section" aria-label="Profile stages">
       <p class="nav-section-title">Profile flow</p>
-      ${profileWorkflowStages.map((stage) => renderProfileStageNavItem(stage, activeTarget)).join("")}
+      ${visibleStages.map((stage) => renderProfileStageNavItem(stage, activeTarget)).join("")}
     </section>
   `;
 }
@@ -1362,7 +1405,7 @@ function renderProfileStageNavItem(stage, activeTarget) {
   const isCurrent = isProfileFlow && state.profileStep === stage.step;
   const complete = profileStageCompleteForSidebar(stage.step);
   const canOpen = canOpenProfileStepFromSidebar(stage.step);
-  const status = isCurrent ? "Current" : complete ? "Done" : canOpen ? "Ready" : "Locked";
+  const status = isCurrent ? "Current" : complete ? "Done" : "Ready";
   const target = isCurrent ? workflowStageActiveSubtarget(stage, activeTarget) : stage.target;
   const stageClasses = [
     "nav-item",
@@ -1386,6 +1429,13 @@ function renderProfileStageNavItem(stage, activeTarget) {
   `;
 }
 
+function profileStageVisibleForSidebar(step) {
+  if (state.flowMode !== "profile") {
+    return false;
+  }
+  return state.profileStep === step || state.profileVisitedSteps.includes(step);
+}
+
 function renderWorkflowSubsteps(stage, activeTarget) {
   const activeSubtarget = workflowStageActiveSubtarget(stage, activeTarget);
   return `
@@ -1405,7 +1455,8 @@ function renderWorkflowSubsteps(stage, activeTarget) {
 
 function renderEvaluateWorkflowNav(activeTarget) {
   const active = state.flowMode === "evaluate";
-  const activeStep = evaluateWorkflowSteps.some((step) => step.target === activeTarget)
+  const visibleSteps = evaluateWorkflowSteps.filter((step) => evaluateStepVisibleForSidebar(step.target));
+  const activeStep = visibleSteps.some((step) => step.target === activeTarget)
     ? activeTarget
     : "evaluateFlow";
   return `
@@ -1420,7 +1471,7 @@ function renderEvaluateWorkflowNav(activeTarget) {
       </a>
       ${active ? `
         <div class="nav-substep-list" aria-label="Evaluate substeps">
-          ${evaluateWorkflowSteps.map((step) => {
+          ${visibleSteps.map((step) => {
             const stepActive = step.target === activeStep;
             return `
               <a class="nav-subitem ${stepActive ? "active" : ""}" href="#${escapeHtml(step.target)}" data-nav-flow="evaluate" data-workflow-nav-target="${escapeHtml(step.target)}"${stepActive ? ' aria-current="step"' : ""}>
@@ -1433,6 +1484,16 @@ function renderEvaluateWorkflowNav(activeTarget) {
       ` : ""}
     </section>
   `;
+}
+
+function evaluateStepVisibleForSidebar(target) {
+  if (target === "evaluateFlow") {
+    return true;
+  }
+  if (target === "evaluationComparison") {
+    return Boolean(state.evaluationArtifacts["evaluation_summary.json"]);
+  }
+  return false;
 }
 
 function workflowStageActiveSubtarget(stage, activeTarget) {
@@ -1482,7 +1543,7 @@ function resolvedWorkflowActiveTarget() {
 
 function workflowVisibleTargets() {
   if (state.flowMode === "evaluate") {
-    return evaluateWorkflowSteps.map((step) => step.target);
+    return evaluateWorkflowSteps.filter((step) => evaluateStepVisibleForSidebar(step.target)).map((step) => step.target);
   }
   if (state.flowMode === "profile") {
     const stage = activeProfileWorkflowStage();

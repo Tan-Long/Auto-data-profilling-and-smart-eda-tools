@@ -319,7 +319,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     for marker in required_css_tokens:
         assert marker in css
 
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in _css_block(css, ".profile-step-strip")
+    assert "grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));" in _css_block(css, ".profile-step-strip")
 
     required_js = [
         "parseDbml",

@@ -37,6 +37,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page.locator("#evaluateFlowButton").click();
   await expect(page.locator("#evaluateFlow")).toBeVisible();
+  await expect(page.locator("#workflowNav")).toContainText("Evaluate flow");
+  await expect(page.locator("#workflowNav")).toContainText("Dataset catalog");
+  await expect(page.locator("#workflowNav")).not.toContainText("Comparison Summary");
+  await expect(page.locator("#workflowNav")).not.toContainText("Profile flow");
+  await expect(page.locator("#workflowNav")).not.toContainText("Connect");
+  await expect(page.locator("#workflowNav")).not.toContainText("Locked");
   await expect(page.locator("#evaluateFlow")).toContainText("Built-in faulty dataset comparison");
   await expect(page.locator("#evaluationCatalogCount")).toContainText("2 datasets", {
     timeout: 10_000,
@@ -56,6 +62,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
     timeout: 60_000,
   });
   await expect(page.locator("#evaluationComparisonStatus")).toContainText("complete");
+  await expect(page.locator("#workflowNav")).toContainText("Comparison Summary");
   await expect(page.locator("#evaluationSummaryStrip")).toContainText("VSF caught");
   await expect(page.locator("#evaluationExpectedList")).toContainText("caught");
   await expect(page.locator("#evaluationUsefulnessList")).toContainText("Actionability");
@@ -73,6 +80,16 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#profileFlow")).toBeVisible();
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "connect");
   await expect(page.locator("#evaluateFlow")).toBeHidden();
+  await expect(page.locator("#workflowNav")).toContainText("Profile flow");
+  await expect(page.locator("#workflowNav")).toContainText("Connect");
+  await expect(page.locator("#workflowNav")).not.toContainText("Evaluate flow");
+  await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="preflight"]')).toHaveCount(0);
+  await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="run"]')).toHaveCount(0);
+  await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="review"]')).toHaveCount(0);
+  await expect(page.locator('[data-profile-step-card="preflight"]')).toBeHidden();
+  await expect(page.locator('[data-profile-step-card="run"]')).toBeHidden();
+  await expect(page.locator('[data-profile-step-card="review"]')).toBeHidden();
+  await expect(page.locator("#workflowNav")).not.toContainText("Locked");
   fs.mkdirSync("outputs/us073_goal3", { recursive: true });
   await expect(page.locator("#sourceState")).toBeVisible();
   await expect(page.locator("#sourceStateTitle")).toContainText("Source status");
@@ -273,6 +290,14 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator('.mapping-select[data-table="customers"]').selectOption("");
   await page.locator('.mapping-select[data-table="orders"]').selectOption("customers");
   await goToProfileStep(page, "preflight");
+  await expect(page.locator("#workflowNav")).toContainText("Connect");
+  await expect(page.locator("#workflowNav")).toContainText("Preflight Review");
+  await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="run"]')).toHaveCount(0);
+  await expect(page.locator('#workflowNav .nav-stage-item[data-nav-profile-step="review"]')).toHaveCount(0);
+  await expect(page.locator('[data-profile-step-card="preflight"]')).toBeVisible();
+  await expect(page.locator('[data-profile-step-card="run"]')).toBeHidden();
+  await expect(page.locator('[data-profile-step-card="review"]')).toBeHidden();
+  await expect(page.locator("#workflowNav")).not.toContainText("Locked");
   await expect(page.locator("#issues")).toBeVisible();
   await expect(page.locator("#issues")).toContainText("Contract health");
   await expect(page.locator("#mapping")).toBeHidden();

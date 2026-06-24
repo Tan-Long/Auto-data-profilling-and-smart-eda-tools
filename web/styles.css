@@ -699,7 +699,7 @@ h3 {
 }
 
 .profile-step-strip {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
 }
 
 .status-card {
@@ -5665,7 +5665,7 @@ details.runtime-stage-item:focus-within {
   }
 
   .profile-step-strip {
-    grid-template-columns: repeat(4, minmax(156px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
     overflow-x: auto;
     padding-bottom: 4px;
   }
@@ -5834,7 +5834,7 @@ details.runtime-stage-item:focus-within {
   }
 
   .profile-step-strip {
-    grid-template-columns: repeat(4, minmax(132px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   }
 
   .nav-item {
