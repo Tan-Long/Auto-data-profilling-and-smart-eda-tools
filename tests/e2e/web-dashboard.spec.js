@@ -124,10 +124,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   fs.writeFileSync(customCsvPath, "account_id,account_name\nA-1,Example account\n");
   await page.locator("#dbmlInput").setInputFiles(customDbmlPath);
   await expect(page.locator("#sourceStateBadge")).toContainText("Custom upload");
-  await expect(page.locator("#dbmlStatus")).toContainText("accounts.dbml parsed: 1 tables");
+  await expect(page.locator("#dbmlStatus")).toContainText("Source incomplete");
+  await expect(page.locator("#sourceStateDetails")).toContainText("accounts.dbml");
   await page.locator("#csvInput").setInputFiles(customCsvPath);
   await expect(page.locator("#csvList")).toContainText("accounts.csv");
   await expect(page.locator("#csvList")).not.toContainText("customers.csv");
+  await expect(page.locator("#dbmlStatus")).toContainText("Source ready");
   await expect(page.locator("#mappingStatus")).toContainText("1/1 tables mapped");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#runProfilerButton")).toBeDisabled();

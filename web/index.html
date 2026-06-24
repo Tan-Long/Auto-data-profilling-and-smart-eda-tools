@@ -132,32 +132,32 @@
       <section class="status-strip profile-step-strip" aria-label="Profile workflow stages">
         <article class="status-card active" data-profile-step-card="connect" role="button" tabindex="0">
           <span class="step-number">01</span>
-          <div>
+          <div class="status-card-copy">
             <strong>Connect</strong>
-            <p id="dbmlStatus">Waiting for DBML</p>
-            <p id="csvStatus">No CSV files selected</p>
+            <p id="dbmlStatus">Add source</p>
+            <p class="sr-only" id="csvStatus">No CSV files selected</p>
           </div>
         </article>
         <article class="status-card" data-profile-step-card="preflight" role="button" tabindex="-1">
           <span class="step-number">02</span>
-          <div>
+          <div class="status-card-copy">
             <strong>Preflight Review</strong>
-            <p id="preflightStatus">Review required before run</p>
-            <p id="mappingStatus">Run auto-link after upload</p>
+            <p id="preflightStatus">Check blockers</p>
+            <p class="sr-only" id="mappingStatus">Run auto-link after upload</p>
           </div>
         </article>
         <article class="status-card" data-profile-step-card="run" role="button" tabindex="-1">
           <span class="step-number">03</span>
-          <div>
+          <div class="status-card-copy">
             <strong>Run</strong>
-            <p id="runnerStatus">Checking local backend</p>
+            <p id="runnerStatus">Check backend</p>
           </div>
         </article>
         <article class="status-card" data-profile-step-card="review" role="button" tabindex="-1">
           <span class="step-number">04</span>
-          <div>
+          <div class="status-card-copy">
             <strong>Review</strong>
-            <p>Quality gates, issues, todos, reports</p>
+            <p>Inspect results</p>
           </div>
         </article>
       </section>

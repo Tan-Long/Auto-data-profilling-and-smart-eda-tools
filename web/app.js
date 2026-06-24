@@ -1889,15 +1889,13 @@ function renderStatus() {
   const missing = Math.max(state.tables.length - mapped, 0);
   const extra = extraCsvs().length;
   const preflightReview = buildPreflightReview();
-  els.dbmlStatus.textContent = state.tables.length
-    ? `${state.dbmlName || "DBML"} parsed: ${state.tables.length} tables, ${state.relationships.length} relationships`
-    : "Waiting for DBML";
+  els.dbmlStatus.textContent = sourceStageStatusText();
   els.csvStatus.textContent = sourceInventoryText();
-  els.preflightStatus.textContent = preflightStatusText(preflightReview);
+  els.preflightStatus.textContent = compactPreflightStatusText(preflightReview);
   els.mappingStatus.textContent = state.tables.length
     ? `${mapped}/${state.tables.length} tables mapped, ${missing} missing, ${extra} extra`
     : "Run auto-link after upload";
-  els.runnerStatus.textContent = runnerStatusText();
+  els.runnerStatus.textContent = runnerStatusText(preflightReview);
   els.tableCountBadge.textContent = `${state.tables.length} tables`;
   els.csvCountBadge.textContent = `${state.csvFiles.length} CSV`;
   els.mappedMetric.textContent = mapped;
@@ -1957,17 +1955,35 @@ function renderSourceState() {
   els.clearUploadButton.disabled = !(state.dbmlFile || uploadedCsvs.length || state.dbmlText || state.csvFiles.length);
 }
 
-function runnerStatusText() {
+function runnerStatusText(preflightReview = buildPreflightReview()) {
   if (!state.runnerAvailable) {
-    return "Backend unavailable";
+    return "Offline";
   }
   if (state.currentJob?.status) {
-    return `${state.currentJob.status}`;
+    return titleCaseStatus(state.currentJob.status);
   }
-  if (state.runnerMode === "path") {
-    return "Ready for local paths";
+  if (!preflightReview.runAllowed) {
+    return "Locked";
   }
-  return "Ready for uploaded files";
+  return "Ready";
+}
+
+function sourceStageStatusText() {
+  if (profileSourceReady()) {
+    return "Source ready";
+  }
+  if (state.dbmlText || state.csvFiles.length) {
+    return "Source incomplete";
+  }
+  return "Add source";
+}
+
+function titleCaseStatus(status) {
+  return String(status || "ready")
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function sourceInventoryText() {
@@ -2388,6 +2404,16 @@ function preflightStatusText(review) {
     return `${countLabel(review.warnings.length, "warning")} accepted`;
   }
   return "Preflight clean";
+}
+
+function compactPreflightStatusText(review) {
+  if (review.blockers.length) {
+    return countLabel(review.blockers.length, "blocker");
+  }
+  if (review.unreviewedWarningCount) {
+    return countLabel(review.unreviewedWarningCount, "warning");
+  }
+  return "Ready";
 }
 
 function preflightBadgeText(review) {

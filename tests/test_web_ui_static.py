@@ -40,6 +40,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="profileStepBack"',
         'id="profileStepNext"',
         'id="profileStepHint"',
+        "Add source",
+        "Inspect results",
         'data-profile-step-card="connect"',
         'data-profile-step-card="preflight"',
         'data-profile-step-card="run"',
@@ -240,6 +242,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".flow-card",
         ".profile-flow",
         ".profile-step-strip",
+        ".status-card-copy",
+        ".sr-only",
         ".profile-step-footer",
         ".profile-step-actions",
         ".source-state-panel",
@@ -289,6 +293,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     ]
     for marker in required_css_tokens:
         assert marker in css
+
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in _css_block(css, ".profile-step-strip")
 
     required_js = [
         "parseDbml",
@@ -524,6 +530,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "run_events.jsonl" in js
     assert "run_summary.json" in js
     assert "renderRunHistory" in js
+    assert "sourceStageStatusText" in js
+    assert "compactPreflightStatusText" in js
+    assert "titleCaseStatus" in js
     assert "renderSidebarNavigation" in js
     assert "profileStageCompleteForSidebar" in js
     assert "workflowTargetFromViewport" in js
