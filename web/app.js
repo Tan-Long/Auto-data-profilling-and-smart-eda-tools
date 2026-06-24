@@ -51,6 +51,7 @@ const state = {
   diagramExpanded: false,
   diagramShowNonKey: false,
   diagramFit: true,
+  diagramZoom: 1,
   diagramManualPositions: new Map(),
   diagramDrag: null,
   diagramSuppressClick: false,
@@ -213,6 +214,9 @@ const els = {
   diagramSvg: document.querySelector("#diagramSvg"),
   diagramInspector: document.querySelector("#diagramInspector"),
   diagramFitButton: document.querySelector("#diagramFitButton"),
+  diagramZoomOutButton: document.querySelector("#diagramZoomOutButton"),
+  diagramZoomInButton: document.querySelector("#diagramZoomInButton"),
+  diagramZoomValue: document.querySelector("#diagramZoomValue"),
   diagramDensityToggle: document.querySelector("#diagramDensityToggle"),
   diagramColumnsToggle: document.querySelector("#diagramColumnsToggle"),
   diagramResetSelection: document.querySelector("#diagramResetSelection"),
@@ -341,8 +345,19 @@ els.visualizeButton.addEventListener("click", () => {
 
 els.diagramFitButton.addEventListener("click", () => {
   state.diagramFit = !state.diagramFit;
+  if (state.diagramFit) {
+    state.diagramZoom = 1;
+  }
   renderDiagram();
   els.diagramCanvas.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+});
+
+els.diagramZoomOutButton.addEventListener("click", () => {
+  adjustDiagramZoom(-0.15);
+});
+
+els.diagramZoomInButton.addEventListener("click", () => {
+  adjustDiagramZoom(0.15);
 });
 
 els.diagramDensityToggle.addEventListener("click", () => {
@@ -1298,9 +1313,17 @@ function resetRunResultsForInputChange() {
 
 function resetDiagramLayoutState() {
   state.diagramSelection = null;
+  state.diagramFit = true;
+  state.diagramZoom = 1;
   state.diagramManualPositions = new Map();
   state.diagramDrag = null;
   state.diagramSuppressClick = false;
+}
+
+function adjustDiagramZoom(delta) {
+  state.diagramFit = false;
+  state.diagramZoom = Math.max(0.5, Math.min(2, Number((state.diagramZoom + delta).toFixed(2))));
+  renderDiagram();
 }
 
 function markCustomUploadSource() {
@@ -6306,12 +6329,16 @@ function renderDiagram() {
 }
 
 function updateDiagramControls(model) {
+  const disabled = !model.hasInput || Boolean(model.error);
   els.diagramFitButton.setAttribute("aria-pressed", state.diagramFit ? "true" : "false");
+  els.diagramZoomValue.textContent = state.diagramFit ? "Fit" : `${Math.round(state.diagramZoom * 100)}%`;
   els.diagramDensityToggle.setAttribute("aria-pressed", state.diagramExpanded ? "true" : "false");
   els.diagramColumnsToggle.setAttribute("aria-pressed", state.diagramShowNonKey ? "true" : "false");
   els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "Hide full columns" : "Show all columns";
   els.diagramResetSelection.disabled = !state.diagramSelection && state.diagramManualPositions.size === 0;
-  els.diagramFitButton.disabled = !model.hasInput || Boolean(model.error);
+  els.diagramFitButton.disabled = disabled;
+  els.diagramZoomOutButton.disabled = disabled || (!state.diagramFit && state.diagramZoom <= 0.5);
+  els.diagramZoomInButton.disabled = disabled || (!state.diagramFit && state.diagramZoom >= 2);
 }
 
 function buildDiagramModel() {
@@ -6534,8 +6561,9 @@ function drawLocalDiagram(model, layout) {
   els.diagramSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
   els.diagramSvg.classList.toggle("fit", state.diagramFit);
   els.localDiagram.classList.toggle("fit", state.diagramFit);
-  els.diagramSvg.style.width = state.diagramFit ? "100%" : `${layout.width}px`;
-  els.diagramSvg.style.height = state.diagramFit ? "100%" : `${layout.height}px`;
+  const zoom = state.diagramFit ? 1 : state.diagramZoom;
+  els.diagramSvg.style.width = state.diagramFit ? "100%" : `${Math.round(layout.width * zoom)}px`;
+  els.diagramSvg.style.height = state.diagramFit ? "100%" : `${Math.round(layout.height * zoom)}px`;
   els.diagramSvg.innerHTML = `
     <g class="diagram-edges">
       ${model.relationships.map((rel, index) => diagramRelationshipSvg(rel, layout, index)).join("")}

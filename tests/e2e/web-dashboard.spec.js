@@ -20,6 +20,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#evaluateFlowButton")).toContainText("Evaluate tool");
   await expect(page.locator("#profileFlow")).toBeHidden();
   await expect(page.locator("#evaluateFlow")).toBeHidden();
+  const profileFlowBox = await page.locator("#profileFlowCard").boundingBox();
+  const evaluateFlowBox = await page.locator("#evaluateFlowCard").boundingBox();
+  expect(profileFlowBox).toBeTruthy();
+  expect(evaluateFlowBox).toBeTruthy();
+  expect(Math.abs(profileFlowBox.y - evaluateFlowBox.y)).toBeLessThan(12);
+  expect(evaluateFlowBox.x).toBeGreaterThan(profileFlowBox.x + profileFlowBox.width - 4);
   fs.mkdirSync("outputs/us073_goal2", { recursive: true });
   fs.mkdirSync(goal12Dir, { recursive: true });
   await page.locator("#flowChooser").screenshot({
@@ -143,6 +149,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveCount(1);
   await expect(page.locator("#diagramFitButton")).toBeVisible();
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramZoomValue")).toContainText("Fit");
+  await page.locator("#diagramZoomInButton").click();
+  await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramZoomValue")).toContainText("115%");
+  await page.locator("#diagramZoomOutButton").click();
+  await expect(page.locator("#diagramZoomValue")).toContainText("100%");
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramColumnsToggle")).toContainText("Show all columns");

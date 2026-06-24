@@ -308,8 +308,15 @@ h3 {
 .flow-grid,
 .evaluate-flow-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.flow-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.evaluate-flow-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .flow-card {
@@ -952,6 +959,46 @@ h3 {
   border-color: rgba(15, 118, 100, 0.48);
   background: rgba(15, 118, 100, 0.1);
   color: var(--accent-strong);
+}
+
+.diagram-zoom-control {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  overflow: hidden;
+  border: 1px solid rgba(11, 107, 95, 0.35);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.diagram-zoom-control .button {
+  width: auto;
+  min-width: 36px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.diagram-zoom-control .button:first-child {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.diagram-zoom-control .button:last-child {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.diagram-zoom-value {
+  min-width: 52px;
+  padding: 0 8px;
+  color: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
 }
 
 .diagram-warnings {
@@ -4138,6 +4185,7 @@ h3 {
     align-items: stretch;
   }
 
+  .flow-grid,
   .runner-source-switch,
   .llm-mode-switch,
   .database-source-grid,
@@ -4189,6 +4237,16 @@ h3 {
   .diagram-toolbar {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .diagram-zoom-control {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .diagram-zoom-control .button {
+    width: 42px;
+    flex: 0 0 42px;
   }
 
   .diagram-detail-grid {
