@@ -124,6 +124,11 @@ const els = {
   profileDeveloperOptions: document.querySelector("#profileDeveloperOptions"),
   llmModeToggle: document.querySelector("#llmModeToggle"),
   llmModeStatus: document.querySelector("#llmModeStatus"),
+  runSourcePreview: document.querySelector("#runSourcePreview"),
+  runSourceMode: document.querySelector("#runSourceMode"),
+  runSourceDbml: document.querySelector("#runSourceDbml"),
+  runSourceCsvCount: document.querySelector("#runSourceCsvCount"),
+  runSourceCsvList: document.querySelector("#runSourceCsvList"),
   runProfilerButton: document.querySelector("#runProfilerButton"),
   runPathProfilerButton: document.querySelector("#runPathProfilerButton"),
   dbmlPathInput: document.querySelector("#dbmlPathInput"),
@@ -833,7 +838,7 @@ async function startPathRun() {
   const dbmlPath = els.dbmlPathInput.value.trim();
   const csvDir = els.csvDirPathInput.value.trim();
   if (!dbmlPath || !csvDir) {
-    renderRunnerMessage("DBML file path and CSV directory path are required.", "error");
+    renderRunnerMessage("Selected DBML and CSV source are required.", "error");
     return;
   }
 
@@ -852,7 +857,7 @@ async function startPathRun() {
   state.currentJob = { status: "queued", input_mode: "path", artifacts: [] };
   resetDashboardState();
   renderJob();
-  renderRunnerMessage(`Starting local path job on ${runnerHostLabel()}${llmRunSuffix()}...`, "pending");
+  renderRunnerMessage(`Starting local profiler job on ${runnerHostLabel()}${llmRunSuffix()}...`, "pending");
   els.runPathProfilerButton.disabled = true;
 
   try {
@@ -863,13 +868,13 @@ async function startPathRun() {
     });
     const responsePayload = await response.json();
     if (!response.ok) {
-      throw new Error(responsePayload.error || "Backend rejected the local paths.");
+      throw new Error(responsePayload.error || "Backend rejected the selected local source.");
     }
     state.currentJob = responsePayload;
     renderRunnerMessage("Pipeline started. Runtime events are streaming from run_events.jsonl.", "pending");
     connectEventStream(responsePayload.events_url);
   } catch (error) {
-    renderRunnerMessage(error.message || "Unable to start local path run.", "error");
+    renderRunnerMessage(error.message || "Unable to start local profiler run.", "error");
   } finally {
     renderAll();
   }
@@ -888,7 +893,7 @@ function setRunnerMode(mode) {
   }
   const messages = {
     upload: "Start with files uploaded from this browser session.",
-    path: `Start with local paths visible to the ${runnerHostLabel()} runner.`,
+    path: `Start with selected files visible to the ${runnerHostLabel()} runner.`,
   };
   renderRunnerMessage(messages[state.runnerMode], "idle");
   renderAll();
@@ -1018,7 +1023,7 @@ function loadDemoState(presetName = "small", options = {}) {
     renderRunnerMessage(
       options.quickDemo
         ? `${preset.label} DBML + CSV demo is loaded. Continue to Preflight Review.`
-        : `${preset.label} paths are ready for the local runner.`,
+        : `${preset.label} DBML + CSV files are ready for the local runner.`,
       "idle",
     );
   }
@@ -1916,29 +1921,21 @@ function renderSourceState() {
   const preset = runnerUiDemoPresets.has(state.selectedDemoPreset)
     ? demoPresets[state.selectedDemoPreset]
     : null;
-  const modeLabel = {
-    upload: "Upload",
-    path: "Local path",
-  }[state.runnerMode] || "Upload";
-  const dbmlLabel = state.dbmlFile
-    ? state.dbmlFile.name
-    : state.runnerMode === "path" && els.dbmlPathInput.value.trim()
-      ? els.dbmlPathInput.value.trim()
-      : state.dbmlName || "Not selected";
-  const csvLabel = state.runnerMode === "path" && els.csvDirPathInput.value.trim()
-    ? els.csvDirPathInput.value.trim()
-    : state.csvFiles.length
-      ? `${integerText(state.csvFiles.length)} file${state.csvFiles.length === 1 ? "" : "s"}`
+  const dbmlLabel = sourceDbmlDisplayName();
+  const csvLabel = state.csvFiles.length
+    ? `${integerText(state.csvFiles.length)} file${state.csvFiles.length === 1 ? "" : "s"}`
+    : els.csvDirPathInput.value.trim()
+      ? "CSV source selected"
       : "0 files";
   let badge = "No upload";
   let status = "";
   let summary = "Choose sample data or add one DBML contract with related CSV files.";
   if (state.runnerMode === "path") {
-    badge = preset ? "Sample data" : "Custom paths";
+    badge = preset ? "Sample data" : "Selected files";
     status = "ready";
     summary = preset
       ? `${preset.label} DBML + CSV demo is loaded for the local runner.`
-      : "Local path mode will read files visible to the backend process.";
+      : "Local runner will read the selected DBML and CSV source.";
   } else if (state.dbmlFile || uploadedCsvs.length) {
     badge = "Custom upload";
     status = state.dbmlFile && uploadedCsvs.length ? "ready" : "warnings_pending";
@@ -1953,7 +1950,6 @@ function renderSourceState() {
   els.sourceStateDetails.innerHTML = `
     <div><span>DBML</span><strong>${escapeHtml(dbmlLabel)}</strong></div>
     <div><span>CSV</span><strong>${escapeHtml(csvLabel)}</strong></div>
-    <div><span>Run mode</span><strong>${escapeHtml(modeLabel)}</strong></div>
   `;
   els.clearUploadButton.disabled = !(state.dbmlFile || uploadedCsvs.length || state.dbmlText || state.csvFiles.length);
 }
@@ -2170,7 +2166,7 @@ function buildPreflightReview() {
   if (!hasRunDbml) {
     blockers.push(preflightItem(
       "missing_dbml",
-      mode === "upload" ? "Uploaded DBML is missing." : "DBML file path is missing.",
+      mode === "upload" ? "Uploaded DBML is missing." : "Selected DBML source is missing.",
       "Connect a DBML schema before running the profiler.",
     ));
   }
@@ -2184,7 +2180,7 @@ function buildPreflightReview() {
   if (!hasCsvSource) {
     blockers.push(preflightItem(
       "no_csv_source",
-      mode === "upload" ? "Uploaded CSV source is missing." : "Local CSV directory path is missing.",
+      mode === "upload" ? "Uploaded CSV source is missing." : "Selected CSV source is missing.",
       "Connect at least one CSV source before running the profiler.",
     ));
   }
@@ -2512,9 +2508,40 @@ function renderControls() {
   els.runnerModePath.setAttribute("aria-selected", state.runnerMode === "path" ? "true" : "false");
   els.runnerForm.hidden = state.runnerMode !== "upload";
   els.pathRunnerForm.hidden = state.runnerMode !== "path";
-  els.dbmlPathInput.readOnly = true;
-  els.csvDirPathInput.readOnly = true;
+  renderRunSourcePreview(preflightReview);
   renderLlmModeControls();
+}
+
+function renderRunSourcePreview(preflightReview = buildPreflightReview()) {
+  const csvNames = state.csvFiles
+    .map((file) => file.name)
+    .filter(Boolean);
+  const csvCount = csvNames.length;
+  const sourceReady = profileSourceReady();
+  els.runSourceMode.textContent = sourceReady
+    ? preflightReview.runAllowed ? "Ready to run" : "Review warnings"
+    : "Waiting for files";
+  els.runSourceMode.dataset.status = sourceReady ? "ready" : "";
+  els.runSourceDbml.textContent = sourceDbmlDisplayName();
+  els.runSourceCsvCount.textContent = csvCount
+    ? `${integerText(csvCount)} CSV file${csvCount === 1 ? "" : "s"}`
+    : els.csvDirPathInput.value.trim()
+      ? "CSV source selected"
+      : "0 CSV files";
+  els.runSourceCsvList.innerHTML = csvNames.length
+    ? csvNames.map((name) => `<li title="${escapeHtml(name)}">${escapeHtml(name)}</li>`).join("")
+    : '<li class="muted">No CSV files selected</li>';
+}
+
+function sourceDbmlDisplayName() {
+  return state.dbmlName || state.dbmlFile?.name || pathBasename(els.dbmlPathInput.value) || "Not selected";
+}
+
+function pathBasename(path) {
+  return String(path || "")
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .pop() || "";
 }
 
 function renderLlmModeControls() {

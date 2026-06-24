@@ -128,7 +128,13 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="runPathProfilerButton"',
         'id="dbmlPathInput"',
         'id="csvDirPathInput"',
-        'readonly aria-readonly="true"',
+        'type="hidden"',
+        'id="runSourcePreview"',
+        'id="runSourceMode"',
+        'id="runSourceDbml"',
+        'id="runSourceCsvCount"',
+        'id="runSourceCsvList"',
+        "Selected source",
         'id="stageList"',
         'id="artifactList"',
         'id="runHistory"',
@@ -492,6 +498,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     assert "Local CSV path" in primary_source_switch
     assert 'id="llmModeOff"' not in html
     assert 'id="llmModeOpenAI"' not in html
+    assert "DBML file path" not in html
+    assert "CSV directory path" not in html
     assert "Developer DB source" not in primary_source_switch
     assert "Legacy Olist sample" not in primary_source_switch
     assert "Legacy Olist sample" not in html

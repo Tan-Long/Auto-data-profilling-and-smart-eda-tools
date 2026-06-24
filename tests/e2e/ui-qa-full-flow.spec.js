@@ -214,10 +214,16 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
     await expect(page.locator("#rulesPathInput")).toHaveCount(0);
     await expect(page.locator("#pathTargetInput")).toHaveCount(0);
+    await expect(page.locator("#runner")).toContainText("Selected source");
+    await expect(page.locator("#runner")).toContainText("demo_schema.dbml");
+    await expect(page.locator("#runSourceCsvCount")).toContainText("7 CSV files");
+    await expect(page.locator("#runSourceCsvList")).toContainText("orders.csv");
+    await expect(page.locator("#runSourceCsvList")).toContainText("order_payments.csv");
+    await expect(page.locator("#runner")).not.toContainText("data/demo_small");
     await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
-    await expect(page.locator("#dbmlPathInput")).toHaveAttribute("readonly", "");
+    await expect(page.locator("#dbmlPathInput")).toHaveAttribute("type", "hidden");
     await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
-    await expect(page.locator("#csvDirPathInput")).toHaveAttribute("readonly", "");
+    await expect(page.locator("#csvDirPathInput")).toHaveAttribute("type", "hidden");
     await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
     await expect(page.locator("#profileStepNext")).toBeDisabled();
     await expect(page.locator("#runPathProfilerButton")).toBeEnabled();

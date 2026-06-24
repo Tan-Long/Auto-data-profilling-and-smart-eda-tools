@@ -830,7 +830,7 @@ h3 {
 
 .source-state-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -3443,6 +3443,106 @@ h3 {
   background: var(--surface-overlay);
 }
 
+.run-source-preview {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.run-source-heading,
+.run-source-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.run-source-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.run-source-heading strong {
+  min-width: 0;
+  color: var(--foreground-primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.run-source-heading span {
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.run-source-heading span[data-status="ready"] {
+  border-color: rgba(15, 118, 100, 0.28);
+  background: rgba(15, 118, 100, 0.08);
+  color: var(--accent-strong);
+}
+
+.run-source-grid {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+}
+
+.run-source-dbml,
+.run-source-csv {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.run-source-dbml span,
+.run-source-csv > span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.run-source-dbml strong,
+.run-source-csv strong {
+  display: block;
+  min-width: 0;
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.run-source-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-source-files li {
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  color: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .developer-options {
   min-width: 0;
   border: 1px solid var(--border-subtle);
@@ -4674,6 +4774,7 @@ details.runtime-stage-item:focus-within {
 
   .flow-grid,
   .runner-source-switch,
+  .run-source-grid,
   .database-source-grid,
   .flow-card {
     grid-template-columns: 1fr;

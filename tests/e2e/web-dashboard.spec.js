@@ -177,8 +177,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
   await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
   await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
-  await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
-  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
+  await expect(page.locator("#sourceStateDetails")).toContainText("demo_schema.dbml");
+  await expect(page.locator("#sourceStateDetails")).toContainText("7 files");
+  await expect(page.locator("#sourceStateDetails")).not.toContainText("data/demo_small");
   await expect(page.locator("#localDiagram")).toBeVisible();
   await expect(page.locator("#diagramSvg")).toContainText("orders");
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"] [data-diagram-column="order_id"] .diagram-column-icon-key')).toHaveCount(1);
@@ -326,10 +327,16 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#pathRunnerForm")).toBeVisible();
   await expect(page.locator("#demoPresetOlist")).toHaveCount(0);
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
+  await expect(page.locator("#runner")).toContainText("Selected source");
+  await expect(page.locator("#runner")).toContainText("demo_schema.dbml");
+  await expect(page.locator("#runSourceCsvCount")).toContainText("7 CSV files");
+  await expect(page.locator("#runSourceCsvList")).toContainText("orders.csv");
+  await expect(page.locator("#runSourceCsvList")).toContainText("order_items.csv");
+  await expect(page.locator("#runner")).not.toContainText("data/demo_small");
   await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
-  await expect(page.locator("#dbmlPathInput")).toHaveAttribute("readonly", "");
+  await expect(page.locator("#dbmlPathInput")).toHaveAttribute("type", "hidden");
   await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
-  await expect(page.locator("#csvDirPathInput")).toHaveAttribute("readonly", "");
+  await expect(page.locator("#csvDirPathInput")).toHaveAttribute("type", "hidden");
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
@@ -347,8 +354,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
-  await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
-  await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
+  await expect(page.locator("#runSourceDbml")).toContainText("demo_schema.dbml");
+  await expect(page.locator("#runSourceCsvList")).toContainText("orders.csv");
+  await expect(page.locator("#runner")).not.toContainText("data/demo_small");
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
 
   await goToProfileStep(page, "preflight");

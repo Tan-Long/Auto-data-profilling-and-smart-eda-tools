@@ -174,7 +174,6 @@
         <div class="source-state-grid" id="sourceStateDetails" aria-label="Current source details">
           <div><span>DBML</span><strong>Not selected</strong></div>
           <div><span>CSV</span><strong>0 files</strong></div>
-          <div><span>Run mode</span><strong>Upload</strong></div>
         </div>
         <div class="source-state-actions">
           <button class="button primary" id="quickDemoButton" type="button">Use sample DBML + CSV</button>
@@ -253,14 +252,25 @@
             </form>
 
             <form class="runner-form" id="pathRunnerForm" hidden>
-              <label class="field-label" for="dbmlPathInput">
-                DBML file path
-                <input id="dbmlPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/schema.dbml" readonly aria-readonly="true">
-              </label>
-              <label class="field-label" for="csvDirPathInput">
-                CSV directory path
-                <input id="csvDirPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/csv" readonly aria-readonly="true">
-              </label>
+              <input id="dbmlPathInput" type="hidden" value="">
+              <input id="csvDirPathInput" type="hidden" value="">
+              <div class="run-source-preview" id="runSourcePreview" aria-label="Selected DBML and CSV files">
+                <div class="run-source-heading">
+                  <strong>Selected source</strong>
+                  <span id="runSourceMode">Waiting for files</span>
+                </div>
+                <div class="run-source-grid">
+                  <div class="run-source-dbml">
+                    <span>DBML</span>
+                    <strong id="runSourceDbml">No DBML selected</strong>
+                  </div>
+                  <div class="run-source-csv">
+                    <span>CSV files</span>
+                    <strong id="runSourceCsvCount">0 CSV files</strong>
+                    <ul class="run-source-files" id="runSourceCsvList"></ul>
+                  </div>
+                </div>
+              </div>
               <div class="developer-options fixed-llm-options" id="profileDeveloperOptions">
                 <div class="option-heading">
                   <strong>LLM report enrichment</strong>
@@ -272,7 +282,7 @@
                 </button>
                 <p class="option-note">OpenAI calls run only when this is on and <code>OPENAI_API_KEY</code> is configured; report rendering stays local.</p>
               </div>
-              <button class="button primary" id="runPathProfilerButton" type="submit" disabled>Run path job</button>
+              <button class="button primary" id="runPathProfilerButton" type="submit" disabled>Run profiler</button>
             </form>
 
             <p class="form-message" id="runnerMessage" role="status">Start with files uploaded from this browser session.</p>
@@ -460,7 +470,7 @@
           </div>
           <label class="dropzone" for="csvInput" id="csvDropzone">
             <span class="dropzone-title">Drop one or many CSV files</span>
-            <span class="dropzone-copy">Upload mode sends selected browser files to the local runner. Use path mode for large local datasets.</span>
+            <span class="dropzone-copy">Selected CSV files are sent to the local runner. Use the sample data button for a ready demo source.</span>
             <input id="csvInput" type="file" accept=".csv,text/csv" multiple>
           </label>
           <div class="csv-list" id="csvList" aria-live="polite"></div>
@@ -562,7 +572,7 @@
         </div>
       </section>
       <section class="profile-step-footer" aria-label="Profile step navigation">
-        <p id="profileStepHint">Add a DBML contract and CSV files, or choose a local demo path.</p>
+        <p id="profileStepHint">Add a DBML contract and CSV files, or choose the built-in sample data.</p>
         <div class="profile-step-actions">
           <button class="button secondary" id="profileStepBack" type="button" disabled>Back</button>
           <button class="button primary" id="profileStepNext" type="button" disabled>Next: Preflight Review</button>
