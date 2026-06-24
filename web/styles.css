@@ -3931,9 +3931,15 @@ h3 {
 }
 
 details.runtime-stage-item {
+  position: relative;
   display: block;
   padding: 0;
   overflow: visible;
+}
+
+details.runtime-stage-item:hover,
+details.runtime-stage-item:focus-within {
+  z-index: 30;
 }
 
 .stage-summary {
@@ -4021,6 +4027,11 @@ details.runtime-stage-item {
   font-weight: 700;
   line-height: 1.35;
   box-shadow: 0 8px 20px rgba(18, 24, 23, 0.12);
+}
+
+.stage-list > .runtime-stage-item:first-child .stage-info-tooltip {
+  top: calc(100% + 8px);
+  bottom: auto;
 }
 
 .stage-info:hover .stage-info-tooltip,

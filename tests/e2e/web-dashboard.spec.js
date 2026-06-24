@@ -367,6 +367,30 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#stageList")).toContainText("Render Markdown and HTML reports");
+  fs.mkdirSync("outputs/us073_stage3", { recursive: true });
+  const parseStage = page.locator("#stageList .runtime-stage-item").filter({
+    hasText: "Parse DBML schema",
+  });
+  const parseStageInfo = parseStage.locator(".stage-info");
+  await parseStageInfo.hover();
+  await expect(parseStage.locator(".stage-info-tooltip")).toBeVisible();
+  await expect(parseStage.locator(".stage-info-tooltip")).toContainText("Parses the DBML contract");
+  const parseTooltipBox = await parseStage.locator(".stage-info-tooltip").boundingBox();
+  const stageListBox = await page.locator("#stageList").boundingBox();
+  expect(parseTooltipBox).not.toBeNull();
+  expect(stageListBox).not.toBeNull();
+  expect(parseTooltipBox.y).toBeGreaterThanOrEqual(stageListBox.y);
+  const parseTooltipOnTop = await page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y);
+    return Boolean(element && element.closest(".stage-info-tooltip"));
+  }, {
+    x: parseTooltipBox.x + parseTooltipBox.width / 2,
+    y: parseTooltipBox.y + parseTooltipBox.height / 2,
+  });
+  expect(parseTooltipOnTop).toBe(true);
+  await page.screenshot({
+    path: "outputs/us073_stage3/runtime-stage-first-info-tooltip.png",
+  });
   const reportStage = page.locator("#stageList .runtime-stage-item").filter({
     hasText: "Render Markdown and HTML reports",
   });
@@ -378,7 +402,6 @@ test("local path run renders the interactive dashboard from generated artifacts"
   expect(await reportStage.evaluate((element) => element.hasAttribute("open"))).toBe(true);
   await expect(reportStage.locator(".stage-detail-grid")).toContainText("report_count");
   await expect(reportStage.locator(".stage-detail-grid")).toContainText("formats");
-  fs.mkdirSync("outputs/us073_stage3", { recursive: true });
   await page.mouse.move(20, 20);
   await reportStage.screenshot({
     path: "outputs/us073_stage3/runtime-stage-info-dropdown.png",
