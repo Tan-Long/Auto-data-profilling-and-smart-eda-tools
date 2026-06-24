@@ -108,8 +108,14 @@ class FakeIssueEnrichmentProvider:
         plan = context["action_plan"]
         columns = ", ".join(issue.get("columns") or []) or "table scope"
         finding_summary = str(plan.get("finding_summary") or "").strip()
-        first_fix = _first_string(plan.get("fix_data_checklist")) or _first_string(issue.get("suggested_fix"))
-        first_verify = _first_string(plan.get("verify_after_fix_checklist"))
+        first_fix = (
+            _first_action_step_detail(plan.get("fix_data_steps"))
+            or _first_string(plan.get("fix_data_checklist"))
+            or _first_string(issue.get("suggested_fix"))
+        )
+        first_verify = _first_action_step_detail(plan.get("verify_after_fix_steps")) or _first_string(
+            plan.get("verify_after_fix_checklist")
+        )
         if not first_fix:
             first_fix = "Confirm the expected source contract with a data owner before changing upstream data."
         if not first_verify:
@@ -691,13 +697,18 @@ def _compact_action_plan(plan: dict[str, Any]) -> dict[str, Any]:
         )
         if len(evidence_values) >= 8:
             break
+    fix_steps = _compact_action_steps(plan.get("fix_data_steps"))
+    verify_steps = _compact_action_steps(plan.get("verify_after_fix_steps"))
     return {
         "issue_id": _short_value(plan.get("issue_id")),
         "source": _short_value(plan.get("source")),
         "priority": _short_value(plan.get("priority"), limit=80),
         "finding_summary": _short_value(plan.get("finding_summary"), limit=240),
+        "issue_context": _compact_issue_context(plan.get("issue_context")),
         "evidence_values": evidence_values,
+        "fix_data_steps": fix_steps,
         "fix_data_checklist": _short_list(plan.get("fix_data_checklist"), limit=5),
+        "verify_after_fix_steps": verify_steps,
         "verify_after_fix_checklist": _short_list(plan.get("verify_after_fix_checklist"), limit=5),
         "guidelines": _short_list(plan.get("guidelines"), limit=4),
         "evidence_coverage": plan.get("evidence_coverage") or {},
@@ -705,6 +716,46 @@ def _compact_action_plan(plan: dict[str, Any]) -> dict[str, Any]:
         "human_review_required": bool(plan.get("human_review_required")),
         "human_review_reason": _short_value(plan.get("human_review_reason"), limit=200),
     }
+
+
+def _compact_issue_context(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "scope": _short_value(value.get("scope"), limit=120),
+        "issue_label": _short_value(value.get("issue_label"), limit=80),
+        "issue_type": _short_value(value.get("issue_type"), limit=80),
+        "severity": _short_value(value.get("severity"), limit=20),
+        "table": _short_value(value.get("table"), limit=80),
+        "columns": _short_list(value.get("columns"), limit=8),
+        "parent_ref": _short_value(value.get("parent_ref"), limit=120),
+        "affected_rows": value.get("affected_rows"),
+        "rows_checked": value.get("rows_checked"),
+        "affected_rate": _short_value(value.get("affected_rate"), limit=40),
+        "sample_path": _safe_artifact_path(value.get("sample_path")),
+        "sample_keys": _short_list(value.get("sample_keys"), limit=5),
+        "has_evidence_sql": bool(value.get("has_evidence_sql")),
+    }
+
+
+def _compact_action_steps(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    steps: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        steps.append(
+            {
+                "title": _short_value(item.get("title"), limit=80),
+                "detail": _short_value(item.get("detail"), limit=220),
+                "evidence": _short_value(item.get("evidence"), limit=180),
+                "why": _short_value(item.get("why"), limit=180),
+            }
+        )
+        if len(steps) >= 5:
+            break
+    return steps
 
 
 def _selected_table_assessment(out_dir: Path, issue: dict[str, Any]) -> dict[str, Any] | None:
@@ -1021,6 +1072,17 @@ def _short_list(value: Any, *, limit: int) -> list[str]:
 def _first_string(value: Any) -> str:
     values = _short_list(value, limit=1)
     return values[0] if values else ""
+
+
+def _first_action_step_detail(value: Any) -> str:
+    if not isinstance(value, list):
+        return ""
+    for item in value:
+        if isinstance(item, dict):
+            detail = _short_value(item.get("detail"), limit=MAX_RESPONSE_ITEM_CHARS)
+            if detail:
+                return detail
+    return ""
 
 
 def _truncate(value: str, limit: int) -> str:

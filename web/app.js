@@ -38,7 +38,7 @@ const state = {
   todoFilter: "all",
   dashboardSelection: null,
   issueSampleRows: {},
-  issueLlmProvider: "fake",
+  issueLlmProvider: "openai",
   issueLlmPanelOpen: false,
   issueLlmRunningIssueId: "",
   issueLlmMessage: "",
@@ -469,7 +469,7 @@ els.tableImpactGrid.addEventListener("click", (event) => {
 els.dashboardDrilldown.addEventListener("click", async (event) => {
   const providerTarget = event.target.closest("[data-issue-llm-provider]");
   if (providerTarget) {
-    state.issueLlmProvider = providerTarget.dataset.issueLlmProvider || "fake";
+    state.issueLlmProvider = providerTarget.dataset.issueLlmProvider || "openai";
     state.issueLlmPanelOpen = true;
     state.issueLlmMessage = "";
     state.issueLlmMessageStatus = "";
@@ -3653,7 +3653,7 @@ async function runIssueLlmEnrichment(issueId) {
     renderDashboardDrilldown();
     return;
   }
-  const provider = ["fake", "openai"].includes(state.issueLlmProvider) ? state.issueLlmProvider : "fake";
+  const provider = ["fake", "openai"].includes(state.issueLlmProvider) ? state.issueLlmProvider : "openai";
   state.issueLlmRunningIssueId = issueId;
   state.issueLlmMessage = `Running ${issueLlmProviderLabel(provider)} issue enrichment for ${issueId}...`;
   state.issueLlmMessageStatus = "pending";
@@ -5000,7 +5000,7 @@ function renderIssueDetailDrawer(issue) {
       ${renderIssueFocusMap(issue, parent)}
       ${renderIssueSampleRows(issue)}
       ${renderIssueActionDisclosure("Fix / Todo", "Deterministic checklist", renderIssueActionPlan(actionPlan, issue), { open: true })}
-      ${renderIssueActionDisclosure("LLM enrichment add-on", "Optional explanation", renderIssueLlmEnrichment(actionPlan, issue), { open: state.issueLlmPanelOpen })}
+      ${renderIssueActionDisclosure("LLM enrichment add-on", "OpenAI context for this issue", renderIssueLlmEnrichment(actionPlan, issue), { open: state.issueLlmPanelOpen })}
       ${renderIssueActionDisclosure("Evidence", "What happened, why, raw values", renderIssueEvidencePack(issue, parent))}
     </article>
   `;
@@ -5375,12 +5375,16 @@ function renderIssueActionPlan(plan, issue) {
       <div class="issue-fix-todo-grid">
         <div class="action-plan-block">
           <strong>Fix data checklist</strong>
-          ${renderActionPlanList(plan.fix_data_checklist, 3)}
+          ${renderActionPlanSteps(plan.fix_data_steps, plan.fix_data_checklist, 4)}
         </div>
         <div class="action-plan-block">
           <strong>Verify after fix checklist</strong>
-          ${renderActionPlanList(plan.verify_after_fix_checklist, 3)}
+          ${renderActionPlanSteps(plan.verify_after_fix_steps, plan.verify_after_fix_checklist, 4)}
         </div>
+      </div>
+      <div class="action-plan-llm-nudge">
+        <strong>Need issue-specific reasoning?</strong>
+        <p>OpenAI enrichment can add concise context for this selected issue using bounded issue evidence, action steps, and sample metadata only.</p>
       </div>
       <details class="issue-detail-disclosure action-plan-more">
         <summary><h5>More deterministic context</h5><span>Metrics, guidelines, finding values</span></summary>
@@ -5415,7 +5419,7 @@ function renderIssueActionPlan(plan, issue) {
 
 function renderIssueLlmEnrichment(plan, issue) {
   const issueId = issueGuid(issue);
-  const provider = ["fake", "openai"].includes(state.issueLlmProvider) ? state.issueLlmProvider : "fake";
+  const provider = ["fake", "openai"].includes(state.issueLlmProvider) ? state.issueLlmProvider : "openai";
   const entry = getIssueLlmEnrichment(issue, provider);
   const running = state.issueLlmRunningIssueId === issueId;
   const status = running ? "pending" : entry?.status || "not_run";
@@ -5440,7 +5444,7 @@ function renderIssueLlmEnrichment(plan, issue) {
           <button class="mode-button ${provider === "openai" ? "active" : ""}" type="button" data-issue-llm-provider="openai" aria-pressed="${provider === "openai" ? "true" : "false"}">OpenAI</button>
         </div>
         <button class="button secondary compact" type="button" data-issue-llm-run data-issue-id="${escapeHtml(issueId)}" ${running ? "disabled" : ""}>
-          ${entry ? "Retry enrichment" : "Run LLM enrichment"}
+          ${issueLlmButtonLabel(provider, Boolean(entry))}
         </button>
       </div>
       <p class="form-message issue-llm-message" data-status="${escapeHtml(state.issueLlmMessageStatus || issueLlmStatusToMessageStatus(status))}" role="status">${escapeHtml(message)}</p>
@@ -5453,7 +5457,7 @@ function renderIssueLlmStructuredResponse(entry, provider) {
   if (!entry) {
     return `
       <div class="issue-llm-result empty">
-        <p class="muted">No ${escapeHtml(issueLlmProviderLabel(provider))} enrichment has been generated for this selected issue.</p>
+        <p class="muted">No ${escapeHtml(issueLlmProviderLabel(provider))} enrichment has been generated for this selected issue. Run it after reviewing the deterministic steps above.</p>
       </div>
     `;
   }
@@ -5477,6 +5481,13 @@ function renderIssueLlmStructuredResponse(entry, provider) {
       <p class="issue-llm-footnote">Deterministic action plans remain the source of truth.</p>
     </div>
   `;
+}
+
+function issueLlmButtonLabel(provider, hasEntry) {
+  if (hasEntry) {
+    return provider === "openai" ? "Retry OpenAI enrichment" : "Retry Fake enrichment";
+  }
+  return provider === "openai" ? "Run OpenAI enrichment" : "Run Fake enrichment";
 }
 
 function renderIssueLlmSection(title, items) {
@@ -5575,15 +5586,32 @@ function issueActionPlanMarkdown(plan) {
     plan.finding_summary || "Finding summary needs human review.",
     "",
     "## Fix data checklist",
-    ...actionPlanMarkdownItems(plan.fix_data_checklist),
+    ...actionPlanMarkdownSteps(plan.fix_data_steps, plan.fix_data_checklist),
     "",
     "## Verify after fix checklist",
-    ...actionPlanMarkdownItems(plan.verify_after_fix_checklist),
+    ...actionPlanMarkdownSteps(plan.verify_after_fix_steps, plan.verify_after_fix_checklist),
     "",
     "## Guidelines",
     ...actionPlanMarkdownItems(plan.guidelines),
   ];
   return lines.join("\n");
+}
+
+function actionPlanMarkdownSteps(steps, fallbackItems) {
+  const structured = Array.isArray(steps) ? steps.filter((step) => step && typeof step === "object") : [];
+  if (!structured.length) {
+    return actionPlanMarkdownItems(fallbackItems);
+  }
+  return structured.flatMap((step, index) => {
+    const lines = [`${index + 1}. ${step.title || "Action step"}: ${step.detail || "Needs human review."}`];
+    if (step.evidence) {
+      lines.push(`   - Evidence: ${step.evidence}`);
+    }
+    if (step.why) {
+      lines.push(`   - Why: ${step.why}`);
+    }
+    return lines;
+  });
 }
 
 function actionPlanMarkdownItems(items) {
@@ -5661,6 +5689,32 @@ function renderActionPlanEvidenceValues(values) {
       }).join("")}
     </div>
   `;
+}
+
+function renderActionPlanSteps(steps, fallbackItems, limit = 4) {
+  const structured = Array.isArray(steps) ? steps.filter((step) => step && typeof step === "object") : [];
+  if (structured.length) {
+    return `
+      <div class="action-plan-step-list">
+        ${structured.slice(0, limit).map((step, index) => {
+          const evidence = String(step.evidence || "").trim();
+          const why = String(step.why || "").trim();
+          return `
+            <div class="action-plan-step">
+              <div class="action-plan-step-heading">
+                <span>${String(index + 1).padStart(2, "0")}</span>
+                <strong>${escapeHtml(step.title || "Action step")}</strong>
+              </div>
+              <p>${escapeHtml(step.detail || "Needs human review before assigning this action.")}</p>
+              ${evidence ? `<small><b>Evidence</b>${escapeHtml(evidence)}</small>` : ""}
+              ${why ? `<small><b>Why</b>${escapeHtml(why)}</small>` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+  return renderActionPlanList(fallbackItems, limit);
 }
 
 function renderActionPlanList(items, limit = 6) {

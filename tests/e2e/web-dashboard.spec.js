@@ -661,6 +661,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("Finding values");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Fix data checklist");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Verify after fix checklist");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Need issue-specific reasoning?");
+  await expect(page.locator("#dashboardDrilldown .action-plan-step").first()).toBeVisible();
   await expect(page.locator("#dashboardDrilldown")).toContainText("Guidelines");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence coverage");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Actionability");
@@ -672,7 +674,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("sellers.seller_id");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Sample rows");
   await expect(page.locator("#dashboardDrilldown")).toContainText("LLM enrichment add-on");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Run LLM enrichment");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Run OpenAI enrichment");
   fs.mkdirSync("outputs/us073_goal11", { recursive: true });
   const issueDetailPanel = page.locator("#dashboard .dashboard-detail").first();
   await issueDetailPanel.screenshot({

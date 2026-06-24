@@ -535,6 +535,7 @@ def test_web_review_surfaces_use_single_flow_layouts():
         ".issue-detail-grid div",
         ".evidence-value",
         ".action-plan-metrics",
+        ".issue-fix-todo-grid",
         ".todo-summary-strip",
         ".todo-group-heading",
         ".todo-occurrence",
@@ -632,11 +633,17 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Todo artifact missing" in js
     assert "getIssueActionPlans" in js
     assert "renderIssueActionPlan" in js
+    assert "renderActionPlanSteps" in js
+    assert "fix_data_steps" in js
+    assert "verify_after_fix_steps" in js
     assert "renderIssueLlmEnrichment" in js
     assert "runIssueLlmEnrichment" in js
     assert "getIssueLlmEnrichment" in js
     assert "data-issue-llm-provider" in js
     assert "data-issue-llm-run" in js
+    assert 'issueLlmProvider: "openai"' in js
+    assert "Need issue-specific reasoning?" in js
+    assert "Run OpenAI enrichment" in js
     assert "/issue-enrichments" in js
     assert "Why this was flagged" in js
     assert "Extra fix suggestion" in js
@@ -647,6 +654,7 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Copy JSON" in js
     assert "data-action-plan-export" in js
     assert "issueActionPlanMarkdown" in js
+    assert "actionPlanMarkdownSteps" in js
     assert "issueActionPlanCsvRow" in js
     assert "issueActionPlanJson" in js
     assert "Fix data checklist" in js

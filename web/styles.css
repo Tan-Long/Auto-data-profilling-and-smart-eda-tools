@@ -3575,7 +3575,7 @@ h3 {
 
 .issue-fix-todo-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -3614,6 +3614,93 @@ h3 {
 .action-plan-block {
   display: grid;
   gap: 7px;
+}
+
+.action-plan-step-list {
+  display: grid;
+  gap: 8px;
+}
+
+.action-plan-step {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.action-plan-step-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.action-plan-step-heading span {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--surface-inset);
+  color: var(--foreground-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.action-plan-step-heading strong {
+  min-width: 0;
+  color: var(--foreground-primary);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.action-plan-step p {
+  margin: 0;
+  color: var(--foreground-primary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.action-plan-step small {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.action-plan-step small b {
+  color: var(--foreground-tertiary);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.action-plan-llm-nudge {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid rgba(35, 120, 95, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(35, 120, 95, 0.08);
+}
+
+.action-plan-llm-nudge strong {
+  color: var(--foreground-primary);
+  font-size: 12px;
+}
+
+.action-plan-llm-nudge p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .action-plan-values .evidence-value {

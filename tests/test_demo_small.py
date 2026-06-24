@@ -106,6 +106,9 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert issue_action_plans["summary"]["plan_count"] == len(issues)
     assert issue_action_plans["summary"]["source"] == "deterministic"
     assert all(plan["source"] == "deterministic" for plan in issue_action_plans["plans"])
+    assert all(plan["issue_context"] for plan in issue_action_plans["plans"])
+    assert all(plan["fix_data_steps"] for plan in issue_action_plans["plans"])
+    assert all(plan["verify_after_fix_steps"] for plan in issue_action_plans["plans"])
     assert issue_todos["artifact"] == "issue_todos"
     assert issue_todos["derived_from"] == "issue_action_plans.json"
     assert issue_todos["summary"]["source"] == "deterministic"

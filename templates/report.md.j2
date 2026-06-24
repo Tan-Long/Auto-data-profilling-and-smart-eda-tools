@@ -150,6 +150,14 @@ Raw JSON and runtime artifacts are listed here for debugging and package compati
 LLM output validation: **{{ l4_report.status_text }}**. This validates optional LLM text only; data readiness still comes from quality gates. Provider: `{{ l4_report.provider }}`{% if l4_report.model %}; model: `{{ l4_report.model }}`{% endif %}{% if l4_report.fallback_reason %}; fallback: `{{ l4_report.fallback_reason }}`{% endif %}.
 
 {% endif -%}
+{% if schema_evaluation.available -%}
+Schema mapping summary: mapped={{ schema_evaluation.mapped_table_count }}, missing={{ schema_evaluation.missing_table_count }}, methods={{ schema_evaluation.mapping_method_counts_text }} (`{{ schema_evaluation.path }}`).
+
+{% endif -%}
+{% if relationship_graph.available -%}
+Relationship cardinality summary: {{ relationship_graph.cardinality_counts_text }}; junction tables={{ relationship_graph.junction_tables_text }} (`{{ relationship_graph.path }}`).
+
+{% endif -%}
 | Artifact | Path |
 | --- | --- |
 {% for artifact in fixed_report.developer_artifacts.artifacts -%}

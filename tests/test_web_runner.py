@@ -102,8 +102,11 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     first_plan = action_plans["plans"][0]
     assert first_plan["source"] == "deterministic"
     assert first_plan["finding_summary"]
+    assert first_plan["issue_context"]
     assert first_plan["evidence_values"]
+    assert first_plan["fix_data_steps"]
     assert first_plan["fix_data_checklist"]
+    assert first_plan["verify_after_fix_steps"]
     assert first_plan["verify_after_fix_checklist"]
     assert first_plan["guidelines"]
     assert first_plan["priority"]
@@ -404,6 +407,47 @@ def test_issue_action_plans_mark_missing_context_for_human_review():
     assert "Needs human review" in plan["human_review_reason"]
     assert plan["fix_data_checklist"][0].startswith("Needs human review")
     assert plan["verify_after_fix_checklist"][0].startswith("Needs human review")
+    assert plan["fix_data_steps"][0]["title"] == "Human review before changing data"
+    assert plan["verify_after_fix_steps"][0]["title"] == "Human review defines the acceptance query"
+
+
+def test_issue_action_plans_generate_specific_relationship_fix_steps():
+    action_plans = build_issue_action_plans(
+        [
+            {
+                "issue_id": "ISSUE-0005",
+                "issue_type": "FOREIGN_KEY_NULL",
+                "severity": "P3",
+                "table": "orders",
+                "columns": ["customer_id"],
+                "parent_table": "customers",
+                "parent_columns": ["customer_id"],
+                "bad_count": 3,
+                "total_count": 25,
+                "bad_rate": 0.12,
+                "sample_bad_rows_path": "samples/ISSUE-0005.csv",
+                "evidence_sql": "SELECT COUNT(*) FROM orders WHERE customer_id IS NULL",
+                "probable_causes": ["Child rows may have missing parent references."],
+                "suggested_fix": ["Backfill customer_id from the source order feed."],
+            }
+        ],
+        table_assessments={},
+    )
+
+    plan = action_plans["plans"][0]
+    fix_details = " ".join(step["detail"] for step in plan["fix_data_steps"])
+    verify_details = " ".join(step["detail"] for step in plan["verify_after_fix_steps"])
+    assert plan["human_review_required"] is False
+    assert plan["issue_context"]["scope"] == "orders.customer_id"
+    assert plan["issue_context"]["parent_ref"] == "customers.customer_id"
+    assert "samples/ISSUE-0005.csv" in fix_details
+    assert "orders.customer_id" in fix_details
+    assert "customers.customer_id" in fix_details
+    assert "source extract or pipeline step" in fix_details
+    assert "orders.customer_id" in verify_details
+    assert "child-to-parent relationship check" in verify_details
+    assert plan["fix_data_checklist"][0].startswith("Open samples/ISSUE-0005.csv")
+    assert plan["verify_after_fix_checklist"][0] == "Rerun the profiler on the corrected CSV + DBML inputs."
 
 
 def test_issue_todos_group_duplicate_text_while_preserving_context():
