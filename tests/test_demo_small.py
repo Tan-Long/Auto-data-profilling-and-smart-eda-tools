@@ -188,6 +188,8 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     )
     assert "VSF Data Quality Report" in report_md
     assert "Data Quality Report" in report_html
+    assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in report_html
+    assert 'href="favicon.svg"' not in report_html
     for section in [
         "Run Summary",
         "Quality Gates",

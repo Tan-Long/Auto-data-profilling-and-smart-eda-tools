@@ -76,6 +76,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert excluded[".connector_extracts/postgres/customers.csv"] == "connector_temp_extract"
 
     index_html = (package_dir / "index.html").read_text(encoding="utf-8")
+    packaged_report_html = (package_dir / "report.html").read_text(encoding="utf-8")
     issue_action_plans = _read_json(out_dir / "issue_action_plans.json")
     issue_todos = _read_json(out_dir / "issue_todos.json")
     fix_todo_group_count = sum(
@@ -85,6 +86,10 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
         1 for group in issue_todos["groups"] if group["todo_type"] == "verify_after_fix"
     )
     assert "Data Quality Package" in index_html
+    assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in index_html
+    assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in packaged_report_html
+    assert 'href="favicon.svg"' not in index_html
+    assert 'href="favicon.svg"' not in packaged_report_html
     for section in [
         "Run Summary",
         "Report / Export",
