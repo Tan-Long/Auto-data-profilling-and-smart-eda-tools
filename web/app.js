@@ -1922,7 +1922,7 @@ function renderSourceState() {
       : "0 files";
   let badge = "No upload";
   let status = "";
-  let summary = "Upload a DBML contract and CSV files to profile your own data.";
+  let summary = "Choose sample data or add one DBML contract with related CSV files.";
   if (state.runnerMode === "path") {
     badge = preset ? "Sample data" : "Custom paths";
     status = "ready";
@@ -1934,7 +1934,7 @@ function renderSourceState() {
     status = state.dbmlFile && uploadedCsvs.length ? "ready" : "warnings_pending";
     summary = uploadedCsvs.length
       ? "Browser upload source is active. New CSV selections replace the previous inventory."
-      : "Custom DBML is active. Upload matching CSV files before running.";
+      : "Custom DBML is active. Add matching CSV files before running.";
   }
 
   els.sourceStateBadge.textContent = badge;

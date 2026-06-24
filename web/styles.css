@@ -784,8 +784,10 @@ h3 {
 
 .source-state-panel {
   order: 1;
-  padding: 16px;
+  padding: 14px 16px;
   margin-bottom: 16px;
+  border-color: var(--border-subtle);
+  background: var(--surface-overlay);
 }
 
 #inputSetup {
@@ -836,7 +838,7 @@ h3 {
   padding: 10px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: var(--surface-overlay);
+  background: var(--surface-panel);
 }
 
 .source-state-grid span {

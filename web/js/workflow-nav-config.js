@@ -7,8 +7,8 @@ window.VSF_WORKFLOW_NAV_CONFIG = {
       detail: "DBML, CSV, diagram, mapping",
       target: "sourceState",
       substeps: [
-        { target: "sourceState", label: "Connected source", detail: "Current DBML + CSV source" },
-        { target: "inputSetup", label: "Input setup", detail: "Upload DBML and CSV files" },
+        { target: "sourceState", label: "Source status", detail: "Selected DBML and CSV inventory" },
+        { target: "inputSetup", label: "Upload files", detail: "Add DBML contract and CSV files" },
         { target: "diagram", label: "DBML diagram", detail: "Preview tables and FK links" },
         { target: "mapping", label: "CSV mapping", detail: "Map CSV files to DBML tables" },
       ],
@@ -20,6 +20,7 @@ window.VSF_WORKFLOW_NAV_CONFIG = {
       detail: "Blockers, warnings, approval",
       target: "preflightReview",
       substeps: [
+        { target: "issues", label: "Contract health", detail: "Mapping and relationship summary" },
         { target: "preflightReview", label: "Gate summary", detail: "Run lock and review status" },
         { target: "preflightBlockerList", label: "Blockers", detail: "Must fix before running" },
         { target: "preflightWarningList", label: "Warnings", detail: "Human review before run" },

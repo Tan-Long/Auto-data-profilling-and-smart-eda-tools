@@ -75,6 +75,9 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await page.locator("#profileFlowButton").click();
     await expect(page.locator("#profileFlow")).toBeVisible();
     await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "connect");
+    await expect(page.locator("#sourceStateTitle")).toContainText("Source status");
+    await expect(page.locator("#inputSetup")).toContainText("Connect DBML + CSV");
+    await expect(page.locator("#issues")).toBeHidden();
     await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
     await expect(page.locator("#csvList")).not.toContainText("customers.csv");
     await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");

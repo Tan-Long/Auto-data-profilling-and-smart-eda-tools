@@ -165,12 +165,12 @@
       <section class="panel source-state-panel" id="sourceState" data-profile-step-section="connect" aria-labelledby="sourceStateTitle">
         <div class="panel-heading compact">
           <div>
-            <p class="eyebrow">Connected source</p>
-            <h3 id="sourceStateTitle">Current DBML + CSV source</h3>
+            <p class="eyebrow">Input source</p>
+            <h3 id="sourceStateTitle">Source status</h3>
           </div>
           <span class="badge" id="sourceStateBadge">No upload</span>
         </div>
-        <p class="source-state-summary" id="sourceStateSummary">Upload a DBML contract and CSV files to profile your own data.</p>
+        <p class="source-state-summary" id="sourceStateSummary">Choose sample data or add one DBML contract with related CSV files.</p>
         <div class="source-state-grid" id="sourceStateDetails" aria-label="Current source details">
           <div><span>DBML</span><strong>Not selected</strong></div>
           <div><span>CSV</span><strong>0 files</strong></div>
@@ -178,7 +178,7 @@
         </div>
         <div class="source-state-actions">
           <button class="button primary" id="quickDemoButton" type="button">Use sample DBML + CSV</button>
-          <a class="button secondary" href="#inputSetup">Edit source</a>
+          <a class="button secondary" href="#inputSetup">Upload files</a>
           <button class="button ghost" id="clearUploadButton" type="button" disabled>Clear source</button>
         </div>
       </section>
@@ -429,8 +429,8 @@
       </section>
 
       <section class="section-label" id="inputSetup" data-profile-step-section="connect">
-        <p class="eyebrow">Input setup</p>
-        <h3>Upload preflight and DBML mapping</h3>
+        <p class="eyebrow">Connect DBML + CSV</p>
+        <h3>Upload files and map tables</h3>
       </section>
 
       <section class="upload-grid" id="upload" data-profile-step-section="connect">
@@ -438,7 +438,7 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Contract</p>
-              <h3>Upload DBML contract</h3>
+              <h3>DBML contract</h3>
             </div>
             <span class="badge" id="tableCountBadge">No DBML</span>
           </div>
@@ -460,7 +460,7 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">CSV inventory</p>
-              <h3>Upload related CSV files</h3>
+              <h3>CSV files</h3>
             </div>
             <span class="badge" id="csvCountBadge">0 CSV</span>
           </div>
@@ -473,8 +473,8 @@
         </article>
       </section>
 
-      <section class="content-grid" data-profile-step-section="connect">
-        <article class="panel diagram-panel" id="diagram">
+      <section class="content-grid" data-profile-step-section="connect preflight">
+        <article class="panel diagram-panel" id="diagram" data-profile-step-section="connect">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Live schema graph</p>
@@ -501,7 +501,7 @@
           <div class="diagram-empty" id="diagramEmpty">
             <div class="diagram-glyph" aria-hidden="true"></div>
             <strong>Upload DBML to preview schema</strong>
-            <p>Use your own DBML and CSV files, or load the sample demo from Connected source.</p>
+            <p>Use your own DBML and CSV files, or load the sample demo from Source status.</p>
           </div>
           <div class="local-diagram" id="localDiagram" hidden>
             <div class="diagram-canvas" id="diagramCanvas">
@@ -512,7 +512,7 @@
           <iframe id="diagramFrame" class="diagram-frame" title="External dbdiagram preview" hidden aria-hidden="true"></iframe>
         </article>
 
-        <aside class="panel preflight-panel" id="issues">
+        <aside class="panel preflight-panel" id="issues" data-profile-step-section="preflight">
           <div class="panel-heading compact">
             <div>
               <p class="eyebrow">Preflight</p>

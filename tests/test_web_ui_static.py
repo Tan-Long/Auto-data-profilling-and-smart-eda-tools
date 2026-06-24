@@ -77,8 +77,12 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="sourceStateDetails"',
         'id="quickDemoButton"',
         'id="clearUploadButton"',
-        "Connected source",
-        "Current DBML + CSV source",
+        "Input source",
+        "Source status",
+        "Connect DBML + CSV",
+        "Upload files and map tables",
+        "DBML contract",
+        "CSV files",
         "Use sample DBML + CSV",
         'id="visualizeButton"',
         'id="mappingBody"',
@@ -181,6 +185,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     assert "Previous runs" not in html
     assert "Run History" not in html
     assert "Select prior run and timeline" not in js
+    assert "Current DBML + CSV source" not in html
+    assert "Upload DBML contract" not in html
+    assert "Upload related CSV files" not in html
 
     forbidden_html = [
         'id="databaseRunnerForm"',

@@ -75,6 +75,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#evaluateFlow")).toBeHidden();
   fs.mkdirSync("outputs/us073_goal3", { recursive: true });
   await expect(page.locator("#sourceState")).toBeVisible();
+  await expect(page.locator("#sourceStateTitle")).toContainText("Source status");
+  await expect(page.locator("#inputSetup")).toContainText("Connect DBML + CSV");
+  await expect(page.locator("#inputSetup")).toContainText("Upload files and map tables");
+  await expect(page.locator("#issues")).toBeHidden();
   await expect(page.locator("#runner")).toBeHidden();
   await expect(page.locator("#preflightReview")).toBeHidden();
   await expect(page.locator("#preflightGateBadge")).toContainText("Run locked");
@@ -83,7 +87,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#profileStepNext")).toBeDisabled();
   await expect(page.locator("#runProfilerButton")).toBeDisabled();
   await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
-  await expect(page.locator("#sourceStateSummary")).toContainText("Upload a DBML contract");
+  await expect(page.locator("#sourceStateSummary")).toContainText("Choose sample data");
   await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
   await page.locator("#profileFlow").screenshot({
     path: "outputs/us073_goal3/profile-preflight-blocked.png",
@@ -231,6 +235,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator('.mapping-select[data-table="customers"]').selectOption("");
   await page.locator('.mapping-select[data-table="orders"]').selectOption("customers");
   await goToProfileStep(page, "preflight");
+  await expect(page.locator("#issues")).toBeVisible();
+  await expect(page.locator("#issues")).toContainText("Contract health");
+  await expect(page.locator("#mapping")).toBeHidden();
   await expect(page.locator("#preflightGateBadge")).toContainText("Review warnings");
   await expect(page.locator("#preflightBlockersInfo")).toBeHidden();
   await page.locator('button[aria-label="What are preflight blockers?"]').hover();
