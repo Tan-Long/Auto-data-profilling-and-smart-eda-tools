@@ -318,7 +318,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#dashboardStatusBadge")).toContainText("succeeded dashboard", {
       timeout: 20_000,
     });
-    await expect(page.locator("#selectedRunTimelineStatus")).toContainText("8 stages");
+    await expect(page.locator("#selectedRunTimelineStatus")).toContainText("7 stages");
+    await expect(page.locator("#selectedRunTimeline")).not.toContainText("influence_analysis");
     record(
       matrix,
       "Run history reload",

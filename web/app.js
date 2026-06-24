@@ -2524,14 +2524,18 @@ function renderStages(job) {
   state.runEvents
     .filter((event) => event.stage)
     .forEach((event) => {
+      const eventDetails = event.details || {};
       const current = stageMap.get(event.stage) || {
         name: event.stage,
-        displayName: event.details?.display_name || event.stage,
+        displayName: eventDetails.display_name || event.stage,
         status: event.status || "running",
         duration: event.duration_seconds,
+        details: {},
+        skipReason: "",
       };
-      if (event.details?.display_name) {
-        current.displayName = event.details.display_name;
+      current.details = { ...(current.details || {}), ...eventDetails };
+      if (eventDetails.display_name) {
+        current.displayName = eventDetails.display_name;
       }
       if (event.event_type === "stage_started") {
         current.status = "running";
@@ -2539,27 +2543,32 @@ function renderStages(job) {
       if (["stage_finished", "stage_failed"].includes(event.event_type)) {
         current.status = event.status || current.status;
         current.duration = event.duration_seconds;
+        current.skipReason = eventDetails.skip_reason || current.skipReason || "";
       }
       stageMap.set(event.stage, current);
     });
 
   if (job?.summary?.stage_timings?.length) {
     job.summary.stage_timings.forEach((stage) => {
+      const stageDetails = stage.details || {};
       stageMap.set(stage.name, {
         name: stage.name,
         displayName: stage.display_name,
         status: stage.status,
         duration: stage.duration_seconds,
+        details: stageDetails,
+        skipReason: stage.skip_reason || stageDetails.skip_reason || "",
       });
     });
   }
 
   els.stageList.innerHTML = "";
-  if (!stageMap.size) {
+  const visibleStages = visibleRuntimeStages([...stageMap.values()]);
+  if (!visibleStages.length) {
     els.stageList.innerHTML = `<p class="muted">Run events from <code>run_events.jsonl</code> will appear here.</p>`;
     return;
   }
-  [...stageMap.values()].forEach((stage) => {
+  visibleStages.forEach((stage) => {
     const item = document.createElement("div");
     item.className = `stage-item ${escapeHtml(stage.status || "running")}`;
     item.innerHTML = `
@@ -2618,6 +2627,11 @@ function renderRunHistory() {
 function renderRunHistoryItem(run) {
   const selected = run.job_id === state.selectedHistoryJobId;
   const gateSummary = run.quality_gate_summary || {};
+  const stages = visibleRuntimeStages(run.stages);
+  const stageCount = stages.length || run.stage_count || 0;
+  const failedStageCount = stages.length
+    ? stages.filter((stage) => stage.status === "failed").length
+    : run.failed_stage_count || 0;
   const finished = run.finished_at ? `finished ${formatRunTimestamp(run.finished_at)}` : "finish time unavailable";
   const created = run.created_at ? `created ${formatRunTimestamp(run.created_at)}` : "created time unavailable";
   return `
@@ -2634,8 +2648,8 @@ function renderRunHistoryItem(run) {
       <span class="run-history-metrics">
         <span>${integerText(run.issue_count || 0)} issues</span>
         <span>${escapeHtml(gateSummaryText(gateSummary))}</span>
-        <span>${integerText(run.stage_count || 0)} stages</span>
-        <span>${integerText(run.failed_stage_count || 0)} failed</span>
+        <span>${integerText(stageCount)} stages</span>
+        <span>${integerText(failedStageCount)} failed</span>
       </span>
     </button>
   `;
@@ -2648,8 +2662,9 @@ function renderSelectedRunTimeline() {
     els.selectedRunTimeline.innerHTML = `<p class="muted">Select a run to inspect stage status, duration, and failure or skip details.</p>`;
     return;
   }
-  const stages = Array.isArray(run.stages) ? run.stages : [];
-  els.selectedRunTimelineStatus.textContent = `${integerText(stages.length)} stages · ${integerText(run.failed_stage_count || 0)} failed`;
+  const stages = visibleRuntimeStages(run.stages);
+  const failedStageCount = stages.filter((stage) => stage.status === "failed").length;
+  els.selectedRunTimelineStatus.textContent = `${integerText(stages.length)} stages · ${integerText(failedStageCount)} failed`;
   if (!stages.length) {
     els.selectedRunTimeline.innerHTML = `<p class="muted">No stage timeline was found for this run. Older folders without <code>run_summary.json</code> or <code>run_events.jsonl</code> remain selectable for available artifacts.</p>`;
     return;
@@ -2692,6 +2707,19 @@ function renderSelectedRunStage(stage) {
       <span class="pill-status ${status === "failed" ? "missing" : "mapped"}">${escapeHtml(status)}</span>
     </article>
   `;
+}
+
+function visibleRuntimeStages(stages) {
+  return (Array.isArray(stages) ? stages : []).filter((stage) => !isHiddenCompatibilityStage(stage));
+}
+
+function isHiddenCompatibilityStage(stage) {
+  if (!stage || stage.name !== "influence_analysis") {
+    return false;
+  }
+  const details = stage.details || {};
+  const skipReason = String(stage.skipReason || stage.skip_reason || details.skip_reason || "");
+  return stage.status === "skipped" && /no target column was provided/i.test(skipReason);
 }
 
 function selectedRunHistoryEntry() {
@@ -2932,8 +2960,8 @@ function renderGeneratedIssueLlmPreview(artifacts) {
 
 function renderGeneratedRuntimePreview(artifacts) {
   const runSummary = generatedRunSummary();
-  const stages = Array.isArray(runSummary.stage_timings) ? runSummary.stage_timings : [];
-  const failedStages = Array.isArray(runSummary.failed_stages) ? runSummary.failed_stages.length : 0;
+  const stages = visibleRuntimeStages(runSummary.stage_timings);
+  const failedStages = visibleRuntimeStages(runSummary.failed_stages).length;
   const status = runSummary.status || state.currentJob?.status || "pending";
   const duration = runSummary.duration_seconds;
   const body = `

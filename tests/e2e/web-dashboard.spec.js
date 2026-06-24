@@ -357,11 +357,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(generatedResults).toContainText("Table readiness");
   await expect(generatedResults).toContainText("7 tables");
   await expect(generatedResults).toContainText("Runtime summary");
-  await expect(generatedResults).toContainText("8 stages");
+  await expect(generatedResults).toContainText("7 stages");
   await expect(generatedResults).not.toContainText("Report HTML");
   await expect(generatedResults).not.toContainText("Report Markdown");
   await expect(generatedResults).not.toContainText("Developer artifact links");
   await expect(generatedResults).not.toContainText("dataset_verdict.json");
+  await expect(page.locator("#stageList")).not.toContainText("Run influence analysis");
+  await expect(page.locator("#stageList")).not.toContainText("influence_analysis");
   fs.mkdirSync("outputs/us070_visual_review", { recursive: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await generatedResults.scrollIntoViewIfNeeded();
@@ -435,8 +437,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
     timeout: 10_000,
   });
   await expect(page.locator("#runHistoryList")).toContainText("12 issues");
-  await expect(page.locator("#runHistoryList")).toContainText("8 stages");
-  await expect(page.locator("#selectedRunTimelineStatus")).toContainText("8 stages");
+  await expect(page.locator("#runHistoryList")).toContainText("7 stages");
+  await expect(page.locator("#selectedRunTimelineStatus")).toContainText("7 stages");
+  await expect(page.locator("#selectedRunTimeline")).not.toContainText("influence_analysis");
 
   await page.reload();
   await expect(page.locator("#flowChooser")).toBeVisible();
@@ -463,8 +466,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#qualityGatesStatus")).toContainText("source=deterministic");
   await expect(page.locator("#todosStatus")).toContainText("grouped todos");
-  await expect(page.locator("#selectedRunTimelineStatus")).toContainText("8 stages");
+  await expect(page.locator("#selectedRunTimelineStatus")).toContainText("7 stages");
   await expect(page.locator("#selectedRunTimeline")).toContainText("Parse DBML schema");
+  await expect(page.locator("#selectedRunTimeline")).not.toContainText("Run influence analysis");
   await page.locator("#selectedRunTimeline").screenshot({
     path: "outputs/us073_goal8/selected-run-stage-timeline.png",
   });
