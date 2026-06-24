@@ -529,7 +529,12 @@ function handleDashboardSelectionClick(event) {
     value: nextValue,
     label: target.dataset.dashboardLabel || target.textContent.trim(),
   };
-  renderDashboardDrilldown();
+  const changedFilter = applyDashboardSelectionFilter(nextKind, nextValue);
+  if (changedFilter) {
+    renderDashboard();
+  } else {
+    renderDashboardDrilldown();
+  }
   if (target.dataset.dashboardScroll === "drilldown") {
     window.requestAnimationFrame(() => {
       els.dashboardDrilldown.scrollIntoView({
@@ -538,6 +543,24 @@ function handleDashboardSelectionClick(event) {
       });
     });
   }
+}
+
+function applyDashboardSelectionFilter(kind, value) {
+  const previous = { ...state.dashboardFilters };
+  if (kind === "severity") {
+    state.dashboardFilters.severity = value || "all";
+  } else if (kind === "issue_type") {
+    state.dashboardFilters.issueType = value || "all";
+  } else if (kind === "table" || kind === "table_assessment") {
+    state.dashboardFilters.table = value || "all";
+  } else {
+    return false;
+  }
+  return (
+    previous.severity !== state.dashboardFilters.severity ||
+    previous.issueType !== state.dashboardFilters.issueType ||
+    previous.table !== state.dashboardFilters.table
+  );
 }
 
 els.diagramSvg.addEventListener("click", (event) => {
@@ -4292,7 +4315,7 @@ function renderIssueVisualRow(row, maxValue) {
   const width = value > 0 ? Math.max(5, Math.round(value / maxValue * 100)) : 0;
   const label = row.displayLabel || row.label;
   return `
-    <button class="issue-visual-row" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.label)}" data-dashboard-label="${escapeHtml(label)}">
+    <button class="issue-visual-row" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.label)}" data-dashboard-label="${escapeHtml(label)}" data-dashboard-scroll="drilldown">
       <span class="issue-visual-row-label">${escapeHtml(label)}</span>
       <span class="issue-visual-row-track" aria-hidden="true">
         <span class="issue-visual-row-fill ${dashboardTone(row.label)}" style="width: ${width}%"></span>

@@ -461,6 +461,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toContainText("Issue map");
   await expect(page.locator("#dashboardPanelGrid .issue-visual-chart")).toHaveCount(3);
   expect(await page.locator("#dashboardPanelGrid .issue-visual-row").count()).toBeGreaterThan(3);
+  await page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="severity"][data-dashboard-value="P1"]').click();
+  await expect(page.locator("#dashboardSeverityFilter")).toHaveValue("P1");
+  await expect(page.locator("#dashboardIssueCount")).toContainText("8/12 issues");
+  await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("8");
+  await page.locator("#dashboardResetFilters").click();
+  await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
 
   await goToProfileStep(page, "connect");
   await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
