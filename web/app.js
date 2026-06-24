@@ -473,7 +473,7 @@ els.dashboardDrilldown.addEventListener("click", async (event) => {
     state.issueLlmPanelOpen = true;
     state.issueLlmMessage = "";
     state.issueLlmMessageStatus = "";
-    renderDashboardDrilldown();
+    renderDashboardDrilldownPreservingViewport();
     return;
   }
   const enrichmentTarget = event.target.closest("[data-issue-llm-run]");
@@ -3591,10 +3591,13 @@ async function loadDashboard(jobId, options = {}) {
   }
   state.dashboardLoadingJobId = jobId;
   const previousSelection = state.dashboardSelection;
-  state.dashboardArtifactIndex = null;
-  state.dashboardArtifacts = {};
-  renderDashboardMessage("Loading issue review artifacts from web-runner URLs...", "pending");
-  renderDashboard();
+  const keepCurrentArtifactsDuringLoad = Boolean(options.keepCurrentArtifactsDuringLoad && state.dashboardArtifactIndex);
+  if (!keepCurrentArtifactsDuringLoad) {
+    state.dashboardArtifactIndex = null;
+    state.dashboardArtifacts = {};
+    renderDashboardMessage("Loading issue review artifacts from web-runner URLs...", "pending");
+    renderDashboard();
+  }
 
   try {
     const response = await fetch(`/api/jobs/${jobId}/dashboard`, { cache: "no-store" });
@@ -3630,7 +3633,11 @@ async function loadDashboard(jobId, options = {}) {
     state.dashboardLoadingJobId = "";
     renderDashboardMessage(error.message || "Unable to load issue review artifacts.", "error");
   } finally {
-    renderDashboard();
+    if (options.preserveViewportSelector) {
+      renderDashboardPreservingViewport(options.preserveViewportSelector);
+    } else {
+      renderDashboard();
+    }
     renderJob();
     renderDiagram();
   }
@@ -3649,14 +3656,14 @@ async function runIssueLlmEnrichment(issueId) {
   if (!jobId || !issueId) {
     state.issueLlmMessage = "Select a completed issue before running LLM enrichment.";
     state.issueLlmMessageStatus = "error";
-    renderDashboardDrilldown();
+    renderDashboardDrilldownPreservingViewport();
     return;
   }
   const provider = ["fake", "openai"].includes(state.issueLlmProvider) ? state.issueLlmProvider : "openai";
   state.issueLlmRunningIssueId = issueId;
   state.issueLlmMessage = `Running ${issueLlmProviderLabel(provider)} issue enrichment for ${issueId}...`;
   state.issueLlmMessageStatus = "pending";
-  renderDashboardDrilldown();
+  renderDashboardDrilldownPreservingViewport();
 
   try {
     const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/issue-enrichments`, {
@@ -3677,13 +3684,18 @@ async function runIssueLlmEnrichment(issueId) {
     const entry = payload.enrichment || {};
     state.issueLlmMessage = issueLlmMessageForEntry(entry);
     state.issueLlmMessageStatus = entry.status === "succeeded" ? "success" : "error";
-    await loadDashboard(jobId, { force: true, preserveSelection: true });
+    await loadDashboard(jobId, {
+      force: true,
+      preserveSelection: true,
+      keepCurrentArtifactsDuringLoad: true,
+      preserveViewportSelector: ".issue-llm-enrichment",
+    });
   } catch (error) {
     state.issueLlmMessage = error.message || "Issue LLM enrichment failed.";
     state.issueLlmMessageStatus = "error";
   } finally {
     state.issueLlmRunningIssueId = "";
-    renderDashboardDrilldown();
+    renderDashboardDrilldownPreservingViewport();
     renderJob();
   }
 }
@@ -3699,6 +3711,38 @@ function renderDashboardMessage(message, status) {
   els.dashboardMessage.textContent = text;
   els.dashboardMessage.dataset.status = status || "";
   els.dashboardMessage.hidden = !text;
+}
+
+function preserveViewportAroundRender(renderFn, anchorSelector = ".issue-llm-enrichment") {
+  const anchor = anchorSelector ? document.querySelector(anchorSelector) : null;
+  const fallback = els.dashboardDrilldown;
+  const beforeAnchor = anchor || fallback;
+  const beforeTop = beforeAnchor?.getBoundingClientRect().top;
+  renderFn();
+  if (!Number.isFinite(beforeTop)) {
+    return;
+  }
+  const afterAnchor = (anchorSelector ? document.querySelector(anchorSelector) : null) || fallback;
+  const afterTop = afterAnchor?.getBoundingClientRect().top;
+  if (!Number.isFinite(afterTop)) {
+    return;
+  }
+  const delta = afterTop - beforeTop;
+  if (Math.abs(delta) > 1) {
+    window.scrollBy({ top: delta, left: 0, behavior: "auto" });
+  }
+}
+
+function renderDashboardPreservingViewport(anchorSelector = ".issue-llm-enrichment") {
+  preserveViewportAroundRender(() => {
+    renderDashboard();
+  }, anchorSelector);
+}
+
+function renderDashboardDrilldownPreservingViewport(anchorSelector = ".issue-llm-enrichment") {
+  preserveViewportAroundRender(() => {
+    renderDashboardDrilldown();
+  }, anchorSelector);
 }
 
 function renderDashboard() {

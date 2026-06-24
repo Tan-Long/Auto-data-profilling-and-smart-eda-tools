@@ -695,10 +695,18 @@ test("local path run renders the interactive dashboard from generated artifacts"
     .click();
   await page.locator('[data-issue-llm-provider="fake"]').click();
   await expect(page.locator('[data-issue-llm-provider="fake"]')).toHaveAttribute("aria-pressed", "true");
+  const llmPanel = page.locator("#dashboardDrilldown .issue-llm-enrichment");
+  await llmPanel.scrollIntoViewIfNeeded();
+  const fakeRunAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
+  const fakeRunScrollY = await page.evaluate(() => window.scrollY);
   await page.locator("[data-issue-llm-run]").click();
   await expect(page.locator(".issue-llm-message")).toContainText("Fake enrichment ready for ISSUE-0009", {
     timeout: 20_000,
   });
+  const fakeResultAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
+  const fakeResultScrollY = await page.evaluate(() => window.scrollY);
+  expect(Math.abs(fakeResultAnchorTop - fakeRunAnchorTop)).toBeLessThan(8);
+  expect(fakeResultScrollY).toBeGreaterThanOrEqual(fakeRunScrollY - 80);
   await expect(page.locator("#dashboardDrilldown")).toContainText("Why this was flagged");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Extra fix suggestion");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Extra verification");
@@ -713,10 +721,17 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   await page.locator('[data-issue-llm-provider="openai"]').click();
   await expect(page.locator('[data-issue-llm-provider="openai"]')).toHaveAttribute("aria-pressed", "true");
+  await llmPanel.scrollIntoViewIfNeeded();
+  const openAiRunAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
+  const openAiRunScrollY = await page.evaluate(() => window.scrollY);
   await page.locator("[data-issue-llm-run]").click();
   await expect(page.locator(".issue-llm-message")).toContainText("OPENAI_API_KEY", {
     timeout: 20_000,
   });
+  const openAiResultAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
+  const openAiResultScrollY = await page.evaluate(() => window.scrollY);
+  expect(Math.abs(openAiResultAnchorTop - openAiRunAnchorTop)).toBeLessThan(8);
+  expect(openAiResultScrollY).toBeGreaterThanOrEqual(openAiRunScrollY - 80);
   await expect(page.locator("#dashboardDrilldown")).toContainText("unavailable");
   await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI provider was selected");
   await page.locator("#dashboardDrilldown .issue-llm-enrichment").scrollIntoViewIfNeeded();

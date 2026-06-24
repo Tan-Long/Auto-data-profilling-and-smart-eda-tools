@@ -399,6 +399,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "artifactUrlFromArtifacts",
         "loadDashboard",
         "renderDashboard",
+        "preserveViewportAroundRender",
+        "renderDashboardPreservingViewport",
+        "renderDashboardDrilldownPreservingViewport",
+        "keepCurrentArtifactsDuringLoad",
+        "preserveViewportSelector",
         "renderDashboardSummary",
         "renderDashboardRiskMeter",
         "renderDashboardRiskBreakdown",
@@ -646,6 +651,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "verify_after_fix_steps" in js
     assert "renderIssueLlmEnrichment" in js
     assert "runIssueLlmEnrichment" in js
+    assert "renderDashboardDrilldownPreservingViewport" in js
+    assert "keepCurrentArtifactsDuringLoad" in js
+    assert "preserveViewportSelector" in js
     assert "getIssueLlmEnrichment" in js
     assert "data-issue-llm-provider" in js
     assert "data-issue-llm-run" in js
