@@ -1126,11 +1126,33 @@ h3 {
   opacity: 0.7;
 }
 
-.diagram-relationship-danger .diagram-edge {
+.diagram-edge-flow {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 3 9;
+  stroke-dashoffset: 12;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.diagram-edge-terminal {
+  fill: none;
+  stroke: rgba(104, 115, 111, 0.66);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.diagram-relationship-danger .diagram-edge,
+.diagram-relationship-danger .diagram-edge-terminal {
   stroke: rgba(178, 59, 50, 0.7);
 }
 
-.diagram-relationship-warn .diagram-edge {
+.diagram-relationship-warn .diagram-edge,
+.diagram-relationship-warn .diagram-edge-terminal {
   stroke: rgba(154, 95, 0, 0.72);
 }
 
@@ -1140,12 +1162,28 @@ h3 {
   stroke-width: 1;
 }
 
-.diagram-relationship-danger .diagram-port-dot {
+.diagram-relationship-danger .diagram-port-dot,
+.diagram-relationship-danger .diagram-cardinality-marker {
   stroke: rgba(178, 59, 50, 0.74);
+  fill: rgba(178, 59, 50, 0.9);
 }
 
-.diagram-relationship-warn .diagram-port-dot {
+.diagram-relationship-warn .diagram-port-dot,
+.diagram-relationship-warn .diagram-cardinality-marker {
   stroke: rgba(154, 95, 0, 0.74);
+  fill: rgba(154, 95, 0, 0.9);
+}
+
+.diagram-cardinality-marker {
+  fill: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 950;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: #ffffff;
+  stroke-width: 3px;
+  text-anchor: middle;
 }
 
 .diagram-edge-label {
@@ -1159,20 +1197,40 @@ h3 {
 
 .diagram-relationship:hover .diagram-edge,
 .diagram-relationship:focus-visible .diagram-edge,
-.diagram-relationship.selected .diagram-edge {
+.diagram-relationship.selected .diagram-edge,
+.diagram-relationship.neighbor .diagram-edge {
   stroke-width: 2.3;
   opacity: 1;
 }
 
+.diagram-relationship:hover .diagram-edge-flow,
+.diagram-relationship:focus-visible .diagram-edge-flow,
+.diagram-relationship.selected .diagram-edge-flow,
+.diagram-relationship.neighbor .diagram-edge-flow {
+  animation: diagram-edge-flow 1.1s linear infinite;
+  opacity: 0.86;
+}
+
 .diagram-relationship:hover .diagram-edge-label,
-.diagram-relationship:focus-visible .diagram-edge-label,
-.diagram-relationship.selected .diagram-edge-label {
+.diagram-relationship:focus-visible .diagram-edge-label {
   opacity: 1;
 }
 
 .diagram-relationship.dimmed .diagram-edge,
-.diagram-relationship.dimmed .diagram-port-dot {
+.diagram-relationship.dimmed .diagram-edge-terminal,
+.diagram-relationship.dimmed .diagram-port-dot,
+.diagram-relationship.dimmed .diagram-cardinality-marker {
   opacity: 0.18;
+}
+
+@keyframes diagram-edge-flow {
+  from {
+    stroke-dashoffset: 12;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .diagram-table {
