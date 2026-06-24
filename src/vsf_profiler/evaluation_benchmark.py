@@ -313,7 +313,7 @@ def build_baseline_comparison(
     availability = _great_expectations_availability()
     native_results: dict[str, dict[str, Any]] = {}
     baseline_status = availability["status"]
-    baseline_reason = availability.get("reason", "")
+    baseline_reason = _human_readable_ge_reason(availability.get("reason", ""))
 
     if availability["status"] == "available":
         try:
@@ -323,7 +323,7 @@ def build_baseline_comparison(
             )
         except Exception as exc:  # pragma: no cover - depends on optional GE API.
             baseline_status = "unavailable"
-            baseline_reason = f"{exc.__class__.__name__}: {exc}"
+            baseline_reason = _human_readable_ge_reason(f"{exc.__class__.__name__}: {exc}")
 
     rows = []
     ge_caught = 0
@@ -699,13 +699,29 @@ def _great_expectations_availability() -> dict[str, Any]:
         return {
             "status": "unavailable",
             "version": None,
-            "reason": f"{exc.__class__.__name__}: {exc}",
+            "reason": _human_readable_ge_reason(f"{exc.__class__.__name__}: {exc}"),
         }
     return {
         "status": "available",
         "version": getattr(module, "__version__", None),
         "reason": "",
     }
+
+
+def _human_readable_ge_reason(reason: str) -> str:
+    text = str(reason or "").strip()
+    if "ModuleNotFoundError" in text and "great_expectations" in text:
+        return (
+            "Great Expectations is not installed in this local environment. "
+            "VSF still ran against seeded ground truth; install the optional "
+            "evaluation extra to run GE-native checks."
+        )
+    if "PandasDataset" in text:
+        return (
+            "The installed Great Expectations version does not expose the legacy "
+            "PandasDataset adapter used by this local benchmark."
+        )
+    return text
 
 
 def _usefulness_summary(

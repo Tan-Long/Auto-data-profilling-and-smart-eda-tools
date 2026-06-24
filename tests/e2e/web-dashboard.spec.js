@@ -64,10 +64,14 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#evaluationComparisonStatus")).toContainText("complete");
   await expect(page.locator("#workflowNav")).toContainText("Comparison Summary");
   await expect(page.locator("#evaluationSummaryStrip")).toContainText("VSF caught");
+  await expect(page.locator("#evaluationExpectedList")).toContainText("Seeded issue");
+  await expect(page.locator("#evaluationExpectedList")).toContainText("VSF profiler");
+  await expect(page.locator("#evaluationExpectedList")).toContainText("Great Expectations");
   await expect(page.locator("#evaluationExpectedList")).toContainText("caught");
   await expect(page.locator("#evaluationUsefulnessList")).toContainText("Actionability");
-  await expect(page.locator("#evaluationBaselineList")).toContainText("GE unavailable");
-  await expect(page.locator("#evaluationBaselineList")).toContainText("Not covered by baseline");
+  await expect(page.locator("#evaluationExpectedList")).toContainText("GE not installed");
+  await expect(page.locator("#evaluationExpectedList")).toContainText("Not covered by baseline");
+  await expect(page.locator("#evaluationComparison")).not.toContainText("ModuleNotFoundError");
   await expect(page.locator("#evaluationArtifactLinks")).toContainText("evaluation_summary.json");
   await page.locator("#evaluationComparison").screenshot({
     path: "outputs/us073_goal10/evaluate-comparison-summary.png",

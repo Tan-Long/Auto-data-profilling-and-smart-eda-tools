@@ -1827,7 +1827,7 @@ function renderEvaluationComparison(summary, baseline) {
       : "Run a curated dataset to compare VSF output against seeded ground truth.";
     els.evaluationExpectedList.innerHTML = `<p class="muted">${escapeHtml(message)}</p>`;
     els.evaluationUsefulnessList.innerHTML = `<p class="muted">Actionability metrics load from issue_action_plans.json after the evaluation run.</p>`;
-    els.evaluationBaselineList.innerHTML = `<p class="muted">Great Expectations baseline status loads after comparison.</p>`;
+    els.evaluationBaselineList.innerHTML = `<p class="muted">Great Expectations baseline status loads after comparison. The final matrix places VSF and GE side by side.</p>`;
     els.evaluationArtifactLinks.innerHTML = "";
     return;
   }
@@ -1835,40 +1835,94 @@ function renderEvaluationComparison(summary, baseline) {
   const correctness = summary.correctness || {};
   const usefulness = summary.usefulness || {};
   const baselineSummary = summary.baseline || {};
+  const baselineRows = summary.baseline_rows || baseline?.rows || [];
   els.evaluationComparisonStatus.textContent = `${summary.dataset?.label || "Evaluation"} complete`;
   els.evaluationSummaryStrip.innerHTML = `
     <div><span>VSF caught</span><strong>${integerText(correctness.vsf_caught_occurrence_count)}/${integerText(correctness.expected_issue_occurrence_count)}</strong></div>
     <div><span>missed</span><strong>${integerText(correctness.vsf_missed_occurrence_count)}</strong></div>
     <div><span>extra</span><strong>${integerText(correctness.vsf_extra_occurrence_count)}</strong></div>
-    <div><span>GE status</span><strong>${escapeHtml(baselineSummary.status || "unknown")}</strong></div>
+    <div><span>GE status</span><strong>${escapeHtml(baselineStatusLabel(baselineSummary.status))}</strong></div>
     <div><span>guidance</span><strong>${integerText(usefulness.issue_action_plan_count)} plans</strong></div>
   `;
-  els.evaluationExpectedList.innerHTML = renderEvaluationIssueRows(summary.issue_comparison_rows || []);
-  els.evaluationUsefulnessList.innerHTML = renderEvaluationUsefulnessRows(usefulness);
-  els.evaluationBaselineList.innerHTML = renderEvaluationBaselineRows(
-    summary.baseline_rows || baseline?.rows || [],
-    baselineSummary,
+  els.evaluationExpectedList.innerHTML = renderEvaluationComparisonMatrix(
+    summary.issue_comparison_rows || [],
+    baselineRows,
   );
+  els.evaluationUsefulnessList.innerHTML = renderEvaluationUsefulnessRows(usefulness);
+  els.evaluationBaselineList.innerHTML = renderEvaluationBaselineSummary(baselineRows, baselineSummary);
   els.evaluationArtifactLinks.innerHTML = renderEvaluationArtifactLinks();
 }
 
-function renderEvaluationIssueRows(rows) {
+function renderEvaluationComparisonMatrix(rows, baselineRows) {
   if (!rows.length) {
     return `<p class="muted">No comparison rows were generated.</p>`;
   }
-  return rows.map((row) => `
-    <div class="evaluation-row">
-      <span class="pill-status ${evaluationStatusClass(row.vsf_status)}">${escapeHtml(row.vsf_status || "unknown")}</span>
-      <span>
-        <strong>${escapeHtml(issueTypeLabel(row))}</strong>
-        <small>${escapeHtml(evaluationIssueContext(row))}</small>
-      </span>
-      <span class="evaluation-row-metrics">
-        <code>${integerText(row.actual_occurrences)}/${integerText(row.expected_occurrences)} occurrences</code>
-        <code>${escapeHtml(row.bad_count_status || "bad count unknown")}</code>
-      </span>
+  const baselineByGroundTruthId = new Map((Array.isArray(baselineRows) ? baselineRows : [])
+    .map((row) => [row.ground_truth_id, row]));
+  const visibleRows = rows.slice(0, 10);
+  const remainingRows = rows.slice(visibleRows.length);
+  return `
+    <div class="evaluation-comparison-table" role="table" aria-label="VSF and Great Expectations comparison">
+      <div class="evaluation-comparison-header" role="row">
+        <span role="columnheader">Seeded issue</span>
+        <span role="columnheader">VSF profiler</span>
+        <span role="columnheader">Great Expectations</span>
+      </div>
+      ${visibleRows.map((row) => renderEvaluationComparisonRow(row, baselineByGroundTruthId.get(row.ground_truth_id))).join("")}
     </div>
-  `).join("");
+    ${remainingRows.length ? `
+      <details class="evaluation-more-rows">
+        <summary>Show ${integerText(remainingRows.length)} more expected issue${remainingRows.length === 1 ? "" : "s"}</summary>
+        <div class="evaluation-comparison-table compact" role="table" aria-label="Additional comparison rows">
+          ${remainingRows.map((row) => renderEvaluationComparisonRow(row, baselineByGroundTruthId.get(row.ground_truth_id))).join("")}
+        </div>
+      </details>
+    ` : ""}
+  `;
+}
+
+function renderEvaluationComparisonRow(row, baselineRow) {
+  const geRow = baselineRow || {};
+  const actualIssueIds = Array.isArray(row.actual_issue_ids) ? row.actual_issue_ids.filter(Boolean) : [];
+  const geReason = shortEvaluationReason(geRow.reason || "", geRow.ge_status, geRow.baseline_coverage);
+  return `
+    <article class="evaluation-comparison-row" role="row">
+      <div class="evaluation-comparison-cell expected" role="cell">
+        <span class="evaluation-cell-label">Seeded issue</span>
+        <div class="evaluation-cell-heading">
+          <span class="issue-pill ${issueStatusClass(issueStatus(row))}">${escapeHtml(row.severity || "P?")}</span>
+          <strong>${escapeHtml(issueTypeLabel(row))}</strong>
+        </div>
+        <small>${escapeHtml(evaluationIssueContext(row))}</small>
+        <div class="evaluation-row-metrics">
+          <code>${integerText(row.expected_occurrences)} expected group${Number(row.expected_occurrences || 0) === 1 ? "" : "s"}</code>
+          <code>${integerText(row.expected_bad_count)} bad rows</code>
+        </div>
+      </div>
+      <div class="evaluation-comparison-cell tool" role="cell">
+        <span class="evaluation-cell-label">VSF profiler</span>
+        <div class="evaluation-tool-status">
+          <span class="pill-status ${evaluationStatusClass(row.vsf_status)}">${escapeHtml(row.vsf_status || "unknown")}</span>
+          <strong>${integerText(row.actual_occurrences)}/${integerText(row.expected_occurrences)}</strong>
+        </div>
+        <small>${escapeHtml(readableEvaluationStatus(row.bad_count_status || "bad count unknown"))}</small>
+        ${actualIssueIds.length ? `
+          <div class="evaluation-issue-chips">
+            ${actualIssueIds.slice(0, 3).map((issueId) => `<code>${escapeHtml(issueId)}</code>`).join("")}
+            ${actualIssueIds.length > 3 ? `<span>+${integerText(actualIssueIds.length - 3)}</span>` : ""}
+          </div>
+        ` : ""}
+      </div>
+      <div class="evaluation-comparison-cell tool" role="cell">
+        <span class="evaluation-cell-label">Great Expectations</span>
+        <div class="evaluation-tool-status">
+          <span class="pill-status ${evaluationStatusClass(geRow.ge_status)}">${escapeHtml(baselineStatusLabel(geRow.ge_status))}</span>
+          <strong>${geRow.observed_bad_count === null || geRow.observed_bad_count === undefined ? "--" : integerText(geRow.observed_bad_count)}</strong>
+        </div>
+        <small>${escapeHtml(geReason || baselineCoverageLabel(geRow.baseline_coverage))}</small>
+      </div>
+    </article>
+  `;
 }
 
 function renderEvaluationUsefulnessRows(usefulness) {
@@ -1882,32 +1936,23 @@ function renderEvaluationUsefulnessRows(usefulness) {
   `;
 }
 
-function renderEvaluationBaselineRows(rows, baselineSummary) {
-  const reason = baselineSummary.reason
-    ? `<p class="evaluation-baseline-note">${escapeHtml(baselineSummary.reason)}</p>`
+function renderEvaluationBaselineSummary(rows, baselineSummary) {
+  const reason = humanEvaluationReason(baselineSummary.reason || "");
+  const nativeCount = (Array.isArray(rows) ? rows : []).filter((row) => row.baseline_coverage === "native").length;
+  const reasonMarkup = reason
+    ? `<p class="evaluation-baseline-note">${escapeHtml(reason)}</p>`
     : "";
-  const summary = `
+  return `
     <div class="evaluation-metric-grid">
       <div><span>GE caught</span><strong>${integerText(baselineSummary.ge_caught_group_count)}</strong></div>
       <div><span>Not covered</span><strong>${integerText(baselineSummary.ge_not_covered_group_count)}</strong></div>
       <div><span>Unavailable</span><strong>${integerText(baselineSummary.ge_unavailable_group_count)}</strong></div>
       <div><span>Baseline gaps</span><strong>${integerText(baselineSummary.baseline_gap_count)}</strong></div>
+      <div><span>Native checks</span><strong>${integerText(nativeCount)}</strong></div>
     </div>
-    ${reason}
+    ${reasonMarkup}
+    <p class="muted">The comparison matrix above shows the VSF result and the GE baseline state on the same seeded issue row.</p>
   `;
-  const rowMarkup = rows.slice(0, 12).map((row) => `
-    <div class="evaluation-row">
-      <span class="pill-status ${evaluationStatusClass(row.ge_status)}">${escapeHtml(baselineStatusLabel(row.ge_status))}</span>
-      <span>
-        <strong>${escapeHtml(row.issue_type || "Expected issue")}</strong>
-        <small>${escapeHtml(evaluationIssueContext(row))}</small>
-      </span>
-      <span class="evaluation-row-metrics">
-        <code>${escapeHtml(row.reason || "")}</code>
-      </span>
-    </div>
-  `).join("");
-  return `${summary}${rowMarkup}`;
 }
 
 function renderEvaluationArtifactLinks() {
@@ -1959,9 +2004,45 @@ function baselineStatusLabel(status) {
     return "Not covered by baseline";
   }
   if (status === "unavailable") {
-    return "GE unavailable";
+    return "GE not installed";
   }
   return status || "unknown";
+}
+
+function baselineCoverageLabel(coverage) {
+  if (coverage === "native") {
+    return "Native GE check";
+  }
+  if (coverage === "not_covered") {
+    return "Not covered by baseline";
+  }
+  return "Baseline state unknown";
+}
+
+function readableEvaluationStatus(status) {
+  return String(status || "unknown").replace(/_/g, " ");
+}
+
+function humanEvaluationReason(reason) {
+  const text = String(reason || "").trim();
+  if (text.includes("ModuleNotFoundError") && text.includes("great_expectations")) {
+    return "Great Expectations is not installed in this local environment. VSF still ran against seeded ground truth.";
+  }
+  if (text.includes("PandasDataset")) {
+    return "Installed Great Expectations version does not expose the legacy PandasDataset adapter used by this benchmark.";
+  }
+  return text;
+}
+
+function shortEvaluationReason(reason, status, coverage) {
+  const text = humanEvaluationReason(reason);
+  if (status === "unavailable" && text.includes("Great Expectations is not installed")) {
+    return "Optional GE baseline unavailable.";
+  }
+  if (coverage === "not_covered") {
+    return "VSF-only data-quality check.";
+  }
+  return text;
 }
 
 function evaluationIssueContext(row) {

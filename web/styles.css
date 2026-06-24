@@ -581,8 +581,15 @@ h3 {
 .evaluation-summary-strip,
 .evaluation-metric-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
+}
+
+.evaluation-summary-strip {
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+}
+
+.evaluation-metric-grid {
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
 }
 
 .evaluation-summary-strip div,
@@ -624,6 +631,130 @@ h3 {
 .evaluation-section-heading span {
   color: var(--foreground-tertiary);
   font-size: 12px;
+}
+
+.evaluation-comparison-table {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.evaluation-comparison-table.compact {
+  margin-top: 8px;
+}
+
+.evaluation-comparison-header,
+.evaluation-comparison-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(170px, 0.95fr) minmax(170px, 0.95fr);
+}
+
+.evaluation-comparison-header {
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+}
+
+.evaluation-comparison-header span {
+  padding: 8px 10px;
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.evaluation-comparison-row + .evaluation-comparison-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.evaluation-comparison-cell {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.evaluation-comparison-cell + .evaluation-comparison-cell {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.evaluation-cell-label {
+  display: none;
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.evaluation-cell-heading,
+.evaluation-tool-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.evaluation-cell-heading strong {
+  min-width: 0;
+  color: var(--foreground-primary);
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.evaluation-tool-status {
+  justify-content: space-between;
+}
+
+.evaluation-tool-status strong {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.evaluation-comparison-cell small {
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.evaluation-issue-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.evaluation-issue-chips code,
+.evaluation-issue-chips span {
+  padding: 3px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--foreground-secondary);
+  font-size: 11px;
+}
+
+.evaluation-more-rows {
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.evaluation-more-rows > summary {
+  padding: 10px 12px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  list-style-position: inside;
+}
+
+.evaluation-more-rows > summary:focus-visible {
+  outline: 3px solid rgba(15, 118, 100, 0.28);
+  outline-offset: 3px;
 }
 
 .evaluation-row {
@@ -6442,6 +6573,23 @@ details.runtime-stage-item:focus-within {
 
   .dashboard-summary-metric:nth-child(n + 3) {
     border-top: 1px solid var(--border-subtle);
+  }
+
+  .evaluation-comparison-header {
+    display: none;
+  }
+
+  .evaluation-comparison-row {
+    grid-template-columns: 1fr;
+  }
+
+  .evaluation-comparison-cell + .evaluation-comparison-cell {
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
+  }
+
+  .evaluation-cell-label {
+    display: block;
   }
 
   .diagram-panel {

@@ -58,9 +58,12 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#evaluateMessage")).toContainText("Evaluation complete", {
       timeout: 60_000,
     });
+    await expect(page.locator("#evaluationExpectedList")).toContainText("VSF profiler");
+    await expect(page.locator("#evaluationExpectedList")).toContainText("Great Expectations");
     await expect(page.locator("#evaluationExpectedList")).toContainText("caught");
     await expect(page.locator("#evaluationUsefulnessList")).toContainText("Actionability");
-    await expect(page.locator("#evaluationBaselineList")).toContainText(/GE unavailable|Not covered by baseline/);
+    await expect(page.locator("#evaluationExpectedList")).toContainText(/GE not installed|Not covered by baseline/);
+    await expect(page.locator("#evaluationComparison")).not.toContainText("ModuleNotFoundError");
     await expect(page.locator("#evaluationArtifactLinks")).toContainText("evaluation_summary.json");
     await expect(page.locator("#evaluationArtifactLinks")).toContainText("ground_truth_issues.json");
     await expect(page.locator("#evaluationArtifactLinks")).toContainText("baseline_comparison.json");

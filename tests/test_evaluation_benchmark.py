@@ -63,6 +63,8 @@ def test_evaluation_benchmark_writes_ground_truth_baseline_and_summary(
     assert persisted_summary["usefulness"]["average_actionability_score"] > 0
     assert persisted_summary["usefulness"]["average_evidence_coverage_score"] > 0
     assert persisted_summary["baseline"]["status"] == "unavailable"
+    assert "Great Expectations is not installed" in persisted_summary["baseline"]["reason"]
+    assert "ModuleNotFoundError" not in persisted_summary["baseline"]["reason"]
     assert persisted_summary["baseline"]["ge_unavailable_group_count"] > 0
     assert persisted_summary["baseline"]["ge_not_covered_group_count"] > 0
     assert persisted_summary["baseline"]["baseline_gap_count"] == 14
@@ -79,6 +81,7 @@ def test_evaluation_benchmark_writes_ground_truth_baseline_and_summary(
         for row in baseline["rows"]
         if row["baseline_coverage"] == "native"
     } == {"unavailable"}
+    assert all("ModuleNotFoundError" not in row.get("reason", "") for row in baseline["rows"])
 
 
 def test_evaluation_benchmark_rejects_unknown_dataset(tmp_path):
