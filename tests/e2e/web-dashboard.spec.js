@@ -491,9 +491,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
   await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toBeVisible();
   await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toContainText("Issue map");
-  await expect(page.locator("#dashboardPanelGrid .issue-visual-chart")).toHaveCount(3);
+  await expect(page.locator("#dashboardPanelGrid .severity-priority-panel")).toContainText("Severity priority");
+  await expect(page.locator("#dashboardPanelGrid .severity-priority-panel")).toContainText("Must fix before analysis");
+  await expect(page.locator("#dashboardPanelGrid .severity-priority-card[data-dashboard-value=\"P0\"]")).toBeVisible();
+  await expect(page.locator("#dashboardPanelGrid .severity-priority-card[data-dashboard-value=\"P1\"]")).toBeVisible();
+  await expect(page.locator("#dashboardPanelGrid .issue-visual-chart")).toHaveCount(2);
   expect(await page.locator("#dashboardPanelGrid .issue-visual-row").count()).toBeGreaterThan(3);
-  await page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="severity"][data-dashboard-value="P1"]').click();
+  await page.locator('#dashboardPanelGrid .severity-priority-card[data-dashboard-kind="severity"][data-dashboard-value="P1"]').click();
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("severity P1");
   await expect(page.locator("#dashboardIssueCount")).toContainText("8/12 issues");
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");

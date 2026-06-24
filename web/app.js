@@ -5184,9 +5184,7 @@ function renderIssueVisualSummary(filteredIssues) {
     .map(([label, value]) => ({ label, displayLabel: issueTypeText(label), value, kind: "issue_type" }))
     .sort((a, b) => b.value - a.value || a.displayLabel.localeCompare(b.displayLabel))
     .slice(0, 5);
-  const severityRows = severityOrder
-    .map((label) => ({ label, value: filteredIssues.filter((issue) => issue.severity === label).length, kind: "severity" }))
-    .filter((row) => row.value > 0);
+  const severityRows = severityPriorityRows(filteredIssues);
   const badRows = sum(filteredIssues.map((issue) => Number(issue.bad_count || 0)));
   return `
     <section class="issue-visual-summary" aria-label="Issue visual summary">
@@ -5204,12 +5202,89 @@ function renderIssueVisualSummary(filteredIssues) {
         </div>
       </div>
       <div class="issue-visual-grid">
-        ${renderIssueVisualChart("Severity", "Run impact", severityRows, "No severities match the current filters.")}
+        ${renderSeverityPriorityPanel(severityRows)}
         ${renderIssueVisualChart("Top tables", "Where issues cluster", tableRows, "No tables match the current filters.")}
         ${renderIssueVisualChart("Issue types", "What failed", typeRows, "No issue types match the current filters.")}
       </div>
     </section>
   `;
+}
+
+function severityPriorityRows(issues) {
+  return severityOrder.map((label) => {
+    const matching = issues.filter((issue) => issue.severity === label);
+    return {
+      label,
+      value: matching.length,
+      badRows: sum(matching.map((issue) => Number(issue.bad_count || 0))),
+      kind: "severity",
+    };
+  });
+}
+
+function renderSeverityPriorityPanel(rows) {
+  const maxBadRows = Math.max(...rows.map((row) => Number(row.badRows || 0)), 1);
+  const mustFix = rows.filter((row) => row.label === "P0" || row.label === "P1");
+  const review = rows.filter((row) => row.label === "P2" || row.label === "P3");
+  return `
+    <article class="severity-priority-panel" aria-label="Severity priority">
+      <div class="issue-visual-chart-heading">
+        <strong>Severity priority</strong>
+        <span>Fix order</span>
+      </div>
+      <div class="severity-priority-stack">
+        ${renderSeverityPriorityGroup("Must fix before analysis", mustFix, maxBadRows, "critical")}
+        ${renderSeverityPriorityGroup("Review after blockers", review, maxBadRows, "review")}
+      </div>
+    </article>
+  `;
+}
+
+function renderSeverityPriorityGroup(title, rows, maxBadRows, tone) {
+  return `
+    <div class="severity-priority-group ${escapeHtml(tone)}">
+      <span>${escapeHtml(title)}</span>
+      <div>
+        ${rows.map((row) => renderSeverityPriorityCard(row, maxBadRows)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderSeverityPriorityCard(row, maxBadRows) {
+  const value = Number(row.value || 0);
+  const badRows = Number(row.badRows || 0);
+  const width = badRows > 0 ? Math.max(6, Math.round(badRows / maxBadRows * 100)) : 0;
+  const selected = state.dashboardFilters.severity === row.label;
+  const meta = severityPriorityMeta(row.label);
+  return `
+    <button class="severity-priority-card ${dashboardTone(row.label)} ${selected ? "selected" : ""}" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.label)}" data-dashboard-label="${escapeHtml(row.label)}" data-dashboard-scroll="drilldown" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(`${row.label}: ${meta.label}, ${integerText(value)} issues, ${integerText(badRows)} bad rows`)}">
+      <span class="severity-priority-code">${escapeHtml(row.label)}</span>
+      <span class="severity-priority-copy">
+        <strong>${escapeHtml(meta.label)}</strong>
+        <small>${escapeHtml(meta.detail)}</small>
+      </span>
+      <span class="severity-priority-count">${integerText(value)}</span>
+      <span class="severity-priority-meter" aria-hidden="true"><span style="width: ${width}%"></span></span>
+      <span class="severity-priority-impact">${integerText(badRows)} bad rows</span>
+    </button>
+  `;
+}
+
+function severityPriorityMeta(severity) {
+  if (severity === "P0") {
+    return { label: "Blocks use", detail: "Stop use" };
+  }
+  if (severity === "P1") {
+    return { label: "Fix first", detail: "Pre-analysis" };
+  }
+  if (severity === "P2") {
+    return { label: "Review", detail: "Owner check" };
+  }
+  if (severity === "P3") {
+    return { label: "Monitor", detail: "Caution" };
+  }
+  return { label: "Review", detail: "Owner check" };
 }
 
 function renderIssueActiveLens(filteredCount) {
@@ -5378,7 +5453,7 @@ function renderIssueInbox(filteredIssues) {
       </div>
       <div class="issue-review-table" role="table" aria-label="Issues by table and column">
         <div class="issue-review-header" role="row">
-          <span role="columnheader">Issue</span>
+          <span role="columnheader">Priority</span>
           <span role="columnheader">Table</span>
           <span role="columnheader">Column</span>
           <span role="columnheader">Problem</span>
@@ -5404,7 +5479,10 @@ function renderInboxIssueRow(issue) {
   const affectedWidth = Number(issue.bad_count || 0) > 0 ? Math.max(2, affectedPercent) : 0;
   return `
     <button class="issue-inbox-row ${selected ? "selected" : ""}" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issue.issue_id)}" data-dashboard-label="${escapeHtml(issue.issue_id)}" data-dashboard-scroll="drilldown" role="row" aria-label="${escapeHtml(`${issueGuid(issue)} ${tableName} ${columnLabel} ${issueTypeLabel(issue)}`)}">
-      <span class="issue-guid" role="cell">${escapeHtml(issueGuid(issue))}</span>
+      <span class="issue-priority-cell" role="cell">
+        <span class="issue-severity-token ${dashboardTone(issue.severity)}">${escapeHtml(issue.severity || "P?")}</span>
+        <code>${escapeHtml(issueGuid(issue))}</code>
+      </span>
       <span class="issue-table-cell" role="cell"><code>${escapeHtml(tableName)}</code></span>
       <span class="issue-column-cell" role="cell"><code>${escapeHtml(columnLabel)}</code>${context ? `<small>${escapeHtml(context)}</small>` : ""}</span>
       <span class="issue-row-main" role="cell">
