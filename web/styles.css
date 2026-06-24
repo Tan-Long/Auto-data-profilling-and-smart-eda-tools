@@ -3451,16 +3451,14 @@ h3 {
   background: var(--surface-overlay);
 }
 
-.developer-options,
-.compat-fields {
+.developer-options {
   min-width: 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-overlay);
 }
 
-.developer-options > summary,
-.compat-fields > summary {
+.developer-options > summary {
   min-height: 42px;
   padding: 11px 12px;
   color: var(--foreground-secondary);
@@ -3469,8 +3467,7 @@ h3 {
   cursor: pointer;
 }
 
-.developer-options[open] > summary,
-.compat-fields[open] > summary {
+.developer-options[open] > summary {
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -3478,15 +3475,6 @@ h3 {
   display: grid;
   gap: 10px;
   padding: 10px;
-}
-
-.compat-fields {
-  display: grid;
-}
-
-.compat-fields > label,
-.compat-fields > .file-card {
-  margin: 10px;
 }
 
 .option-heading {

@@ -241,7 +241,7 @@
             </div>
 
             <details class="developer-options" id="profileDeveloperOptions">
-              <summary>Advanced and compatibility options</summary>
+              <summary>Demo and LLM options</summary>
               <div class="developer-options-grid">
                 <div class="runner-option-block" aria-label="Demo dataset">
                   <div class="option-heading">
@@ -254,47 +254,21 @@
                   </div>
                 </div>
 
-                <div class="runner-option-block" aria-label="Compatibility LLM report mode">
+                <div class="runner-option-block" aria-label="Optional LLM report mode">
                   <div class="option-heading">
-                    <strong>Compatibility LLM report</strong>
+                    <strong>Optional LLM report</strong>
                     <span id="llmModeStatus">LLM off</span>
                   </div>
-                  <div class="runner-mode-switch llm-mode-switch" role="group" aria-label="Compatibility LLM report mode">
+                  <div class="runner-mode-switch llm-mode-switch" role="group" aria-label="Optional LLM report mode">
                     <button class="mode-button active" id="llmModeOff" type="button" aria-pressed="true">Off</button>
                     <button class="mode-button" id="llmModeFake" type="button" aria-pressed="false">Fake</button>
                     <button class="mode-button" id="llmModeOpenAI" type="button" aria-pressed="false">OpenAI</button>
                   </div>
                 </div>
-
-                <div class="runner-option-block" aria-label="Developer database source">
-                  <div class="option-heading">
-                    <strong>Developer DB source</strong>
-                    <span>Compatibility</span>
-                  </div>
-                  <button class="mode-button" id="runnerModeDatabase" type="button" role="tab" aria-selected="false" aria-controls="databaseRunnerForm">Developer DB source</button>
-                </div>
               </div>
             </details>
 
             <form class="runner-form" id="runnerForm">
-              <details class="compat-fields" id="uploadCompatibilityOptions">
-                <summary>Compatibility run options</summary>
-                <label class="field-label" for="rulesInput">
-                  Compatibility rule config
-                  <input id="rulesInput" type="file" accept=".yaml,.yml,.json,.txt">
-                </label>
-                <div class="file-card compact" id="rulesFileCard" hidden>
-                  <span class="file-icon" aria-hidden="true">YML</span>
-                  <div>
-                    <strong id="rulesFileName">rules.yaml</strong>
-                    <p id="rulesFileMeta">Ready for backend run</p>
-                  </div>
-                </div>
-                <label class="field-label" for="targetInput">
-                  Compatibility association field
-                  <input id="targetInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="order_reviews.review_score">
-                </label>
-              </details>
               <button class="button primary" id="runProfilerButton" type="submit" disabled>Run full profiler</button>
             </form>
 
@@ -307,55 +281,7 @@
                 CSV directory path
                 <input id="csvDirPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/csv">
               </label>
-              <details class="compat-fields" id="pathCompatibilityOptions">
-                <summary>Compatibility run options</summary>
-                <label class="field-label" for="rulesPathInput">
-                  Compatibility rule config path
-                  <input id="rulesPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="data/demo_small/rules.yaml">
-                </label>
-                <label class="field-label" for="pathTargetInput">
-                  Compatibility association field
-                  <input id="pathTargetInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="order_reviews.review_score">
-                </label>
-              </details>
               <button class="button primary" id="runPathProfilerButton" type="submit" disabled>Run path job</button>
-            </form>
-
-            <form class="runner-form" id="databaseRunnerForm" hidden>
-              <div class="database-source-grid">
-                <label class="field-label" for="databaseSourceType">
-                  Developer source type
-                  <select id="databaseSourceType">
-                    <option value="postgres">Postgres</option>
-                    <option value="mysql">MySQL / MariaDB</option>
-                  </select>
-                </label>
-                <label class="field-label" for="databaseChunkRowsInput">
-                  Chunk rows
-                  <input id="databaseChunkRowsInput" type="number" inputmode="numeric" min="1" max="100000" value="10000">
-                </label>
-              </div>
-              <label class="field-label" for="databaseUrlInput">
-                Connection URL
-                <input id="databaseUrlInput" type="password" inputmode="url" autocomplete="off" spellcheck="false" placeholder="postgresql://user:password@127.0.0.1:5432/app">
-              </label>
-              <label class="field-label" for="databaseSchemaInput">
-                Schema / database
-                <input id="databaseSchemaInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" value="public">
-              </label>
-              <label class="field-label" for="databaseTablesInput">
-                Table list
-                <input id="databaseTablesInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="customers, orders, order_items">
-              </label>
-              <label class="field-label" for="databaseRulesPathInput">
-                Compatibility rule config path
-                <input id="databaseRulesPathInput" type="text" inputmode="text" autocomplete="off" spellcheck="false">
-              </label>
-              <label class="field-label" for="databaseTargetInput">
-                Compatibility association field
-                <input id="databaseTargetInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="orders.order_total">
-              </label>
-              <button class="button primary" id="runDatabaseProfilerButton" type="submit" disabled>Run database job</button>
             </form>
 
             <p class="form-message" id="runnerMessage" role="status">Start with files uploaded from this browser session.</p>

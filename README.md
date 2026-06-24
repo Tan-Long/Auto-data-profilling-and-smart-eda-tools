@@ -363,9 +363,8 @@ Export, table readiness, and Developer artifact evidence. Selected issues can
 run optional fake/OpenAI enrichment as a short structured add-on; the
 deterministic action plan remains the source of truth.
 
-Treat database source mode, Olist preset paths, compatibility LLM report
-artifacts, graph artifacts, and raw artifact links as developer/compatibility
-surfaces.
+Treat Olist preset paths, optional LLM report artifacts, graph artifacts, and
+raw artifact links as developer/demo support surfaces.
 
 Historical hosted previews are retained only as compatibility previews for
 browser-side DBML/CSV mapping. They are not the product-facing workflow and do
@@ -384,9 +383,9 @@ put your own authentication/reverse proxy in front before any public exposure.
 The runner preserves CLI artifact contracts and can run upload-mode jobs for
 demo/small-medium CSV+DBML inputs or local path mode jobs where browser-entered
 DBML and CSV directory paths are validated locally without uploading CSV bytes
-through the browser. Legacy controls for rule config, association fields,
-database sources, and optional compatibility LLM report artifacts remain
-available for compatibility but are not the main workflow.
+through the browser. The Profile input surface exposes only DBML plus CSV
+sources; legacy rule config, association-field, and database-source controls are
+not shown in the browser workflow.
 After a run completes, the local runner can show an interactive dashboard from
 generated artifact URLs such as
 `charts/*.json`, `issues.json`, `profile_summary.json`,
@@ -410,11 +409,6 @@ available.
 - Local path mode sends only local path strings to the backend, then runs the
   existing Python/DuckDB pipeline directly against those paths. Use it for
   larger local datasets when the CSV directory is visible to the server process.
-- Developer database source mode sends a local Postgres or MySQL/MariaDB
-  connection URL to the configured backend, introspects selected tables,
-  generates schema/DBML evidence, extracts temporary chunked CSV material for
-  DuckDB scanning, and removes those temporary extracts after artifacts are
-  written.
 
 The static `report.html` keeps its deterministic issue summary. The web-runner
 review surface is an interactive browser view with filters and drilldown; it

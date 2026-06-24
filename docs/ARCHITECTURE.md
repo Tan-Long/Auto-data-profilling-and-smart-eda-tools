@@ -50,8 +50,8 @@ Compatibility and developer surfaces:
   concrete issue, deterministic action plan, and bounded sample evidence;
 - historical static DBML/CSV mapping preview;
 - local-only web runner with upload mode for demo/small-medium files and local
-  path mode for larger local datasets, plus developer database source mode over
-  the existing connector boundary;
+  path mode for larger local datasets, with the browser input surface limited
+  to DBML plus CSV sources;
 - interactive local web-runner review surface rendered from generated
   artifacts, including chart panels plus developer schema/relationship context;
 - exportable self-contained analysis packages generated from existing output
@@ -111,7 +111,7 @@ Target roadmap scope:
 | CLI | Run the full profiler and write artifacts to an output directory. | v0.2 local RC. |
 | Static reports | Let users inspect findings without running an app server. | v0.2 local RC. |
 | Static web workspace | Historical browser-only DBML/CSV mapping preview. It is retained for compatibility and is not the product-facing guided workflow. | Compatibility preview. |
-| Local web runner | Run CSV+DBML jobs through the Python/DuckDB backend, binding to `127.0.0.1` by default and allowing an explicit trusted self-host bind such as `--host 0.0.0.0`, then expose quality gates, issue evidence, deterministic action plans, todos, table readiness, report/export links, selected-issue LLM enrichment, developer artifact links, persistent run history, and per-run stage timelines. Legacy rule config, association fields, database source mode, compatibility LLM report artifacts, and graph artifacts remain compatibility controls. | Guided local runner. |
+| Local web runner | Run CSV+DBML jobs through the Python/DuckDB backend, binding to `127.0.0.1` by default and allowing an explicit trusted self-host bind such as `--host 0.0.0.0`, then expose quality gates, issue evidence, deterministic action plans, todos, table readiness, report/export links, selected-issue LLM enrichment, developer artifact links, persistent run history, and per-run stage timelines. Browser inputs are limited to DBML plus CSV upload/path sources; legacy rule config, association fields, and database source mode are not exposed in the guided UI. | Guided local runner. |
 | Evaluate tool | Run built-in faulty dataset comparisons against seeded ground truth and the available Great Expectations baseline state without accepting arbitrary uploads. | Local demo/release surface. |
 | Runtime trace files | Make each run debuggable through log, JSONL events, and summary metadata. | v0.2 hardening. |
 | Optional LLM artifacts | Produce guarded evidence summaries from artifact JSON after deterministic checks finish. | Compatibility surface. |
@@ -143,9 +143,9 @@ DBML + CSV directory
 ```
 
 Legacy rule config, target-based association analysis, database source mode,
-lineage artifacts, and compatibility LLM report artifacts enter the same
-implementation flow when explicitly enabled, but they are compatibility or
-developer paths rather than the guided product workflow.
+lineage artifacts, and optional LLM report artifacts can still exist in older
+CLI/backend compatibility paths, but the guided browser workflow no longer
+exposes rule config, association-field, or database-source inputs.
 
 ### Selected-issue enrichment flow
 

@@ -195,31 +195,20 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#llmModeStatus")).toContainText("OpenAI");
     await page.locator("#llmModeOff").click();
     await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
-    await openDetails(page, "#profileDeveloperOptions");
-    await page.locator("#runnerModeDatabase").click();
-    await expect(page.locator("#databaseRunnerForm")).toBeVisible();
-    await expect(page.locator("#runDatabaseProfilerButton")).toBeDisabled();
-    await page.locator("#databaseUrlInput").fill("postgresql://profiler:secret@127.0.0.1:5432/demo");
-    await page.locator("#databaseTablesInput").fill("customers, orders");
-    await expect(page.locator("#profileStepNext")).toBeEnabled();
-    await expect(page.locator("#runDatabaseProfilerButton")).toBeDisabled();
-    await goToProfileStep(page, "preflight");
-    await goToProfileStep(page, "run");
-    await expect(page.locator("#runDatabaseProfilerButton")).toBeEnabled();
-    await page.locator("#runnerModePath").click();
-    await openDetails(page, "#pathCompatibilityOptions");
+    await expect(page.locator("#runnerModeDatabase")).toHaveCount(0);
+    await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
+    await expect(page.locator("#rulesPathInput")).toHaveCount(0);
+    await expect(page.locator("#pathTargetInput")).toHaveCount(0);
     await page.locator("#dbmlPathInput").fill("data/demo_small/schema.dbml");
     await page.locator("#csvDirPathInput").fill("data/demo_small/csv");
-    await page.locator("#rulesPathInput").fill("data/demo_small/rules.yaml");
-    await page.locator("#pathTargetInput").fill("order_reviews.review_score");
     await expect(page.locator("#profileStepNext")).toBeEnabled();
     await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
     record(
       matrix,
-      "Advanced controls",
-      "LLM report mode toggles and developer DB validation work without requiring a real DB.",
-      "Fake/OpenAI/off toggles update state, DB source stays disabled until URL/tables are supplied.",
-      await screenshot(page.locator("#runner"), "08-advanced-controls.png"),
+      "Input contract",
+      "The Profile input surface accepts only DBML plus CSV sources while keeping optional LLM mode available.",
+      "Developer DB, rule config, and association target controls are absent; DBML path and CSV directory remain runnable after preflight.",
+      await screenshot(page.locator("#runner"), "08-input-contract.png"),
     );
 
     await goToProfileStep(page, "preflight");
@@ -232,7 +221,7 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#dashboardStatusBadge")).toContainText("succeeded dashboard", {
       timeout: 20_000,
     });
-    await expect(page.locator("#dashboardIssueCount")).toContainText("15/15 issues");
+    await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
     await expect(page.locator("#stageList")).toContainText("Render Markdown and HTML reports");
     await expect(page.locator("#artifactList")).toContainText("Data-quality readiness");
     await expect(page.locator("#qualityGates")).toContainText("Quality Gates");

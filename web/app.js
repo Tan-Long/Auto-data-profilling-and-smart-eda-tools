@@ -2,7 +2,6 @@ const state = {
   dbmlText: "",
   dbmlName: "",
   dbmlFile: null,
-  rulesFile: null,
   flowMode: "choose",
   profileStep: "connect",
   evaluationCatalog: [],
@@ -121,18 +120,10 @@ const els = {
   dbmlFileCard: document.querySelector("#dbmlFileCard"),
   dbmlFileName: document.querySelector("#dbmlFileName"),
   dbmlFileMeta: document.querySelector("#dbmlFileMeta"),
-  rulesInput: document.querySelector("#rulesInput"),
-  rulesFileCard: document.querySelector("#rulesFileCard"),
-  rulesFileName: document.querySelector("#rulesFileName"),
-  rulesFileMeta: document.querySelector("#rulesFileMeta"),
-  targetInput: document.querySelector("#targetInput"),
-  pathTargetInput: document.querySelector("#pathTargetInput"),
   runnerModeUpload: document.querySelector("#runnerModeUpload"),
   runnerModePath: document.querySelector("#runnerModePath"),
-  runnerModeDatabase: document.querySelector("#runnerModeDatabase"),
   runnerForm: document.querySelector("#runnerForm"),
   pathRunnerForm: document.querySelector("#pathRunnerForm"),
-  databaseRunnerForm: document.querySelector("#databaseRunnerForm"),
   demoPresetSmall: document.querySelector("#demoPresetSmall"),
   demoPresetOlist: document.querySelector("#demoPresetOlist"),
   demoPresetStatus: document.querySelector("#demoPresetStatus"),
@@ -142,17 +133,8 @@ const els = {
   llmModeStatus: document.querySelector("#llmModeStatus"),
   runProfilerButton: document.querySelector("#runProfilerButton"),
   runPathProfilerButton: document.querySelector("#runPathProfilerButton"),
-  runDatabaseProfilerButton: document.querySelector("#runDatabaseProfilerButton"),
   dbmlPathInput: document.querySelector("#dbmlPathInput"),
   csvDirPathInput: document.querySelector("#csvDirPathInput"),
-  rulesPathInput: document.querySelector("#rulesPathInput"),
-  databaseSourceType: document.querySelector("#databaseSourceType"),
-  databaseUrlInput: document.querySelector("#databaseUrlInput"),
-  databaseSchemaInput: document.querySelector("#databaseSchemaInput"),
-  databaseTablesInput: document.querySelector("#databaseTablesInput"),
-  databaseChunkRowsInput: document.querySelector("#databaseChunkRowsInput"),
-  databaseRulesPathInput: document.querySelector("#databaseRulesPathInput"),
-  databaseTargetInput: document.querySelector("#databaseTargetInput"),
   runnerMessage: document.querySelector("#runnerMessage"),
   jobStatusBadge: document.querySelector("#jobStatusBadge"),
   eventCount: document.querySelector("#eventCount"),
@@ -334,17 +316,6 @@ els.csvInput.addEventListener("change", async (event) => {
   await loadCsvFiles([...event.target.files]);
 });
 
-els.rulesInput.addEventListener("change", (event) => {
-  resetPreflightReview();
-  const file = event.target.files[0];
-  if (file) {
-    state.rulesFile = file;
-  } else {
-    state.rulesFile = null;
-  }
-  renderAll();
-});
-
 els.visualizeButton.addEventListener("click", () => {
   renderDiagram();
 });
@@ -412,10 +383,6 @@ els.runnerModePath.addEventListener("click", () => {
   setRunnerMode("path");
 });
 
-els.runnerModeDatabase.addEventListener("click", () => {
-  setRunnerMode("database");
-});
-
 els.demoPresetSmall.addEventListener("click", () => {
   loadDemoState("small", { switchToPath: true });
 });
@@ -446,11 +413,6 @@ els.pathRunnerForm.addEventListener("submit", async (event) => {
   await startPathRun();
 });
 
-els.databaseRunnerForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await startDatabaseRun();
-});
-
 els.preflightReview.addEventListener("click", (event) => {
   const warningButton = event.target.closest("[data-preflight-warning-id]");
   if (warningButton) {
@@ -478,31 +440,10 @@ els.runHistoryList.addEventListener("click", async (event) => {
 [
   els.dbmlPathInput,
   els.csvDirPathInput,
-  els.rulesPathInput,
-  els.pathTargetInput,
 ].forEach((input) => {
   input.addEventListener("input", () => {
     resetPreflightReview();
     syncDemoPresetFromPathInputs();
-    renderAll();
-  });
-});
-
-els.databaseSourceType.addEventListener("change", () => {
-  syncDatabaseSourceControls();
-  renderAll();
-});
-
-[
-  els.databaseUrlInput,
-  els.databaseSchemaInput,
-  els.databaseTablesInput,
-  els.databaseChunkRowsInput,
-  els.databaseRulesPathInput,
-  els.databaseTargetInput,
-].forEach((input) => {
-  input.addEventListener("input", () => {
-    resetPreflightReview();
     renderAll();
   });
 });
@@ -930,13 +871,6 @@ async function startProfilerRun() {
   uploadableCsvs.forEach((file) => {
     form.append("csv", file.sourceFile, file.sourceFile.name);
   });
-  if (state.rulesFile) {
-    form.append("rules", state.rulesFile, state.rulesFile.name);
-  }
-  const target = els.targetInput.value.trim();
-  if (target) {
-    form.append("target", target);
-  }
   const mappingOverrides = mappingOverridesForRun();
   if (Object.keys(mappingOverrides).length) {
     form.append("mapping_overrides", JSON.stringify(mappingOverrides));
@@ -981,8 +915,6 @@ async function startPathRun() {
 
   const dbmlPath = els.dbmlPathInput.value.trim();
   const csvDir = els.csvDirPathInput.value.trim();
-  const rulesPath = els.rulesPathInput.value.trim();
-  const target = els.pathTargetInput.value.trim();
   if (!dbmlPath || !csvDir) {
     renderRunnerMessage("DBML file path and CSV directory path are required.", "error");
     return;
@@ -992,12 +924,6 @@ async function startPathRun() {
     dbml_path: dbmlPath,
     csv_dir: csvDir,
   };
-  if (rulesPath) {
-    payload.rules_path = rulesPath;
-  }
-  if (target) {
-    payload.target = target;
-  }
   const mappingOverrides = mappingOverridesForRun();
   if (Object.keys(mappingOverrides).length) {
     payload.mapping_overrides = mappingOverrides;
@@ -1032,90 +958,9 @@ async function startPathRun() {
   }
 }
 
-async function startDatabaseRun() {
-  state.profileStep = "run";
-  const preflightReview = buildPreflightReview();
-  if (!preflightReview.runAllowed) {
-    renderRunnerMessage(preflightGateMessage(preflightReview), "error");
-    return;
-  }
-  if (!state.runnerAvailable) {
-    renderRunnerMessage("Open this page with vsf-profiler web to run the backend pipeline.", "error");
-    return;
-  }
-
-  const sourceType = els.databaseSourceType.value;
-  const connectionUrl = els.databaseUrlInput.value.trim();
-  const schema = els.databaseSchemaInput.value.trim();
-  const tables = els.databaseTablesInput.value.trim();
-  const chunkRows = els.databaseChunkRowsInput.value.trim();
-  const rulesPath = els.databaseRulesPathInput.value.trim();
-  const target = els.databaseTargetInput.value.trim();
-  if (!connectionUrl) {
-    renderRunnerMessage("Database connection URL is required.", "error");
-    return;
-  }
-
-  const payload = {
-    source_type: sourceType,
-    connection_url: connectionUrl,
-  };
-  if (schema) {
-    payload.schema = schema;
-  }
-  if (tables) {
-    payload.tables = tables;
-  }
-  if (chunkRows) {
-    payload.chunk_rows = Number(chunkRows);
-  }
-  if (rulesPath) {
-    payload.rules_path = rulesPath;
-  }
-  if (target) {
-    payload.target = target;
-  }
-  payload.preflight_review = buildPreflightReviewPayload(preflightReview);
-  Object.assign(payload, llmRunOptions());
-
-  state.runEvents = [];
-  state.currentJob = {
-    status: "queued",
-    input_mode: "database",
-    database: { source_type: sourceType },
-    artifacts: [],
-  };
-  resetDashboardState();
-  renderJob();
-  renderRunnerMessage(
-    `Starting ${databaseSourceLabel(sourceType)} database job on ${runnerHostLabel()}${llmRunSuffix()}...`,
-    "pending",
-  );
-  els.runDatabaseProfilerButton.disabled = true;
-
-  try {
-    const response = await fetch("/api/database-jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const responsePayload = await response.json();
-    if (!response.ok) {
-      throw new Error(responsePayload.error || "Backend rejected the developer database source.");
-    }
-    state.currentJob = responsePayload;
-    renderRunnerMessage("Pipeline started. Runtime events are streaming from run_events.jsonl.", "pending");
-    connectEventStream(responsePayload.events_url);
-  } catch (error) {
-    renderRunnerMessage(error.message || "Unable to start database run.", "error");
-  } finally {
-    renderAll();
-  }
-}
-
 function setRunnerMode(mode) {
   resetPreflightReview();
-  state.runnerMode = ["upload", "path", "database"].includes(mode) ? mode : "upload";
+  state.runnerMode = ["upload", "path"].includes(mode) ? mode : "upload";
   state.profileStep = "connect";
   if (state.runnerMode === "path") {
     syncDemoPresetFromPathInputs();
@@ -1125,13 +970,9 @@ function setRunnerMode(mode) {
     loadDemoState(presetName, { switchToPath: true });
     return;
   }
-  if (state.runnerMode === "database") {
-    syncDatabaseSourceControls({ preserveUserValue: true });
-  }
   const messages = {
     upload: "Start with files uploaded from this browser session.",
     path: `Start with local paths visible to the ${runnerHostLabel()} runner.`,
-    database: `Start with a developer database source visible to the ${runnerHostLabel()} runner.`,
   };
   renderRunnerMessage(messages[state.runnerMode], "idle");
   renderAll();
@@ -1246,16 +1087,12 @@ function loadDemoState(presetName = "small", options = {}) {
   state.dbmlText = preset.dbmlText;
   state.dbmlName = preset.dbmlName;
   state.dbmlFile = null;
-  state.rulesFile = null;
   state.csvFiles = preset.csvs.map(cloneCsvPreview);
   state.csvReadErrors = [];
   els.dbmlInput.value = "";
   els.csvInput.value = "";
-  els.rulesInput.value = "";
   els.dbmlPathInput.value = preset.dbmlPath;
   els.csvDirPathInput.value = preset.csvDir;
-  els.rulesPathInput.value = preset.rulesPath;
-  els.pathTargetInput.value = preset.target;
   if (options.switchToPath) {
     state.runnerMode = "path";
     renderRunnerMessage(
@@ -1278,7 +1115,6 @@ function clearProfileInputs(options = {}) {
   state.profileStep = "connect";
   clearDbmlState();
   state.dbmlFile = null;
-  state.rulesFile = null;
   state.csvFiles = [];
   state.csvReadErrors = [];
   state.mapping = new Map();
@@ -1287,12 +1123,9 @@ function clearProfileInputs(options = {}) {
   state.selectedDemoPreset = "custom";
   els.dbmlInput.value = "";
   els.csvInput.value = "";
-  els.rulesInput.value = "";
   if (options.clearPathValues) {
     els.dbmlPathInput.value = "";
     els.csvDirPathInput.value = "";
-    els.rulesPathInput.value = "";
-    els.pathTargetInput.value = "";
   }
   renderRunnerMessage("Source cleared. Add DBML and CSV files for a new profile run.", "idle");
   renderAll();
@@ -1340,32 +1173,11 @@ function markCustomUploadSource() {
 function syncDemoPresetFromPathInputs() {
   const dbmlPath = els.dbmlPathInput.value.trim();
   const csvDir = els.csvDirPathInput.value.trim();
-  const rulesPath = els.rulesPathInput.value.trim();
-  const target = els.pathTargetInput.value.trim();
   const match = Object.entries(demoPresets).find(([, preset]) => (
     preset.dbmlPath === dbmlPath &&
-    preset.csvDir === csvDir &&
-    preset.rulesPath === rulesPath &&
-    preset.target === target
+    preset.csvDir === csvDir
   ));
   state.selectedDemoPreset = match ? match[0] : "custom";
-}
-
-function syncDatabaseSourceControls(options = {}) {
-  const sourceType = els.databaseSourceType.value;
-  if (sourceType === "mysql") {
-    els.databaseUrlInput.placeholder = "mysql://user:password@127.0.0.1:3306/app";
-    els.databaseSchemaInput.placeholder = "app";
-    if (!options.preserveUserValue && els.databaseSchemaInput.value.trim() === "public") {
-      els.databaseSchemaInput.value = "";
-    }
-  } else {
-    els.databaseUrlInput.placeholder = "postgresql://user:password@127.0.0.1:5432/app";
-    els.databaseSchemaInput.placeholder = "public";
-    if (!options.preserveUserValue && !els.databaseSchemaInput.value.trim()) {
-      els.databaseSchemaInput.value = "public";
-    }
-  }
 }
 
 function llmRunOptions() {
@@ -1396,10 +1208,6 @@ function llmModeLabel(mode) {
     fake: "Fake",
     openai: "OpenAI",
   }[mode] || "LLM off";
-}
-
-function databaseSourceLabel(sourceType) {
-  return sourceType === "mysql" ? "MySQL/MariaDB" : "Postgres";
 }
 
 function setupDropzone(element, onDrop) {
@@ -1574,7 +1382,7 @@ function profileStepGuard(step) {
       allowed: ready,
       message: ready
         ? "Source connected. Continue to Preflight Review."
-        : "Add DBML and CSV files, choose local paths, or configure a developer database source before continuing.",
+        : "Add a DBML schema and matching CSV files before continuing.",
     };
   }
   if (step === "preflight") {
@@ -1605,9 +1413,6 @@ function profileStepGuard(step) {
 }
 
 function profileSourceReady() {
-  if (state.runnerMode === "database") {
-    return Boolean(els.databaseUrlInput.value.trim());
-  }
   if (state.runnerMode === "path") {
     return Boolean(els.dbmlPathInput.value.trim() && els.csvDirPathInput.value.trim());
   }
@@ -1909,7 +1714,6 @@ function renderSourceState() {
   const modeLabel = {
     upload: "Upload",
     path: "Local path",
-    database: "Database",
   }[state.runnerMode] || "Upload";
   const dbmlLabel = state.dbmlFile
     ? state.dbmlFile.name
@@ -1924,11 +1728,7 @@ function renderSourceState() {
   let badge = "No upload";
   let status = "";
   let summary = "Upload a DBML contract and CSV files to profile your own data.";
-  if (state.runnerMode === "database") {
-    badge = "Developer DB";
-    status = "warnings_pending";
-    summary = "Developer database mode is a compatibility source. CSV+DBML upload remains the primary guided path.";
-  } else if (state.runnerMode === "path") {
+  if (state.runnerMode === "path") {
     badge = preset ? "Demo paths" : "Custom paths";
     status = "ready";
     summary = preset
@@ -1963,21 +1763,10 @@ function runnerStatusText() {
   if (state.runnerMode === "path") {
     return "Ready for local paths";
   }
-  if (state.runnerMode === "database") {
-    return "Ready for developer database source";
-  }
   return "Ready for uploaded files";
 }
 
 function sourceInventoryText() {
-  if (state.runnerMode === "database") {
-    const sourceType = databaseSourceLabel(els.databaseSourceType.value);
-    if (els.databaseUrlInput.value.trim()) {
-      const tableText = els.databaseTablesInput.value.trim() ? "selected tables" : "schema tables";
-      return `${sourceType} ${tableText} ready`;
-    }
-    return `${sourceType} connection URL required`;
-  }
   return state.csvFiles.length
     ? `${state.csvFiles.length} CSV files loaded`
     : "No CSV files selected";
@@ -2132,17 +1921,6 @@ function buildPreflightReview() {
   const blockers = [];
   const warnings = [];
   const mode = state.runnerMode;
-
-  if (mode === "database") {
-    if (!els.databaseUrlInput.value.trim()) {
-      blockers.push(preflightItem(
-        "missing_database_source",
-        "Database source URL is missing.",
-        "Enter a developer database connection URL or switch back to CSV + DBML source mode.",
-      ));
-    }
-    return finalizePreflightReview(mode, blockers, warnings);
-  }
 
   const hasRunDbml = mode === "upload"
     ? Boolean(state.dbmlFile)
@@ -2470,7 +2248,6 @@ function renderControls() {
   const hasUploadedDbml = Boolean(state.dbmlFile);
   const hasUploadedCsvs = state.csvFiles.some((file) => file.sourceFile);
   const hasPathInputs = Boolean(els.dbmlPathInput.value.trim() && els.csvDirPathInput.value.trim());
-  const hasDatabaseUrl = Boolean(els.databaseUrlInput.value.trim());
   const jobRunning = ["queued", "running"].includes(state.currentJob?.status);
   const evaluationRunning = evaluationJobRunning();
   const preflightReview = buildPreflightReview();
@@ -2480,17 +2257,13 @@ function renderControls() {
   els.autoLinkButton.disabled = !hasDbml || !state.csvFiles.length;
   els.runProfilerButton.disabled = !runStepActive || !state.runnerAvailable || !hasUploadedDbml || !hasUploadedCsvs || !preflightAllowsRun || jobRunning;
   els.runPathProfilerButton.disabled = !runStepActive || !state.runnerAvailable || !hasPathInputs || !preflightAllowsRun || jobRunning;
-  els.runDatabaseProfilerButton.disabled = !runStepActive || !state.runnerAvailable || !hasDatabaseUrl || !preflightAllowsRun || jobRunning;
   els.startEvaluationButton.disabled = !state.runnerAvailable || !selectedEvaluationDataset() || evaluationRunning;
   els.runnerModeUpload.classList.toggle("active", state.runnerMode === "upload");
   els.runnerModePath.classList.toggle("active", state.runnerMode === "path");
-  els.runnerModeDatabase.classList.toggle("active", state.runnerMode === "database");
   els.runnerModeUpload.setAttribute("aria-selected", state.runnerMode === "upload" ? "true" : "false");
   els.runnerModePath.setAttribute("aria-selected", state.runnerMode === "path" ? "true" : "false");
-  els.runnerModeDatabase.setAttribute("aria-selected", state.runnerMode === "database" ? "true" : "false");
   els.runnerForm.hidden = state.runnerMode !== "upload";
   els.pathRunnerForm.hidden = state.runnerMode !== "path";
-  els.databaseRunnerForm.hidden = state.runnerMode !== "database";
   renderDemoPresetControls();
   renderLlmModeControls();
 }
@@ -2520,13 +2293,6 @@ function renderLlmModeControls() {
 }
 
 function renderRunner() {
-  if (state.rulesFile) {
-    els.rulesFileCard.hidden = false;
-    els.rulesFileName.textContent = state.rulesFile.name;
-    els.rulesFileMeta.textContent = `${formatBytes(state.rulesFile.size)} · optional rules`;
-  } else {
-    els.rulesFileCard.hidden = true;
-  }
   renderJob();
 }
 
@@ -2927,7 +2693,7 @@ function renderGeneratedL4Preview(artifacts) {
     </div>
     <p>${integerText(checkedNumbers)} numbers · ${integerText(checkedRefs)} refs · ${integerText(violationCount)} violations${fallback ? ` · ${escapeHtml(fallback)}` : ""}</p>
   `;
-  return generatedResultCard("Compatibility LLM guardrail", "guardrail_report.json", body, artifacts);
+  return generatedResultCard("Optional LLM guardrail", "guardrail_report.json", body, artifacts);
 }
 
 function renderGeneratedIssueLlmPreview(artifacts) {
@@ -4811,7 +4577,7 @@ function renderL4GuardrailPanel() {
   const violationCount = Array.isArray(guardrail.violations) ? guardrail.violations.length : 0;
   const fallback = guardrail.fallback_reason || "";
   return dashboardPanel(
-    "Compatibility LLM guardrail",
+    "Optional LLM guardrail",
     "guardrail_report.json",
     `
       <button class="risk-gauge-button" type="button" data-dashboard-kind="l4_guardrail" data-dashboard-value="${escapeHtml(status)}" data-dashboard-label="LLM guardrail ${escapeHtml(status)}">
@@ -6134,7 +5900,7 @@ function artifactLabel(path) {
     "schema_evaluation.json": "Schema evaluation",
     "influence.json": "Legacy association artifact",
     "run_summary.json": "Run summary",
-    "l4_report.md": "Compatibility LLM report",
+    "l4_report.md": "Optional LLM report",
     "guardrail_report.json": "Guardrail report",
   };
   return labels[path] || path.replace(/^charts\//, "Chart: ");

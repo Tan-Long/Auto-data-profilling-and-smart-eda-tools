@@ -93,7 +93,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="diagramInspector"',
         'id="runnerForm"',
         'id="pathRunnerForm"',
-        'id="databaseRunnerForm"',
         'id="preflightReview"',
         'id="preflightGateBadge"',
         'id="preflightRunSummary"',
@@ -101,8 +100,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="preflightWarningList"',
         "Preflight Review",
         "Review connection and mapping readiness",
-        "Advanced and compatibility options",
-        "Compatibility run options",
+        "Demo and LLM options",
         'id="demoPresetSmall"',
         'id="demoPresetOlist"',
         'id="demoPresetStatus"',
@@ -112,18 +110,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="llmModeStatus"',
         'id="runProfilerButton"',
         'id="runPathProfilerButton"',
-        'id="runDatabaseProfilerButton"',
         'id="dbmlPathInput"',
         'id="csvDirPathInput"',
-        'id="rulesPathInput"',
-        'id="runnerModeDatabase"',
-        'id="databaseSourceType"',
-        'id="databaseUrlInput"',
-        'id="databaseSchemaInput"',
-        'id="databaseTablesInput"',
-        'id="databaseChunkRowsInput"',
-        'id="databaseRulesPathInput"',
-        'id="databaseTargetInput"',
         'id="stageList"',
         'id="artifactList"',
         'id="runHistory"',
@@ -188,15 +176,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Hosted previews do not run profiler jobs",
         "Upload CSV + DBML",
         "Local CSV path",
-        "Developer DB source",
-        "Postgres",
-        "MySQL / MariaDB",
-        "Connection URL",
-        "Schema / database",
-        "Table list",
         "Small demo",
         "Legacy Olist sample",
-        "Compatibility LLM report",
+        "Optional LLM report",
         "OpenAI",
         "Upload DBML to preview schema",
         "Reset demo",
@@ -206,6 +188,31 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     ]
     for marker in required_html:
         assert marker in html
+
+    forbidden_html = [
+        'id="databaseRunnerForm"',
+        'id="runDatabaseProfilerButton"',
+        'id="rulesPathInput"',
+        'id="pathTargetInput"',
+        'id="runnerModeDatabase"',
+        'id="databaseSourceType"',
+        'id="databaseUrlInput"',
+        'id="databaseSchemaInput"',
+        'id="databaseTablesInput"',
+        'id="databaseChunkRowsInput"',
+        'id="databaseRulesPathInput"',
+        'id="databaseTargetInput"',
+        "Developer DB source",
+        "Compatibility run options",
+        "Compatibility rule config",
+        "Compatibility rule config path",
+        "Compatibility association field",
+        "Connection URL",
+        "Schema / database",
+        "Table list",
+    ]
+    for marker in forbidden_html:
+        assert marker not in html
 
     required_css_tokens = [
         "--surface-canvas",
@@ -240,9 +247,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".quality-gate-card",
         ".quality-gate-evidence-value",
         ".developer-options",
-        ".compat-fields",
         ".runner-source-switch",
-        ".database-source-grid",
         ".diagram-role-bridge",
         ".diagram-inspector",
         ".diagram-edge-hit",
@@ -304,7 +309,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "quickDemo",
         "examples/olist/schema.dbml",
         "data/olist",
-        "olist_order_reviews_dataset.review_score",
         "mappingOverridesForRun",
         "buildPreflightReview",
         "buildPreflightReviewPayload",
@@ -321,10 +325,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "checkRunnerHealth",
         "startProfilerRun",
         "startPathRun",
-        "startDatabaseRun",
-        "databaseSourceLabel",
-        "syncDatabaseSourceControls",
-        "/api/database-jobs",
         "renderGeneratedResults",
         "renderGeneratedResultPreviews",
         "renderGeneratedL4Preview",
@@ -438,7 +438,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'type="file"',
         'fetch("/api/jobs"',
         'fetch("/api/path-jobs"',
-        'fetch("/api/database-jobs"',
     ]:
         assert marker not in evaluate_shell
 
@@ -505,7 +504,6 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert 'fetch("/api/health"' in js
     assert 'fetch("/api/jobs"' in js
     assert 'fetch("/api/path-jobs"' in js
-    assert 'fetch("/api/database-jobs"' in js
     assert 'fetch("/api/history"' in js
     assert 'fetch(`/api/jobs/${jobId}/dashboard`' in js
     assert "new EventSource" in js

@@ -226,38 +226,19 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
   await page.locator("#profileDeveloperOptions > summary").click();
-
-  await page.locator("#runnerModeDatabase").click();
-  await expect(page.locator("#databaseRunnerForm")).toBeVisible();
-  await expect(page.locator("#runnerStatus")).toContainText("Ready for developer database source");
-  await expect(page.locator("#databaseSourceType")).toHaveValue("postgres");
-  await expect(page.locator("#databaseSchemaInput")).toHaveValue("public");
-  await expect(page.locator("#runDatabaseProfilerButton")).toBeDisabled();
-  await page
-    .locator("#databaseUrlInput")
-    .fill("postgresql://profiler:secret@127.0.0.1:5432/demo");
-  await page.locator("#databaseTablesInput").fill("customers, orders, order_items");
-  await page.locator("#databaseTargetInput").fill("orders.order_total");
-  await expect(page.locator("#csvStatus")).toContainText("Postgres selected tables ready");
-  await expect(page.locator("#profileStepNext")).toBeEnabled();
-  await expect(page.locator("#runDatabaseProfilerButton")).toBeDisabled();
-  await page.locator("#databaseSourceType").selectOption("mysql");
-  await expect(page.locator("#databaseSchemaInput")).toHaveValue("");
-  await page
-    .locator("#databaseUrlInput")
-    .fill("mysql://profiler:secret@127.0.0.1:3306/demo");
-  await expect(page.locator("#csvStatus")).toContainText("MySQL/MariaDB selected tables ready");
-  await goToProfileStep(page, "preflight");
-  await goToProfileStep(page, "run");
-  await expect(page.locator("#runDatabaseProfilerButton")).toBeEnabled();
-  fs.mkdirSync("outputs/us072_database_mode", { recursive: true });
+  await expect(page.locator("#runnerModeDatabase")).toHaveCount(0);
+  await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
+  await expect(page.locator("#runDatabaseProfilerButton")).toHaveCount(0);
+  await expect(page.locator("#rulesPathInput")).toHaveCount(0);
+  await expect(page.locator("#pathTargetInput")).toHaveCount(0);
+  fs.mkdirSync("outputs/us073_input_contract", { recursive: true });
   await page.locator("#runner").screenshot({
-    path: "outputs/us072_database_mode/database-mode-runner.png",
+    path: "outputs/us073_input_contract/input-contract-runner.png",
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#runner").scrollIntoViewIfNeeded();
   await page.locator("#runner").screenshot({
-    path: "outputs/us072_database_mode/database-mode-runner-mobile.png",
+    path: "outputs/us073_input_contract/input-contract-runner-mobile.png",
   });
   await page.setViewportSize({ width: 1280, height: 720 });
 
@@ -268,8 +249,6 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#demoPresetStatus")).toContainText("Legacy Olist sample");
   await expect(page.locator("#dbmlPathInput")).toHaveValue("examples/olist/schema.dbml");
   await expect(page.locator("#csvDirPathInput")).toHaveValue("data/olist");
-  await expect(page.locator("#rulesPathInput")).toHaveValue("examples/olist/rules.yaml");
-  await expect(page.locator("#pathTargetInput")).toHaveValue("olist_order_reviews_dataset.review_score");
   await expect(page.locator("#diagramSvg")).toContainText("olist_orders_dataset");
   await expect(page.locator("#mappingStatus")).toContainText("9/9 tables mapped");
 
@@ -284,11 +263,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramSvg")).toContainText("order_payments");
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
-  await page.locator("#pathCompatibilityOptions > summary").click();
   await page.locator("#dbmlPathInput").fill("data/demo_small/schema.dbml");
   await page.locator("#csvDirPathInput").fill("data/demo_small/csv");
-  await page.locator("#rulesPathInput").fill("data/demo_small/rules.yaml");
-  await page.locator("#pathTargetInput").fill("order_reviews.review_score");
 
   await goToProfileStep(page, "preflight");
   await goToProfileStep(page, "run");
@@ -306,7 +282,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardStatusBadge")).toContainText(
     "succeeded dashboard",
   );
-  await expect(page.locator("#dashboardIssueCount")).toContainText("15/15 issues");
+  await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("readiness");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("gates");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
@@ -338,7 +314,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(generatedResults).toContainText("Data-quality readiness");
   await expect(generatedResults).toContainText("NOT_READY");
   await expect(generatedResults).toContainText("Issue counts");
-  await expect(generatedResults).toContainText("15 issues");
+  await expect(generatedResults).toContainText("12 issues");
   await expect(generatedResults).toContainText("Column usability");
   await expect(generatedResults).toContainText("blocked columns");
   await expect(generatedResults).toContainText("Table readiness");
@@ -418,7 +394,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#runHistoryStatus")).toContainText("History ready", {
     timeout: 10_000,
   });
-  await expect(page.locator("#runHistoryList")).toContainText("15 issues");
+  await expect(page.locator("#runHistoryList")).toContainText("12 issues");
   await expect(page.locator("#runHistoryList")).toContainText("8 stages");
   await expect(page.locator("#selectedRunTimelineStatus")).toContainText("8 stages");
 
@@ -434,7 +410,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#runHistoryStatus")).toContainText("History ready", {
     timeout: 10_000,
   });
-  await expect(page.locator("#runHistoryList")).toContainText("15 issues");
+  await expect(page.locator("#runHistoryList")).toContainText("12 issues");
   await expect(page.locator("#runHistoryList")).toContainText("gates");
   await page.locator("#runHistory").scrollIntoViewIfNeeded();
   await page.locator("#runHistory").screenshot({
@@ -444,7 +420,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardStatusBadge")).toContainText("succeeded dashboard", {
     timeout: 20_000,
   });
-  await expect(page.locator("#dashboardIssueCount")).toContainText("15/15 issues");
+  await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#qualityGatesStatus")).toContainText("source=deterministic");
   await expect(page.locator("#todosStatus")).toContainText("grouped todos");
   await expect(page.locator("#selectedRunTimelineStatus")).toContainText("8 stages");
@@ -486,7 +462,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("Copy CSV row");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Copy JSON");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Parent context");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("customers.customer_id");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("sellers.seller_id");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Sample rows");
   await expect(page.locator("#dashboardDrilldown")).toContainText("LLM enrichment add-on");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Run LLM enrichment");
@@ -550,7 +526,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#todos")).toContainText("source=deterministic");
   await page.locator("#todosFilterVerify").click();
   await expect(page.locator("#todos")).toContainText("Rerun the profiler on the corrected CSV + DBML inputs.");
-  await expect(page.locator("#todos")).toContainText("15 occurrences");
+  await expect(page.locator("#todos")).toContainText("12 occurrences");
   await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todos").screenshot({
     path: "outputs/us073_goal6/global-todos-tab.png",
@@ -671,7 +647,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   );
 
   await page.locator("#dashboardSeverityFilter").selectOption("P1");
-  await expect(page.locator("#dashboardIssueCount")).toContainText("/15 issues");
+  await expect(page.locator("#dashboardIssueCount")).toContainText("/12 issues");
   await expect(page.locator("#dashboardPanelGrid")).toContainText("Blocked");
   await page.locator('[data-dashboard-kind="issue"]').first().click();
   await expect(page.locator("#dashboardDrilldown")).toContainText("Sample rows");
