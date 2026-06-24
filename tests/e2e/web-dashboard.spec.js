@@ -449,7 +449,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: `${goal12Dir}/profile-post-run-review-surface.png`,
   });
 
-  await page.locator('[data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
+  await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Where");
   await expect(page.locator("#dashboardDrilldown")).toContainText("What happened");
@@ -530,6 +530,14 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#todos")).toContainText("Fix data");
   await expect(page.locator("#todos")).toContainText("Verify after fix");
   await expect(page.locator("#todos")).toContainText("source=deterministic");
+  await expect(page.locator("#todos")).toContainText("Parent Key Duplicate on orders.order_id");
+  await expect(page.locator("#todos")).toContainText("Evidence:");
+  const parentDuplicateTodo = page.locator(".todo-occurrence").filter({ hasText: "Parent Key Duplicate on orders.order_id" }).first();
+  await parentDuplicateTodo.click();
+  await expect(page.locator("#dashboardDrilldownMeta")).toContainText(/ISSUE-/);
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Parent Key Duplicate");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Finding values");
+  await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todosFilterVerify").click();
   await expect(page.locator("#todos")).toContainText("Rerun the profiler on the corrected CSV + DBML inputs.");
   await expect(page.locator("#todos")).toContainText("12 occurrences");
@@ -563,7 +571,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#dashboardSeverityFilter").selectOption("P1");
   await expect(page.locator("#dashboardIssueCount")).toContainText("/12 issues");
   await expect(page.locator("#dashboardPanelGrid")).toContainText("Blocked");
-  await page.locator('[data-dashboard-kind="issue"]').first().click();
+  await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"]').first().click();
   await expect(page.locator("#dashboardDrilldown")).toContainText("Sample rows");
 
   const rawCsvArtifactRequests = artifactRequests.filter(

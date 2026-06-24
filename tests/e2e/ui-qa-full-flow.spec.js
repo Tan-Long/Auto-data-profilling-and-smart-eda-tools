@@ -240,7 +240,7 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       await screenshot(page.locator("#dashboard"), "09-small-demo-review.png"),
     );
 
-    await page.locator('[data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
+    await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
     await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
     await expect(page.locator("#dashboardDrilldown")).toContainText("Action plan");
     await page.locator('[data-action-plan-export="markdown"]').click();

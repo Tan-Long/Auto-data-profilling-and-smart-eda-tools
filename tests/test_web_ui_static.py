@@ -258,6 +258,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".issue-llm-enrichment",
         ".issue-llm-controls",
         ".issue-llm-section",
+        ".todo-occurrence-heading",
+        ".todo-occurrence-finding",
+        ".todo-occurrence-evidence",
         ".quality-gates-section",
         ".quality-gate-card",
         ".quality-gate-evidence-value",
@@ -535,6 +538,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderTableImpactSection" in js
     assert "renderTodosSection" in js
     assert "renderReportExportSection" in js
+    assert "issueForTodoOccurrence" in js
+    assert "todoOccurrenceEvidenceText" in js
+    assert "data-dashboard-scroll=\"drilldown\"" in js
+    assert "open issue detail" in js
     assert "Copy Fix data Markdown" in js
     assert "Copy Verify after fix Markdown" in js
     assert "Reports and todo exports are ready for review." in js

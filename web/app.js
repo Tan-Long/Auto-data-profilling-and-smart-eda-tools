@@ -462,6 +462,10 @@ els.dashboardPanelGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
 });
 
+els.todosGrid.addEventListener("click", (event) => {
+  handleDashboardSelectionClick(event);
+});
+
 els.tableImpactGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
 });
@@ -498,6 +502,14 @@ function handleDashboardSelectionClick(event) {
     label: target.dataset.dashboardLabel || target.textContent.trim(),
   };
   renderDashboardDrilldown();
+  if (target.dataset.dashboardScroll === "drilldown") {
+    window.requestAnimationFrame(() => {
+      els.dashboardDrilldown.scrollIntoView({
+        block: "start",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    });
+  }
 }
 
 els.diagramSvg.addEventListener("click", (event) => {
@@ -3296,16 +3308,81 @@ function renderTodoGroup(group) {
 }
 
 function renderTodoOccurrence(occurrence) {
+  const issue = issueForTodoOccurrence(occurrence);
   const columns = Array.isArray(occurrence.columns) && occurrence.columns.length
     ? occurrence.columns.join(", ")
     : "table scope";
+  const scope = `${occurrence.table || "unknown"}.${columns}`;
+  const issueId = occurrence.issue_id || "UNKNOWN";
+  const issueType = issue ? issueTypeLabel(issue) : todoIssueTypeLabel(occurrence.issue_type || "UNKNOWN");
+  const finding = occurrence.finding_summary || todoFindingFromIssue(issue) || `${issueType} on ${scope}.`;
+  const evidence = todoOccurrenceEvidenceText(occurrence, issue);
   return `
-    <div class="todo-occurrence">
-      <code>${escapeHtml(occurrence.issue_id || "UNKNOWN")}</code>
-      <span>${escapeHtml(occurrence.table || "unknown")}.${escapeHtml(columns)}</span>
-      <small>${escapeHtml(occurrence.priority || "Needs human review")}</small>
-    </div>
+    <button class="todo-occurrence" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
+      <span class="todo-occurrence-heading">
+        <code>${escapeHtml(issueId)}</code>
+        <strong>${escapeHtml(issueType)}</strong>
+      </span>
+      <span class="todo-occurrence-finding">${escapeHtml(finding)}</span>
+      <span class="todo-occurrence-evidence">${escapeHtml(evidence)}</span>
+      <small>${escapeHtml(occurrence.priority || "Needs human review")} · open issue detail</small>
+    </button>
   `;
+}
+
+function issueForTodoOccurrence(occurrence) {
+  const issueId = occurrence?.issue_id || "";
+  if (!issueId) {
+    return null;
+  }
+  return getDashboardIssues().find((issue) => issue.issue_id === issueId) || null;
+}
+
+function todoFindingFromIssue(issue) {
+  if (!issue) {
+    return "";
+  }
+  const columns = Array.isArray(issue.columns) && issue.columns.length
+    ? issue.columns.join(", ")
+    : "table scope";
+  return `${issueTypeLabel(issue)} on ${issue.table || "unknown"}.${columns}: ${integerText(issue.bad_count)} of ${integerText(issue.total_count)} rows affected (${percentText(issue.bad_rate)}).`;
+}
+
+function todoIssueTypeLabel(value) {
+  return String(value || "UNKNOWN")
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Unknown";
+}
+
+function todoOccurrenceEvidenceText(occurrence, issue) {
+  const parts = [];
+  if (issue?.bad_count !== undefined && issue?.total_count !== undefined) {
+    parts.push(`${integerText(issue.bad_count)}/${integerText(issue.total_count)} rows`);
+  }
+  const sampleKeys = Array.isArray(issue?.sample_keys) ? issue.sample_keys.filter(Boolean) : [];
+  if (sampleKeys.length) {
+    parts.push(`sample key ${sampleKeys.slice(0, 3).join(", ")}`);
+  }
+  if (issue?.sample_bad_rows_path) {
+    parts.push(`sample rows ${issue.sample_bad_rows_path}`);
+  }
+  const parentTable = occurrence.parent_table || issue?.parent_table;
+  const parentColumns = Array.isArray(occurrence.parent_columns) && occurrence.parent_columns.length
+    ? occurrence.parent_columns
+    : (Array.isArray(issue?.parent_columns) ? issue.parent_columns : []);
+  if (parentTable) {
+    parts.push(`parent ${parentTable}.${parentColumns.length ? parentColumns.join(", ") : "key"}`);
+  }
+  const cause = Array.isArray(issue?.probable_causes) ? issue.probable_causes.find(Boolean) : "";
+  if (cause) {
+    parts.push(cause);
+  }
+  return parts.length
+    ? `Evidence: ${parts.join(" · ")}`
+    : "Evidence: open the issue detail drawer for generated sample rows and query context.";
 }
 
 function renderDashboardFilters(issues) {

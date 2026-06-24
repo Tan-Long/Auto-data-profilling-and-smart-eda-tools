@@ -3017,20 +3017,57 @@ h3 {
 .todo-occurrence {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 6px;
   align-items: start;
+  width: 100%;
   padding: 7px 8px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-overlay);
+  color: var(--foreground-primary);
+  text-align: left;
+  cursor: pointer;
 }
 
-.todo-occurrence span,
+.todo-occurrence:hover,
+.todo-occurrence:focus-visible {
+  border-color: var(--accent);
+  background: #f6fbf8;
+  outline: none;
+}
+
+.todo-occurrence:focus-visible {
+  box-shadow: 0 0 0 3px rgba(15, 118, 100, 0.16);
+}
+
+.todo-occurrence-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.todo-occurrence-heading strong {
+  min-width: 0;
+  color: var(--foreground-primary);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.todo-occurrence-finding,
+.todo-occurrence-evidence,
 .todo-occurrence small {
   min-width: 0;
   color: var(--foreground-secondary);
   font-size: 12px;
+  line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.todo-occurrence-evidence {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
 }
 
 .todo-occurrence code {
