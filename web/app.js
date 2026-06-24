@@ -6702,11 +6702,27 @@ function diagramRelationshipSvg(rel, layout, index) {
   if (!source || !target) {
     return "";
   }
-  const sameLayer = source.layer === target.layer;
   const sourceColumn = (rel.childColumns || [])[0] || "";
   const targetColumn = (rel.parentColumns || [])[0] || "";
-  const y1 = source.columnY.get(sourceColumn) || source.y + 80;
-  const y2 = target.columnY.get(targetColumn) || target.y + 80;
+  const geometry = diagramRelationshipGeometry(source, target, sourceColumn, targetColumn, index);
+  const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
+  const selectionClass = diagramRelationshipSelectionClass(rel, layout.selection);
+  return `
+    <g class="diagram-relationship diagram-relationship-${escapeHtml(diagramStatusTone(rel.status))} ${selectionClass}" data-diagram-relationship="${escapeHtml(rel.id)}" data-diagram-child-table="${escapeHtml(rel.childTable)}" data-diagram-parent-table="${escapeHtml(rel.parentTable)}" data-diagram-child-column="${escapeHtml(sourceColumn)}" data-diagram-parent-column="${escapeHtml(targetColumn)}" data-diagram-edge-index="${index}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
+      <title>${escapeHtml(label)}</title>
+      <path class="diagram-edge-hit" d="${geometry.path}"></path>
+      <path class="diagram-edge" d="${geometry.path}"></path>
+      <circle class="diagram-port-dot diagram-port-source" cx="${geometry.x1}" cy="${geometry.y1}" r="3"></circle>
+      <circle class="diagram-port-dot diagram-port-target" cx="${geometry.x2}" cy="${geometry.y2}" r="3"></circle>
+      <text class="diagram-edge-label" x="${geometry.labelX}" y="${geometry.labelY}">${escapeHtml(truncateMiddle(rel.label || rel.cardinality || "FK", 22))}</text>
+    </g>
+  `;
+}
+
+function diagramRelationshipGeometry(source, target, sourceColumn, targetColumn, index) {
+  const sameLayer = source.layer === target.layer;
+  const y1 = source.columnY?.get(sourceColumn) || source.y + 80;
+  const y2 = target.columnY?.get(targetColumn) || target.y + 80;
   const sourceIsLeft = source.x < target.x;
   const x1 = sameLayer ? source.x + source.width : sourceIsLeft ? source.x + source.width : source.x;
   const x2 = sameLayer ? target.x + target.width : sourceIsLeft ? target.x : target.x + target.width;
@@ -6728,18 +6744,7 @@ function diagramRelationshipSvg(rel, layout, index) {
     labelX = midX + direction * 8;
     labelY = (y1 + y2) / 2 - 6;
   }
-  const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
-  const selectionClass = diagramRelationshipSelectionClass(rel, layout.selection);
-  return `
-    <g class="diagram-relationship diagram-relationship-${escapeHtml(diagramStatusTone(rel.status))} ${selectionClass}" data-diagram-relationship="${escapeHtml(rel.id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
-      <title>${escapeHtml(label)}</title>
-      <path class="diagram-edge-hit" d="${path}"></path>
-      <path class="diagram-edge" d="${path}"></path>
-      <circle class="diagram-port-dot" cx="${x1}" cy="${y1}" r="3"></circle>
-      <circle class="diagram-port-dot" cx="${x2}" cy="${y2}" r="3"></circle>
-      <text class="diagram-edge-label" x="${labelX}" y="${labelY}">${escapeHtml(truncateMiddle(rel.label || rel.cardinality || "FK", 22))}</text>
-    </g>
-  `;
+  return { path, x1, y1, x2, y2, labelX, labelY };
 }
 
 function diagramTableSvg(record, position, selection) {
@@ -6756,7 +6761,7 @@ function diagramTableSvg(record, position, selection) {
   ].filter(Boolean).join(" · ");
   const selectionClass = diagramTableSelectionClass(table.name, selection);
   return `
-    <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))} diagram-role-${escapeHtml(record.role.name)} ${selectionClass}" data-diagram-table="${escapeHtml(table.name)}" transform="translate(${position.x} ${position.y})" tabindex="0" role="button" aria-label="${escapeHtml(`${table.name} table`)}">
+    <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))} diagram-role-${escapeHtml(record.role.name)} ${selectionClass}" data-diagram-table="${escapeHtml(table.name)}" data-diagram-layer="${position.layer}" transform="translate(${position.x} ${position.y})" tabindex="0" role="button" aria-label="${escapeHtml(`${table.name} table`)}">
       <title>${escapeHtml(`${table.name} · ${record.role.label} · ${meta}`)}</title>
       <rect class="diagram-table-box" width="${position.width}" height="${position.height}" rx="8"></rect>
       <rect class="diagram-table-header" width="${position.width}" height="46" rx="8"></rect>
@@ -6860,6 +6865,7 @@ function handleDiagramPointerMove(event) {
   const tableTarget = findDiagramTableElement(drag.tableName);
   if (tableTarget) {
     tableTarget.setAttribute("transform", `translate(${nextPosition.x} ${nextPosition.y})`);
+    syncDiagramRelationshipGeometry(drag.tableName);
   }
   event.preventDefault();
   return true;
@@ -6898,12 +6904,64 @@ function diagramTablePositionFromElement(element) {
     y: match ? Number(match[2]) : 0,
     width: Number(box?.getAttribute("width") || 0),
     height: Number(box?.getAttribute("height") || 0),
+    layer: Number(element.dataset.diagramLayer || 0),
   };
 }
 
 function findDiagramTableElement(tableName) {
   return [...els.diagramSvg.querySelectorAll("[data-diagram-table]")]
     .find((element) => element.dataset.diagramTable === tableName) || null;
+}
+
+function syncDiagramRelationshipGeometry(tableName = "") {
+  els.diagramSvg.querySelectorAll("[data-diagram-relationship]").forEach((relationshipElement) => {
+    const childTable = relationshipElement.dataset.diagramChildTable || "";
+    const parentTable = relationshipElement.dataset.diagramParentTable || "";
+    if (tableName && childTable !== tableName && parentTable !== tableName) {
+      return;
+    }
+    const sourceElement = findDiagramTableElement(relationshipElement.dataset.diagramChildTable || "");
+    const targetElement = findDiagramTableElement(relationshipElement.dataset.diagramParentTable || "");
+    if (!sourceElement || !targetElement) {
+      return;
+    }
+    const source = diagramRelationshipTablePosition(
+      sourceElement,
+      relationshipElement.dataset.diagramChildColumn || "",
+    );
+    const target = diagramRelationshipTablePosition(
+      targetElement,
+      relationshipElement.dataset.diagramParentColumn || "",
+    );
+    const geometry = diagramRelationshipGeometry(
+      source,
+      target,
+      relationshipElement.dataset.diagramChildColumn || "",
+      relationshipElement.dataset.diagramParentColumn || "",
+      Number(relationshipElement.dataset.diagramEdgeIndex || 0),
+    );
+    relationshipElement.querySelectorAll(".diagram-edge-hit, .diagram-edge").forEach((pathElement) => {
+      pathElement.setAttribute("d", geometry.path);
+    });
+    relationshipElement.querySelector(".diagram-port-source")?.setAttribute("cx", geometry.x1);
+    relationshipElement.querySelector(".diagram-port-source")?.setAttribute("cy", geometry.y1);
+    relationshipElement.querySelector(".diagram-port-target")?.setAttribute("cx", geometry.x2);
+    relationshipElement.querySelector(".diagram-port-target")?.setAttribute("cy", geometry.y2);
+    relationshipElement.querySelector(".diagram-edge-label")?.setAttribute("x", geometry.labelX);
+    relationshipElement.querySelector(".diagram-edge-label")?.setAttribute("y", geometry.labelY);
+  });
+}
+
+function diagramRelationshipTablePosition(tableElement, columnName) {
+  const position = diagramTablePositionFromElement(tableElement);
+  position.columnY = new Map([[columnName, diagramColumnAbsoluteY(tableElement, position, columnName)]]);
+  return position;
+}
+
+function diagramColumnAbsoluteY(tableElement, position, columnName) {
+  const columnElement = [...tableElement.querySelectorAll("[data-diagram-column]")]
+    .find((element) => element.dataset.diagramColumn === columnName);
+  return position.y + Number(columnElement?.getAttribute("y") || 80);
 }
 
 function diagramSelectionContext(model) {

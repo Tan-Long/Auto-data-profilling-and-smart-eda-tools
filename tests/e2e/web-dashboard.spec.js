@@ -158,6 +158,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramSvg")).toContainText("order_status");
   const ordersTable = page.locator('#diagramSvg [data-diagram-table="orders"]');
+  const ordersRelationshipPath = page.locator(
+    '#diagramSvg [data-diagram-relationship="order_items.order_id->orders.order_id"] .diagram-edge',
+  );
+  const relationshipPathBeforeDrag = await ordersRelationshipPath.getAttribute("d");
   const ordersTransformBeforeDrag = await ordersTable.getAttribute("transform");
   const ordersBox = await ordersTable.boundingBox();
   expect(ordersBox).toBeTruthy();
@@ -166,6 +170,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.mouse.move(ordersBox.x + ordersBox.width / 2 + 90, ordersBox.y + ordersBox.height / 2 + 36, {
     steps: 8,
   });
+  await expect.poll(async () => ordersRelationshipPath.getAttribute("d")).not.toBe(relationshipPathBeforeDrag);
   await page.mouse.up();
   await expect.poll(async () => ordersTable.getAttribute("transform")).not.toBe(ordersTransformBeforeDrag);
   await page.locator("#diagramResetSelection").click();
