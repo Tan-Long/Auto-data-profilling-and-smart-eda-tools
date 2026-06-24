@@ -225,8 +225,8 @@ const runtimeStageDescriptions = {
   data_quality_checks: "Runs deterministic column and table checks from the DBML contract, then writes issue rows for missing, duplicate, invalid, and outlier findings.",
   relationship_checks: "Validates DBML foreign-key relationships against the CSV data, including orphan child rows, null keys, and duplicate parent keys.",
   write_machine_artifacts: "Writes the machine-readable artifacts used by Review: issues, table readiness, action plans, todos, quality gates, charts, and schema evidence.",
-  llm_narrative: "Optionally generates the compatibility LLM summary artifact and guardrail report without changing deterministic issue results.",
-  render_reports: "Renders the human-readable Markdown and HTML reports from the deterministic artifacts generated earlier in the run.",
+  llm_narrative: "Optionally generates the compatibility LLM summary artifact. OpenAI is called only when selected and configured; missing provider config uses deterministic fallback.",
+  render_reports: "Renders the human-readable Markdown and HTML reports locally from existing artifacts. This step does not call OpenAI or any external provider.",
 };
 
 let workflowNavScrollFrame = 0;

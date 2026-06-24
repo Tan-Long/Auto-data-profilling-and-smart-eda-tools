@@ -226,10 +226,12 @@ def generate_l4_narrative(
     out_dir: Path,
     artifacts: dict[str, Any],
     provider: NarrativeProvider | None,
+    requested_provider: str | None = None,
 ) -> dict[str, Any]:
     context = build_narrative_context(artifacts)
     evidence = build_guardrail_evidence(artifacts, context)
     provider_name = getattr(provider, "name", "none") if provider else "none"
+    requested_provider_name = (requested_provider or provider_name or "none").strip().lower()
     provider_config = _provider_config_summary(provider)
     provider_model = provider_config.get("model", "")
     violations: list[dict[str, Any]] = []
@@ -280,6 +282,7 @@ def generate_l4_narrative(
         "artifact": "guardrail_report",
         "version": 1,
         "status": status,
+        "requested_provider": requested_provider_name,
         "provider": provider_name,
         "model": provider_model,
         "model_config": provider_config,

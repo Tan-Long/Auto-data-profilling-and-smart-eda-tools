@@ -174,6 +174,7 @@ def run(
     elif mapping is not None:
         raise typer.BadParameter("--mapping is only supported for CSV mode.")
 
+    requested_llm_provider = _llm_provider_name_from_config(llm_provider) if use_llm else None
     result = run_pipeline(
         dbml_path=dbml_path,
         csv_dir=csv_dir,
@@ -184,6 +185,7 @@ def run(
         source_connector=source_connector,
         use_llm=use_llm,
         llm_provider=_llm_provider_from_config(llm_provider) if use_llm else None,
+        requested_llm_provider=requested_llm_provider,
         max_analysis_rows=max_analysis_rows,
         max_feature_columns=max_feature_columns,
     )
@@ -334,6 +336,7 @@ def run_pipeline(
     source_connector: TabularSourceConnector | None = None,
     use_llm: bool = False,
     llm_provider: NarrativeProvider | None = None,
+    requested_llm_provider: str | None = None,
     max_analysis_rows: int = MAX_ANALYSIS_ROWS,
     max_feature_columns: int = MAX_FEATURE_COLUMNS,
 ) -> dict[str, str | int]:
@@ -366,8 +369,12 @@ def run_pipeline(
             "target": target,
         }
     if use_llm:
+        requested_provider = _normalized_requested_llm_provider(
+            requested_llm_provider or getattr(llm_provider, "name", None)
+        )
         runtime_inputs["use_llm"] = True
-        runtime_inputs["llm_provider"] = getattr(llm_provider, "name", "none")
+        runtime_inputs["llm_provider"] = requested_provider
+        runtime_inputs["llm_provider_executed"] = getattr(llm_provider, "name", "none")
     if max_analysis_rows != MAX_ANALYSIS_ROWS:
         runtime_inputs["max_analysis_rows"] = max_analysis_rows
     if max_feature_columns != MAX_FEATURE_COLUMNS:
@@ -637,6 +644,9 @@ def run_pipeline(
         l4_report_path: Path | None = None
         if use_llm:
             with runtime.stage("llm_narrative", "Generate optional LLM summary artifact") as stage:
+                requested_provider = _normalized_requested_llm_provider(
+                    requested_llm_provider or getattr(llm_provider, "name", None)
+                )
                 narrative_result = generate_l4_narrative(
                     out_dir=out_dir,
                     artifacts={
@@ -650,6 +660,7 @@ def run_pipeline(
                         "chart_specs": chart_specs,
                     },
                     provider=llm_provider,
+                    requested_provider=requested_provider,
                 )
                 l4_report_path = narrative_result["l4_report_path"]
                 runtime.artifact_written(l4_report_path, key="l4_report", kind="llm_report")
@@ -668,7 +679,14 @@ def run_pipeline(
                     },
                 )
                 guardrail_report = narrative_result["guardrail_report"]
+                external_api_call = (
+                    guardrail_report["provider"] == "openai"
+                    and guardrail_report.get("fallback_reason") != "provider_config_missing"
+                )
+                stage.add_detail("selected_provider", requested_provider)
                 stage.add_detail("provider", guardrail_report["provider"])
+                stage.add_detail("executed_provider", guardrail_report["provider"])
+                stage.add_detail("external_api_call", "yes" if external_api_call else "no")
                 stage.add_detail("guardrail_status", guardrail_report["status"])
                 if guardrail_report.get("model"):
                     stage.add_detail("model", guardrail_report["model"])
@@ -696,6 +714,12 @@ def run_pipeline(
             )
             stage.add_detail("report_count", 2)
             stage.add_detail("formats", ["markdown", "html"])
+            stage.add_detail("execution_scope", "local report rendering")
+            stage.add_detail("external_api_call", "no")
+            stage.add_detail(
+                "llm_dependency",
+                "Reads existing LLM artifacts when present; does not call providers.",
+            )
 
         runtime.declare_artifact(out_dir / "lineage_graph.json", key="lineage_graph")
         lineage_graph = build_lineage_graph(
@@ -851,10 +875,9 @@ def _source_connector_from_cli(
 
 def _llm_provider_from_config(name: str | None) -> NarrativeProvider | None:
     _load_env_file()
-    provider_name = name or os.environ.get("VSF_PROFILER_LLM_PROVIDER")
+    provider_name = _llm_provider_name_from_config(name)
     if provider_name is None:
         return None
-    provider_name = provider_name.strip().lower()
     if provider_name == "fake":
         return FakeNarrativeProvider()
     if provider_name == "openai":
@@ -876,6 +899,21 @@ def _llm_provider_from_config(name: str | None) -> NarrativeProvider | None:
     raise typer.BadParameter(
         f"Unsupported LLM provider '{provider_name}'. Supported providers: fake, openai."
     )
+
+
+def _llm_provider_name_from_config(name: str | None) -> str | None:
+    _load_env_file()
+    provider_name = name or os.environ.get("VSF_PROFILER_LLM_PROVIDER")
+    if provider_name is None:
+        return None
+    normalized = _normalized_requested_llm_provider(provider_name)
+    return None if normalized == "none" else normalized
+
+
+def _normalized_requested_llm_provider(name: str | None) -> str:
+    if not name:
+        return "none"
+    return str(name).strip().lower() or "none"
 
 
 def _load_env_file(path: Path = Path(".env")) -> None:

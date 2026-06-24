@@ -649,6 +649,7 @@ class WebRunStore:
                 out_dir=job.out_dir,
                 use_llm=use_llm,
                 llm_provider=llm_provider,
+                requested_llm_provider=llm_provider_name if use_llm else None,
             )
         except Exception as exc:
             job.status = "failed"
@@ -685,6 +686,7 @@ class WebRunStore:
                 source_connector=source_connector,
                 use_llm=use_llm,
                 llm_provider=llm_provider,
+                requested_llm_provider=llm_provider_name if use_llm else None,
             )
         except Exception as exc:
             job.status = "failed"

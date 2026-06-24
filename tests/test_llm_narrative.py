@@ -252,8 +252,45 @@ def test_missing_provider_config_uses_deterministic_fallback(tmp_path):
     guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
     assert guardrail_report["status"] == "fallback_used"
     assert guardrail_report["fallback_reason"] == "provider_config_missing"
+    assert guardrail_report["requested_provider"] == "none"
     assert guardrail_report["provider"] == "none"
     assert (out_dir / "l4_report.md").exists()
+
+
+def test_requested_openai_without_config_is_audited_without_external_call(tmp_path):
+    data_dir = create_small_demo(tmp_path / "data" / "demo_small")
+    out_dir = tmp_path / "outputs" / "demo_small_openai_missing"
+
+    run_pipeline(
+        dbml_path=data_dir / "schema.dbml",
+        csv_dir=data_dir / "csv",
+        rules_path=data_dir / "rules.yaml",
+        target="order_reviews.review_score",
+        out_dir=out_dir,
+        use_llm=True,
+        llm_provider=None,
+        requested_llm_provider="openai",
+    )
+
+    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
+    run_summary = json.loads((out_dir / "run_summary.json").read_text())
+    llm_stage = next(
+        stage for stage in run_summary["stage_timings"] if stage["name"] == "llm_narrative"
+    )
+    report_stage = next(
+        stage for stage in run_summary["stage_timings"] if stage["name"] == "render_reports"
+    )
+
+    assert guardrail_report["requested_provider"] == "openai"
+    assert guardrail_report["provider"] == "none"
+    assert guardrail_report["fallback_reason"] == "provider_config_missing"
+    assert run_summary["inputs"]["llm_provider"] == "openai"
+    assert run_summary["inputs"]["llm_provider_executed"] == "none"
+    assert llm_stage["details"]["selected_provider"] == "openai"
+    assert llm_stage["details"]["executed_provider"] == "none"
+    assert llm_stage["details"]["external_api_call"] == "no"
+    assert report_stage["details"]["execution_scope"] == "local report rendering"
+    assert report_stage["details"]["external_api_call"] == "no"
 
 
 def test_llm_disabled_preserves_deterministic_artifact_set(tmp_path):

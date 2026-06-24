@@ -3482,6 +3482,13 @@ h3 {
   text-align: right;
 }
 
+.option-note {
+  margin: 0;
+  color: var(--foreground-tertiary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .mode-button {
   min-height: 38px;
   border: 1px solid transparent;
@@ -3767,6 +3774,10 @@ h3 {
   gap: 8px;
   max-height: 360px;
   overflow: auto;
+}
+
+.stage-list:has(.runtime-stage-item[open]) {
+  max-height: min(560px, calc(100vh - 176px));
 }
 
 .artifact-list {

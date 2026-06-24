@@ -397,11 +397,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportStage.locator(".stage-info-icon")).toHaveText("i");
   await reportStage.hover();
   await expect(reportStage.locator(".stage-info-tooltip")).toBeVisible();
-  await expect(reportStage.locator(".stage-info-tooltip")).toContainText("Renders the human-readable Markdown and HTML reports");
+  await expect(reportStage.locator(".stage-info-tooltip")).toContainText("does not call OpenAI");
   await reportStage.locator("summary").click();
   expect(await reportStage.evaluate((element) => element.hasAttribute("open"))).toBe(true);
   await expect(reportStage.locator(".stage-detail-grid")).toContainText("report_count");
   await expect(reportStage.locator(".stage-detail-grid")).toContainText("formats");
+  await expect(reportStage.locator(".stage-detail-grid")).toContainText("external_api_call");
+  await expect(reportStage.locator(".stage-detail-grid")).toContainText("no");
   await page.waitForFunction(() => {
     const list = document.querySelector("#stageList");
     const stage = [...document.querySelectorAll("#stageList .runtime-stage-item")]
