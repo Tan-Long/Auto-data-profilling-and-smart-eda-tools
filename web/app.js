@@ -2118,11 +2118,20 @@ function mappingMethodForTable(table, csvFile) {
 function foreignKeySummary(table) {
   const fks = table.columns.filter((column) => column.fk);
   if (!fks.length) {
-    return "none";
+    return `<span class="muted">none</span>`;
   }
-  return fks
-    .map((column) => `<div><code>${escapeHtml(column.name)}</code> -> <code>${escapeHtml(column.fk.parentTable)}.${escapeHtml(column.fk.parentColumn)}</code></div>`)
+  const rows = fks
+    .map((column) => `
+      <span class="fk-row">
+        <code class="fk-column">${escapeHtml(column.name)}</code>
+        <span class="fk-arrow" aria-label="references">-></span>
+        <span class="fk-target">
+          <code>${escapeHtml(column.fk.parentTable)}</code><span>.</span><code>${escapeHtml(column.fk.parentColumn)}</code>
+        </span>
+      </span>
+    `)
     .join("");
+  return `<div class="fk-list" aria-label="Foreign key references for ${escapeHtml(table.name)}">${rows}</div>`;
 }
 
 function headerMatch(table, csvFile) {

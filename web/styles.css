@@ -4022,6 +4022,42 @@ h3 {
   border-bottom: 0;
 }
 
+.fk-list {
+  display: grid;
+  gap: 6px;
+  min-width: 250px;
+}
+
+.fk-row {
+  display: grid;
+  grid-template-columns: minmax(84px, max-content) 20px minmax(120px, 1fr);
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.fk-column,
+.fk-target {
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  overflow-wrap: anywhere;
+}
+
+.fk-target {
+  background: var(--surface-inset);
+}
+
+.fk-arrow {
+  color: var(--foreground-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .empty-row {
   height: 88px;
   color: var(--foreground-tertiary);
