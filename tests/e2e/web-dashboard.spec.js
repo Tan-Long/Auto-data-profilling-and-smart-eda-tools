@@ -106,6 +106,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
   await expect(page.locator("#csvList")).toContainText("customers.csv");
   await expect(page.locator("#diagramSvg")).toContainText("orders");
+  const mappingTableOverflow = await page.locator("#mapping .mapping-table-wrap").evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(mappingTableOverflow.scrollWidth).toBeLessThanOrEqual(mappingTableOverflow.clientWidth + 1);
   const orderItemsMappingRow = page.locator("#mappingBody tr").filter({
     has: page.locator("td:nth-child(2) code", { hasText: /^order_items$/ }),
   });

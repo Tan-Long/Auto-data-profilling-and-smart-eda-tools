@@ -3772,24 +3772,57 @@ h3 {
 }
 
 .mapping-table-wrap {
-  overflow-x: auto;
+  overflow-x: visible;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
 }
 
 .mapping-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   background: var(--surface-overlay);
 }
 
 .mapping-table th,
 .mapping-table td {
-  padding: 12px;
+  min-width: 0;
+  padding: 10px;
   border-bottom: 1px solid var(--border-subtle);
+  overflow-wrap: anywhere;
   text-align: left;
   vertical-align: middle;
+}
+
+.mapping-table th:nth-child(1),
+.mapping-table td:nth-child(1) {
+  width: 9%;
+}
+
+.mapping-table th:nth-child(2),
+.mapping-table td:nth-child(2) {
+  width: 15%;
+}
+
+.mapping-table th:nth-child(3),
+.mapping-table td:nth-child(3) {
+  width: 12%;
+}
+
+.mapping-table th:nth-child(4),
+.mapping-table td:nth-child(4) {
+  width: 29%;
+}
+
+.mapping-table th:nth-child(5),
+.mapping-table td:nth-child(5) {
+  width: 22%;
+}
+
+.mapping-table th:nth-child(6),
+.mapping-table td:nth-child(6) {
+  width: 13%;
 }
 
 .mapping-table th {
@@ -3807,12 +3840,12 @@ h3 {
 .fk-list {
   display: grid;
   gap: 6px;
-  min-width: 250px;
+  min-width: 0;
 }
 
 .fk-row {
   display: grid;
-  grid-template-columns: minmax(84px, max-content) 20px minmax(120px, 1fr);
+  grid-template-columns: minmax(0, 0.9fr) 16px minmax(0, 1.25fr);
   align-items: center;
   gap: 6px;
   font-size: 12px;
@@ -3848,7 +3881,7 @@ h3 {
 
 .mapping-select {
   width: 100%;
-  min-width: 220px;
+  min-width: 0;
   min-height: 40px;
   padding: 8px 10px;
   border: 1px solid var(--border-default);
@@ -3859,13 +3892,13 @@ h3 {
 
 .csv-file-cell {
   display: grid;
-  min-width: 240px;
+  min-width: 0;
 }
 
 .header-meter {
   display: grid;
   gap: 5px;
-  min-width: 148px;
+  min-width: 0;
 }
 
 .meter-track {
