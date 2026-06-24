@@ -459,7 +459,7 @@
           {% if schema_evaluation.available %}<li><strong>Schema Mapping Summary</strong>: mapped={{ schema_evaluation.mapped_table_count }}, missing={{ schema_evaluation.missing_table_count }}, methods={{ schema_evaluation.mapping_method_counts_text }} (<code>{{ schema_evaluation.path }}</code>)</li>{% endif %}
           {% if relationship_graph.available %}<li><strong>Relationship Cardinality Summary</strong>: {{ relationship_graph.cardinality_counts_text }}; junction tables={{ relationship_graph.junction_tables_text }} (<code>{{ relationship_graph.path }}</code>)</li>{% endif %}
           {% if execution_flow.available %}<li><strong>Execution Flow</strong>: {{ execution_flow.stages|length }} stages; status={{ execution_flow.status }} (<code>run_summary.json</code>, <code>run_events.jsonl</code>)</li>{% endif %}
-          {% if l4_report.available %}<li><strong>Compatibility LLM Guardrail Artifact</strong>: status={{ l4_report.status }}; provider={{ l4_report.provider }}{% if l4_report.model %}; model={{ l4_report.model }}{% endif %}{% if l4_report.fallback_reason %}; fallback={{ l4_report.fallback_reason }}{% endif %}</li>{% endif %}
+          {% if l4_report.available %}<li><strong>LLM Output Validation</strong>: {{ l4_report.status_text }}; validates LLM text only, not data readiness; provider={{ l4_report.provider }}{% if l4_report.model %}; model={{ l4_report.model }}{% endif %}{% if l4_report.fallback_reason %}; fallback={{ l4_report.fallback_reason }}{% endif %}</li>{% endif %}
         </ul>
         <div class="artifact-grid">
           {% for artifact in fixed_report.developer_artifacts.artifacts %}

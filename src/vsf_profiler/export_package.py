@@ -620,11 +620,13 @@ def l4_summary_html(guardrail_report: dict[str, Any], artifact_index: dict[str, 
             "LLM summary artifact was not generated for this deterministic run.</p>"
         )
     status = guardrail_report.get("status", "unknown")
+    status_text = _l4_display_status(str(status))
     provider = guardrail_report.get("provider", "unknown")
     model = guardrail_report.get("model", "")
     fallback_reason = guardrail_report.get("fallback_reason", "")
     details = [
-        f'<span class="pill {_h(status)}">{_h(status)}</span>',
+        f'<span class="pill {_h(status)}">{_h(status_text)}</span>',
+        "validates LLM text only, not data readiness",
         f"provider=<strong>{_h(provider)}</strong>",
     ]
     if model:
@@ -635,7 +637,7 @@ def l4_summary_html(guardrail_report: dict[str, Any], artifact_index: dict[str, 
       <p>{' · '.join(details)}</p>
       <div class="links">
         {_artifact_link("Open compatibility LLM report", "l4_report.md", artifact_index)}
-        {_artifact_link("Open guardrail report", "guardrail_report.json", artifact_index)}
+        {_artifact_link("Open LLM output validation report", "guardrail_report.json", artifact_index)}
       </div>
     """
 
@@ -1133,7 +1135,7 @@ def package_developer_artifact_links_html(
         ("Great Expectations baseline comparison", "baseline_comparison.json"),
         ("Evaluation summary", "evaluation_summary.json"),
         ("Compatibility LLM report", "l4_report.md"),
-        ("Guardrail report", "guardrail_report.json"),
+        ("LLM output validation report", "guardrail_report.json"),
     ]
     links: list[str] = []
     seen: set[str] = set()
@@ -1368,6 +1370,18 @@ def _analysis_consequence(issue_type: str) -> str:
 
 def _scorecard_row(label: str, value: Any, detail: str) -> str:
     return f"<tr><td>{_h(label)}</td><td><strong>{_h(value)}</strong></td><td>{_h(detail)}</td></tr>"
+
+
+def _l4_display_status(status: str) -> str:
+    if status == "passed":
+        return "LLM text valid"
+    if status == "failed":
+        return "LLM text failed"
+    if status == "fallback_used":
+        return "fallback used"
+    if status == "not_enabled":
+        return "not enabled"
+    return str(status or "unknown").replace("_", " ")
 
 
 def _artifact_links() -> list[tuple[str, str]]:

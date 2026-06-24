@@ -66,7 +66,7 @@ ARTIFACT_LABELS = {
     "run_events.jsonl": "Runtime events",
     "run_summary.json": "Runtime summary",
     "l4_report.md": "Compatibility LLM report",
-    "guardrail_report.json": "Guardrail report",
+    "guardrail_report.json": "LLM output validation report",
     "preflight_review.json": "Preflight review",
     "ground_truth_issues.json": "Evaluation ground truth",
     "baseline_comparison.json": "Great Expectations baseline comparison",

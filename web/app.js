@@ -2827,6 +2827,9 @@ function runtimeStageDetailRows(stage, purpose) {
     ["Stage id", stage.name || "stage"],
     ["Status", stage.status || "running"],
   ];
+  if (stage.name === "llm_narrative") {
+    rows.push(["Scope", guardrailScopeText()]);
+  }
   if (stage.duration !== null && stage.duration !== undefined) {
     rows.push(["Duration", `${Number(stage.duration).toFixed(3)}s`]);
   }
@@ -2839,6 +2842,10 @@ function runtimeStageDetailRows(stage, purpose) {
   Object.entries(stage.details || {})
     .filter(([key, value]) => key !== "display_name" && value !== null && value !== undefined && value !== "")
     .forEach(([key, value]) => {
+      if (stage.name === "llm_narrative" && key === "guardrail_status") {
+        rows.push(["LLM output validation", guardrailDisplayStatus(value)]);
+        return;
+      }
       rows.push([key, value]);
     });
   return rows;
@@ -3415,14 +3422,15 @@ function renderGeneratedL4Preview(artifacts) {
   const checkedRefs = Array.isArray(guardrail.checked_refs) ? guardrail.checked_refs.length : 0;
   const violationCount = Array.isArray(guardrail.violations) ? guardrail.violations.length : 0;
   const fallback = guardrail.fallback_reason || "";
+  const displayStatus = guardrailDisplayStatus(status);
   const body = `
     <div class="generated-result-kpi">
-      <strong>${escapeHtml(status)}</strong>
+      <strong>${escapeHtml(displayStatus)}</strong>
       <span>${escapeHtml(provider)}${model ? ` · ${escapeHtml(model)}` : ""}</span>
     </div>
-    <p>${integerText(checkedNumbers)} numbers · ${integerText(checkedRefs)} refs · ${integerText(violationCount)} violations${fallback ? ` · ${escapeHtml(fallback)}` : ""}</p>
+    <p>${guardrailScopeText()} ${integerText(checkedNumbers)} numbers · ${integerText(checkedRefs)} refs · ${integerText(violationCount)} violations${fallback ? ` · ${escapeHtml(fallback)}` : ""}</p>
   `;
-  return generatedResultCard("Optional LLM guardrail", "guardrail_report.json", body, artifacts);
+  return generatedResultCard("LLM output validation", "guardrail_report.json", body, artifacts);
 }
 
 function renderGeneratedIssueLlmPreview(artifacts) {
@@ -4510,15 +4518,16 @@ function renderL4GuardrailPanel() {
   const checkedRefs = Array.isArray(guardrail.checked_refs) ? guardrail.checked_refs.length : 0;
   const violationCount = Array.isArray(guardrail.violations) ? guardrail.violations.length : 0;
   const fallback = guardrail.fallback_reason || "";
+  const displayStatus = guardrailDisplayStatus(status);
   return dashboardPanel(
-    "Optional LLM guardrail",
+    "LLM output validation",
     "guardrail_report.json",
     `
-      <button class="risk-gauge-button" type="button" data-dashboard-kind="l4_guardrail" data-dashboard-value="${escapeHtml(status)}" data-dashboard-label="LLM guardrail ${escapeHtml(status)}">
-        <span class="pill-status ${guardrailStatusClass(status)}">${escapeHtml(status)}</span>
+      <button class="risk-gauge-button" type="button" data-dashboard-kind="l4_guardrail" data-dashboard-value="${escapeHtml(status)}" data-dashboard-label="LLM output validation ${escapeHtml(displayStatus)}">
+        <span class="pill-status ${guardrailStatusClass(status)}">${escapeHtml(displayStatus)}</span>
         <span>
           <strong>${escapeHtml(provider)}${model ? ` · ${escapeHtml(model)}` : ""}</strong>
-          <small>${integerText(checkedNumbers)} numbers · ${integerText(checkedRefs)} refs · ${integerText(violationCount)} violations${fallback ? ` · ${escapeHtml(fallback)}` : ""}</small>
+          <small>${guardrailScopeText()} ${integerText(checkedNumbers)} numbers · ${integerText(checkedRefs)} refs · ${integerText(violationCount)} violations${fallback ? ` · ${escapeHtml(fallback)}` : ""}</small>
         </span>
       </button>
     `,
@@ -5864,19 +5873,21 @@ function renderL4GuardrailDetails(selection) {
   const checkedRefs = Array.isArray(guardrail.checked_refs) ? guardrail.checked_refs.length : 0;
   const violations = Array.isArray(guardrail.violations) ? guardrail.violations : [];
   const model = guardrail.model || guardrail.model_config?.model || "";
+  const displayStatus = guardrailDisplayStatus(guardrail.status);
   return `
     <div class="table-assessment-detail">
       <div>
-        <strong>LLM guardrail</strong>
-        <p>${escapeHtml(guardrail.provider || "unknown")}${model ? ` · ${escapeHtml(model)}` : ""}</p>
+        <strong>LLM output validation</strong>
+        <p>${guardrailScopeText()}</p>
       </div>
-      <span class="pill-status ${guardrailStatusClass(guardrail.status)}">${escapeHtml(guardrail.status || "unknown")}</span>
+      <span class="pill-status ${guardrailStatusClass(guardrail.status)}">${escapeHtml(displayStatus)}</span>
       <dl class="graph-metadata">
-        <div><dt>checked_numbers</dt><dd>${integerText(checkedNumbers)}</dd></div>
-        <div><dt>checked_refs</dt><dd>${integerText(checkedRefs)}</dd></div>
+        <div><dt>provider</dt><dd>${escapeHtml(guardrail.provider || "unknown")}${model ? ` · ${escapeHtml(model)}` : ""}</dd></div>
+        <div><dt>checked numbers</dt><dd>${integerText(checkedNumbers)}</dd></div>
+        <div><dt>checked refs</dt><dd>${integerText(checkedRefs)}</dd></div>
         <div><dt>violations</dt><dd>${integerText(violations.length)}</dd></div>
-        <div><dt>fallback_reason</dt><dd>${escapeHtml(guardrail.fallback_reason || "none")}</dd></div>
-        <div><dt>raw_csv_included</dt><dd>${escapeHtml(String(Boolean(guardrail.raw_csv_included)))}</dd></div>
+        <div><dt>fallback reason</dt><dd>${escapeHtml(guardrail.fallback_reason || "none")}</dd></div>
+        <div><dt>raw CSV included</dt><dd>${escapeHtml(String(Boolean(guardrail.raw_csv_included)))}</dd></div>
       </dl>
     </div>
   `;
@@ -6106,7 +6117,7 @@ function artifactLabel(path) {
     "influence.json": "Legacy association artifact",
     "run_summary.json": "Run summary",
     "l4_report.md": "Optional LLM report",
-    "guardrail_report.json": "Guardrail report",
+    "guardrail_report.json": "LLM output validation report",
   };
   return labels[path] || path.replace(/^charts\//, "Chart: ");
 }
@@ -6172,6 +6183,27 @@ function dashboardTone(label) {
     return "warn";
   }
   return "";
+}
+
+function guardrailDisplayStatus(status) {
+  const normalized = String(status || "unknown");
+  if (normalized === "passed") {
+    return "LLM text valid";
+  }
+  if (normalized === "failed") {
+    return "LLM text failed";
+  }
+  if (normalized === "fallback_used") {
+    return "fallback used";
+  }
+  if (normalized === "not_enabled") {
+    return "not enabled";
+  }
+  return normalized.replace(/_/g, " ");
+}
+
+function guardrailScopeText() {
+  return "Validates LLM text only; data readiness still comes from quality gates.";
 }
 
 function guardrailStatusClass(status) {

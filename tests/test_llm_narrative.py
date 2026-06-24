@@ -168,10 +168,11 @@ def test_configured_fake_provider_output_passes_guardrail(tmp_path):
     assert "Table-by-Table Health Review" in l4_report
     assert "Column Issue Blocks" in l4_report
     assert "Legacy association findings are association-only" in l4_report
-    assert "LLM guardrail status: **passed**" in report_md
-    assert "provider=fake" in report_md
-    assert "LLM guardrail" in report_html
-    assert "passed" in report_html
+    assert "LLM output validation: **LLM text valid**" in report_md
+    assert "validates optional LLM text only; data readiness still comes from quality gates" in report_md
+    assert "Provider: `fake`" in report_md
+    assert "LLM Output Validation" in report_html
+    assert "LLM text valid" in report_html
 
 
 def test_openai_safe_draft_output_passes_without_fallback(tmp_path):
@@ -204,7 +205,8 @@ def test_openai_safe_draft_output_passes_without_fallback(tmp_path):
     assert "Table-by-Table Health Review" in l4_report
     assert "Column Issue Blocks" in l4_report
     assert "Deterministic fallback summary" not in l4_report
-    assert "LLM guardrail status: **passed**" in report_md
+    assert "LLM output validation: **LLM text valid**" in report_md
+    assert "validates optional LLM text only; data readiness still comes from quality gates" in report_md
     assert "fallback" not in report_md.lower()
     assert provider.context["guardrail_safe_draft"] == l4_report
 

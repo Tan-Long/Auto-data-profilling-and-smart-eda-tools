@@ -146,6 +146,10 @@ This report shows the first {{ fixed_report.todos.display_limit }} todo groups p
 
 Raw JSON and runtime artifacts are listed here for debugging and package compatibility. Normal report reading should use the sections above.
 
+{% if l4_report.available -%}
+LLM output validation: **{{ l4_report.status_text }}**. This validates optional LLM text only; data readiness still comes from quality gates. Provider: `{{ l4_report.provider }}`{% if l4_report.model %}; model: `{{ l4_report.model }}`{% endif %}{% if l4_report.fallback_reason %}; fallback: `{{ l4_report.fallback_reason }}`{% endif %}.
+
+{% endif -%}
 | Artifact | Path |
 | --- | --- |
 {% for artifact in fixed_report.developer_artifacts.artifacts -%}

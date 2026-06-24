@@ -587,6 +587,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderIssueFocusMap" in js
     assert "selectedRunTimeline" in js
     assert 'return stage?.name === "influence_analysis";' in js
+    assert "LLM output validation" in js
+    assert "LLM text valid" in js
+    assert "Validates LLM text only; data readiness still comes from quality gates." in js
+    assert "Optional LLM guardrail" not in js
     assert "data-run-history-job-id" in js
     assert "charts/issue_counts_by_severity.json" in js
     assert "charts/issue_counts_by_type.json" in js

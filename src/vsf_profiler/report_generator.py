@@ -864,7 +864,7 @@ def _scorecard_context(
     total_fk_count = relationship_graph.get("edge_count", 0)
     l4_status = l4_report.get("status", "not_enabled")
     l4_detail = (
-        f"{l4_report.get('provider', 'unknown')} provider"
+        f"{l4_report.get('provider', 'unknown')} provider; validates LLM text only"
         if l4_report.get("available")
         else "deterministic run"
     )
@@ -900,8 +900,8 @@ def _scorecard_context(
             "tone": "danger" if invalid_fk_count else "ok",
         },
         {
-            "label": "LLM report",
-            "value": l4_status,
+            "label": "LLM text validation",
+            "value": l4_report.get("status_text", _l4_display_status(l4_status)),
             "detail": l4_detail,
             "tone": _tone_for_l4_status(l4_status),
         },
@@ -1547,6 +1547,18 @@ def _tone_for_l4_status(status: str) -> str:
     return "info"
 
 
+def _l4_display_status(status: str) -> str:
+    if status == "passed":
+        return "LLM text valid"
+    if status == "failed":
+        return "LLM text failed"
+    if status == "fallback_used":
+        return "fallback used"
+    if status == "not_enabled":
+        return "not enabled"
+    return str(status or "unknown").replace("_", " ")
+
+
 def _abs_numeric(value: Any) -> float:
     return abs(_numeric(value))
 
@@ -1608,12 +1620,13 @@ def _l4_report_context(run_summary: dict[str, Any] | None, out_dir: Path) -> dic
         "path": l4_path,
         "guardrail_path": artifact_paths.get("guardrail_report", ""),
         "status": status or "unknown",
+        "status_text": _l4_display_status(status or "unknown"),
         "status_class": status or "unknown",
         "provider": provider or "unknown",
         "model": details.get("model", ""),
         "fallback_reason": fallback_reason,
         "preview_lines": preview_lines,
-        "state_text": "Guarded optional LLM summary artifact available.",
+        "state_text": "LLM output validation checks the optional LLM text only; data readiness still comes from quality gates.",
     }
 
 
@@ -1623,6 +1636,7 @@ def _l4_not_enabled_context() -> dict[str, Any]:
         "path": "",
         "guardrail_path": "",
         "status": "not_enabled",
+        "status_text": _l4_display_status("not_enabled"),
         "status_class": "not_enabled",
         "provider": "none",
         "model": "",
