@@ -94,6 +94,7 @@ const els = {
   sourceStateBadge: document.querySelector("#sourceStateBadge"),
   sourceStateSummary: document.querySelector("#sourceStateSummary"),
   sourceStateDetails: document.querySelector("#sourceStateDetails"),
+  quickDemoButton: document.querySelector("#quickDemoButton"),
   clearUploadButton: document.querySelector("#clearUploadButton"),
   preflightStatus: document.querySelector("#preflightStatus"),
   mappingStatus: document.querySelector("#mappingStatus"),
@@ -367,7 +368,11 @@ els.loadDemoButton.addEventListener("click", () => {
 });
 
 els.clearUploadButton.addEventListener("click", () => {
-  clearProfileInputs();
+  clearProfileInputs({ clearPathValues: true });
+});
+
+els.quickDemoButton.addEventListener("click", () => {
+  loadDemoState("small", { switchToPath: true, quickDemo: true });
 });
 
 els.runnerModeUpload.addEventListener("click", () => {
@@ -1066,8 +1071,9 @@ function setRunnerMode(mode) {
   if (state.runnerMode === "path") {
     syncDemoPresetFromPathInputs();
   }
-  if (state.runnerMode === "path" && !state.dbmlText && demoPresets[state.selectedDemoPreset]) {
-    loadDemoState(state.selectedDemoPreset, { switchToPath: true });
+  if (state.runnerMode === "path" && !state.dbmlText) {
+    const presetName = demoPresets[state.selectedDemoPreset] ? state.selectedDemoPreset : "small";
+    loadDemoState(presetName, { switchToPath: true });
     return;
   }
   if (state.runnerMode === "database") {
@@ -1202,7 +1208,12 @@ function loadDemoState(presetName = "small", options = {}) {
   els.pathTargetInput.value = preset.target;
   if (options.switchToPath) {
     state.runnerMode = "path";
-    renderRunnerMessage(`${preset.label} paths are ready for the local runner.`, "idle");
+    renderRunnerMessage(
+      options.quickDemo
+        ? `${preset.label} DBML + CSV demo is loaded. Continue to Preflight Review.`
+        : `${preset.label} paths are ready for the local runner.`,
+      "idle",
+    );
   }
   parseDbmlState();
   autoLinkCsvs();
@@ -1221,6 +1232,7 @@ function clearProfileInputs(options = {}) {
   state.csvReadErrors = [];
   state.mapping = new Map();
   state.manualMappings = new Set();
+  state.runnerMode = "upload";
   state.selectedDemoPreset = "custom";
   els.dbmlInput.value = "";
   els.csvInput.value = "";
@@ -1852,7 +1864,7 @@ function renderSourceState() {
     badge = preset ? "Demo paths" : "Custom paths";
     status = "ready";
     summary = preset
-      ? `${preset.label} paths are selected for the local runner.`
+      ? `${preset.label} DBML + CSV demo is loaded for the local runner.`
       : "Local path mode will read files visible to the backend process.";
   } else if (state.dbmlFile || uploadedCsvs.length) {
     badge = "Custom upload";

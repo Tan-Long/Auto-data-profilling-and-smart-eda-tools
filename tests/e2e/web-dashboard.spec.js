@@ -77,10 +77,23 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#runProfilerButton")).toBeDisabled();
   await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
   await expect(page.locator("#sourceStateSummary")).toContainText("Upload a DBML contract");
+  await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
   await page.locator("#profileFlow").screenshot({
     path: "outputs/us073_goal3/profile-preflight-blocked.png",
   });
-  await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
+  await page.locator("#quickDemoButton").click();
+  await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
+  await expect(page.locator("#sourceStateSummary")).toContainText("DBML + CSV demo is loaded");
+  await expect(page.locator("#runnerMessage")).toContainText("DBML + CSV demo is loaded");
+  await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
+  await expect(page.locator("#csvList")).toContainText("customers.csv");
+  await expect(page.locator("#diagramSvg")).toContainText("orders");
+  await expect(page.locator("#profileStepNext")).toBeEnabled();
+  await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
+  await page.locator("#clearUploadButton").click();
+  await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+  await expect(page.locator("#csvList")).not.toContainText("customers.csv");
+  await expect(page.locator("#runnerMessage")).toContainText("Source cleared");
   await expect(page.locator("#diagramEmpty")).toBeVisible();
   await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");
   await expect(page.locator("#localDiagram")).toBeHidden();

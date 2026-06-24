@@ -86,6 +86,26 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       await screenshot(page.locator("#sourceState"), "04-upload-empty-source.png"),
     );
 
+    await page.locator("#quickDemoButton").click();
+    await expect(page.locator("#sourceStateBadge")).toContainText("Demo paths");
+    await expect(page.locator("#sourceStateSummary")).toContainText("DBML + CSV demo is loaded");
+    await expect(page.locator("#runnerMessage")).toContainText("DBML + CSV demo is loaded");
+    await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
+    await expect(page.locator("#csvList")).toContainText("customers.csv");
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
+    await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
+    record(
+      matrix,
+      "Quick demo source",
+      "A visible Connect-step button loads sample DBML and CSV inventory for demo runs.",
+      "The sample demo switched to local path mode, filled mapping 7/7, and enabled Next while keeping Run gated.",
+      await screenshot(page.locator("#sourceState"), "05-quick-demo-source.png"),
+    );
+
+    await page.locator("#clearUploadButton").click();
+    await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+    await expect(page.locator("#csvList")).not.toContainText("customers.csv");
+
     const uploadFixtureDir = path.join(qaDir, "fixtures");
     fs.mkdirSync(uploadFixtureDir, { recursive: true });
     const accountsDbml = path.join(uploadFixtureDir, "accounts.dbml");
