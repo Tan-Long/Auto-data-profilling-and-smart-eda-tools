@@ -24,6 +24,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
 
     required_html = [
         "Data Quality Profiler",
+        'rel="icon"',
+        'href="favicon.svg"',
         'id="flowChooser"',
         'id="profileFlow"',
         'data-profile-step="connect"',
