@@ -36,7 +36,9 @@ const state = {
   },
   todoFilter: "all",
   dashboardSelection: null,
+  issueSampleRows: {},
   issueLlmProvider: "fake",
+  issueLlmPanelOpen: false,
   issueLlmRunningIssueId: "",
   issueLlmMessage: "",
   issueLlmMessageStatus: "",
@@ -493,6 +495,7 @@ els.dashboardDrilldown.addEventListener("click", async (event) => {
   const providerTarget = event.target.closest("[data-issue-llm-provider]");
   if (providerTarget) {
     state.issueLlmProvider = providerTarget.dataset.issueLlmProvider || "fake";
+    state.issueLlmPanelOpen = true;
     state.issueLlmMessage = "";
     state.issueLlmMessageStatus = "";
     renderDashboardDrilldown();
@@ -500,6 +503,7 @@ els.dashboardDrilldown.addEventListener("click", async (event) => {
   }
   const enrichmentTarget = event.target.closest("[data-issue-llm-run]");
   if (enrichmentTarget) {
+    state.issueLlmPanelOpen = true;
     await runIssueLlmEnrichment(enrichmentTarget.dataset.issueId || "");
     return;
   }
@@ -515,9 +519,14 @@ function handleDashboardSelectionClick(event) {
   if (!target) {
     return;
   }
+  const nextKind = target.dataset.dashboardKind;
+  const nextValue = target.dataset.dashboardValue || "";
+  if (state.dashboardSelection?.kind !== nextKind || state.dashboardSelection?.value !== nextValue) {
+    state.issueLlmPanelOpen = false;
+  }
   state.dashboardSelection = {
-    kind: target.dataset.dashboardKind,
-    value: target.dataset.dashboardValue || "",
+    kind: nextKind,
+    value: nextValue,
     label: target.dataset.dashboardLabel || target.textContent.trim(),
   };
   renderDashboardDrilldown();
@@ -4517,6 +4526,7 @@ function renderIssueDetailDrawer(issue) {
   const status = issueStatus(issue);
   const parent = issueParentContext(issue);
   const actionPlan = getIssueActionPlan(issue);
+  requestIssueSampleRows(issue);
   return `
     <article class="issue-detail-drawer">
       <div class="issue-detail-header">
@@ -4527,13 +4537,10 @@ function renderIssueDetailDrawer(issue) {
         <span class="pill-status ${issueStatusClass(status)}">${escapeHtml(status)}</span>
       </div>
       ${renderIssueFocusMap(issue, parent)}
-      ${renderIssueDetailSection("Where", renderIssueWhere(issue, parent))}
-      ${renderIssueDetailSection("What happened", renderIssueWhatHappened(issue))}
-      ${renderIssueDetailSection("Why it matters", renderIssueWhyItMatters(issue))}
-      ${renderIssueDetailSection("How to fix", renderIssueHowToFix(issue))}
-      ${renderIssueDetailSection("Evidence", renderIssueEvidence(issue), { collapsed: true })}
-      ${renderIssueDetailSection("Action plan", renderIssueActionPlan(actionPlan, issue))}
-      ${renderIssueDetailSection("LLM enrichment add-on", renderIssueLlmEnrichment(actionPlan, issue))}
+      ${renderIssueSampleRows(issue)}
+      ${renderIssueActionDisclosure("Fix / Todo", "Deterministic checklist", renderIssueActionPlan(actionPlan, issue), { open: true })}
+      ${renderIssueActionDisclosure("LLM enrichment add-on", "Optional explanation", renderIssueLlmEnrichment(actionPlan, issue), { open: state.issueLlmPanelOpen })}
+      ${renderIssueActionDisclosure("Evidence", "What happened, why, raw values", renderIssueEvidencePack(issue, parent))}
     </article>
   `;
 }
@@ -4572,6 +4579,198 @@ function renderIssueFocusMap(issue, parent) {
   `;
 }
 
+function renderIssueSampleRows(issue) {
+  const path = issue.sample_bad_rows_path || "";
+  const highlightedColumns = issueHighlightedColumns(issue);
+  const sample = path ? state.issueSampleRows[path] : null;
+  if (!path) {
+    return `
+      <section class="issue-row-evidence">
+        <div class="issue-row-evidence-heading">
+          <div>
+            <h5>Row evidence</h5>
+            <p>No bounded sample CSV was generated for this issue.</p>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+  if (!sample || sample.status === "loading") {
+    return `
+      <section class="issue-row-evidence" aria-busy="true">
+        <div class="issue-row-evidence-heading">
+          <div>
+            <h5>Row evidence</h5>
+            <p>Loading sample rows from <code>${escapeHtml(path)}</code>...</p>
+          </div>
+          <a href="${escapeHtml(artifactUrlFor(path))}" target="_blank" rel="noopener">Open CSV</a>
+        </div>
+      </section>
+    `;
+  }
+  if (sample.status === "error" || !sample.rows.length || !sample.headers.length) {
+    return `
+      <section class="issue-row-evidence">
+        <div class="issue-row-evidence-heading">
+          <div>
+            <h5>Row evidence</h5>
+            <p>${escapeHtml(sample.error || "Sample rows were unavailable for this issue.")}</p>
+          </div>
+          <a href="${escapeHtml(artifactUrlFor(path))}" target="_blank" rel="noopener">Open CSV</a>
+        </div>
+      </section>
+    `;
+  }
+  return `
+    <section class="issue-row-evidence">
+      <div class="issue-row-evidence-heading">
+        <div>
+          <h5>Row evidence</h5>
+          <p>Highlighted cells are the issue columns from <code>${escapeHtml(path)}</code>.</p>
+        </div>
+        <a href="${escapeHtml(artifactUrlFor(path))}" target="_blank" rel="noopener">Open CSV</a>
+      </div>
+      <div class="issue-sample-table-wrap">
+        <table class="issue-sample-table">
+          <thead>
+            <tr>
+              <th>Row</th>
+              ${sample.headers.map((header) => `
+                <th class="${highlightedColumns.has(normalizeColumnKey(header)) ? "highlighted" : ""}">${escapeHtml(header)}</th>
+              `).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${sample.rows.map((row, rowIndex) => `
+              <tr>
+                <td><strong>${integerText(rowIndex + 1)}</strong></td>
+                ${sample.headers.map((header) => {
+                  const highlighted = highlightedColumns.has(normalizeColumnKey(header));
+                  const value = row[header] ?? "";
+                  return `<td class="${highlighted ? "highlighted" : ""}${highlighted && !String(value).trim() ? " missing" : ""}">${escapeHtml(String(value)) || "<span>blank</span>"}</td>`;
+                }).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function requestIssueSampleRows(issue) {
+  const path = issue.sample_bad_rows_path || "";
+  if (!path || state.issueSampleRows[path]) {
+    return;
+  }
+  const url = artifactUrlFor(path);
+  if (!url) {
+    state.issueSampleRows[path] = {
+      status: "error",
+      headers: [],
+      rows: [],
+      error: "Sample artifact URL is unavailable for this run.",
+    };
+    return;
+  }
+  state.issueSampleRows[path] = { status: "loading", headers: [], rows: [] };
+  fetch(url)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Sample CSV request failed with ${response.status}.`);
+      }
+      return response.text();
+    })
+    .then((text) => {
+      state.issueSampleRows[path] = {
+        status: "ready",
+        ...parseIssueSampleCsv(text, 3),
+      };
+    })
+    .catch((error) => {
+      state.issueSampleRows[path] = {
+        status: "error",
+        headers: [],
+        rows: [],
+        error: error.message || "Sample CSV could not be loaded.",
+      };
+    })
+    .finally(() => {
+      const selectedIssueId = state.dashboardSelection?.kind === "issue"
+        ? state.dashboardSelection.value
+        : "";
+      if (selectedIssueId === issueGuid(issue)) {
+        renderDashboardDrilldown();
+      }
+    });
+}
+
+function parseIssueSampleCsv(text, rowLimit) {
+  const records = csvRecords(text, rowLimit + 1);
+  const headers = (records[0] || []).map((header) => header.replace(/^\uFEFF/, "").trim());
+  const rows = records.slice(1, rowLimit + 1).map((record) => {
+    const row = {};
+    headers.forEach((header, index) => {
+      row[header] = record[index] ?? "";
+    });
+    return row;
+  });
+  return { headers, rows };
+}
+
+function csvRecords(text, maxRecords) {
+  const records = [];
+  let record = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') {
+      field += '"';
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (char === "," && !quoted) {
+      record.push(field);
+      field = "";
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[index + 1] === "\n") {
+        index += 1;
+      }
+      record.push(field);
+      records.push(record);
+      if (records.length >= maxRecords) {
+        return records;
+      }
+      record = [];
+      field = "";
+      continue;
+    }
+    field += char;
+  }
+  if (field || record.length) {
+    record.push(field);
+    records.push(record);
+  }
+  return records;
+}
+
+function issueHighlightedColumns(issue) {
+  const columns = Array.isArray(issue.columns) ? issue.columns : [];
+  const parentColumns = Array.isArray(issue.parent_columns) ? issue.parent_columns : [];
+  return new Set([...columns, ...parentColumns].map(normalizeColumnKey).filter(Boolean));
+}
+
+function normalizeColumnKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function renderIssueDetailSection(title, body, options = {}) {
   if (options.collapsed) {
     return `
@@ -4588,6 +4787,47 @@ function renderIssueDetailSection(title, body, options = {}) {
       <h5>${escapeHtml(title)}</h5>
       ${body}
     </section>
+  `;
+}
+
+function renderIssueActionDisclosure(title, subtitle, body, options = {}) {
+  return `
+    <details class="issue-action-disclosure" ${options.open ? "open" : ""}>
+      <summary>
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(subtitle)}</span>
+      </summary>
+      <div class="issue-action-body">
+        ${body}
+      </div>
+    </details>
+  `;
+}
+
+function renderIssueEvidencePack(issue, parent) {
+  return `
+    <div class="issue-evidence-pack">
+      <section>
+        <h5>Where</h5>
+        ${renderIssueWhere(issue, parent)}
+      </section>
+      <section>
+        <h5>What happened</h5>
+        ${renderIssueWhatHappened(issue)}
+      </section>
+      <section>
+        <h5>Why it matters</h5>
+        ${renderIssueWhyItMatters(issue)}
+      </section>
+      <section>
+        <h5>How to fix</h5>
+        ${renderIssueHowToFix(issue)}
+      </section>
+      <section>
+        <h5>Raw evidence values</h5>
+        ${renderIssueEvidence(issue)}
+      </section>
+    </div>
   `;
 }
 
@@ -4671,36 +4911,43 @@ function renderIssueActionPlan(plan, issue) {
           <p>${escapeHtml(plan.human_review_reason || "Deterministic context is incomplete.")}</p>
         </div>
       ` : ""}
-      <div class="action-plan-metrics" aria-label="Action plan metrics">
-        ${renderActionPlanMetric("Priority", plan.priority || "Needs human review", "")}
-        ${renderActionPlanMetric("Source", sourceValue, "Generated without LLM enrichment.")}
-        ${renderActionPlanMetric(
-          "Evidence coverage",
-          `${coverage.label || "Unknown"} · ${integerText(coverage.score)}/100`,
-          coverage.explanation || "Shows how much expected evidence is present.",
-        )}
-        ${renderActionPlanMetric(
-          "Actionability",
-          `${actionability.label || "Unknown"} · ${integerText(actionability.score)}/100`,
-          actionability.explanation || "Shows whether this plan has enough context to assign.",
-        )}
+      <div class="issue-fix-todo-grid">
+        <div class="action-plan-block">
+          <strong>Fix data checklist</strong>
+          ${renderActionPlanList(plan.fix_data_checklist, 3)}
+        </div>
+        <div class="action-plan-block">
+          <strong>Verify after fix checklist</strong>
+          ${renderActionPlanList(plan.verify_after_fix_checklist, 3)}
+        </div>
       </div>
-      <div class="action-plan-block">
-        <strong>Finding values</strong>
-        ${renderActionPlanEvidenceValues(evidenceValues)}
-      </div>
-      <div class="action-plan-block">
-        <strong>Fix data checklist</strong>
-        ${renderActionPlanList(plan.fix_data_checklist)}
-      </div>
-      <div class="action-plan-block">
-        <strong>Verify after fix checklist</strong>
-        ${renderActionPlanList(plan.verify_after_fix_checklist)}
-      </div>
-      <div class="action-plan-block">
-        <strong>Guidelines</strong>
-        ${renderActionPlanList(plan.guidelines)}
-      </div>
+      <details class="issue-detail-disclosure action-plan-more">
+        <summary><h5>More deterministic context</h5><span>Metrics, guidelines, finding values</span></summary>
+        <div class="issue-detail-disclosure-body">
+          <div class="action-plan-metrics" aria-label="Action plan metrics">
+            ${renderActionPlanMetric("Priority", plan.priority || "Needs human review", "")}
+            ${renderActionPlanMetric("Source", sourceValue, "Generated without LLM enrichment.")}
+            ${renderActionPlanMetric(
+              "Evidence coverage",
+              `${coverage.label || "Unknown"} · ${integerText(coverage.score)}/100`,
+              coverage.explanation || "Shows how much expected evidence is present.",
+            )}
+            ${renderActionPlanMetric(
+              "Actionability",
+              `${actionability.label || "Unknown"} · ${integerText(actionability.score)}/100`,
+              actionability.explanation || "Shows whether this plan has enough context to assign.",
+            )}
+          </div>
+          <div class="action-plan-block">
+            <strong>Finding values</strong>
+            ${renderActionPlanEvidenceValues(evidenceValues)}
+          </div>
+          <div class="action-plan-block">
+            <strong>Guidelines</strong>
+            ${renderActionPlanList(plan.guidelines)}
+          </div>
+        </div>
+      </details>
     </div>
   `;
 }
@@ -4955,12 +5202,12 @@ function renderActionPlanEvidenceValues(values) {
   `;
 }
 
-function renderActionPlanList(items) {
+function renderActionPlanList(items, limit = 6) {
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
   if (!list.length) {
     return `<p class="muted">Needs human review before todos can be assigned.</p>`;
   }
-  return `<ul class="issue-detail-list">${list.slice(0, 6).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+  return `<ul class="issue-detail-list">${list.slice(0, limit).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
 }
 
 function actionPlanRawValue(item) {

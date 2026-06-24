@@ -269,13 +269,19 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
 
     await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
     await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
-    await expect(page.locator("#dashboardDrilldown")).toContainText("Action plan");
+    await expect(page.locator("#dashboardDrilldown")).toContainText("Row evidence");
+    await expect(page.locator("#dashboardDrilldown .issue-sample-table td.highlighted").first()).toBeVisible();
+    await expect(page.locator("#dashboardDrilldown")).toContainText("Fix / Todo");
     await page.locator('[data-action-plan-export="markdown"]').click();
     await expect(page.locator(".issue-export-status")).toContainText("Copied Markdown for ISSUE-0009.");
     await page.locator('[data-action-plan-export="csv"]').click();
     await expect(page.locator(".issue-export-status")).toContainText("Copied CSV row for ISSUE-0009.");
     await page.locator('[data-action-plan-export="json"]').click();
     await expect(page.locator(".issue-export-status")).toContainText("Copied JSON for ISSUE-0009.");
+    await page
+      .locator(".issue-action-disclosure", { hasText: "LLM enrichment add-on" })
+      .locator("summary")
+      .click();
     await page.locator('[data-issue-llm-provider="fake"]').click();
     await page.locator("[data-issue-llm-run]").click();
     await expect(page.locator(".issue-llm-message")).toContainText("Fake enrichment ready for ISSUE-0009", {

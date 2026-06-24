@@ -608,11 +608,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown .issue-focus-map")).toBeVisible();
   await expect(page.locator("#dashboardDrilldown .issue-focus-map")).toContainText("sellers.seller_id");
   await expect(page.locator("#dashboardDrilldown .issue-focus-track span")).toHaveAttribute("style", /width: [^0]/);
+  await expect(page.locator("#dashboardDrilldown .issue-row-evidence")).toContainText("Row evidence");
+  await expect(page.locator("#dashboardDrilldown .issue-sample-table td.highlighted").first()).toBeVisible();
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Fix / Todo");
   await expect(page.locator("#dashboardDrilldown")).toContainText("What happened");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Why it matters");
   await expect(page.locator("#dashboardDrilldown")).toContainText("How to fix");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Action plan");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Finding values");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Fix data checklist");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Verify after fix checklist");
@@ -633,6 +635,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await issueDetailPanel.screenshot({
     path: "outputs/us073_goal11/issue-drawer-before-llm-enrichment.png",
   });
+  await page
+    .locator(".issue-action-disclosure", { hasText: "LLM enrichment add-on" })
+    .locator("summary")
+    .click();
   await page.locator('[data-issue-llm-provider="fake"]').click();
   await expect(page.locator('[data-issue-llm-provider="fake"]')).toHaveAttribute("aria-pressed", "true");
   await page.locator("[data-issue-llm-run]").click();
