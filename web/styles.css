@@ -1253,8 +1253,7 @@ h3 {
   flex: 1;
   min-height: 430px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.28fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1265,7 +1264,6 @@ h3 {
   min-width: 0;
   min-height: 430px;
   overflow: auto;
-  border-right: 1px solid var(--border-subtle);
   background: linear-gradient(180deg, #ffffff 0%, var(--surface-overlay) 100%);
 }
 
@@ -1585,187 +1583,6 @@ h3 {
 .diagram-column.empty,
 .diagram-column.non-key {
   fill: var(--foreground-tertiary);
-}
-
-.diagram-inspector {
-  min-width: 0;
-  max-height: 540px;
-  overflow: auto;
-  padding: 12px;
-  background: var(--surface-panel);
-}
-
-.diagram-inspector-heading {
-  display: grid;
-  gap: 4px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.diagram-inspector-heading h4 {
-  margin: 0;
-  color: var(--foreground-primary);
-  font-size: 16px;
-  line-height: 1.25;
-}
-
-.diagram-inspector-heading span,
-.diagram-detail-section p,
-.diagram-detail-section li {
-  color: var(--foreground-secondary);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.diagram-detail-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  margin: 12px 0;
-}
-
-.diagram-detail-grid div {
-  min-width: 0;
-  padding: 9px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-overlay);
-}
-
-.diagram-detail-grid dt {
-  color: var(--foreground-tertiary);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.diagram-detail-grid dd {
-  margin: 3px 0 0;
-  color: var(--foreground-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.diagram-detail-section {
-  display: grid;
-  gap: 7px;
-  margin-top: 12px;
-}
-
-.diagram-detail-section strong,
-.diagram-artifact-links strong {
-  color: var(--foreground-primary);
-  font-size: 12px;
-}
-
-.diagram-detail-section ul {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding-left: 18px;
-}
-
-.diagram-column-list {
-  display: grid;
-  gap: 0;
-  max-height: 220px;
-  margin: 0;
-  padding: 0;
-  overflow: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-overlay);
-  list-style: none;
-}
-
-.diagram-column-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  min-height: 30px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.diagram-column-list li:last-child {
-  border-bottom: 0;
-}
-
-.diagram-column-main {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.diagram-column-list span {
-  min-width: 0;
-  color: var(--foreground-tertiary);
-  font-size: 11px;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.diagram-column-badge {
-  align-self: start;
-  padding: 2px 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--surface-panel);
-  color: var(--foreground-secondary);
-}
-
-.diagram-column-target {
-  grid-column: 1 / -1;
-  padding-top: 2px;
-}
-
-.diagram-detail-section code,
-.diagram-artifact-links code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-}
-
-.diagram-chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.diagram-chip-list span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 4px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--surface-overlay);
-  color: var(--foreground-secondary);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.diagram-artifact-links {
-  display: grid;
-  gap: 7px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.diagram-artifact-links div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.diagram-artifact-links a {
-  color: var(--accent-strong);
-  font-weight: 800;
-  text-decoration: none;
 }
 
 .metric-grid {
@@ -4217,25 +4034,8 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .diagram-canvas {
-    border-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
   .local-diagram.fit .diagram-canvas {
     overflow: auto;
-  }
-
-  .diagram-inspector {
-    max-height: none;
-  }
-
-  .diagram-column-list {
-    max-height: 260px;
-  }
-
-  .diagram-column-list li {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -4358,10 +4158,6 @@ h3 {
   .diagram-zoom-control .button {
     width: 42px;
     flex: 0 0 42px;
-  }
-
-  .diagram-detail-grid {
-    grid-template-columns: 1fr;
   }
 }
 

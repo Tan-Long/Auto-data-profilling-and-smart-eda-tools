@@ -6219,196 +6219,36 @@ function diagramRelationshipSelectionClass(rel, selection) {
 function renderDiagramInspector(model, layout) {
   const selected = layout.selection.selected;
   if (!selected) {
-    els.diagramInspector.innerHTML = renderDiagramOverview(model, layout);
+    els.diagramInspector.textContent = `${integerText(model.tables.length)} tables, ${integerText(model.relationships.length)} relationships. ${state.diagramShowNonKey ? "Full columns visible." : "Key columns only."}`;
     return;
   }
   if (selected.kind === "table") {
     const record = layout.tableRecords.find((item) => item.table.name === selected.id);
-    els.diagramInspector.innerHTML = record
-      ? renderDiagramTableInspector(record, layout)
-      : renderDiagramOverview(model, layout);
+    els.diagramInspector.textContent = record
+      ? diagramTableSelectionStatus(record, layout)
+      : `${integerText(model.tables.length)} tables, ${integerText(model.relationships.length)} relationships.`;
     return;
   }
   const rel = model.relationships.find((item) => item.id === selected.id);
-  els.diagramInspector.innerHTML = rel
-    ? renderDiagramRelationshipInspector(rel)
-    : renderDiagramOverview(model, layout);
+  els.diagramInspector.textContent = rel
+    ? diagramRelationshipSelectionStatus(rel)
+    : `${integerText(model.tables.length)} tables, ${integerText(model.relationships.length)} relationships.`;
 }
 
-function renderDiagramOverview(model, layout) {
-  const roleCounts = layout.tableRecords.reduce((counts, record) => {
-    counts[record.role.label] = (counts[record.role.label] || 0) + 1;
-    return counts;
-  }, {});
-  return `
-    <div class="diagram-inspector-heading">
-      <p class="eyebrow">ERD overview</p>
-      <h4>${integerText(model.tables.length)} tables</h4>
-      <span>${integerText(model.relationships.length)} relationships</span>
-    </div>
-    <dl class="diagram-detail-grid">
-      <div><dt>Source</dt><dd>${escapeHtml(model.sourceBadge)}</dd></div>
-      <div><dt>Layers</dt><dd>${integerText(new Set(layout.tableRecords.map((record) => record.layer)).size)}</dd></div>
-      <div><dt>Columns</dt><dd>${state.diagramShowNonKey ? "key + non-key" : "key only"}</dd></div>
-    </dl>
-    <div class="diagram-detail-section">
-      <strong>Layer roles</strong>
-      <div class="diagram-chip-list">
-        ${Object.entries(roleCounts).map(([label, count]) => `<span>${escapeHtml(label)} ${integerText(count)}</span>`).join("")}
-      </div>
-    </div>
-    ${diagramArtifactLinks(["schema_diagram.json", "relationship_graph.json", "schema_parse_report.json"])}
-  `;
-}
-
-function renderDiagramTableInspector(record, layout) {
+function diagramTableSelectionStatus(record, layout) {
   const table = record.table;
   const incoming = layout.graph.incoming.get(table.name) || [];
   const outgoing = layout.graph.outgoing.get(table.name) || [];
-  const columns = (table.columns || []).filter((column) => !column.summary);
-  const keyColumns = columns.filter((column) => column.isPk || column.isFk);
-  return `
-    <div class="diagram-inspector-heading">
-      <p class="eyebrow">${escapeHtml(record.role.label)}</p>
-      <h4><code>${escapeHtml(table.name)}</code></h4>
-      <span>${escapeHtml(table.status || "schema")}</span>
-    </div>
-    <dl class="diagram-detail-grid">
-      <div><dt>Rows</dt><dd>${table.rowCount === null || table.rowCount === undefined ? "n/a" : integerText(table.rowCount)}</dd></div>
-      <div><dt>Columns</dt><dd>${integerText(record.totalColumns)}</dd></div>
-      <div><dt>Incoming</dt><dd>${integerText(incoming.length)}</dd></div>
-      <div><dt>Outgoing</dt><dd>${integerText(outgoing.length)}</dd></div>
-    </dl>
-    <div class="diagram-detail-section">
-      <strong>CSV mapping</strong>
-      <p>${table.csvPath ? `<code>${escapeHtml(table.csvPath)}</code>` : "No CSV mapped"}</p>
-    </div>
-    <div class="diagram-detail-section">
-      <strong>All columns</strong>
-      ${renderDiagramColumnList(columns, record.totalColumns)}
-    </div>
-    <div class="diagram-detail-section">
-      <strong>Key columns</strong>
-      ${keyColumns.length ? `<ul>${keyColumns.map((column) => `<li><code>${escapeHtml(column.name)}</code> ${escapeHtml(diagramColumnRole(column))}${column.fkTarget ? ` -> <code>${escapeHtml(column.fkTarget)}</code>` : ""}</li>`).join("")}</ul>` : `<p class="muted">No PK/FK columns in current evidence.</p>`}
-    </div>
-    <div class="diagram-detail-section">
-      <strong>Relationships</strong>
-      ${renderDiagramRelationshipList([...incoming, ...outgoing], table.name)}
-    </div>
-    ${diagramArtifactLinks(["schema_diagram.json", "relationship_graph.json", "schema_parse_report.json"])}
-  `;
+  const rowText = table.rowCount === null || table.rowCount === undefined ? "rows unavailable" : `${integerText(table.rowCount)} rows`;
+  return `${table.name} table selected. ${record.role.label}. ${table.status || "schema"}. ${rowText}, ${integerText(record.totalColumns)} columns, ${integerText(incoming.length)} incoming and ${integerText(outgoing.length)} outgoing relationships.`;
 }
 
-function renderDiagramRelationshipInspector(rel) {
-  return `
-    <div class="diagram-inspector-heading">
-      <p class="eyebrow">Relationship</p>
-      <h4><code>${escapeHtml(rel.childTable)}</code> -> <code>${escapeHtml(rel.parentTable)}</code></h4>
-      <span>${escapeHtml(rel.status || "declared")}</span>
-    </div>
-    <dl class="diagram-detail-grid">
-      <div><dt>Child columns</dt><dd>${escapeHtml((rel.childColumns || []).join(", ") || "n/a")}</dd></div>
-      <div><dt>Parent columns</dt><dd>${escapeHtml((rel.parentColumns || []).join(", ") || "n/a")}</dd></div>
-      <div><dt>Cardinality</dt><dd>${escapeHtml(rel.cardinality || rel.declaredCardinality || "unknown")}</dd></div>
-      <div><dt>Type</dt><dd>${escapeHtml(rel.relationshipType || "FK")}</dd></div>
-    </dl>
-    ${rel.statusReason ? `<div class="diagram-detail-section"><strong>Status reason</strong><p>${escapeHtml(rel.statusReason)}</p></div>` : ""}
-    ${renderDiagramRelationshipMetrics(rel.metrics)}
-    ${renderDiagramEvidenceLinks(rel.evidenceLinks)}
-    ${diagramArtifactLinks(["relationship_graph.json", "schema_diagram.json"])}
-  `;
-}
-
-function diagramColumnRole(column) {
-  if (column.isPk && column.isFk) {
-    return "PK/FK";
-  }
-  if (column.isPk) {
-    return "PK";
-  }
-  if (column.isFk) {
-    return "FK";
-  }
-  return "COL";
-}
-
-function renderDiagramColumnList(columns, totalColumns) {
-  if (!columns.length) {
-    return `<p class="muted">Column-level metadata is not available in current evidence.</p>`;
-  }
-  const unavailableCount = Math.max(Number(totalColumns || columns.length) - columns.length, 0);
-  return `
-    <ol class="diagram-column-list">
-      ${columns.map((column) => `
-        <li>
-          <div class="diagram-column-main">
-            <code>${escapeHtml(column.name)}</code>
-            ${column.type ? `<span>${escapeHtml(column.type)}</span>` : ""}
-          </div>
-          <span class="diagram-column-badge">${escapeHtml(diagramColumnRole(column))}</span>
-          ${column.fkTarget ? `<span class="diagram-column-target">-> <code>${escapeHtml(column.fkTarget)}</code></span>` : ""}
-        </li>
-      `).join("")}
-      ${unavailableCount ? `<li><span>+${integerText(unavailableCount)} columns without column-level metadata</span></li>` : ""}
-    </ol>
-  `;
-}
-
-function renderDiagramRelationshipList(relationships, tableName) {
-  if (!relationships.length) {
-    return `<p class="muted">No relationships in current evidence.</p>`;
-  }
-  return `
-    <ul>
-      ${relationships.map((rel) => {
-        const direction = rel.childTable === tableName ? "to parent" : "from child";
-        const otherTable = rel.childTable === tableName ? rel.parentTable : rel.childTable;
-        return `<li><span>${escapeHtml(direction)}</span> <code>${escapeHtml(otherTable)}</code> <span>${escapeHtml(rel.status || rel.cardinality || "FK")}</span></li>`;
-      }).join("")}
-    </ul>
-  `;
-}
-
-function renderDiagramRelationshipMetrics(metrics = {}) {
-  const entries = Object.entries(metrics).filter(([, value]) => value !== null && value !== undefined);
-  if (!entries.length) {
-    return "";
-  }
-  return `
-    <div class="diagram-detail-section">
-      <strong>Metrics</strong>
-      <div class="diagram-chip-list">
-        ${entries.slice(0, 6).map(([key, value]) => `<span><code>${escapeHtml(key)}</code> ${escapeHtml(typeof value === "number" ? scoreOrIntegerText(value) : value)}</span>`).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderDiagramEvidenceLinks(evidenceLinks = []) {
-  if (!evidenceLinks.length) {
-    return "";
-  }
-  return `
-    <div class="diagram-detail-section">
-      <strong>Evidence</strong>
-      <ul>
-        ${evidenceLinks.slice(0, 6).map((link) => {
-          const sampleUrl = artifactUrlFromArtifacts(link.sample_bad_rows_path || "");
-          return `<li><code>${escapeHtml(link.issue_id || "issue")}</code> ${escapeHtml(link.issue_type || "")} ${escapeHtml(link.severity || "")} · ${integerText(link.bad_count)} rows${sampleUrl ? ` · <a href="${escapeHtml(sampleUrl)}" target="_blank" rel="noopener">sample</a>` : ""}</li>`;
-        }).join("")}
-      </ul>
-    </div>
-  `;
-}
-
-function diagramArtifactLinks(paths) {
-  const links = paths.map((path) => {
-    const url = artifactUrlFromArtifacts(path);
-    return url
-      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><code>${escapeHtml(path)}</code></a>`
-      : `<code>${escapeHtml(path)}</code>`;
-  }).join("");
-  return `<div class="diagram-artifact-links"><strong>Artifacts</strong><div>${links}</div></div>`;
+function diagramRelationshipSelectionStatus(rel) {
+  const childColumns = (rel.childColumns || []).join(", ") || "unknown child column";
+  const parentColumns = (rel.parentColumns || []).join(", ") || "unknown parent column";
+  const issueCount = Array.isArray(rel.evidenceLinks) ? rel.evidenceLinks.length : 0;
+  const issueText = issueCount ? ` ${integerText(issueCount)} linked issue${issueCount === 1 ? "" : "s"}.` : "";
+  return `Relationship selected. ${rel.childTable}.${childColumns} points to ${rel.parentTable}.${parentColumns}. ${rel.status || rel.cardinality || "declared FK"}.${issueText}`;
 }
 
 function scoreOrIntegerText(value) {

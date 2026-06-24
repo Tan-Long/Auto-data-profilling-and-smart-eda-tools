@@ -169,8 +169,10 @@ Data style: monospace with tabular numbers.
 - Diagram controls are compact evidence-tool controls: Fit view, zoom,
   non-key column visibility, and reset selection. Avoid card-density controls
   and per-table CSV source chips on the primary diagram surface.
-- Selection highlights the chosen table or relationship plus direct neighbors,
-  while the detail panel shows artifact-backed table/edge evidence and links.
+- Selection highlights the chosen table or relationship plus direct neighbors.
+  Avoid a visible inspector column in the DBML preview; full column detail
+  belongs inside table cards, while artifact-backed evidence belongs in Review
+  Issues, Quality Gates, Todos, and report surfaces.
 
 ## Decisions
 
@@ -187,3 +189,4 @@ Data style: monospace with tabular numbers.
 | Compact deterministic reports for US-073 | Meeting feedback rejected long LLM-style text dumps; report readers need summary tables and bounded expanded examples, while full artifacts stay available for audit | 2026-06-23 |
 | Remove developer graph and artifact-source panes from the primary dashboard | Demo feedback rejected the extra developer schema context, graph drilldown, and raw artifact source panes because they distract from issue review and next actions | 2026-06-24 |
 | Default DBML preview to full-column reading | Demo feedback needs the ERD to behave more like dbdiagram.io: columns are visible immediately, while optional controls reduce clutter only when requested | 2026-06-24 |
+| Remove visible DBML inspector rail | Demo feedback found the selected-table inspector too verbose and duplicative; the ERD should use the full available width and keep detailed evidence in the review/report flow | 2026-06-24 |
