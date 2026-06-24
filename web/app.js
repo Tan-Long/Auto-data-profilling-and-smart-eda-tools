@@ -6224,7 +6224,7 @@ function renderDiagram() {
     renderDiagramState(
       "empty",
       "Upload DBML to preview schema",
-      "The local preview renders from the current browser DBML state. Use custom files or load demo paths from Advanced options.",
+      "The local preview renders from the current browser DBML state. Use custom files or the sample DBML + CSV demo.",
       model,
     );
     return;
@@ -6509,11 +6509,11 @@ function drawLocalDiagram(model, layout) {
 
 function layoutLocalDiagram(model) {
   const graph = buildDiagramGraph(model);
-  const nodeWidth = state.diagramExpanded ? 276 : 252;
-  const xGap = 126;
-  const yGap = 34;
-  const margin = 32;
-  const topMargin = 76;
+  const nodeWidth = state.diagramExpanded ? 236 : 204;
+  const xGap = state.diagramExpanded ? 92 : 76;
+  const yGap = state.diagramExpanded ? 30 : 24;
+  const margin = 24;
+  const topMargin = 36;
   const tableRecords = model.tables.map((table) => {
     const role = diagramTableRole(table, graph);
     const columnSet = diagramVisibleColumns(table);
@@ -6526,7 +6526,7 @@ function layoutLocalDiagram(model) {
       hiddenCount: columnSet.hiddenCount,
       totalColumns: columnSet.totalColumns,
       width: nodeWidth,
-      height: Math.max(state.diagramExpanded ? 156 : 134, 74 + rowCount * 22 + 18),
+      height: Math.max(state.diagramExpanded ? 144 : 116, 62 + rowCount * 20 + 14),
     };
   });
   const originalLayers = [...new Set(tableRecords.map((record) => record.role.layer))].sort((a, b) => a - b);
@@ -6545,9 +6545,9 @@ function layoutLocalDiagram(model) {
   });
   const layerCount = Math.max(layers.size, 1);
   const layerHeights = [...layers.values()].map((records) => records.reduce((total, record) => total + record.height, 0) + Math.max(records.length - 1, 0) * yGap);
-  const maxLayerHeight = Math.max(360, ...layerHeights);
-  const width = Math.max(860, margin * 2 + layerCount * nodeWidth + Math.max(layerCount - 1, 0) * xGap);
-  const height = Math.max(460, topMargin + margin + maxLayerHeight);
+  const maxLayerHeight = Math.max(320, ...layerHeights);
+  const width = Math.max(760, margin * 2 + layerCount * nodeWidth + Math.max(layerCount - 1, 0) * xGap);
+  const height = Math.max(380, topMargin + margin + maxLayerHeight);
   const positions = new Map();
   [...layers.entries()].forEach(([layer, records]) => {
     const layerHeight = records.reduce((total, record) => total + record.height, 0) + Math.max(records.length - 1, 0) * yGap;
@@ -6555,7 +6555,7 @@ function layoutLocalDiagram(model) {
     records.forEach((record) => {
       const columnY = new Map();
       record.visibleColumns.forEach((column, index) => {
-        columnY.set(column.name, y + 79 + index * 22);
+        columnY.set(column.name, y + 68 + index * 20);
       });
       positions.set(record.table.name, {
         x: margin + layer * (nodeWidth + xGap),
@@ -6643,8 +6643,7 @@ function diagramRelationshipSvg(rel, layout, index) {
   const sourceIsLeft = source.x < target.x;
   const x1 = sameLayer ? source.x + source.width : sourceIsLeft ? source.x + source.width : source.x;
   const x2 = sameLayer ? target.x + target.width : sourceIsLeft ? target.x : target.x + target.width;
-  const laneY = 22 + (index % 4) * 13;
-  const offset = 42 + (index % 3) * 9;
+  const offset = 24 + (index % 4) * 8;
   const direction = x2 >= x1 ? 1 : -1;
   let path;
   let labelX;
@@ -6655,11 +6654,12 @@ function diagramRelationshipSvg(rel, layout, index) {
     labelX = routeX + 8;
     labelY = (y1 + y2) / 2 - 6;
   } else {
-    const exitX = x1 + direction * offset;
-    const entryX = x2 - direction * offset;
-    path = `M ${x1} ${y1} L ${exitX} ${y1} L ${exitX} ${laneY} L ${entryX} ${laneY} L ${entryX} ${y2} L ${x2} ${y2}`;
-    labelX = (exitX + entryX) / 2;
-    labelY = laneY - 5;
+    const layerDistance = Math.max(Math.abs(source.layer - target.layer), 1);
+    const spread = layerDistance > 1 ? (index % 3 - 1) * 10 : 0;
+    const midX = (x1 + x2) / 2 + spread;
+    path = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+    labelX = midX + direction * 8;
+    labelY = (y1 + y2) / 2 - 6;
   }
   const label = `${rel.childTable}.${(rel.childColumns || []).join(",")} -> ${rel.parentTable}.${(rel.parentColumns || []).join(",")}`;
   const selectionClass = diagramRelationshipSelectionClass(rel, layout.selection);
@@ -6681,8 +6681,8 @@ function diagramTableSvg(record, position, selection) {
     return "";
   }
   const columns = record.visibleColumns;
-  const lines = columns.map((column, index) => diagramColumnTspan(column, 74 + index * 22)).join("");
-  const overflowLine = record.hiddenCount ? `<text class="diagram-column overflow" x="14" y="${74 + columns.length * 22}">+${integerText(record.hiddenCount)} columns</text>` : "";
+  const lines = columns.map((column, index) => diagramColumnTspan(column, 66 + index * 20)).join("");
+  const overflowLine = record.hiddenCount ? `<text class="diagram-column overflow" x="12" y="${66 + columns.length * 20}">+${integerText(record.hiddenCount)} columns</text>` : "";
   const meta = [
     table.status === "mapped" ? "mapped CSV" : table.status === "missing_csv" ? "missing CSV" : table.status || "schema",
     table.rowCount !== null && table.rowCount !== undefined ? `${integerText(table.rowCount)} rows` : `${integerText(record.totalColumns)} columns`,
@@ -6692,12 +6692,12 @@ function diagramTableSvg(record, position, selection) {
     <g class="diagram-table diagram-table-${escapeHtml(diagramStatusTone(table.status))} diagram-role-${escapeHtml(record.role.name)} ${selectionClass}" data-diagram-table="${escapeHtml(table.name)}" transform="translate(${position.x} ${position.y})" tabindex="0" role="button" aria-label="${escapeHtml(`${table.name} table`)}">
       <title>${escapeHtml(`${table.name} · ${record.role.label} · ${meta}`)}</title>
       <rect class="diagram-table-box" width="${position.width}" height="${position.height}" rx="8"></rect>
-      <rect class="diagram-table-header" width="${position.width}" height="52" rx="8"></rect>
-      <text class="diagram-table-name" x="14" y="22">${escapeHtml(truncateMiddle(table.name, 26))}</text>
-      <text class="diagram-table-meta" x="14" y="42">${escapeHtml(truncateMiddle(`${record.role.label} · ${meta}`, 38))}</text>
-      <rect class="diagram-status-chip" x="${position.width - 78}" y="14" width="62" height="22" rx="11"></rect>
-      <text class="diagram-status-text" x="${position.width - 47}" y="29" text-anchor="middle">${escapeHtml(table.status === "missing_csv" ? "missing" : table.status || "schema")}</text>
-      ${lines || `<text class="diagram-column empty" x="14" y="74">No key columns</text>`}
+      <rect class="diagram-table-header" width="${position.width}" height="46" rx="8"></rect>
+      <text class="diagram-table-name" x="12" y="20">${escapeHtml(truncateMiddle(table.name, 22))}</text>
+      <text class="diagram-table-meta" x="12" y="38">${escapeHtml(truncateMiddle(`${record.role.label} · ${meta}`, 32))}</text>
+      <rect class="diagram-status-chip" x="${position.width - 58}" y="13" width="44" height="18" rx="9"></rect>
+      <text class="diagram-status-text" x="${position.width - 36}" y="25" text-anchor="middle">${escapeHtml(table.status === "missing_csv" ? "miss" : table.status === "mapped" ? "ok" : table.status || "db")}</text>
+      ${lines || `<text class="diagram-column empty" x="12" y="66">No key columns</text>`}
       ${overflowLine}
     </g>
   `;
@@ -6706,7 +6706,7 @@ function diagramTableSvg(record, position, selection) {
 function diagramColumnTspan(column, y) {
   const role = column.isPk && column.isFk ? "PK/FK" : column.isPk ? "PK" : column.isFk ? "FK" : "COL";
   const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
-  return `<text class="diagram-column ${column.isPk ? "pk" : ""} ${column.isFk ? "fk" : ""} ${!column.isPk && !column.isFk ? "non-key" : ""}" x="14" y="${y}" data-diagram-column="${escapeHtml(column.name)}"><tspan class="diagram-column-role">${escapeHtml(role)}</tspan> ${escapeHtml(truncateMiddle(`${column.name}${target}`, 34))}</text>`;
+  return `<text class="diagram-column ${column.isPk ? "pk" : ""} ${column.isFk ? "fk" : ""} ${!column.isPk && !column.isFk ? "non-key" : ""}" x="12" y="${y}" data-diagram-column="${escapeHtml(column.name)}"><tspan class="diagram-column-role">${escapeHtml(role)}</tspan> ${escapeHtml(truncateMiddle(`${column.name}${target}`, 28))}</text>`;
 }
 
 function diagramStatusTone(status) {
