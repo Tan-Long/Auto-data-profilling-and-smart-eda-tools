@@ -212,6 +212,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator('.mapping-select[data-table="orders"]').selectOption("customers");
   await goToProfileStep(page, "preflight");
   await expect(page.locator("#preflightGateBadge")).toContainText("Review warnings");
+  await page.locator('summary[aria-label="What are preflight blockers?"]').click();
+  await expect(page.locator('details.info-popover[open]').filter({ hasText: "Blockers stop the run." })).toHaveCount(1);
+  await page.locator('summary[aria-label="What are preflight warnings?"]').click();
+  await expect(page.locator('details.info-popover[open]').filter({ hasText: "Warnings need review." })).toHaveCount(1);
+  await page.locator('summary[aria-label="What are preflight blockers?"]').click();
+  await page.locator('summary[aria-label="What are preflight warnings?"]').click();
   await expect(page.locator("#preflightWarningList")).toContainText("Manual mapping selected");
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
   await page.locator("[data-preflight-accept-all]").click();

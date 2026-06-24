@@ -203,7 +203,16 @@
         <div class="preflight-review-grid">
           <div class="preflight-review-column">
             <div class="runtime-heading">
-              <strong>Blockers</strong>
+              <div class="preflight-heading-label">
+                <strong>Blockers</strong>
+                <details class="info-popover">
+                  <summary aria-label="What are preflight blockers?">i</summary>
+                  <div class="info-popover-card">
+                    <strong>Blockers stop the run.</strong>
+                    <p>They mean the DBML, CSV source, or table mapping is missing or invalid. Fix blockers in Connect before continuing.</p>
+                  </div>
+                </details>
+              </div>
               <span id="preflightBlockerCount">0 blockers</span>
             </div>
             <div class="preflight-list" id="preflightBlockerList">
@@ -212,7 +221,16 @@
           </div>
           <div class="preflight-review-column">
             <div class="runtime-heading">
-              <strong>Warnings</strong>
+              <div class="preflight-heading-label">
+                <strong>Warnings</strong>
+                <details class="info-popover">
+                  <summary aria-label="What are preflight warnings?">i</summary>
+                  <div class="info-popover-card">
+                    <strong>Warnings need review.</strong>
+                    <p>They flag risky but runnable choices, such as manual or imperfect mappings. Accepting a warning only lets the demo run continue.</p>
+                  </div>
+                </details>
+              </div>
               <span id="preflightWarningCount">0 warnings</span>
             </div>
             <div class="preflight-list" id="preflightWarningList">
