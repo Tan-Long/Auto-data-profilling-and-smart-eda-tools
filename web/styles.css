@@ -1650,7 +1650,7 @@ h3 {
   gap: 16px;
 }
 
-.dashboard-sidebar,
+.dashboard-filters,
 .dashboard-detail,
 .dashboard-card {
   min-width: 0;
@@ -1660,10 +1660,34 @@ h3 {
   background: var(--surface-overlay);
 }
 
-.dashboard-sidebar {
+.dashboard-filters {
   display: grid;
-  align-content: start;
-  gap: 12px;
+  grid-template-columns: minmax(116px, 0.7fr) repeat(3, minmax(120px, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.dashboard-filters .runtime-heading {
+  align-self: center;
+  margin: 0;
+}
+
+.dashboard-filter-field {
+  min-width: 0;
+}
+
+.dashboard-filter-field select {
+  width: 100%;
+}
+
+.dashboard-filters #dashboardResetFilters {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.dashboard-filters #dashboardMessage {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .dashboard-main {
@@ -4045,6 +4069,10 @@ h3 {
   .panel-heading {
     display: grid;
     justify-content: stretch;
+  }
+
+  .dashboard-filters {
+    grid-template-columns: 1fr;
   }
 
   .diagram-panel {

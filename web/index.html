@@ -325,24 +325,24 @@
         </div>
 
         <div class="dashboard-layout">
-          <aside class="dashboard-sidebar" aria-label="Issue review filters">
+          <div class="dashboard-filters" role="group" aria-label="Issue review filters">
             <div class="runtime-heading">
               <strong>Filters</strong>
               <span id="dashboardIssueCount">0 issues</span>
             </div>
-            <label class="field-label" for="dashboardSeverityFilter">
+            <label class="field-label dashboard-filter-field" for="dashboardSeverityFilter">
               Severity
               <select id="dashboardSeverityFilter">
                 <option value="all">All severities</option>
               </select>
             </label>
-            <label class="field-label" for="dashboardIssueTypeFilter">
+            <label class="field-label dashboard-filter-field" for="dashboardIssueTypeFilter">
               Issue type
               <select id="dashboardIssueTypeFilter">
                 <option value="all">All issue types</option>
               </select>
             </label>
-            <label class="field-label" for="dashboardTableFilter">
+            <label class="field-label dashboard-filter-field" for="dashboardTableFilter">
               Table
               <select id="dashboardTableFilter">
                 <option value="all">All tables</option>
@@ -350,7 +350,7 @@
             </label>
             <button class="button secondary" id="dashboardResetFilters" type="button">Reset filters</button>
             <p class="form-message" id="dashboardMessage" role="status">Issue review loads after a completed backend job.</p>
-          </aside>
+          </div>
 
           <div class="dashboard-main">
             <div class="dashboard-summary-strip" id="dashboardSummaryStrip" aria-label="Issue review summary">

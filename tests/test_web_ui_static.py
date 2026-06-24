@@ -282,6 +282,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".quality-gates-section",
         ".quality-gate-card",
         ".quality-gate-evidence-value",
+        ".dashboard-filters",
+        ".dashboard-filter-field",
         ".developer-options",
         ".runner-source-switch",
         ".diagram-role-bridge",

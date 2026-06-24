@@ -364,6 +364,18 @@ test("local path run renders the interactive dashboard from generated artifacts"
     "succeeded dashboard",
   );
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
+  const filterToolbarLayout = await page.locator("#dashboard .dashboard-filters").evaluate((element) => {
+    const controls = [...element.querySelectorAll("#dashboardSeverityFilter, #dashboardIssueTypeFilter, #dashboardTableFilter, #dashboardResetFilters")]
+      .map((control) => control.getBoundingClientRect());
+    return {
+      controlCount: controls.length,
+      overflow: element.scrollWidth - element.clientWidth,
+      ySpread: Math.max(...controls.map((rect) => rect.top)) - Math.min(...controls.map((rect) => rect.top)),
+    };
+  });
+  expect(filterToolbarLayout.controlCount).toBe(4);
+  expect(filterToolbarLayout.overflow).toBeLessThanOrEqual(1);
+  expect(filterToolbarLayout.ySpread).toBeLessThan(8);
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("readiness");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("gates");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
