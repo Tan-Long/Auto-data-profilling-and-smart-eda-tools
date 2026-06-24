@@ -270,6 +270,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
     await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
     await expect(page.locator("#dashboardDrilldown")).toContainText("Row evidence");
+    await expect(page.locator("#dashboardDrilldown .issue-row-evidence")).toContainText("Previewing sample");
+    await expect(page.locator("#dashboardDrilldown .issue-row-evidence")).not.toContainText("Open CSV");
     await expect(page.locator("#dashboardDrilldown .issue-sample-table td.highlighted").first()).toBeVisible();
     await expect(page.locator("#dashboardDrilldown")).toContainText("Fix / Todo");
     await page.locator('[data-action-plan-export="markdown"]').click();

@@ -2894,8 +2894,12 @@ h3 {
   line-height: 1.35;
 }
 
-.issue-row-evidence-heading a {
+.issue-row-evidence-heading > span {
   flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-overlay);
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 900;

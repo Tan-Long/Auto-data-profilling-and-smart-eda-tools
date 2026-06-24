@@ -4603,7 +4603,7 @@ function renderIssueSampleRows(issue) {
             <h5>Row evidence</h5>
             <p>Loading sample rows from <code>${escapeHtml(path)}</code>...</p>
           </div>
-          <a href="${escapeHtml(artifactUrlFor(path))}" target="_blank" rel="noopener">Open CSV</a>
+          <span>Previewing sample</span>
         </div>
       </section>
     `;
@@ -4616,7 +4616,7 @@ function renderIssueSampleRows(issue) {
             <h5>Row evidence</h5>
             <p>${escapeHtml(sample.error || "Sample rows were unavailable for this issue.")}</p>
           </div>
-          <a href="${escapeHtml(artifactUrlFor(path))}" target="_blank" rel="noopener">Open CSV</a>
+          <span>Preview unavailable</span>
         </div>
       </section>
     `;
@@ -4628,7 +4628,7 @@ function renderIssueSampleRows(issue) {
           <h5>Row evidence</h5>
           <p>Highlighted cells are the issue columns from <code>${escapeHtml(path)}</code>.</p>
         </div>
-        <a href="${escapeHtml(artifactUrlFor(path))}" target="_blank" rel="noopener">Open CSV</a>
+        <span>Previewing sample</span>
       </div>
       <div class="issue-sample-table-wrap">
         <table class="issue-sample-table">
