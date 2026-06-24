@@ -145,16 +145,32 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramColumnsToggle")).toContainText("Show all columns");
   await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="order_items"]')).toHaveCount(1);
   await page.locator('#diagramSvg [data-diagram-table="orders"]').click();
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).toHaveClass(/selected/);
   await expect(page.locator("#diagramInspector")).toContainText("orders");
   await expect(page.locator("#diagramInspector")).toContainText("Fact/event");
+  await expect(page.locator("#diagramInspector")).toContainText("All columns");
   await page.locator("#diagramColumnsToggle").click();
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramColumnsToggle")).toContainText("Hide full columns");
+  await expect(page.locator("#diagramFitButton")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramSvg")).toContainText("order_status");
+  const ordersTable = page.locator('#diagramSvg [data-diagram-table="orders"]');
+  const ordersTransformBeforeDrag = await ordersTable.getAttribute("transform");
+  const ordersBox = await ordersTable.boundingBox();
+  expect(ordersBox).toBeTruthy();
+  await page.mouse.move(ordersBox.x + ordersBox.width / 2, ordersBox.y + ordersBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ordersBox.x + ordersBox.width / 2 + 90, ordersBox.y + ordersBox.height / 2 + 36, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => ordersTable.getAttribute("transform")).not.toBe(ordersTransformBeforeDrag);
   await page.locator("#diagramResetSelection").click();
   await expect(page.locator('#diagramSvg [data-diagram-table="orders"]')).not.toHaveClass(/selected/);
+  await expect.poll(async () => ordersTable.getAttribute("transform")).toBe(ordersTransformBeforeDrag);
   await expect(page.locator("#dbdiagramLink")).toHaveAttribute(
     "href",
     /https:\/\/dbdiagram\.io\/embed\?c=/,

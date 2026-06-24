@@ -51,6 +51,9 @@ const state = {
   diagramExpanded: false,
   diagramShowNonKey: false,
   diagramFit: true,
+  diagramManualPositions: new Map(),
+  diagramDrag: null,
+  diagramSuppressClick: false,
   tables: [],
   relationships: [],
   dbmlParseError: "",
@@ -349,11 +352,16 @@ els.diagramDensityToggle.addEventListener("click", () => {
 
 els.diagramColumnsToggle.addEventListener("click", () => {
   state.diagramShowNonKey = !state.diagramShowNonKey;
+  if (state.diagramShowNonKey) {
+    state.diagramFit = false;
+  }
   renderDiagram();
 });
 
 els.diagramResetSelection.addEventListener("click", () => {
   state.diagramSelection = null;
+  state.diagramManualPositions = new Map();
+  state.diagramDrag = null;
   renderDiagram();
 });
 
@@ -634,7 +642,27 @@ els.dashboardGraphSvg.addEventListener("keydown", (event) => {
 });
 
 els.diagramSvg.addEventListener("click", (event) => {
+  if (state.diagramSuppressClick) {
+    state.diagramSuppressClick = false;
+    return;
+  }
   handleDiagramSelectionEvent(event);
+});
+
+els.diagramSvg.addEventListener("pointerdown", (event) => {
+  handleDiagramPointerDown(event);
+});
+
+els.diagramSvg.addEventListener("pointermove", (event) => {
+  handleDiagramPointerMove(event);
+});
+
+els.diagramSvg.addEventListener("pointerup", (event) => {
+  handleDiagramPointerEnd(event);
+});
+
+els.diagramSvg.addEventListener("pointercancel", (event) => {
+  handleDiagramPointerEnd(event);
 });
 
 els.diagramSvg.addEventListener("keydown", (event) => {
@@ -1190,6 +1218,7 @@ function renderRunnerMessage(message, status) {
 function loadDemoState(presetName = "small", options = {}) {
   resetPreflightReview();
   resetRunResultsForInputChange();
+  resetDiagramLayoutState();
   state.profileStep = "connect";
   const preset = demoPresets[presetName] || demoPresets.small;
   state.selectedDemoPreset = presetName in demoPresets ? presetName : "small";
@@ -1224,6 +1253,7 @@ function loadDemoState(presetName = "small", options = {}) {
 function clearProfileInputs(options = {}) {
   resetPreflightReview();
   resetRunResultsForInputChange();
+  resetDiagramLayoutState();
   state.profileStep = "connect";
   clearDbmlState();
   state.dbmlFile = null;
@@ -1264,6 +1294,13 @@ function resetRunResultsForInputChange() {
   state.currentJob = null;
   state.runEvents = [];
   resetDashboardState();
+}
+
+function resetDiagramLayoutState() {
+  state.diagramSelection = null;
+  state.diagramManualPositions = new Map();
+  state.diagramDrag = null;
+  state.diagramSuppressClick = false;
 }
 
 function markCustomUploadSource() {
@@ -1352,6 +1389,7 @@ function setupDropzone(element, onDrop) {
 async function loadDbmlFile(file) {
   resetPreflightReview();
   resetRunResultsForInputChange();
+  resetDiagramLayoutState();
   state.profileStep = "connect";
   markCustomUploadSource();
   if (!state.csvFiles.some((csvFile) => csvFile.sourceFile)) {
@@ -1373,6 +1411,7 @@ async function loadCsvFiles(files) {
   }
   resetPreflightReview();
   resetRunResultsForInputChange();
+  resetDiagramLayoutState();
   state.profileStep = "connect";
   const hasUploadedDbml = Boolean(state.dbmlFile);
   markCustomUploadSource();
@@ -6270,8 +6309,8 @@ function updateDiagramControls(model) {
   els.diagramFitButton.setAttribute("aria-pressed", state.diagramFit ? "true" : "false");
   els.diagramDensityToggle.setAttribute("aria-pressed", state.diagramExpanded ? "true" : "false");
   els.diagramColumnsToggle.setAttribute("aria-pressed", state.diagramShowNonKey ? "true" : "false");
-  els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "Hide non-key columns" : "Show non-key columns";
-  els.diagramResetSelection.disabled = !state.diagramSelection;
+  els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "Hide full columns" : "Show all columns";
+  els.diagramResetSelection.disabled = !state.diagramSelection && state.diagramManualPositions.size === 0;
   els.diagramFitButton.disabled = !model.hasInput || Boolean(model.error);
 }
 
@@ -6568,8 +6607,33 @@ function layoutLocalDiagram(model) {
       y += record.height + yGap;
     });
   });
+  applyDiagramManualPositions(positions, tableRecords, width, height);
   const selection = diagramSelectionContext(model);
   return { width, height, positions, tableRecords, graph, selection, topMargin };
+}
+
+function applyDiagramManualPositions(positions, tableRecords, layoutWidth, layoutHeight) {
+  tableRecords.forEach((record) => {
+    const manual = state.diagramManualPositions.get(record.table.name);
+    const position = positions.get(record.table.name);
+    if (!manual || !position) {
+      return;
+    }
+    const nextPosition = clampDiagramPosition(manual.x, manual.y, position.width, position.height, layoutWidth, layoutHeight);
+    position.x = nextPosition.x;
+    position.y = nextPosition.y;
+    record.visibleColumns.forEach((column, index) => {
+      position.columnY.set(column.name, position.y + 68 + index * 20);
+    });
+  });
+}
+
+function clampDiagramPosition(x, y, width, height, layoutWidth, layoutHeight) {
+  const min = 8;
+  return {
+    x: Math.max(min, Math.min(Number(x || 0), Math.max(min, layoutWidth - width - min))),
+    y: Math.max(min, Math.min(Number(y || 0), Math.max(min, layoutHeight - height - min))),
+  };
 }
 
 function buildDiagramGraph(model) {
@@ -6621,8 +6685,11 @@ function diagramVisibleColumns(table) {
   const allColumns = (table.columns || []).filter((column) => !column.summary);
   const totalColumns = Number(table.columnCount || allColumns.length || 0);
   const keyColumns = allColumns.filter((column) => column.isPk || column.isFk || column.isUnique);
-  const candidates = state.diagramShowNonKey ? allColumns : keyColumns;
-  const limit = state.diagramExpanded ? (state.diagramShowNonKey ? 12 : 8) : (state.diagramShowNonKey ? 7 : 5);
+  if (state.diagramShowNonKey) {
+    return { visible: allColumns, hiddenCount: Math.max(totalColumns - allColumns.length, 0), totalColumns };
+  }
+  const candidates = keyColumns;
+  const limit = state.diagramExpanded ? 8 : 5;
   const visible = candidates.slice(0, limit);
   const hiddenCount = Math.max(totalColumns - visible.length, 0);
   return { visible, hiddenCount, totalColumns };
@@ -6739,6 +6806,104 @@ function handleDiagramSelectionEvent(event) {
     return true;
   }
   return false;
+}
+
+function handleDiagramPointerDown(event) {
+  if (event.button !== 0) {
+    return false;
+  }
+  const tableTarget = event.target.closest("[data-diagram-table]");
+  if (!tableTarget) {
+    return false;
+  }
+  const point = diagramPointerPoint(event);
+  const position = diagramTablePositionFromElement(tableTarget);
+  state.diagramDrag = {
+    pointerId: event.pointerId,
+    tableName: tableTarget.dataset.diagramTable || "",
+    startPointerX: point.x,
+    startPointerY: point.y,
+    startX: position.x,
+    startY: position.y,
+    width: position.width,
+    height: position.height,
+    moved: false,
+  };
+  tableTarget.classList.add("dragging");
+  tableTarget.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+  return true;
+}
+
+function handleDiagramPointerMove(event) {
+  const drag = state.diagramDrag;
+  if (!drag || drag.pointerId !== event.pointerId) {
+    return false;
+  }
+  const point = diagramPointerPoint(event);
+  const dx = point.x - drag.startPointerX;
+  const dy = point.y - drag.startPointerY;
+  if (Math.abs(dx) + Math.abs(dy) > 3) {
+    drag.moved = true;
+  }
+  const layoutWidth = Number(els.diagramSvg.viewBox.baseVal.width || 0);
+  const layoutHeight = Number(els.diagramSvg.viewBox.baseVal.height || 0);
+  const nextPosition = clampDiagramPosition(
+    drag.startX + dx,
+    drag.startY + dy,
+    drag.width,
+    drag.height,
+    layoutWidth,
+    layoutHeight,
+  );
+  state.diagramManualPositions.set(drag.tableName, nextPosition);
+  const tableTarget = findDiagramTableElement(drag.tableName);
+  if (tableTarget) {
+    tableTarget.setAttribute("transform", `translate(${nextPosition.x} ${nextPosition.y})`);
+  }
+  event.preventDefault();
+  return true;
+}
+
+function handleDiagramPointerEnd(event) {
+  const drag = state.diagramDrag;
+  if (!drag || drag.pointerId !== event.pointerId) {
+    return false;
+  }
+  const tableTarget = findDiagramTableElement(drag.tableName);
+  tableTarget?.classList.remove("dragging");
+  tableTarget?.releasePointerCapture?.(event.pointerId);
+  state.diagramSuppressClick = drag.moved;
+  state.diagramDrag = null;
+  if (drag.moved) {
+    renderDiagram();
+  }
+  return true;
+}
+
+function diagramPointerPoint(event) {
+  const point = els.diagramSvg.createSVGPoint();
+  point.x = event.clientX;
+  point.y = event.clientY;
+  const matrix = els.diagramSvg.getScreenCTM();
+  return matrix ? point.matrixTransform(matrix.inverse()) : { x: point.x, y: point.y };
+}
+
+function diagramTablePositionFromElement(element) {
+  const transform = element.getAttribute("transform") || "";
+  const match = transform.match(/translate\(([-\d.]+)[ ,]+([-\d.]+)\)/);
+  const box = element.querySelector(".diagram-table-box");
+  return {
+    x: match ? Number(match[1]) : 0,
+    y: match ? Number(match[2]) : 0,
+    width: Number(box?.getAttribute("width") || 0),
+    height: Number(box?.getAttribute("height") || 0),
+  };
+}
+
+function findDiagramTableElement(tableName) {
+  return [...els.diagramSvg.querySelectorAll("[data-diagram-table]")]
+    .find((element) => element.dataset.diagramTable === tableName) || null;
 }
 
 function diagramSelectionContext(model) {
@@ -6881,6 +7046,10 @@ function renderDiagramTableInspector(record, layout) {
       <p>${table.csvPath ? `<code>${escapeHtml(table.csvPath)}</code>` : "No CSV mapped"}</p>
     </div>
     <div class="diagram-detail-section">
+      <strong>All columns</strong>
+      ${renderDiagramColumnList(columns, record.totalColumns)}
+    </div>
+    <div class="diagram-detail-section">
       <strong>Key columns</strong>
       ${keyColumns.length ? `<ul>${keyColumns.map((column) => `<li><code>${escapeHtml(column.name)}</code> ${escapeHtml(diagramColumnRole(column))}${column.fkTarget ? ` -> <code>${escapeHtml(column.fkTarget)}</code>` : ""}</li>`).join("")}</ul>` : `<p class="muted">No PK/FK columns in current evidence.</p>`}
     </div>
@@ -6923,6 +7092,28 @@ function diagramColumnRole(column) {
     return "FK";
   }
   return "COL";
+}
+
+function renderDiagramColumnList(columns, totalColumns) {
+  if (!columns.length) {
+    return `<p class="muted">Column-level metadata is not available in current evidence.</p>`;
+  }
+  const unavailableCount = Math.max(Number(totalColumns || columns.length) - columns.length, 0);
+  return `
+    <ol class="diagram-column-list">
+      ${columns.map((column) => `
+        <li>
+          <div class="diagram-column-main">
+            <code>${escapeHtml(column.name)}</code>
+            ${column.type ? `<span>${escapeHtml(column.type)}</span>` : ""}
+          </div>
+          <span class="diagram-column-badge">${escapeHtml(diagramColumnRole(column))}</span>
+          ${column.fkTarget ? `<span class="diagram-column-target">-> <code>${escapeHtml(column.fkTarget)}</code></span>` : ""}
+        </li>
+      `).join("")}
+      ${unavailableCount ? `<li><span>+${integerText(unavailableCount)} columns without column-level metadata</span></li>` : ""}
+    </ol>
+  `;
 }
 
 function renderDiagramRelationshipList(relationships, tableName) {

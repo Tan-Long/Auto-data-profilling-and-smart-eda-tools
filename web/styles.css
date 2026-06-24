@@ -1049,6 +1049,7 @@ h3 {
 .diagram-svg {
   display: block;
   max-width: none;
+  touch-action: none;
 }
 
 .diagram-svg.fit {
@@ -1128,8 +1129,13 @@ h3 {
 }
 
 .diagram-table {
-  cursor: pointer;
+  cursor: grab;
   outline: none;
+  user-select: none;
+}
+
+.diagram-table.dragging {
+  cursor: grabbing;
 }
 
 .diagram-table-box {
@@ -1170,6 +1176,11 @@ h3 {
 .diagram-table:focus-visible .diagram-table-box {
   stroke: var(--focus-ring);
   stroke-width: 1.6;
+}
+
+.diagram-table.dragging .diagram-table-box {
+  stroke: var(--accent);
+  stroke-width: 2.2;
 }
 
 .diagram-table.selected .diagram-table-box,
@@ -1326,6 +1337,61 @@ h3 {
   gap: 6px;
   margin: 0;
   padding-left: 18px;
+}
+
+.diagram-column-list {
+  display: grid;
+  gap: 0;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  list-style: none;
+}
+
+.diagram-column-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.diagram-column-list li:last-child {
+  border-bottom: 0;
+}
+
+.diagram-column-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.diagram-column-list span {
+  min-width: 0;
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.diagram-column-badge {
+  align-self: start;
+  padding: 2px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+}
+
+.diagram-column-target {
+  grid-column: 1 / -1;
+  padding-top: 2px;
 }
 
 .diagram-detail-section code,
@@ -4002,6 +4068,14 @@ h3 {
 
   .diagram-inspector {
     max-height: none;
+  }
+
+  .diagram-column-list {
+    max-height: 260px;
+  }
+
+  .diagram-column-list li {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
