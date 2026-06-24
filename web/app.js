@@ -6848,48 +6848,62 @@ function diagramColumnRowSvg(column, y, width) {
   const target = column.fkTarget ? ` -> ${column.fkTarget}` : "";
   const typeLabel = String(column.type || "");
   const typeWidth = typeLabel ? Math.min(78, Math.max(34, typeLabel.length * 6 + 10)) : 0;
-  const nameX = column.isPk || column.isFk ? 36 : 18;
+  const nameX = 18;
   const typeX = width - 18;
-  const nameLimit = Math.max(9, Math.floor((typeX - nameX - typeWidth - 8) / 6));
+  const iconWidth = diagramColumnInlineIconWidth(column);
+  const nameLimit = Math.max(9, Math.floor((typeX - nameX - typeWidth - iconWidth - 14) / 6));
+  const displayName = truncateMiddle(column.name, nameLimit);
+  const iconX = Math.min(nameX + displayName.length * 5.7 + 6, typeX - typeWidth - iconWidth - 8);
   return `
     <g class="diagram-column-row diagram-column-row-${tone}" data-diagram-column="${escapeHtml(column.name)}" data-diagram-column-y="${y}">
       <title>${escapeHtml(`${role} ${column.name}${target}`)}</title>
       <rect class="diagram-column-row-bg" x="10" y="${y - 14}" width="${rowWidth}" height="18" rx="6"></rect>
-      ${diagramColumnIconSvg(column, y)}
-      <text class="diagram-column-name" x="${nameX}" y="${y - 2}">${escapeHtml(truncateMiddle(column.name, nameLimit))}</text>
+      <text class="diagram-column-name" x="${nameX}" y="${y - 2}">${escapeHtml(displayName)}</text>
+      ${diagramColumnIconSvg(column, iconX, y)}
       ${typeLabel ? `<text class="diagram-column-type" x="${typeX}" y="${y - 2}" text-anchor="end">${escapeHtml(truncateMiddle(typeLabel, 12))}</text>` : ""}
     </g>
   `;
 }
 
-function diagramColumnIconSvg(column, y) {
+function diagramColumnInlineIconWidth(column) {
   if (column.isPk && column.isFk) {
-    return `${diagramKeyIconSvg(14, y, 0.34)}${diagramLinkIconSvg(24, y, 0.34)}`;
+    return 21;
+  }
+  if (column.isPk || column.isFk) {
+    return 10;
+  }
+  return 0;
+}
+
+function diagramColumnIconSvg(column, x, y) {
+  if (column.isPk && column.isFk) {
+    return `${diagramKeyIconSvg(x, y)}${diagramLinkIconSvg(x + 11, y)}`;
   }
   if (column.isPk) {
-    return diagramKeyIconSvg(15, y, 0.43);
+    return diagramKeyIconSvg(x, y);
   }
   if (column.isFk) {
-    return diagramLinkIconSvg(15, y, 0.43);
+    return diagramLinkIconSvg(x, y);
   }
   return "";
 }
 
-function diagramKeyIconSvg(x, y, scale) {
+function diagramKeyIconSvg(x, y) {
   return `
-    <g class="diagram-column-icon diagram-column-icon-key" transform="translate(${x} ${y - 14}) scale(${scale})" aria-hidden="true">
-      <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"></path>
-      <circle class="diagram-icon-fill" cx="16.5" cy="7.5" r=".5"></circle>
+    <g class="diagram-column-icon diagram-column-icon-key" transform="translate(${x} ${y - 13}) scale(0.4)" aria-hidden="true">
+      <path d="M21 2l-2 2"></path>
+      <path d="M11.39 11.61a5.5 5.5 0 1 1-7.78 7.78a5.5 5.5 0 0 1 7.78-7.78z"></path>
+      <path d="M11.39 11.61L15.5 7.5"></path>
+      <path d="M15.5 7.5l3 3L22 7l-3-3"></path>
     </g>
   `;
 }
 
-function diagramLinkIconSvg(x, y, scale) {
+function diagramLinkIconSvg(x, y) {
   return `
-    <g class="diagram-column-icon diagram-column-icon-link" transform="translate(${x} ${y - 14}) scale(${scale})" aria-hidden="true">
-      <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
-      <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
-      <line x1="8" x2="16" y1="12" y2="12"></line>
+    <g class="diagram-column-icon diagram-column-icon-link" transform="translate(${x} ${y - 13}) scale(0.4)" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
     </g>
   `;
 }

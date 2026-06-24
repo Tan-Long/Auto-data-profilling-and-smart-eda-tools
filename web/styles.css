@@ -1322,14 +1322,11 @@ h3 {
 
 .diagram-column-icon {
   fill: none;
-  stroke: var(--foreground-tertiary);
-  stroke-width: 2;
+  stroke: var(--foreground-secondary);
+  stroke-width: 2.35;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.diagram-column-icon * {
-  vector-effect: non-scaling-stroke;
+  opacity: 0.84;
 }
 
 .diagram-column-icon .diagram-icon-fill {
@@ -1338,13 +1335,13 @@ h3 {
 }
 
 .diagram-column-icon-key {
-  color: var(--accent-strong);
-  stroke: var(--accent-strong);
+  color: var(--foreground-secondary);
+  stroke: var(--foreground-secondary);
 }
 
 .diagram-column-icon-link {
-  color: var(--info);
-  stroke: var(--info);
+  color: var(--foreground-secondary);
+  stroke: var(--foreground-secondary);
 }
 
 .diagram-column.overflow {
