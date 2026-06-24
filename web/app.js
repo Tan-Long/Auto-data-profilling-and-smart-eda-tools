@@ -961,13 +961,13 @@ function connectEventStream(eventsUrl) {
       state.eventSource = null;
       renderRunnerMessage(
         state.currentJob.status === "succeeded"
-          ? "Run complete. Generated artifacts are ready."
+          ? "Run complete. Generated artifacts are ready. Click Next to review them."
           : state.currentJob.error || "Run failed.",
         state.currentJob.status === "succeeded" ? "success" : "error",
       );
       if (state.currentJob.status === "succeeded") {
         loadDashboard(state.currentJob.job_id)
-          .then(() => setProfileStep("review"))
+          .then(() => renderAll())
           .catch(() => renderAll());
       } else {
         loadDashboard(state.currentJob.job_id);
@@ -1627,7 +1627,8 @@ function pathSourceActive() {
 }
 
 function profileRunComplete() {
-  return state.currentJob?.status === "succeeded" && !state.dashboardLoadingJobId;
+  const succeeded = state.currentJob?.status === "succeeded" || state.dashboardArtifactIndex?.status === "succeeded";
+  return succeeded && Boolean(state.dashboardArtifactIndex) && !state.dashboardLoadingJobId;
 }
 
 function canOpenProfileStep(step) {

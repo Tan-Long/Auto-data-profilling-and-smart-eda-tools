@@ -236,8 +236,11 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       timeout: 20_000,
     });
     await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
     await expect(page.locator("#stageList")).toContainText("Render Markdown and HTML reports");
     await expect(page.locator("#artifactList")).toContainText("Data-quality readiness");
+    await goToProfileStep(page, "review");
     await expect(page.locator("#qualityGates")).toContainText("Quality Gates");
     await expect(page.locator("#dashboard")).toContainText("Review Issues");
     await expect(page.locator("#todosStatus")).toContainText("grouped todos");

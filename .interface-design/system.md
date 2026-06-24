@@ -129,6 +129,9 @@ Data style: monospace with tabular numbers.
 - Guided workflow, preflight review, post-run review, quality gates, issue
   details, action plans, and todos should read top-to-bottom as one review
   stack.
+- Stage navigation is user-controlled. A completed backend run may unlock the
+  next step, but the UI should not move from Run to Review until the user
+  clicks Next or explicitly selects Review.
 - Avoid primary two-column split layouts for review surfaces. Use full-width
   panels, then compact pills, rows, and metric strips inside each section.
 - Evidence values render as label, raw value, then meaning in one vertical
@@ -212,3 +215,4 @@ Data style: monospace with tabular numbers.
 | Remove visible DBML inspector rail | Demo feedback found the selected-table inspector too verbose and duplicative; the ERD should use the full available width and keep detailed evidence in the review/report flow | 2026-06-24 |
 | Use ERD endpoint glyphs for relationship cardinality | Text labels like `1` and `*` felt detached from the FK line; crow's-foot endpoints attach cardinality to the relationship itself | 2026-06-24 |
 | Add compact visual issue review | Stage 4 text-only issue review was hard to scan; compact charts, an issue table, and a selected-issue focus map make table, column, type, and affected rows visible before detailed text | 2026-06-24 |
+| Keep Run-to-Review transition manual | Demo users need to see all runtime stages and generated artifacts before entering Stage 4; successful runs unlock Review but do not auto-navigate away from Stage 3 | 2026-06-24 |

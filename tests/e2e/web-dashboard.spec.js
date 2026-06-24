@@ -364,6 +364,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
     "succeeded dashboard",
   );
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+  await expect(page.locator("#profileStepNext")).toBeEnabled();
+  await expect(page.locator("#stageList")).toContainText("Render Markdown and HTML reports");
+  await page.locator("#profileStepNext").click();
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
   const filterToolbarLayout = await page.locator("#dashboard .dashboard-filters").evaluate((element) => {
     const controls = [...element.querySelectorAll("#dashboardSeverityFilter, #dashboardIssueTypeFilter, #dashboardTableFilter, #dashboardResetFilters")]
       .map((control) => control.getBoundingClientRect());
@@ -383,7 +388,6 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toContainText("Issue map");
   await expect(page.locator("#dashboardPanelGrid .issue-visual-chart")).toHaveCount(3);
   expect(await page.locator("#dashboardPanelGrid .issue-visual-row").count()).toBeGreaterThan(3);
-  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
 
   await goToProfileStep(page, "connect");
   await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
