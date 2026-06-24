@@ -237,12 +237,17 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert len(report_md.splitlines()) < 360
     assert "Fix data" in report_md
     assert "Verify after fix" in report_md
-    assert "This report shows the first 10 todo groups per type" in report_md
-    assert "This report shows the first 10 todo groups per type" in report_html
-    if fix_todo_group_count > 10:
-        assert f"{fix_todo_group_count - 10} additional Fix data groups" in report_md
-    if verify_todo_group_count > 10:
-        assert f"{verify_todo_group_count - 10} additional Verify after fix groups" in report_md
+    assert "Todo snapshot:" in report_md
+    assert "highest-priority non-routine groups" in report_md
+    assert "Compact todo snapshot" in report_html
+    assert "Fix data snapshot" in report_md
+    assert "Verify after fix snapshot" in report_html
+    assert "This report shows the first 10 todo groups per type" not in report_md
+    assert "This report shows the first 10 todo groups per type" not in report_html
+    if fix_todo_group_count > 3:
+        assert f"{fix_todo_group_count - 3} additional Fix data groups" in report_md
+    if verify_todo_group_count > 3:
+        assert f"{verify_todo_group_count - 3} additional Verify after fix groups" in report_md
     assert "Not evaluated" in report_md
     assert "Not evaluated" in report_html
     developer_section = report_md.index("## Developer Artifacts")

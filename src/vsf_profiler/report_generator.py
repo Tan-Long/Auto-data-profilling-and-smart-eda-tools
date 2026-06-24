@@ -20,7 +20,7 @@ RELATIONSHIP_ISSUES = {
 }
 MAIN_REPORT_ACTION_PLAN_LIMIT = 5
 MAIN_REPORT_EVIDENCE_VALUE_LIMIT = 6
-MAIN_REPORT_TODO_GROUP_LIMIT = 10
+MAIN_REPORT_TODO_GROUP_LIMIT = 3
 DEVELOPER_ARTIFACT_LABELS = {
     "connector_metadata.json": "Connector Metadata",
     "lineage_graph.json": "Developer Runtime Context",
@@ -571,19 +571,108 @@ def _issue_todos_context(artifact: dict[str, Any] | None) -> dict[str, Any]:
     groups = [dict(group) for group in artifact.get("groups", []) if isinstance(group, dict)]
     fix_groups = [group for group in groups if group.get("todo_type") == "fix_data"]
     verify_groups = [group for group in groups if group.get("todo_type") == "verify_after_fix"]
+    fix_display_groups = _todo_report_groups(fix_groups, MAIN_REPORT_TODO_GROUP_LIMIT)
+    verify_display_groups = _todo_report_groups(verify_groups, MAIN_REPORT_TODO_GROUP_LIMIT)
+    summary = artifact.get("summary") or {}
     return {
         "available": True,
         "path": "issue_todos.json",
-        "summary": artifact.get("summary") or {},
+        "summary": summary,
         "fix_groups": fix_groups[:30],
         "verify_groups": verify_groups[:30],
-        "fix_display_groups": fix_groups[:MAIN_REPORT_TODO_GROUP_LIMIT],
-        "verify_display_groups": verify_groups[:MAIN_REPORT_TODO_GROUP_LIMIT],
+        "fix_display_groups": fix_display_groups,
+        "verify_display_groups": verify_display_groups,
         "display_limit": MAIN_REPORT_TODO_GROUP_LIMIT,
-        "fix_remaining_count": max(0, len(fix_groups) - MAIN_REPORT_TODO_GROUP_LIMIT),
-        "verify_remaining_count": max(0, len(verify_groups) - MAIN_REPORT_TODO_GROUP_LIMIT),
-        "message": "Todos are split into Fix data and Verify after fix groups.",
+        "fix_group_count": int(summary.get("fix_data_group_count") or len(fix_groups)),
+        "verify_group_count": int(summary.get("verify_after_fix_group_count") or len(verify_groups)),
+        "fix_occurrence_count": int(summary.get("fix_data_occurrence_count") or _todo_occurrence_total(fix_groups)),
+        "verify_occurrence_count": int(summary.get("verify_after_fix_occurrence_count") or _todo_occurrence_total(verify_groups)),
+        "fix_remaining_count": max(0, len(fix_groups) - len(fix_display_groups)),
+        "verify_remaining_count": max(0, len(verify_groups) - len(verify_display_groups)),
+        "message": "Report shows a compact todo snapshot. Full grouped todos remain in issue_todos.json.",
     }
+
+
+def _todo_report_groups(groups: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    candidates = [group for group in groups if not _is_routine_report_todo(group)]
+    selected = sorted(candidates, key=_todo_group_report_sort_key)[:limit]
+    if not selected:
+        selected = sorted(groups, key=_todo_group_report_sort_key)[:limit]
+    return [_todo_report_group(group) for group in selected]
+
+
+def _todo_report_group(group: dict[str, Any]) -> dict[str, Any]:
+    occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+    tables = [str(table) for table in group.get("tables") or [] if str(table).strip()]
+    priorities = [str(priority).split(" - ", maxsplit=1)[0] for priority in group.get("priorities") or [] if str(priority).strip()]
+    issue_ids = [str(issue_id) for issue_id in group.get("issue_ids") or [] if str(issue_id).strip()]
+    issue_types = [
+        str(occurrence.get("issue_type")).replace("_", " ").title()
+        for occurrence in occurrences
+        if isinstance(occurrence, dict) and occurrence.get("issue_type")
+    ]
+    return {
+        "todo_id": str(group.get("todo_id") or "TODO"),
+        "text": str(group.get("text") or "Todo needs review."),
+        "short_text": _report_short_text(str(group.get("text") or "Todo needs review."), 118),
+        "occurrence_count": int(group.get("occurrence_count") or len(occurrences) or 0),
+        "tables_text": _report_compact_list(tables, empty="table context"),
+        "priorities_text": _report_compact_list(sorted(set(priorities)), empty="priority n/a"),
+        "issue_count": len(issue_ids) or len(occurrences),
+        "issue_types_text": _report_compact_list(issue_types, empty="issue context"),
+    }
+
+
+def _todo_occurrence_total(groups: list[dict[str, Any]]) -> int:
+    return sum(int(group.get("occurrence_count") or 0) for group in groups)
+
+
+def _is_routine_report_todo(group: dict[str, Any]) -> bool:
+    text = " ".join(str(group.get("text") or "").lower().split())
+    routine_fragments = [
+        "do not edit generated artifacts",
+        "rerun the profiler on the corrected csv + dbml inputs",
+    ]
+    return any(fragment in text for fragment in routine_fragments)
+
+
+def _todo_group_report_sort_key(group: dict[str, Any]) -> tuple[int, int, str]:
+    priorities = [str(priority) for priority in group.get("priorities") or []]
+    priority_rank = min((_priority_rank(priority) for priority in priorities), default=9)
+    return (priority_rank, -int(group.get("occurrence_count") or 0), str(group.get("text") or ""))
+
+
+def _priority_rank(value: str) -> int:
+    label = str(value).upper()
+    for index, severity in enumerate(("P0", "P1", "P2", "P3")):
+        if label.startswith(severity):
+            return index
+    return 9
+
+
+def _report_short_text(text: str, limit: int) -> str:
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    cutoff = normalized.rfind(" ", 0, max(1, limit - 3))
+    if cutoff < 48:
+        cutoff = max(1, limit - 3)
+    return normalized[:cutoff].rstrip() + "..."
+
+
+def _report_compact_list(values: list[str], *, empty: str, limit: int = 3) -> str:
+    unique_values = []
+    seen = set()
+    for value in values:
+        if value and value not in seen:
+            unique_values.append(value)
+            seen.add(value)
+    if not unique_values:
+        return empty
+    visible = unique_values[:limit]
+    remaining = len(unique_values) - len(visible)
+    suffix = f" +{remaining}" if remaining > 0 else ""
+    return ", ".join(visible) + suffix
 
 
 def _issue_llm_enrichments_context(artifact: dict[str, Any] | None) -> dict[str, Any]:

@@ -203,10 +203,89 @@
     }
     details.report-details > summary { cursor: pointer; font-weight: 900; }
     details.report-details > summary:focus-visible { outline: 3px solid rgba(15, 118, 100, 0.28); outline-offset: 3px; }
+    .todo-summary-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .todo-summary-cards div,
+    .todo-card {
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--surface-overlay);
+    }
+    .todo-summary-cards strong {
+      display: block;
+      color: var(--foreground-primary);
+      font-size: 22px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .todo-summary-cards span,
+    .todo-card span {
+      color: var(--foreground-tertiary);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .todo-summary-cards p,
+    .todo-card p {
+      margin: 4px 0 0;
+      color: var(--foreground-secondary);
+      font-size: 13px;
+      line-height: 1.38;
+    }
     .todo-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .todo-block {
       padding: 12px 0 0;
       border-top: 1px solid var(--border-subtle);
+    }
+    .todo-card-list {
+      display: grid;
+      gap: 8px;
+    }
+    .todo-card header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 6px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .todo-card code {
+      color: var(--accent);
+      font-weight: 900;
+    }
+    .todo-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .todo-card-meta span {
+      padding: 3px 7px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      background: var(--surface-panel);
+      color: var(--foreground-secondary);
+      font-size: 11px;
+      text-transform: none;
+    }
+    .todo-more {
+      margin: 8px 0 0;
+      padding: 8px 10px;
+      border: 1px dashed var(--border-default);
+      border-radius: 8px;
+      background: var(--surface-panel);
+      color: var(--foreground-secondary);
+      font-size: 13px;
     }
     .artifact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .artifact-link { display: grid; gap: 3px; color: var(--foreground-primary); text-decoration: none; }
@@ -214,7 +293,7 @@
     @media (max-width: 900px) {
       main { width: min(100% - 20px, 1120px); padding-top: 12px; }
       .report-header-line { display: grid; }
-      .summary-strip, .visual-panel, .todo-stack, .artifact-grid { grid-template-columns: 1fr; }
+      .summary-strip, .visual-panel, .todo-summary-cards, .todo-stack, .artifact-grid { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: minmax(0, 1fr); }
       .bar-value { text-align: left; }
     }
@@ -478,33 +557,45 @@
     <section id="todos">
       <h2>Todos</h2>
       {% if fixed_report.todos.available %}
-      <p class="muted">This report shows the first {{ fixed_report.todos.display_limit }} todo groups per type. Full grouped todos remain in <code>{{ fixed_report.todos.path }}</code>.</p>
+      <p class="muted">Compact todo snapshot. Full grouped todos remain in <code>{{ fixed_report.todos.path }}</code>.</p>
+      <div class="todo-summary-cards" aria-label="Todo summary">
+        <div><strong>{{ fixed_report.todos.fix_group_count }}</strong><span>Fix data groups</span><p>{{ fixed_report.todos.fix_occurrence_count }} occurrences from deterministic action plans.</p></div>
+        <div><strong>{{ fixed_report.todos.verify_group_count }}</strong><span>Verify groups</span><p>{{ fixed_report.todos.verify_occurrence_count }} occurrences to check after rerun.</p></div>
+      </div>
       <div class="todo-stack">
         <article class="todo-block">
-          <h3>Fix data</h3>
-          <ul class="checklist">
+          <h3>Fix data snapshot</h3>
+          <div class="todo-card-list">
             {% for group in fixed_report.todos.fix_display_groups %}
-            <li><strong>{{ group.todo_id }}</strong> {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})</li>
+            <article class="todo-card">
+              <header><code>{{ group.todo_id }}</code><span>{{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}</span></header>
+              <p>{{ group.short_text }}</p>
+              <div class="todo-card-meta"><span>{{ group.tables_text }}</span><span>{{ group.priorities_text }}</span></div>
+            </article>
             {% else %}
-            <li>No Fix data todos were generated.</li>
+            <p class="muted">No issue-specific Fix data todos were generated.</p>
             {% endfor %}
+          </div>
             {% if fixed_report.todos.fix_remaining_count > 0 %}
-            <li>{{ fixed_report.todos.fix_remaining_count }} additional Fix data groups are available in <code>{{ fixed_report.todos.path }}</code>.</li>
+            <p class="todo-more">{{ fixed_report.todos.fix_remaining_count }} additional Fix data groups, including routine repeated steps, remain in <code>{{ fixed_report.todos.path }}</code>.</p>
             {% endif %}
-          </ul>
         </article>
         <article class="todo-block">
-          <h3>Verify after fix</h3>
-          <ul class="checklist">
+          <h3>Verify after fix snapshot</h3>
+          <div class="todo-card-list">
             {% for group in fixed_report.todos.verify_display_groups %}
-            <li><strong>{{ group.todo_id }}</strong> {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})</li>
+            <article class="todo-card">
+              <header><code>{{ group.todo_id }}</code><span>{{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}</span></header>
+              <p>{{ group.short_text }}</p>
+              <div class="todo-card-meta"><span>{{ group.tables_text }}</span><span>{{ group.priorities_text }}</span></div>
+            </article>
             {% else %}
-            <li>No Verify after fix todos were generated.</li>
+            <p class="muted">No issue-specific Verify after fix todos were generated.</p>
             {% endfor %}
+          </div>
             {% if fixed_report.todos.verify_remaining_count > 0 %}
-            <li>{{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups are available in <code>{{ fixed_report.todos.path }}</code>.</li>
+            <p class="todo-more">{{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups, including routine repeated checks, remain in <code>{{ fixed_report.todos.path }}</code>.</p>
             {% endif %}
-          </ul>
         </article>
       </div>
       {% else %}

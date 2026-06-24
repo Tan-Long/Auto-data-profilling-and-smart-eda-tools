@@ -22,7 +22,7 @@ FIXED_ZIP_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
 PACKAGE_ACTION_PLAN_LIMIT = 5
 PACKAGE_ACTION_PLAN_SUMMARY_LIMIT = 30
 PACKAGE_EVIDENCE_VALUE_LIMIT = 6
-PACKAGE_TODO_GROUP_LIMIT = 10
+PACKAGE_TODO_GROUP_LIMIT = 3
 REQUIRED_ARTIFACTS = [
     "profile_summary.json",
     "issues.json",
@@ -499,6 +499,20 @@ def _render_index_html(
     .metric strong {{ display: block; font-size: 24px; line-height: 1; }}
     .metric span {{ color: var(--foreground-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }}
     .stack {{ display: grid; gap: 10px; }}
+    .todo-summary-cards {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }}
+    .todo-summary-cards div,
+    .todo-card {{ min-width: 0; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--surface-panel); }}
+    .todo-summary-cards strong {{ display: block; font-size: 22px; line-height: 1; }}
+    .todo-summary-cards span,
+    .todo-card span {{ color: var(--foreground-tertiary); font-size: 11px; font-weight: 800; text-transform: uppercase; }}
+    .todo-summary-cards p,
+    .todo-card p {{ margin: 4px 0 0; color: var(--foreground-secondary); font-size: 13px; line-height: 1.38; }}
+    .todo-card-list {{ display: grid; gap: 8px; }}
+    .todo-card header {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px; padding: 0; border: 0; border-radius: 0; background: transparent; }}
+    .todo-card code {{ color: var(--accent); font-weight: 800; }}
+    .todo-card-meta {{ display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }}
+    .todo-card-meta span {{ padding: 3px 7px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface-overlay); color: var(--foreground-secondary); font-size: 11px; text-transform: none; }}
+    .todo-more {{ margin: 8px 0 0; padding: 8px 10px; border: 1px dashed var(--border-default); border-radius: 8px; background: var(--surface-panel); color: var(--foreground-secondary); font-size: 13px; }}
     table {{ width: 100%; border-collapse: collapse; background: var(--surface-panel); }}
     th, td {{ padding: 8px 9px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }}
     th {{ background: var(--surface-inset); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; text-transform: uppercase; }}
@@ -530,7 +544,7 @@ def _render_index_html(
       background: white;
     }}
     @media (max-width: 820px) {{
-      .grid, .links {{ grid-template-columns: 1fr; }}
+      .grid, .links, .todo-summary-cards {{ grid-template-columns: 1fr; }}
       main {{ width: min(100% - 20px, 1180px); padding-top: 16px; }}
     }}
   </style>
@@ -1059,32 +1073,42 @@ def package_todos_html(issue_todos: dict[str, Any]) -> str:
     verify_groups = [
         group for group in groups if isinstance(group, dict) and group.get("todo_type") == "verify_after_fix"
     ]
-    fix_remaining_count = max(0, len(fix_groups) - PACKAGE_TODO_GROUP_LIMIT)
-    verify_remaining_count = max(0, len(verify_groups) - PACKAGE_TODO_GROUP_LIMIT)
+    fix_display_groups = _package_todo_report_groups(fix_groups, PACKAGE_TODO_GROUP_LIMIT)
+    verify_display_groups = _package_todo_report_groups(verify_groups, PACKAGE_TODO_GROUP_LIMIT)
+    fix_remaining_count = max(0, len(fix_groups) - len(fix_display_groups))
+    verify_remaining_count = max(0, len(verify_groups) - len(verify_display_groups))
     fix_remaining_html = (
-        f'<p class="meta">{fix_remaining_count} additional Fix data groups are available in '
+        f'<p class="todo-more">{fix_remaining_count} additional Fix data groups, including routine repeated steps, remain in '
         '<code>issue_todos.json</code>.</p>'
         if fix_remaining_count
         else ""
     )
     verify_remaining_html = (
-        f'<p class="meta">{verify_remaining_count} additional Verify after fix groups are available in '
+        f'<p class="todo-more">{verify_remaining_count} additional Verify after fix groups, including routine repeated checks, remain in '
         '<code>issue_todos.json</code>.</p>'
         if verify_remaining_count
         else ""
     )
+    fix_occurrence_count = summary.get("fix_data_occurrence_count", _package_todo_occurrence_total(fix_groups))
+    verify_occurrence_count = summary.get(
+        "verify_after_fix_occurrence_count",
+        _package_todo_occurrence_total(verify_groups),
+    )
     return f"""
-      <p class="meta">Todo groups: {_h(summary.get('todo_group_count', len(groups)))} · Fix data: {_h(summary.get('fix_data_group_count', len(fix_groups)))} · Verify after fix: {_h(summary.get('verify_after_fix_group_count', len(verify_groups)))}.</p>
-      <p class="meta">Package index shows the first {PACKAGE_TODO_GROUP_LIMIT} todo groups per type. Full grouped todos remain in <code>issue_todos.json</code>.</p>
+      <p class="meta">Compact todo snapshot. Full grouped todos remain in <code>issue_todos.json</code>.</p>
+      <div class="todo-summary-cards" aria-label="Todo summary">
+        <div><strong>{_h(summary.get('fix_data_group_count', len(fix_groups)))}</strong><span>Fix data groups</span><p>{_h(fix_occurrence_count)} occurrences from deterministic action plans.</p></div>
+        <div><strong>{_h(summary.get('verify_after_fix_group_count', len(verify_groups)))}</strong><span>Verify groups</span><p>{_h(verify_occurrence_count)} occurrences to check after rerun.</p></div>
+      </div>
       <div class="stack">
         <article class="panel">
-          <h3>Fix data</h3>
-          {_package_todo_group_list_html(fix_groups[:PACKAGE_TODO_GROUP_LIMIT], 'No Fix data todos were generated.')}
+          <h3>Fix data snapshot</h3>
+          {_package_todo_group_list_html(fix_display_groups, 'No issue-specific Fix data todos were generated.')}
           {fix_remaining_html}
         </article>
         <article class="panel">
-          <h3>Verify after fix</h3>
-          {_package_todo_group_list_html(verify_groups[:PACKAGE_TODO_GROUP_LIMIT], 'No Verify after fix todos were generated.')}
+          <h3>Verify after fix snapshot</h3>
+          {_package_todo_group_list_html(verify_display_groups, 'No issue-specific Verify after fix todos were generated.')}
           {verify_remaining_html}
         </article>
       </div>
@@ -1205,9 +1229,89 @@ def _package_todo_group_list_html(groups: list[dict[str, Any]], empty_text: str)
     items = []
     for group in groups:
         items.append(
-            f"<li><strong>{_h(group.get('todo_id', 'TODO'))}</strong> {_h(group.get('text', 'Todo needs review.'))} ({_h(group.get('occurrence_count', 0))} occurrences)</li>"
+            f"""
+            <article class="todo-card">
+              <header><code>{_h(group.get('todo_id', 'TODO'))}</code><span>{_h(group.get('occurrence_count', 0))} occurrence{'' if group.get('occurrence_count') == 1 else 's'}</span></header>
+              <p>{_h(group.get('short_text') or group.get('text', 'Todo needs review.'))}</p>
+              <div class="todo-card-meta"><span>{_h(group.get('tables_text', 'table context'))}</span><span>{_h(group.get('priorities_text', 'priority n/a'))}</span></div>
+            </article>
+            """
         )
-    return "<ul>" + "".join(items) + "</ul>"
+    return '<div class="todo-card-list">' + "".join(items) + "</div>"
+
+
+def _package_todo_report_groups(groups: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    candidates = [group for group in groups if not _package_is_routine_todo(group)]
+    selected = sorted(candidates, key=_package_todo_sort_key)[:limit]
+    if not selected:
+        selected = sorted(groups, key=_package_todo_sort_key)[:limit]
+    return [_package_todo_report_group(group) for group in selected]
+
+
+def _package_todo_report_group(group: dict[str, Any]) -> dict[str, Any]:
+    occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+    tables = [str(table) for table in group.get("tables") or [] if str(table).strip()]
+    priorities = [str(priority).split(" - ", maxsplit=1)[0] for priority in group.get("priorities") or [] if str(priority).strip()]
+    return {
+        "todo_id": str(group.get("todo_id") or "TODO"),
+        "text": str(group.get("text") or "Todo needs review."),
+        "short_text": _package_short_text(str(group.get("text") or "Todo needs review."), 118),
+        "occurrence_count": int(group.get("occurrence_count") or len(occurrences) or 0),
+        "tables_text": _package_compact_list(tables, empty="table context"),
+        "priorities_text": _package_compact_list(sorted(set(priorities)), empty="priority n/a"),
+    }
+
+
+def _package_todo_occurrence_total(groups: list[dict[str, Any]]) -> int:
+    return sum(int(group.get("occurrence_count") or 0) for group in groups)
+
+
+def _package_is_routine_todo(group: dict[str, Any]) -> bool:
+    text = " ".join(str(group.get("text") or "").lower().split())
+    routine_fragments = [
+        "do not edit generated artifacts",
+        "rerun the profiler on the corrected csv + dbml inputs",
+    ]
+    return any(fragment in text for fragment in routine_fragments)
+
+
+def _package_todo_sort_key(group: dict[str, Any]) -> tuple[int, int, str]:
+    priorities = [str(priority) for priority in group.get("priorities") or []]
+    priority_rank = min((_package_priority_rank(priority) for priority in priorities), default=9)
+    return (priority_rank, -int(group.get("occurrence_count") or 0), str(group.get("text") or ""))
+
+
+def _package_priority_rank(value: str) -> int:
+    label = str(value).upper()
+    for index, severity in enumerate(("P0", "P1", "P2", "P3")):
+        if label.startswith(severity):
+            return index
+    return 9
+
+
+def _package_short_text(text: str, limit: int) -> str:
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    cutoff = normalized.rfind(" ", 0, max(1, limit - 3))
+    if cutoff < 48:
+        cutoff = max(1, limit - 3)
+    return normalized[:cutoff].rstrip() + "..."
+
+
+def _package_compact_list(values: list[str], *, empty: str, limit: int = 3) -> str:
+    unique_values = []
+    seen = set()
+    for value in values:
+        if value and value not in seen:
+            unique_values.append(value)
+            seen.add(value)
+    if not unique_values:
+        return empty
+    visible = unique_values[:limit]
+    remaining = len(unique_values) - len(visible)
+    suffix = f" +{remaining}" if remaining > 0 else ""
+    return ", ".join(visible) + suffix
 
 
 def _package_display_artifact_text(text: str) -> str:

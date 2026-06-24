@@ -113,11 +113,14 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert "Main package index expands the first 5 highest-priority plans" in index_html
     assert "Full deterministic action-plan evidence remains in <code>issue_action_plans.json</code>" in index_html
     assert index_html.count("<summary>") == expanded_plan_count
-    assert "Package index shows the first 10 todo groups per type" in index_html
-    if fix_todo_group_count > 10:
-        assert f"{fix_todo_group_count - 10} additional Fix data groups" in index_html
-    if verify_todo_group_count > 10:
-        assert f"{verify_todo_group_count - 10} additional Verify after fix groups" in index_html
+    assert "Compact todo snapshot" in index_html
+    assert "Fix data snapshot" in index_html
+    assert "Verify after fix snapshot" in index_html
+    assert "Package index shows the first 10 todo groups per type" not in index_html
+    if fix_todo_group_count > 3:
+        assert f"{fix_todo_group_count - 3} additional Fix data groups" in index_html
+    if verify_todo_group_count > 3:
+        assert f"{verify_todo_group_count - 3} additional Verify after fix groups" in index_html
     assert "report.html" in index_html
     assert "report.md" in index_html
     developer_section = index_html.index("Developer Artifacts")

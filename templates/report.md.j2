@@ -115,28 +115,34 @@ Main report shows the first {{ fixed_report.issue_action_plans.display_limit }} 
 ## Todos
 
 {% if fixed_report.todos.available -%}
-This report shows the first {{ fixed_report.todos.display_limit }} todo groups per type. Full grouped todos remain in `{{ fixed_report.todos.path }}`.
+Todo snapshot: {{ fixed_report.todos.fix_group_count }} Fix data groups ({{ fixed_report.todos.fix_occurrence_count }} occurrences) and {{ fixed_report.todos.verify_group_count }} Verify after fix groups ({{ fixed_report.todos.verify_occurrence_count }} occurrences).
 
-### Fix data
+This report shows up to {{ fixed_report.todos.display_limit }} highest-priority non-routine groups per type. Full grouped todos remain in `{{ fixed_report.todos.path }}`.
 
+### Fix data snapshot
+
+| Todo | Action | Where | Count |
+| --- | --- | --- | ---: |
 {% for group in fixed_report.todos.fix_display_groups -%}
-- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})
+| {{ group.todo_id }} | {{ group.short_text }} | {{ group.tables_text }} · {{ group.priorities_text }} | {{ group.occurrence_count }} |
 {% else -%}
-- No Fix data todos were generated.
+| - | No issue-specific Fix data todos were generated. | - | 0 |
 {% endfor %}
 {% if fixed_report.todos.fix_remaining_count > 0 -%}
-- {{ fixed_report.todos.fix_remaining_count }} additional Fix data groups are available in `{{ fixed_report.todos.path }}`.
+{{ fixed_report.todos.fix_remaining_count }} additional Fix data groups, including routine repeated steps, remain in `{{ fixed_report.todos.path }}`.
 {% endif %}
 
-### Verify after fix
+### Verify after fix snapshot
 
+| Todo | Check | Where | Count |
+| --- | --- | --- | ---: |
 {% for group in fixed_report.todos.verify_display_groups -%}
-- **{{ group.todo_id }}** {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})
+| {{ group.todo_id }} | {{ group.short_text }} | {{ group.tables_text }} · {{ group.priorities_text }} | {{ group.occurrence_count }} |
 {% else -%}
-- No Verify after fix todos were generated.
+| - | No issue-specific Verify after fix todos were generated. | - | 0 |
 {% endfor %}
 {% if fixed_report.todos.verify_remaining_count > 0 -%}
-- {{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups are available in `{{ fixed_report.todos.path }}`.
+{{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups, including routine repeated checks, remain in `{{ fixed_report.todos.path }}`.
 {% endif %}
 {% else -%}
 {{ fixed_report.todos.message }}
