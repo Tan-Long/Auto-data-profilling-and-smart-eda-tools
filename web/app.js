@@ -2999,29 +2999,228 @@ function formatRunTimestamp(value) {
 function renderGeneratedResultPreviews(artifacts) {
   if (state.dashboardLoadingJobId && !state.dashboardArtifactIndex) {
     return `
-      <div class="generated-result-grid">
-        <article class="generated-result-card">
-          <div class="generated-result-heading">
-            <strong>Loading issue review snapshot</strong>
-            <span>artifact URLs</span>
+      <section class="run-snapshot-card">
+        <div class="run-snapshot-hero pending">
+          <div>
+            <span>Data-quality readiness</span>
+            <strong>Loading</strong>
           </div>
-          <p class="muted">Fetching chart specs and machine artifacts from the completed job.</p>
-        </article>
-      </div>
+          <p>Fetching generated artifacts for the issue review snapshot.</p>
+        </div>
+      </section>
     `;
   }
 
+  const optionalCards = [
+    renderGeneratedL4Preview(artifacts),
+    renderGeneratedIssueLlmPreview(artifacts),
+  ].filter(Boolean).join("");
+
   return `
-    <div class="generated-result-grid">
-      ${renderGeneratedVerdictPreview(artifacts)}
-      ${renderGeneratedIssueCountsPreview(artifacts)}
-      ${renderGeneratedColumnUsabilityPreview(artifacts)}
-      ${renderGeneratedTableImpactPreview(artifacts)}
-      ${renderGeneratedL4Preview(artifacts)}
-      ${renderGeneratedIssueLlmPreview(artifacts)}
-      ${renderGeneratedRuntimePreview(artifacts)}
+    ${renderRunSnapshotCard()}
+    ${optionalCards ? `<div class="generated-result-grid generated-result-grid-secondary">${optionalCards}</div>` : ""}
+  `;
+}
+
+function renderRunSnapshotCard() {
+  const verdict = generatedVerdictSummary();
+  const severity = generatedSeveritySummary();
+  const columns = generatedColumnUsabilitySummary();
+  const tables = generatedTableReadinessSummary();
+  const runtime = generatedRuntimeSummary();
+  const riskTone = verdict.riskValue >= 80 ? "danger" : verdict.riskValue >= 40 ? "warning" : "success";
+  const maxSeverity = Math.max(...severity.rows.map((row) => row.count), 1);
+  return `
+    <section class="run-snapshot-card" aria-label="Issue review snapshot">
+      <div class="run-snapshot-hero ${riskTone}">
+        <div class="run-snapshot-readiness">
+          <span>Data-quality readiness</span>
+          <strong>${escapeHtml(verdict.label)}</strong>
+          <small>${integerText(verdict.issueCount)} issues · ${integerText(verdict.blockerCount)} top blockers</small>
+        </div>
+        <div class="run-snapshot-risk">
+          <span>risk</span>
+          <strong>${escapeHtml(verdict.riskLabel)}</strong>
+          <div class="run-snapshot-risk-track" aria-hidden="true">
+            <span class="${riskTone}" style="width: ${verdict.riskValue}%"></span>
+          </div>
+        </div>
+      </div>
+      <div class="run-snapshot-grid">
+        <section class="run-snapshot-section run-snapshot-wide">
+          <div class="run-snapshot-section-heading">
+            <strong>Issue counts</strong>
+            <span>${integerText(severity.total)} issues</span>
+          </div>
+          <div class="run-snapshot-severity-bars">
+            ${severity.rows.map((row) => renderRunSnapshotSeverityRow(row, maxSeverity)).join("")}
+          </div>
+        </section>
+        <section class="run-snapshot-section">
+          <div class="run-snapshot-section-heading">
+            <strong>Column usability</strong>
+            <span>${integerText(columns.total)} columns</span>
+          </div>
+          ${renderRunSnapshotMetricStrip([
+            ["blocked columns", columns.blocked, "danger"],
+            ["need prep", columns.needsPreparation, "warning"],
+            ["ready", columns.ready, "success"],
+          ])}
+        </section>
+        <section class="run-snapshot-section">
+          <div class="run-snapshot-section-heading">
+            <strong>Table readiness</strong>
+            <span>${integerText(tables.tableCount)} tables</span>
+          </div>
+          <div class="run-snapshot-health">
+            <strong>${escapeHtml(tables.averageHealthLabel)}</strong>
+            <span>avg health · ${integerText(tables.notReady)} not ready</span>
+          </div>
+          ${tables.topTables.length ? `<div class="run-snapshot-table-tags">${tables.topTables.map((table) => `<code>${escapeHtml(table)}</code>`).join("")}</div>` : ""}
+        </section>
+        <section class="run-snapshot-section">
+          <div class="run-snapshot-section-heading">
+            <strong>Runtime summary</strong>
+            <span>${escapeHtml(runtime.status)}</span>
+          </div>
+          ${renderRunSnapshotMetricStrip([
+            ["stages", runtime.stageCount, ""],
+            ["failed", runtime.failedStageCount, runtime.failedStageCount ? "danger" : "success"],
+            ["runtime", runtime.durationLabel, ""],
+          ])}
+        </section>
+      </div>
+    </section>
+  `;
+}
+
+function renderRunSnapshotSeverityRow(row, maxValue) {
+  const width = row.count > 0 ? Math.max(4, Math.round(row.count / maxValue * 100)) : 0;
+  return `
+    <div class="run-snapshot-severity-row">
+      <code>${escapeHtml(row.label)}</code>
+      <span class="run-snapshot-bar" aria-hidden="true">
+        <span class="${dashboardTone(row.label)}" style="width: ${width}%"></span>
+      </span>
+      <strong>${integerText(row.count)}</strong>
     </div>
   `;
+}
+
+function renderRunSnapshotMetricStrip(items) {
+  return `
+    <div class="run-snapshot-metric-strip">
+      ${items.map(([label, value, tone]) => `
+        <div class="${tone ? `run-snapshot-metric ${tone}` : "run-snapshot-metric"}">
+          <strong>${escapeHtml(value)}</strong>
+          <span>${escapeHtml(label)}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function generatedVerdictSummary() {
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const riskScore = verdict.risk_score ?? verdict.summary?.risk_score;
+  const riskKnown = Number.isFinite(Number(riskScore));
+  const riskValue = riskKnown ? clampNumber(riskScore, 0, 100) : 0;
+  return {
+    label: verdict.verdict || verdict.summary?.verdict || "Waiting",
+    riskValue,
+    riskLabel: riskKnown ? `${integerText(riskValue)}/100` : "--",
+    issueCount: verdict.issue_counts?.total ?? getDashboardIssues().length,
+    blockerCount: Array.isArray(verdict.top_blockers) ? verdict.top_blockers.length : 0,
+  };
+}
+
+function generatedSeveritySummary() {
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const runSummary = generatedRunSummary();
+  const issues = getDashboardIssues();
+  const bySeverity = verdict.issue_counts?.by_severity || runSummary.issue_counts?.by_severity || {};
+  const total = verdict.issue_counts?.total ?? runSummary.issue_counts?.total ?? issues.length;
+  return {
+    total,
+    rows: severityOrder.map((label) => ({ label, count: Number(bySeverity[label] || 0) })),
+  };
+}
+
+function generatedColumnUsabilitySummary() {
+  const profile = state.dashboardArtifacts["profile_summary.json"] || {};
+  const tables = profile.tables || {};
+  const issues = getDashboardIssues();
+  const issueSeverityByField = new Map();
+  issues.forEach((issue) => {
+    const table = issue.table || "";
+    const columns = Array.isArray(issue.columns) && issue.columns.length ? issue.columns : [""];
+    columns.forEach((column) => {
+      const key = column ? `${table}.${column}` : table;
+      const current = issueSeverityByField.get(key);
+      if (!current || severityRank(issue.severity) < severityRank(current)) {
+        issueSeverityByField.set(key, issue.severity || "");
+      }
+    });
+  });
+
+  let ready = 0;
+  let needsPreparation = 0;
+  let blocked = 0;
+  Object.entries(tables).forEach(([tableName, table]) => {
+    Object.entries(table.columns || {}).forEach(([columnName, column]) => {
+      const severity = issueSeverityByField.get(`${tableName}.${columnName}`) || "";
+      const outliers = column.outliers || {};
+      const hasReviewSignal = Number(column.null_rate || 0) > 0 ||
+        Number(column.invalid_cast_count || 0) > 0 ||
+        Number(outliers.outlier_count || 0) > 0;
+      if (severity === "P0" || severity === "P1") {
+        blocked += 1;
+      } else if (severity === "P2" || severity === "P3" || hasReviewSignal) {
+        needsPreparation += 1;
+      } else {
+        ready += 1;
+      }
+    });
+  });
+  return { ready, needsPreparation, blocked, total: ready + needsPreparation + blocked };
+}
+
+function generatedTableReadinessSummary() {
+  const assessmentArtifact = state.dashboardArtifacts["table_assessments.json"] || {};
+  const assessments = getDashboardTableAssessments();
+  const summary = assessmentArtifact.summary || {};
+  const tableCount = summary.table_count ?? assessments.length;
+  const averageHealth = summary.average_health_score;
+  const notReady = summary.readiness_counts?.NOT_READY ?? assessments.filter((row) => row.readiness === "NOT_READY").length;
+  const topTables = assessments
+    .slice()
+    .sort((a, b) => (
+      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
+      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      String(a.table || "").localeCompare(String(b.table || ""))
+    ))
+    .slice(0, 3)
+    .map((assessment) => assessment.table)
+    .filter(Boolean);
+  return {
+    tableCount,
+    notReady,
+    topTables,
+    averageHealthLabel: averageHealth === undefined ? "--" : integerText(averageHealth),
+  };
+}
+
+function generatedRuntimeSummary() {
+  const runSummary = generatedRunSummary();
+  const stages = visibleRuntimeStages(runSummary.stage_timings);
+  const failedStages = visibleRuntimeStages(runSummary.failed_stages).length;
+  const duration = runSummary.duration_seconds;
+  return {
+    status: runSummary.status || state.currentJob?.status || "pending",
+    stageCount: stages.length,
+    failedStageCount: failedStages,
+    durationLabel: duration === undefined ? "--" : `${Number(duration).toFixed(2)}s`,
+  };
 }
 
 function renderGeneratedVerdictPreview(artifacts) {

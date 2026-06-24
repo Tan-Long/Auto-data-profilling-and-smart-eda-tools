@@ -5073,6 +5073,263 @@ details.runtime-stage-item:focus-within {
   gap: 10px;
 }
 
+.run-snapshot-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-panel);
+}
+
+.run-snapshot-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(156px, 0.44fr);
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.run-snapshot-hero.danger {
+  border-left-color: var(--destructive);
+}
+
+.run-snapshot-hero.warning {
+  border-left-color: var(--warning);
+}
+
+.run-snapshot-hero.success {
+  border-left-color: var(--success);
+}
+
+.run-snapshot-hero.pending {
+  border-left-color: var(--border-strong);
+}
+
+.run-snapshot-hero p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+}
+
+.run-snapshot-readiness,
+.run-snapshot-risk {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.run-snapshot-readiness span,
+.run-snapshot-risk span,
+.run-snapshot-section-heading span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.run-snapshot-readiness strong,
+.run-snapshot-risk strong {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.run-snapshot-readiness small {
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.run-snapshot-risk {
+  align-content: center;
+}
+
+.run-snapshot-risk-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-inset);
+}
+
+.run-snapshot-risk-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.run-snapshot-risk-track span.danger {
+  background: var(--destructive);
+}
+
+.run-snapshot-risk-track span.warning {
+  background: var(--warning);
+}
+
+.run-snapshot-risk-track span.success {
+  background: var(--success);
+}
+
+.run-snapshot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 8px;
+}
+
+.run-snapshot-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.run-snapshot-wide {
+  grid-row: span 3;
+}
+
+.run-snapshot-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.run-snapshot-section-heading strong {
+  color: var(--foreground-primary);
+  font-size: 13px;
+}
+
+.run-snapshot-severity-bars {
+  display: grid;
+  gap: 8px;
+}
+
+.run-snapshot-severity-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.run-snapshot-severity-row code,
+.run-snapshot-severity-row strong {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-snapshot-severity-row strong {
+  text-align: right;
+}
+
+.run-snapshot-bar {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-inset);
+}
+
+.run-snapshot-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.run-snapshot-bar span.danger {
+  background: var(--destructive);
+}
+
+.run-snapshot-bar span.warn {
+  background: var(--warning);
+}
+
+.run-snapshot-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.run-snapshot-metric {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.run-snapshot-metric.danger {
+  border-color: rgba(178, 59, 50, 0.34);
+}
+
+.run-snapshot-metric.warning {
+  border-color: rgba(154, 95, 0, 0.34);
+}
+
+.run-snapshot-metric.success {
+  border-color: rgba(35, 118, 77, 0.32);
+}
+
+.run-snapshot-metric strong,
+.run-snapshot-health strong {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.run-snapshot-metric span,
+.run-snapshot-health span {
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.run-snapshot-health {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.run-snapshot-table-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.run-snapshot-table-tags code {
+  min-height: 23px;
+  padding: 3px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  font-size: 11px;
+}
+
 .generated-result-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
@@ -5421,6 +5678,9 @@ details.runtime-stage-item:focus-within {
   .dashboard-layout,
   .dashboard-panel-grid,
   .generated-result-grid,
+  .run-snapshot-hero,
+  .run-snapshot-grid,
+  .run-snapshot-metric-strip,
   .generated-report-links,
   .report-preview-signal-grid,
   .report-fix-row,
@@ -5457,6 +5717,10 @@ details.runtime-stage-item:focus-within {
 
   .issue-review-header {
     display: none;
+  }
+
+  .run-snapshot-wide {
+    grid-row: auto;
   }
 
   .todos-toolbar {
