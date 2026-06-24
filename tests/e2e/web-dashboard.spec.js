@@ -367,14 +367,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#runnerMessage")).toContainText("Run complete", {
     timeout: 60_000,
   });
-  await expect(page.locator("#dashboardMessage")).toContainText(
-    /Issue review loaded|Legacy association chart is absent/,
-    { timeout: 20_000 },
-  );
-
   await expect(page.locator("#dashboardStatusBadge")).toContainText(
     "succeeded dashboard",
   );
+  await expect(page.locator("#dashboardMessage")).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator("#dashboardMessage")).not.toContainText("Legacy association");
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
@@ -442,6 +439,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   await page.locator("#profileStepNext").click();
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
+  const reviewHeaderOrder = await page.locator("#dashboard").evaluate((element) => {
+    const summary = element.querySelector("#dashboardSummaryStrip")?.getBoundingClientRect();
+    const filters = element.querySelector(".dashboard-filters")?.getBoundingClientRect();
+    return Boolean(summary && filters && summary.top < filters.top);
+  });
+  expect(reviewHeaderOrder).toBeTruthy();
   const filterToolbarLayout = await page.locator("#dashboard .dashboard-filters").evaluate((element) => {
     const controls = [...element.querySelectorAll("#dashboardSeverityFilter, #dashboardIssueTypeFilter, #dashboardTableFilter, #dashboardResetFilters")]
       .map((control) => control.getBoundingClientRect());
@@ -453,8 +456,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   expect(filterToolbarLayout.controlCount).toBe(4);
   expect(filterToolbarLayout.overflow).toBeLessThanOrEqual(1);
-  expect(filterToolbarLayout.ySpread).toBeLessThan(8);
+  expect(filterToolbarLayout.ySpread).toBeLessThan(12);
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("readiness");
+  await expect(page.locator("#dashboardSummaryStrip")).toContainText("NOT_READY");
+  await expect(page.locator("#dashboardSummaryStrip")).toContainText("100/100");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("gates");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
   await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toBeVisible();

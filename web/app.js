@@ -3332,7 +3332,7 @@ async function loadDashboard(jobId, options = {}) {
     state.dashboardSelection = options.preserveSelection && previousSelection
       ? previousSelection
       : { kind: "overview", value: "", label: "Review Issues" };
-    renderDashboardMessage("Issue review loaded from generated artifacts.", "success");
+    renderDashboardMessage("", "");
   } catch (error) {
     state.dashboardLoadingJobId = "";
     renderDashboardMessage(error.message || "Unable to load issue review artifacts.", "error");
@@ -3402,8 +3402,10 @@ function wait(ms) {
 }
 
 function renderDashboardMessage(message, status) {
-  els.dashboardMessage.textContent = message;
-  els.dashboardMessage.dataset.status = status;
+  const text = message || "";
+  els.dashboardMessage.textContent = text;
+  els.dashboardMessage.dataset.status = status || "";
+  els.dashboardMessage.hidden = !text;
 }
 
 function renderDashboard() {
@@ -3429,6 +3431,10 @@ function renderDashboard() {
   renderReportExportSection();
 
   if (!loaded) {
+    renderDashboardMessage(
+      loading ? "Fetching issue artifacts..." : "Issue review loads after a completed backend job.",
+      "pending",
+    );
     els.dashboardPanelGrid.innerHTML = loading
       ? `<p class="muted">Fetching issue artifacts...</p>`
       : `<p class="muted">Run a job to review issues by table and column.</p>`;
@@ -3448,8 +3454,8 @@ function renderDashboard() {
       `Issue review loaded with missing artifacts: ${artifactIndex.missing_artifacts.join(", ")}.`,
       "pending",
     );
-  } else if (artifacts["influence.json"] && !artifacts[dashboardChartPaths.influence]) {
-    renderDashboardMessage("Issue review loaded. Legacy association chart is absent because no features were generated.", "success");
+  } else {
+    renderDashboardMessage("", "");
   }
 }
 
@@ -3459,22 +3465,57 @@ function renderDashboardSummary(issues) {
   const assessmentArtifact = state.dashboardArtifacts["table_assessments.json"] || {};
   const qualityGates = getQualityGatesArtifact();
   const assessments = getDashboardTableAssessments();
-  const guardrail = getL4Guardrail();
   const riskScore = verdict.risk_score ?? verdict.summary?.risk_score ?? "--";
   const verdictLabel = verdict.verdict || verdict.summary?.verdict || (artifactIndex ? "unknown" : "Waiting");
   const paths = Object.keys(artifactIndex?.artifact_urls || {});
   const gateSummary = qualityGates?.summary || {};
-  const l4Summary = guardrail.status
-    ? `<div><span>LLM report</span><strong>${escapeHtml(guardrail.status)}</strong></div>`
-    : "";
+  const numericRisk = Number(riskScore);
+  const riskKnown = Number.isFinite(numericRisk);
+  const riskValue = riskKnown ? clampNumber(numericRisk, 0, 100) : 0;
+  const riskLabel = riskKnown ? `${integerText(riskValue)}/100` : "--";
+  const readinessToken = String(verdictLabel || "").toLowerCase();
+  const readinessTone = readinessToken.includes("not") || readinessToken.includes("fail")
+    ? "danger"
+    : readinessToken.includes("ready") || readinessToken.includes("pass")
+      ? "success"
+      : "pending";
+  const riskTone = riskValue >= 80 ? "danger" : riskValue >= 40 ? "warning" : "success";
+  const tableCount = assessmentArtifact.summary?.table_count ?? assessments.length;
+  const blockedGates = qualityGates ? gateSummary.blocked_count || 0 : null;
   els.dashboardSummaryStrip.innerHTML = `
-    <div><span>readiness</span><strong>${escapeHtml(verdictLabel)}</strong></div>
-    <div><span>risk</span><strong>${escapeHtml(riskScore === "--" ? "--" : `${integerText(riskScore)}/100`)}</strong></div>
-    <div><span>issues</span><strong>${integerText(issues.length)}</strong></div>
-    <div><span>tables</span><strong>${integerText(assessmentArtifact.summary?.table_count ?? assessments.length)}</strong></div>
-    <div><span>gates</span><strong>${qualityGates ? `${integerText(gateSummary.blocked_count || 0)} blocked` : "--"}</strong></div>
-    ${l4Summary}
-    <div><span>artifacts</span><strong>${integerText(paths.length)}</strong></div>
+    <div class="dashboard-readiness-card ${readinessTone}">
+      <div class="dashboard-summary-status">
+        <span>readiness</span>
+        <strong>${escapeHtml(verdictLabel)}</strong>
+      </div>
+      <div class="dashboard-risk-meter" aria-label="Risk score ${escapeHtml(riskLabel)}">
+        <div class="dashboard-risk-heading">
+          <span>risk</span>
+          <strong>${escapeHtml(riskLabel)}</strong>
+        </div>
+        <div class="dashboard-risk-track" aria-hidden="true">
+          <span class="dashboard-risk-fill ${riskTone}" style="width: ${riskValue}%"></span>
+        </div>
+      </div>
+    </div>
+    <div class="dashboard-summary-metrics">
+      <div class="dashboard-summary-metric">
+        <span>issues</span>
+        <strong>${integerText(issues.length)}</strong>
+      </div>
+      <div class="dashboard-summary-metric">
+        <span>tables</span>
+        <strong>${integerText(tableCount)}</strong>
+      </div>
+      <div class="dashboard-summary-metric">
+        <span>gates</span>
+        <strong>${blockedGates === null ? "--" : `${integerText(blockedGates)} blocked`}</strong>
+      </div>
+      <div class="dashboard-summary-metric">
+        <span>artifacts</span>
+        <strong>${integerText(paths.length)}</strong>
+      </div>
+    </div>
   `;
 }
 

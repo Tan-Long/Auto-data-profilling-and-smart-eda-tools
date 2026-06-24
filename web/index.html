@@ -329,39 +329,39 @@
         </div>
 
         <div class="dashboard-layout">
-          <div class="dashboard-filters" role="group" aria-label="Issue review filters">
-            <div class="runtime-heading">
-              <strong>Filters</strong>
-              <span id="dashboardIssueCount">0 issues</span>
-            </div>
-            <label class="field-label dashboard-filter-field" for="dashboardSeverityFilter">
-              Severity
-              <select id="dashboardSeverityFilter">
-                <option value="all">All severities</option>
-              </select>
-            </label>
-            <label class="field-label dashboard-filter-field" for="dashboardIssueTypeFilter">
-              Issue type
-              <select id="dashboardIssueTypeFilter">
-                <option value="all">All issue types</option>
-              </select>
-            </label>
-            <label class="field-label dashboard-filter-field" for="dashboardTableFilter">
-              Table
-              <select id="dashboardTableFilter">
-                <option value="all">All tables</option>
-              </select>
-            </label>
-            <button class="button secondary" id="dashboardResetFilters" type="button">Reset filters</button>
-            <p class="form-message" id="dashboardMessage" role="status">Issue review loads after a completed backend job.</p>
-          </div>
-
           <div class="dashboard-main">
             <div class="dashboard-summary-strip" id="dashboardSummaryStrip" aria-label="Issue review summary">
               <div><span>readiness</span><strong>Waiting</strong></div>
               <div><span>risk</span><strong>--</strong></div>
               <div><span>issues</span><strong>0</strong></div>
               <div><span>tables</span><strong>0</strong></div>
+            </div>
+
+            <div class="dashboard-filters" role="group" aria-label="Issue review filters">
+              <div class="dashboard-filter-heading">
+                <strong>Review filters</strong>
+                <span id="dashboardIssueCount">0 issues</span>
+              </div>
+              <label class="field-label dashboard-filter-field" for="dashboardSeverityFilter">
+                Severity
+                <select id="dashboardSeverityFilter">
+                  <option value="all">All severities</option>
+                </select>
+              </label>
+              <label class="field-label dashboard-filter-field" for="dashboardIssueTypeFilter">
+                Issue type
+                <select id="dashboardIssueTypeFilter">
+                  <option value="all">All issue types</option>
+                </select>
+              </label>
+              <label class="field-label dashboard-filter-field" for="dashboardTableFilter">
+                Table
+                <select id="dashboardTableFilter">
+                  <option value="all">All tables</option>
+                </select>
+              </label>
+              <button class="button secondary" id="dashboardResetFilters" type="button">Reset</button>
+              <p class="form-message" id="dashboardMessage" role="status">Issue review loads after a completed backend job.</p>
             </div>
 
             <section class="dashboard-section quality-gates-section" id="qualityGates" aria-labelledby="qualityGatesTitle">
