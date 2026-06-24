@@ -3565,33 +3565,61 @@ function renderQualityGateCard(gate) {
   const nextAction = gate.recommended_next_action || {};
   const contextCount = contexts.length;
   const evidenceCount = evidence.length;
+  const statusClass = issueStatusClass(status);
   return `
     <details class="quality-gate-card" data-status="${escapeHtml(status)}">
       <summary class="quality-gate-summary">
+        ${renderQualityGateStatusBlock(status, statusClass)}
         <span class="quality-gate-summary-main">
           <strong>${escapeHtml(gate.label || "Quality gate")}</strong>
           <small>${integerText(evidenceCount)} evidence values · ${integerText(contextCount)} linked contexts</small>
         </span>
-        <span class="pill-status ${issueStatusClass(status)}" title="${escapeHtml(gate.explanation || status)}">${escapeHtml(status)}</span>
         <span class="quality-gate-expand" aria-hidden="true">Details</span>
       </summary>
       <div class="quality-gate-body">
-        <div class="quality-gate-heading">
-          <strong>Why this gate is ${escapeHtml(status)}</strong>
+        <div class="quality-gate-explanation">
+          <span>Why</span>
           <p>${escapeHtml(gate.explanation || "Gate evidence needs review.")}</p>
+        </div>
+        <div class="quality-gate-detail-actions">
+          <a class="quality-gate-action" href="${escapeHtml(nextAction.anchor || "#dashboardPanelGrid")}">${escapeHtml(nextAction.label || "Open Review Issues.")}</a>
+        </div>
+        <div class="quality-gate-section-heading">
+          <strong>Evidence values</strong>
+          <span>${integerText(evidenceCount)} generated values</span>
         </div>
         <div class="quality-gate-evidence" aria-label="${escapeHtml(gate.label || "Quality gate")} evidence">
           ${evidence.slice(0, 4).map(renderQualityGateEvidence).join("")}
         </div>
-        ${contexts.length ? `
-          <div class="quality-gate-contexts">
-            ${contexts.slice(0, 5).map(renderQualityGateContext).join("")}
-          </div>
-        ` : `<p class="muted">No linked table, column, or issue context for this gate.</p>`}
-        <a class="quality-gate-action" href="${escapeHtml(nextAction.anchor || "#dashboardPanelGrid")}">${escapeHtml(nextAction.label || "Open Review Issues.")}</a>
+        ${renderQualityGateContextSummary(contexts)}
       </div>
     </details>
   `;
+}
+
+function renderQualityGateStatusBlock(status, statusClass) {
+  return `
+    <span class="quality-gate-status-block ${escapeHtml(statusClass)}">
+      <span class="quality-gate-status-mark" aria-hidden="true">${status === "Clean" ? "OK" : "!"}</span>
+      <span class="quality-gate-status-copy">
+        <strong>${escapeHtml(status)}</strong>
+        <small>${escapeHtml(qualityGateStatusMeaning(status))}</small>
+      </span>
+    </span>
+  `;
+}
+
+function qualityGateStatusMeaning(status) {
+  if (status === "Blocked") {
+    return "Stops analysis";
+  }
+  if (status === "Clean") {
+    return "No action needed";
+  }
+  if (status === "Usable With Caution") {
+    return "Proceed carefully";
+  }
+  return "Needs owner review";
 }
 
 function renderQualityGateEvidence(value) {
@@ -3600,6 +3628,74 @@ function renderQualityGateEvidence(value) {
       <span>${escapeHtml(value.label || "Evidence")}</span>
       <strong>${escapeHtml(value.raw_value ?? "unknown")}</strong>
       <small>${escapeHtml(value.meaning || "")}</small>
+    </div>
+  `;
+}
+
+function renderQualityGateContextSummary(contexts) {
+  if (!contexts.length) {
+    return `<p class="muted">No linked table, column, or issue context for this gate.</p>`;
+  }
+  const groups = qualityGateContextGroups(contexts);
+  const visibleGroups = groups.slice(0, 4);
+  const remainingGroups = Math.max(0, groups.length - visibleGroups.length);
+  const rawRows = contexts.slice(0, 8);
+  const remaining = Math.max(0, contexts.length - rawRows.length);
+  return `
+    <div class="quality-gate-section-heading">
+      <strong>Where it shows up</strong>
+      <span>${integerText(contexts.length)} linked contexts grouped by table</span>
+    </div>
+    <div class="quality-gate-context-groups">
+      ${visibleGroups.map(renderQualityGateContextGroup).join("")}
+    </div>
+    ${remainingGroups ? `<p class="quality-gate-more-context">${integerText(remainingGroups)} more table group${remainingGroups === 1 ? "" : "s"} are available in quality_gates.json.</p>` : ""}
+    <details class="quality-gate-context-disclosure">
+      <summary>Show linked context rows</summary>
+      <div class="quality-gate-contexts">
+        ${rawRows.map(renderQualityGateContext).join("")}
+      </div>
+      ${remaining ? `<p class="quality-gate-more-context">${integerText(remaining)} more context rows are available in quality_gates.json.</p>` : ""}
+    </details>
+  `;
+}
+
+function qualityGateContextGroups(contexts) {
+  const groups = new Map();
+  contexts.forEach((context) => {
+    const table = context.table || context.parent_table || "dataset";
+    if (!groups.has(table)) {
+      groups.set(table, {
+        table,
+        count: 0,
+        columns: new Set(),
+        statuses: new Set(),
+        issueTypes: new Set(),
+      });
+    }
+    const group = groups.get(table);
+    group.count += 1;
+    arrayOfStrings(context.columns).forEach((column) => group.columns.add(column));
+    [context.status, context.severity, context.todo_type].filter(Boolean).forEach((value) => group.statuses.add(value));
+    if (context.issue_type) {
+      group.issueTypes.add(context.issue_type);
+    }
+  });
+  return [...groups.values()].sort((a, b) => b.count - a.count || a.table.localeCompare(b.table));
+}
+
+function renderQualityGateContextGroup(group) {
+  const columns = [...group.columns].slice(0, 3);
+  const statuses = [...group.statuses].slice(0, 3);
+  const issueTypes = [...group.issueTypes].slice(0, 2);
+  return `
+    <div class="quality-gate-context-group">
+      <div>
+        <code>${escapeHtml(group.table)}</code>
+        <span>${columns.length ? escapeHtml(columns.join(", ")) : "table scope"}</span>
+      </div>
+      <strong>${integerText(group.count)}</strong>
+      <small>${escapeHtml([...issueTypes, ...statuses].filter(Boolean).join(" · ") || "linked evidence")}</small>
     </div>
   `;
 }

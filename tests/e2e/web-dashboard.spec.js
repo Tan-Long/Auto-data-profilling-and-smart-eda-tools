@@ -556,8 +556,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await firstQualityGate.locator(".quality-gate-summary").click();
   await expect(firstQualityGate).toHaveAttribute("open", "");
   await expect(firstQualityGate.locator(".quality-gate-evidence")).toBeVisible();
+  await expect(firstQualityGate.locator(".quality-gate-context-group").first()).toBeVisible();
+  await expect(firstQualityGate.locator(".quality-gate-context-disclosure .quality-gate-contexts")).toBeHidden();
   await expect(firstQualityGate).toContainText("Dataset verdict");
   await expect(firstQualityGate).toContainText("Open Review Issues");
+  await firstQualityGate.screenshot({
+    path: "outputs/us073_goal7/quality-gate-expanded-detail.png",
+  });
   fs.mkdirSync("outputs/us073_goal9", { recursive: true });
   const reportExport = page.locator("#reportExport");
   await expect(reportExport).toContainText("Report / Export");

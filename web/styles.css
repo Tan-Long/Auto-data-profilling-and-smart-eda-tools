@@ -2268,19 +2268,26 @@ h3 {
 }
 
 .quality-gate-card[data-status="Blocked"] {
-  border-color: rgba(178, 59, 50, 0.32);
+  border-color: rgba(178, 59, 50, 0.44);
+  background: rgba(178, 59, 50, 0.035);
 }
 
 .quality-gate-card[data-status="Needs Review"] {
-  border-color: rgba(154, 95, 0, 0.32);
+  border-color: rgba(154, 95, 0, 0.42);
+  background: rgba(154, 95, 0, 0.035);
+}
+
+.quality-gate-card[data-status="Clean"] {
+  border-color: rgba(35, 118, 77, 0.38);
+  background: rgba(35, 118, 77, 0.035);
 }
 
 .quality-gate-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(134px, 0.28fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 64px;
+  min-height: 72px;
   padding: 12px;
   cursor: pointer;
   list-style: none;
@@ -2302,6 +2309,82 @@ h3 {
 
 .quality-gate-summary:focus-visible {
   box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+.quality-gate-status-block {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 9px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.quality-gate-status-block.failed {
+  border-color: var(--destructive);
+  background: var(--destructive);
+  color: #ffffff;
+}
+
+.quality-gate-status-block.mapped {
+  border-color: var(--success);
+  background: var(--success);
+  color: #ffffff;
+}
+
+.quality-gate-status-block.missing {
+  border-color: var(--warning);
+  background: var(--warning);
+  color: #ffffff;
+}
+
+.quality-gate-status-block.extra {
+  border-color: var(--info);
+  background: var(--info);
+  color: #ffffff;
+}
+
+.quality-gate-status-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.quality-gate-status-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quality-gate-status-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.quality-gate-status-copy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .quality-gate-summary-main {
@@ -2356,9 +2439,56 @@ h3 {
 
 .quality-gate-body {
   display: grid;
-  gap: 10px;
-  padding: 0 12px 12px;
+  gap: 12px;
+  padding: 12px;
   border-top: 1px solid var(--border-subtle);
+  background: var(--surface-panel);
+}
+
+.quality-gate-explanation {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.quality-gate-explanation span,
+.quality-gate-section-heading span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.quality-gate-explanation p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.quality-gate-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quality-gate-section-heading strong {
+  color: var(--foreground-primary);
+  font-size: 13px;
+}
+
+.quality-gate-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .quality-gate-heading {
@@ -2392,9 +2522,11 @@ h3 {
 
 .quality-gate-evidence-value {
   display: grid;
-  gap: 3px;
-  min-height: 76px;
-  padding: 8px;
+  grid-template-columns: minmax(132px, 0.34fr) minmax(86px, 0.18fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  padding: 9px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-overlay);
@@ -2423,6 +2555,91 @@ h3 {
 .quality-gate-contexts {
   display: grid;
   gap: 6px;
+}
+
+.quality-gate-context-groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.quality-gate-context-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+}
+
+.quality-gate-context-group div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.quality-gate-context-group code {
+  color: var(--foreground-primary);
+  font-size: 12px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quality-gate-context-group span {
+  overflow: hidden;
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quality-gate-context-group strong {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.quality-gate-context-group small {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quality-gate-context-disclosure {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.quality-gate-context-disclosure summary {
+  min-height: 38px;
+  padding: 9px 10px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.quality-gate-context-disclosure .quality-gate-contexts {
+  padding: 0 10px 10px;
+}
+
+.quality-gate-more-context {
+  margin: 0;
+  padding: 0 10px 10px;
+  color: var(--foreground-tertiary);
+  font-size: 11px;
 }
 
 .quality-gate-context {
@@ -5244,7 +5461,10 @@ details.runtime-stage-item:focus-within {
 
   .quality-gate-heading,
   .quality-gate-summary,
+  .quality-gate-explanation,
+  .quality-gate-evidence-value,
   .quality-gate-context,
+  .quality-gate-context-groups,
   .issue-inbox-row,
   .todo-group-heading,
   .todo-occurrence,
