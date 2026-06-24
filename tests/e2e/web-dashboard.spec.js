@@ -112,6 +112,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(orderItemsMappingRow.locator(".fk-row")).toHaveCount(3);
   await expect(orderItemsMappingRow.locator(".fk-column").first()).toContainText("order_id");
   await expect(orderItemsMappingRow.locator(".fk-target").first()).toContainText("orders.order_id");
+  await expect(orderItemsMappingRow.locator(".selected-csv-file-name")).toContainText("order_items.csv");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
   await expect(page.locator("#runner")).toBeHidden();
@@ -199,6 +200,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#diagramZoomOutButton").click();
   await expect(page.locator("#diagramZoomValue")).toContainText("100%");
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#diagramDensityToggle")).toContainText("Cards: compact");
   await expect(page.locator("#diagramColumnsToggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#diagramColumnsToggle")).toContainText("Show all columns");
   await expect(page.locator('#diagramSvg .diagram-role-bridge[data-diagram-table="order_items"]')).toHaveCount(1);
@@ -369,6 +371,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramInspector")).toContainText("relationship_graph.json");
   await page.locator("#diagramDensityToggle").click();
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#diagramDensityToggle")).toContainText("Cards: expanded");
 
   await goToProfileStep(page, "run");
   await expect(page.getByText("Issue review snapshot")).toBeVisible();

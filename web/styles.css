@@ -3997,7 +3997,7 @@ h3 {
 
 .mapping-table {
   width: 100%;
-  min-width: 940px;
+  min-width: 1080px;
   border-collapse: collapse;
   background: var(--surface-overlay);
 }
@@ -4066,12 +4066,38 @@ h3 {
 
 .mapping-select {
   width: 100%;
+  min-width: 220px;
   min-height: 40px;
   padding: 8px 10px;
   border: 1px solid var(--border-default);
   border-radius: 10px;
   background: var(--surface-panel);
   color: var(--foreground-primary);
+}
+
+.csv-file-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.selected-csv-file-name {
+  display: block;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--foreground-primary);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.selected-csv-file-name.empty {
+  color: var(--foreground-tertiary);
+  font-family: inherit;
 }
 
 .header-meter {

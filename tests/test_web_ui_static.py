@@ -161,7 +161,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Fit view",
         "Zoom out",
         "Zoom in",
-        "Expanded cards",
+        "Cards: compact",
         "Show all columns",
         "Reset layout",
         "CSV to DBML Table Mapping",

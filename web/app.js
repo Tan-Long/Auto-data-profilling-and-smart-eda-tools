@@ -2079,13 +2079,20 @@ function renderMapping() {
 }
 
 function csvSelect(tableName, selectedStem) {
+  const selectedFile = state.csvFiles.find((file) => file.stem === selectedStem);
   const options = [`<option value="">Select CSV...</option>`].concat(
     state.csvFiles.map((file) => {
       const selected = file.stem === selectedStem ? "selected" : "";
       return `<option value="${escapeHtml(file.stem)}" ${selected}>${escapeHtml(file.name)}</option>`;
     }),
   );
-  return `<select class="mapping-select" data-table="${escapeHtml(tableName)}" aria-label="CSV for ${escapeHtml(tableName)}">${options.join("")}</select>`;
+  const selectedName = selectedFile?.name || "No CSV selected";
+  return `
+    <div class="csv-file-cell">
+      <code class="selected-csv-file-name ${selectedFile ? "" : "empty"}" title="${escapeHtml(selectedName)}">${escapeHtml(selectedName)}</code>
+      <select class="mapping-select" data-table="${escapeHtml(tableName)}" aria-label="CSV for ${escapeHtml(tableName)}">${options.join("")}</select>
+    </div>
+  `;
 }
 
 function statusPill(status) {
@@ -5335,6 +5342,7 @@ function updateDiagramControls(model) {
   els.diagramFitButton.setAttribute("aria-pressed", state.diagramFit ? "true" : "false");
   els.diagramZoomValue.textContent = state.diagramFit ? "Fit" : `${Math.round(state.diagramZoom * 100)}%`;
   els.diagramDensityToggle.setAttribute("aria-pressed", state.diagramExpanded ? "true" : "false");
+  els.diagramDensityToggle.textContent = state.diagramExpanded ? "Cards: expanded" : "Cards: compact";
   els.diagramColumnsToggle.setAttribute("aria-pressed", state.diagramShowNonKey ? "true" : "false");
   els.diagramColumnsToggle.textContent = state.diagramShowNonKey ? "Hide full columns" : "Show all columns";
   els.diagramResetSelection.disabled = !state.diagramSelection && state.diagramManualPositions.size === 0;
