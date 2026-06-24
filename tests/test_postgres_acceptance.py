@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from vsf_profiler.cli import run_pipeline
-from vsf_profiler.connectors import PostgresConnector
+from vsf_profiler.ingestion.connectors import PostgresConnector
 from vsf_profiler.web_runner import WebRunJob, WebRunStore
 
 
@@ -60,14 +60,12 @@ def test_real_postgres_acceptance_smoke_introspection_and_dbml_modes(tmp_path):
             schema_name=schema_name,
             out_dir=introspection_out,
             dbml_path=None,
-            rules_path=rules_path,
         )
         _run_postgres_pipeline(
             url=url,
             schema_name=schema_name,
             out_dir=dbml_out,
             dbml_path=dbml_path,
-            rules_path=rules_path,
         )
 
         _assert_acceptance_outputs(
@@ -193,7 +191,6 @@ def _run_postgres_pipeline(
     run_pipeline(
         dbml_path=dbml_path,
         csv_dir=None,
-        rules_path=rules_path,
         target="order_reviews.review_score",
         out_dir=out_dir,
         source_connector=connector,

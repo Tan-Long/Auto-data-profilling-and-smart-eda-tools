@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from collections import defaultdict
 from typing import Any, Optional
 
 import typer
 
-from vsf_profiler.action_plans import build_issue_action_plans
-from vsf_profiler.chart_specs import build_chart_specs
-from vsf_profiler.connectors import (
+from vsf_profiler.artifacts.action_plans import build_issue_action_plans
+from vsf_profiler.artifacts.chart_specs import build_chart_specs
+from vsf_profiler.ingestion.connectors import (
     DEFAULT_MYSQL_CHUNK_ROWS,
     DEFAULT_MYSQL_SCHEMA,
     DEFAULT_MYSQL_URL_ENV,
@@ -21,43 +22,45 @@ from vsf_profiler.connectors import (
     TabularSourceConnector,
     cleanup_connector_extracts,
 )
-from vsf_profiler.csv_catalog import build_catalog, load_mapping_overrides
-from vsf_profiler.dataset_verdict import build_dataset_verdict
-from vsf_profiler.dbml_parser import parse_dbml_with_report
-from vsf_profiler.demo_data import create_small_demo, download_olist
-from vsf_profiler.doctor import (
+from vsf_profiler.ingestion.csv_catalog import build_catalog, load_mapping_overrides
+from vsf_profiler.artifacts.dataset_verdict import build_dataset_verdict
+from vsf_profiler.ingestion.dbml_parser import parse_dbml_with_report
+from vsf_profiler.benchmarks.demo_data import create_small_demo, download_olist
+from vsf_profiler.benchmarks.doctor import (
     build_doctor_report,
     format_doctor_report,
     has_required_failures,
 )
-from vsf_profiler.duckdb_utils import connect
-from vsf_profiler.export_package import create_analysis_package
+from vsf_profiler.ingestion.duckdb_utils import connect
+from vsf_profiler.reporting.export_package import create_analysis_package
 from vsf_profiler.influence_analyzer import (
     MAX_ANALYSIS_ROWS,
     MAX_FEATURE_COLUMNS,
     analyze_influence,
 )
-from vsf_profiler.issue_catalog import IssueCatalog
-from vsf_profiler.lineage_graph import build_lineage_graph, read_run_events
-from vsf_profiler.llm_narrative import (
+from vsf_profiler.profiling.issue_catalog import IssueCatalog
+from vsf_profiler.artifacts.lineage_graph import build_lineage_graph, read_run_events
+from vsf_profiler.llm.narrative import (
     DEFAULT_OPENAI_BASE_URL,
     DEFAULT_OPENAI_MODEL,
     FakeNarrativeProvider,
     NarrativeProvider,
     OpenAINarrativeProvider,
     generate_l4_narrative,
+    generate_per_table_insights,
+    generate_dual_track_overview,
 )
-from vsf_profiler.profiler import profile_dataset
-from vsf_profiler.quality_gates import build_quality_gates
-from vsf_profiler.quality_rules import run_quality_checks
-from vsf_profiler.relationship_checker import run_relationship_checks
-from vsf_profiler.relationship_graph import build_relationship_graph
-from vsf_profiler.report_generator import generate_reports
-from vsf_profiler.runtime import RuntimeRecorder
-from vsf_profiler.schema_diagram import build_schema_diagram
-from vsf_profiler.schema_evaluation import build_schema_evaluation
-from vsf_profiler.table_assessments import build_table_assessments
-from vsf_profiler.todos import build_issue_todos
+from vsf_profiler.profiling.profiler import profile_dataset
+from vsf_profiler.profiling.quality_gates import build_quality_gates
+from vsf_profiler.profiling.quality_rules import run_quality_checks
+from vsf_profiler.profiling.relationship_checker import run_relationship_checks
+from vsf_profiler.profiling.relationship_graph import build_relationship_graph
+from vsf_profiler.reporting.report_generator import generate_reports
+from vsf_profiler.artifacts.runtime import RuntimeRecorder
+from vsf_profiler.reporting.schema_diagram import build_schema_diagram
+from vsf_profiler.ingestion.schema_evaluation import build_schema_evaluation
+from vsf_profiler.artifacts.table_assessments import build_table_assessments
+from vsf_profiler.artifacts.todos import build_issue_todos
 
 
 app = typer.Typer(help="VSF Data Profiler CLI")
@@ -75,7 +78,6 @@ def run(
         "--mapping",
         help="Optional YAML/JSON table-to-CSV mapping override file.",
     ),
-    rules: Optional[Path] = typer.Option(None, "--rules", help="Optional YAML rules file."),
     target: Optional[str] = typer.Option(None, "--target", help="Target column as table.column."),
     out: Path = typer.Option(..., "--out", help="Output directory."),
     postgres_url: Optional[str] = typer.Option(
@@ -178,7 +180,6 @@ def run(
         dbml_path=dbml_path,
         csv_dir=csv_dir,
         mapping_path=mapping,
-        rules_path=rules,
         target=target,
         out_dir=out,
         source_connector=source_connector,
@@ -224,7 +225,6 @@ def demo_run_olist(
     result = run_pipeline(
         dbml_path=Path("examples/olist/schema.dbml"),
         csv_dir=csv_dir,
-        rules_path=Path("examples/olist/rules.yaml"),
         target="olist_order_reviews_dataset.review_score",
         out_dir=out,
     )
@@ -319,7 +319,6 @@ def run_pipeline(
     csv_dir: Path | None,
     mapping_path: Path | None = None,
     mapping_overrides: dict[str, str] | None = None,
-    rules_path: Path | None,
     target: str | None,
     out_dir: Path,
     source_connector: TabularSourceConnector | None = None,
@@ -341,7 +340,6 @@ def run_pipeline(
             "dbml_path": str(dbml_path),
             "csv_dir": str(csv_dir),
             "mapping_path": str(mapping_path) if mapping_path else None,
-            "rules_path": str(rules_path) if rules_path else None,
             "target": target,
         }
         resolved_mapping_overrides = dict(mapping_overrides or {})
@@ -353,7 +351,6 @@ def run_pipeline(
         runtime_inputs = {
             **source_connector.runtime_inputs(),
             "dbml_path": str(dbml_path) if dbml_path else None,
-            "rules_path": str(rules_path) if rules_path else None,
             "target": target,
         }
     if use_llm:
@@ -434,7 +431,6 @@ def run_pipeline(
                     catalog=catalog,
                     profile=profile,
                     issues=issue_catalog,
-                    rules_path=rules_path,
                 )
                 stage.add_detail("issue_count", len(issue_catalog.issues))
 
@@ -667,6 +663,29 @@ def run_pipeline(
                     stage.add_detail("fallback_reason", guardrail_report["fallback_reason"])
                 stage.add_detail("l4_report_path", "l4_report.md")
 
+
+        per_table_llm = None
+        dual_track_llm = None
+        with runtime.stage("generate_ui_insights", "Generate UI Insights (Per-table and Dual-track)") as stage:
+            issues_by_table = defaultdict(list)
+            for issue in issues_payload:
+                if issue.get("table"):
+                    issues_by_table[issue["table"]].append(issue)
+            
+            per_table_llm = generate_per_table_insights(
+                issues_by_table=issues_by_table,
+                action_plans_map=issue_action_plans.get("action_plans", {}),
+                provider=llm_provider if use_llm else None,
+            )
+            
+            dual_track_llm = generate_dual_track_overview(
+                issues=issues_payload,
+                dbml_text=schema_parse_report.get("dbml_text", "") if schema_parse_report else "",
+                verdict=dataset_verdict,
+                provider=llm_provider if use_llm else None,
+            )
+            stage.add_detail("per_table_count", len(per_table_llm))
+
         with runtime.stage("render_reports", "Render Markdown and HTML reports") as stage:
             runtime.declare_artifact(out_dir / "report.md", key="report_md")
             runtime.declare_artifact(out_dir / "report.html", key="report_html")
@@ -684,6 +703,8 @@ def run_pipeline(
                 table_assessments=table_assessments,
                 chart_specs=chart_specs,
                 run_summary=runtime.report_context(status="success"),
+                per_table_llm=per_table_llm,
+                dual_track_llm=dual_track_llm,
             )
             stage.add_detail("report_count", 2)
             stage.add_detail("formats", ["markdown", "html"])
@@ -725,6 +746,8 @@ def run_pipeline(
             table_assessments=table_assessments,
             chart_specs=chart_specs,
             run_summary=runtime.report_context(status="success"),
+            per_table_llm=per_table_llm,
+            dual_track_llm=dual_track_llm,
         )
         runtime.artifact_written(out_dir / "report.md", key="report_md", kind="report")
         runtime.artifact_written(out_dir / "report.html", key="report_html", kind="report")

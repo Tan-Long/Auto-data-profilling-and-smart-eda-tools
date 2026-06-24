@@ -2,7 +2,7 @@ import json
 import csv
 
 from vsf_profiler.cli import run_pipeline
-from vsf_profiler.demo_data import create_small_demo
+from vsf_profiler.benchmarks.demo_data import create_small_demo
 
 
 def test_relationship_checker_finds_orphans(tmp_path):
@@ -12,7 +12,6 @@ def test_relationship_checker_finds_orphans(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
         target="order_reviews.review_score",
         out_dir=out_dir,
     )
@@ -164,7 +163,6 @@ def test_extended_relationship_cardinality_composite_fk_and_junction_detection(t
     run_pipeline(
         dbml_path=schema_path,
         csv_dir=csv_dir,
-        rules_path=None,
         target=None,
         out_dir=out_dir,
     )

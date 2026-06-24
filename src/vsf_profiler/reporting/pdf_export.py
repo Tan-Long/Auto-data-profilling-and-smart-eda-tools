@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 PDF_BACKEND = "vsf_profiler.simple_pdf"
-PDF_GENERATOR = "vsf_profiler.pdf_export.write_simple_pdf_report"
+PDF_GENERATOR = "vsf_profiler.reporting.pdf_export.write_simple_pdf_report"
 PAGE_WIDTH = 612
 PAGE_HEIGHT = 792
 PAGE_MARGIN = 54

@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from vsf_profiler.connectors import DEFAULT_MYSQL_URL_ENV, DEFAULT_POSTGRES_URL_ENV
-from vsf_profiler.pdf_export import PDF_BACKEND
+from vsf_profiler.ingestion.connectors import DEFAULT_MYSQL_URL_ENV, DEFAULT_POSTGRES_URL_ENV
+from vsf_profiler.reporting.pdf_export import PDF_BACKEND
 
 
 CapabilityStatus = Literal["ok", "failed", "missing", "skipped"]

@@ -6,8 +6,8 @@ from typing import Any
 import duckdb
 import yaml
 
-from vsf_profiler.csv_catalog import CsvCatalog
-from vsf_profiler.duckdb_utils import (
+from vsf_profiler.ingestion.csv_catalog import CsvCatalog
+from vsf_profiler.ingestion.duckdb_utils import (
     csv_relation,
     non_empty_expr,
     null_or_empty_expr,
@@ -15,7 +15,7 @@ from vsf_profiler.duckdb_utils import (
     sql_literal,
     try_cast_expr,
 )
-from vsf_profiler.issue_catalog import IssueCatalog
+from vsf_profiler.profiling.issue_catalog import IssueCatalog
 from vsf_profiler.models import ProfileSummary, Schema, TableSchema
 
 
@@ -29,12 +29,10 @@ def run_quality_checks(
     catalog: CsvCatalog,
     profile: ProfileSummary,
     issues: IssueCatalog,
-    rules_path: str | Path | None = None,
 ) -> None:
     _schema_checks(schema, catalog, profile, issues)
     _dbml_value_checks(con, schema, catalog, profile, issues)
     _numeric_outlier_checks(catalog, profile, issues)
-    _yaml_rules(con, catalog, profile, issues, rules_path)
 
 
 def _schema_checks(
@@ -294,156 +292,3 @@ def _text_quality_checks(
     )
 
 
-def _yaml_rules(
-    con: duckdb.DuckDBPyConnection,
-    catalog: CsvCatalog,
-    profile: ProfileSummary,
-    issues: IssueCatalog,
-    rules_path: str | Path | None,
-) -> None:
-    if not rules_path:
-        return
-    path = Path(rules_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Rules file does not exist: {path}")
-    loaded = yaml.safe_load(path.read_text()) or {}
-    rules_by_table = loaded.get("rules", {})
-    if not isinstance(rules_by_table, dict):
-        raise ValueError("rules.yaml must contain a top-level 'rules' mapping")
-
-    for table_name, rules in rules_by_table.items():
-        catalog_table = catalog.tables.get(table_name)
-        table_profile = profile.tables.get(table_name)
-        if not catalog_table or not table_profile:
-            continue
-        relation = csv_relation(catalog_table.csv_path)
-        for rule in rules or []:
-            _run_yaml_rule(con, issues, relation, table_name, table_profile.row_count, rule)
-
-
-def _run_yaml_rule(
-    con: duckdb.DuckDBPyConnection,
-    issues: IssueCatalog,
-    relation: str,
-    table_name: str,
-    total: int,
-    rule: dict[str, Any],
-) -> None:
-    rule_type = str(rule.get("type", "")).lower()
-    severity = str(rule.get("severity", "P2"))
-    if rule_type == "range":
-        _range_rule(issues, relation, table_name, total, rule, severity)
-    elif rule_type == "accepted_values":
-        _accepted_values_rule(issues, relation, table_name, total, rule, severity)
-    elif rule_type == "regex":
-        _regex_rule(issues, relation, table_name, total, rule, severity)
-    elif rule_type == "expression":
-        _expression_rule(issues, relation, table_name, total, rule, severity)
-    else:
-        raise ValueError(f"Unsupported YAML rule type for {table_name}: {rule_type}")
-
-
-def _range_rule(
-    issues: IssueCatalog,
-    relation: str,
-    table_name: str,
-    total: int,
-    rule: dict[str, Any],
-    severity: str,
-) -> None:
-    column = str(rule["column"])
-    col = quote_ident(column)
-    numeric = f"try_cast({col} AS DOUBLE)"
-    bounds: list[str] = []
-    if "min" in rule:
-        bounds.append(f"{numeric} < {float(rule['min'])}")
-    if "max" in rule:
-        bounds.append(f"{numeric} > {float(rule['max'])}")
-    condition = f"{non_empty_expr(col)} AND ({' OR '.join(bounds)})"
-    issue_type = "VALUE_OUT_OF_RANGE"
-    if float(rule.get("min", -1)) == 0.0 and "max" not in rule:
-        issue_type = "NEGATIVE_VALUE_NOT_ALLOWED"
-    issues.add_count_issue(
-        issue_type=issue_type,
-        severity=severity,
-        table=table_name,
-        columns=[column],
-        total_count=total,
-        count_sql=f"SELECT COUNT(*) FROM {relation} WHERE {condition}",
-        sample_sql=f"SELECT * FROM {relation} WHERE {condition} LIMIT 50",
-        sample_key_sql=f"SELECT DISTINCT {col} FROM {relation} WHERE {condition} LIMIT 10",
-    )
-
-
-def _accepted_values_rule(
-    issues: IssueCatalog,
-    relation: str,
-    table_name: str,
-    total: int,
-    rule: dict[str, Any],
-    severity: str,
-) -> None:
-    column = str(rule["column"])
-    values = [str(value) for value in rule.get("values", [])]
-    col = quote_ident(column)
-    accepted = ", ".join(sql_literal(value) for value in values)
-    condition = f"{non_empty_expr(col)} AND CAST({col} AS VARCHAR) NOT IN ({accepted})"
-    issues.add_count_issue(
-        issue_type="ACCEPTED_VALUE_VIOLATION",
-        severity=severity,
-        table=table_name,
-        columns=[column],
-        total_count=total,
-        count_sql=f"SELECT COUNT(*) FROM {relation} WHERE {condition}",
-        sample_sql=f"SELECT * FROM {relation} WHERE {condition} LIMIT 50",
-        sample_key_sql=f"SELECT DISTINCT {col} FROM {relation} WHERE {condition} LIMIT 10",
-    )
-
-
-def _regex_rule(
-    issues: IssueCatalog,
-    relation: str,
-    table_name: str,
-    total: int,
-    rule: dict[str, Any],
-    severity: str,
-) -> None:
-    column = str(rule["column"])
-    pattern = str(rule["pattern"])
-    col = quote_ident(column)
-    condition = f"{non_empty_expr(col)} AND NOT regexp_matches(CAST({col} AS VARCHAR), {sql_literal(pattern)})"
-    issues.add_count_issue(
-        issue_type="REGEX_MISMATCH",
-        severity=severity,
-        table=table_name,
-        columns=[column],
-        total_count=total,
-        count_sql=f"SELECT COUNT(*) FROM {relation} WHERE {condition}",
-        sample_sql=f"SELECT * FROM {relation} WHERE {condition} LIMIT 50",
-    )
-
-
-def _expression_rule(
-    issues: IssueCatalog,
-    relation: str,
-    table_name: str,
-    total: int,
-    rule: dict[str, Any],
-    severity: str,
-) -> None:
-    expression = str(rule["expression"])
-    where = str(rule.get("where", "TRUE"))
-    columns = [str(col) for col in rule.get("columns", [])]
-    condition = f"({where}) AND NOT ({expression})"
-    issue_type = "DATE_ORDER_INVALID" if "date" in expression.lower() or "timestamp" in expression.lower() else "EXPRESSION_RULE_FAILED"
-    if "DELIVERED_AFTER_PURCHASE" in str(rule.get("id", "")):
-        issue_type = "DATE_ORDER_INVALID"
-    issues.add_count_issue(
-        issue_type=issue_type,
-        severity=severity,
-        table=table_name,
-        columns=columns,
-        total_count=total,
-        count_sql=f"SELECT COUNT(*) FROM {relation} WHERE {condition}",
-        sample_sql=f"SELECT * FROM {relation} WHERE {condition} LIMIT 50",
-    )

@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vsf_profiler.cli import app, run_pipeline
-from vsf_profiler.connectors import (
+from vsf_profiler.ingestion.connectors import (
     IntrospectedTable,
     PostgresConnector,
     PostgresTableRef,
@@ -17,7 +17,7 @@ from vsf_profiler.connectors import (
     schema_from_postgres_introspection,
 )
 from vsf_profiler.models import CatalogTable, CsvCatalog, ColumnSchema, Schema, TableSchema
-from vsf_profiler.demo_data import create_small_demo
+from vsf_profiler.benchmarks.demo_data import create_small_demo
 
 
 SECRET_URL = "postgresql://profiler:super-secret@127.0.0.1:5432/demo"
@@ -92,7 +92,6 @@ def test_pipeline_with_connector_writes_metadata_and_redacts_secrets(tmp_path):
     run_pipeline(
         dbml_path=None,
         csv_dir=None,
-        rules_path=None,
         target=None,
         out_dir=out_dir,
         source_connector=connector,
@@ -108,7 +107,7 @@ def test_pipeline_with_connector_writes_metadata_and_redacts_secrets(tmp_path):
     lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text())
     run_summary = json.loads((out_dir / "run_summary.json").read_text())
     report_md = (out_dir / "report.md").read_text()
-    report_html = (out_dir / "report.html").read_text()
+    report_html = (out_dir / "report.html").read_text(encoding="utf-8")
 
     assert metadata["source_type"] == "postgres"
     assert metadata["connection"]["url"] == "postgresql://[redacted]@127.0.0.1:5432/demo"
@@ -127,8 +126,6 @@ def test_pipeline_with_connector_writes_metadata_and_redacts_secrets(tmp_path):
     assert ("source:connector", "table:customers", "provides_table") in lineage_edges
     assert "connector_metadata.json" in report_md
     assert "lineage_graph.json" in report_md
-    assert "Connector Metadata" in report_html
-    assert "Developer Runtime Context" in report_html
     assert run_summary["inputs"]["source_type"] == "postgres"
     assert run_summary["inputs"]["postgres_url"] == "postgresql://[redacted]@127.0.0.1:5432/demo"
     assert run_summary["artifact_paths"]["lineage_graph"] == "lineage_graph.json"
@@ -141,7 +138,6 @@ def test_runtime_redacts_secret_strings_on_connector_failure(tmp_path):
         run_pipeline(
             dbml_path=None,
             csv_dir=None,
-            rules_path=None,
             target=None,
             out_dir=tmp_path / "out",
             source_connector=FailingConnector(secret_url=SECRET_URL),
@@ -165,8 +161,6 @@ def test_cli_csv_mode_is_not_hijacked_by_postgres_env(tmp_path, monkeypatch):
             str(data_dir / "schema.dbml"),
             "--csv-dir",
             str(data_dir / "csv"),
-            "--rules",
-            str(data_dir / "rules.yaml"),
             "--out",
             str(out_dir),
         ],
@@ -230,7 +224,6 @@ def test_postgres_integration_uses_local_fixture_or_skips(tmp_path):
         run_pipeline(
             dbml_path=None,
             csv_dir=None,
-            rules_path=None,
             target=None,
             out_dir=out_dir,
             source_connector=connector,

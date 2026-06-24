@@ -3,8 +3,8 @@ from __future__ import annotations
 import duckdb
 import pandas as pd
 
-from vsf_profiler.csv_catalog import CsvCatalog
-from vsf_profiler.duckdb_utils import csv_relation, fetch_bounded_df, quote_ident
+from vsf_profiler.ingestion.csv_catalog import CsvCatalog
+from vsf_profiler.ingestion.duckdb_utils import csv_relation, fetch_bounded_df, quote_ident
 from vsf_profiler.models import InfluenceFeature, InfluenceResult, Schema
 
 

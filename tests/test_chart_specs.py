@@ -1,4 +1,4 @@
-from vsf_profiler.chart_specs import ALLOWED_SOURCE_ARTIFACTS, build_chart_specs
+from vsf_profiler.artifacts.chart_specs import ALLOWED_SOURCE_ARTIFACTS, build_chart_specs
 
 
 def test_chart_specs_are_deterministic_and_aggregate_only():

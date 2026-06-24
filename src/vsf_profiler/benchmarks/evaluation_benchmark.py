@@ -9,7 +9,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any, Callable
 
-from vsf_profiler.demo_data import create_small_demo
+from vsf_profiler.benchmarks.demo_data import create_small_demo
 
 
 GROUND_TRUTH_ARTIFACT = "ground_truth_issues.json"
@@ -142,7 +142,6 @@ def run_evaluation_benchmark(
     run_pipeline(
         dbml_path=input_paths.dbml_path,
         csv_dir=input_paths.csv_dir,
-        rules_path=input_paths.rules_path,
         target=spec.target,
         out_dir=output_path,
         use_llm=False,

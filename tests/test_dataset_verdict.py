@@ -1,4 +1,4 @@
-from vsf_profiler.dataset_verdict import build_dataset_verdict, normalize_severity
+from vsf_profiler.artifacts.dataset_verdict import build_dataset_verdict, normalize_severity
 from vsf_profiler.models import Issue
 
 

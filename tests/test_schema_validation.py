@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from vsf_profiler.cli import run_pipeline
-from vsf_profiler.demo_data import create_small_demo
+from vsf_profiler.benchmarks.demo_data import create_small_demo
 
 
 def test_missing_column_emits_column_missing(tmp_path):
@@ -24,7 +24,6 @@ def test_missing_column_emits_column_missing(tmp_path):
     run_pipeline(
         dbml_path=root / "schema.dbml",
         csv_dir=csv_dir,
-        rules_path=None,
         target=None,
         out_dir=out_dir,
     )
@@ -50,7 +49,6 @@ def test_extra_column_emits_extra_column(tmp_path):
     run_pipeline(
         dbml_path=root / "schema.dbml",
         csv_dir=csv_dir,
-        rules_path=None,
         target=None,
         out_dir=out_dir,
     )
@@ -81,7 +79,6 @@ def test_invalid_float_values_emit_type_cast_invalid(tmp_path):
     run_pipeline(
         dbml_path=root / "schema.dbml",
         csv_dir=csv_dir,
-        rules_path=None,
         target=None,
         out_dir=out_dir,
     )
@@ -98,7 +95,6 @@ def test_report_generated_without_target(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
         target=None,
         out_dir=out_dir,
     )

@@ -1,368 +1,807 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VSF Data Quality Report</title>
-  <style>
-    :root {
-      --foreground-primary: #121817;
-      --foreground-secondary: #46504d;
-      --foreground-tertiary: #68736f;
-      --surface-canvas: #f5f7f5;
-      --surface-panel: #ffffff;
-      --surface-overlay: #f9faf8;
-      --surface-inset: #eef2ef;
-      --border-subtle: #e3e8e4;
-      --border-default: #cfd8d2;
-      --accent: #0f7664;
-      --success: #23764d;
-      --warning: #9a5f00;
-      --destructive: #b23b32;
-      --info: #316596;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--surface-canvas);
-      color: var(--foreground-primary);
-      font: 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 56px; }
-    header, section {
-      margin-bottom: 16px;
-      padding: 18px;
-      border: 1px solid var(--border-default);
-      border-radius: 12px;
-      background: var(--surface-panel);
-    }
-    h1, h2, h3, p { margin-top: 0; }
-    h1 { margin-bottom: 8px; font-size: 32px; line-height: 1.08; letter-spacing: 0; }
-    h2 { margin-bottom: 12px; font-size: 20px; line-height: 1.2; }
-    h3 { margin: 18px 0 8px; font-size: 15px; }
-    a { color: var(--accent); font-weight: 800; }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
-    .eyebrow { margin-bottom: 6px; color: var(--foreground-tertiary); font-size: 12px; font-weight: 800; text-transform: uppercase; }
-    .muted { color: var(--foreground-secondary); }
-    .answer-grid, .summary-grid, .artifact-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .answer-card, .metric-card, .artifact-link {
-      min-width: 0;
-      padding: 12px;
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      background: var(--surface-overlay);
-    }
-    .answer-card strong, .metric-card strong { display: block; font-size: 22px; line-height: 1.05; overflow-wrap: anywhere; }
-    .answer-card span, .metric-card span {
-      color: var(--foreground-tertiary);
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-    .answer-card p, .metric-card p { margin: 6px 0 0; color: var(--foreground-secondary); font-size: 12px; }
-    .answer-card.Blocked { border-left: 4px solid var(--destructive); }
-    .answer-card.Clean { border-left: 4px solid var(--success); }
-    .answer-card.Needs { border-left: 4px solid var(--warning); }
-    .answer-card.Usable { border-left: 4px solid var(--warning); }
-    .pill {
-      display: inline-flex;
-      min-height: 24px;
-      align-items: center;
-      padding: 2px 8px;
-      border: 1px solid var(--border-default);
-      border-radius: 999px;
-      background: var(--surface-panel);
-      font: 800 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      white-space: nowrap;
-    }
-    .P0, .P1, .Blocked, .NOT_READY, .failed, .invalid { color: var(--destructive); border-color: rgba(178, 59, 50, 0.35); }
-    .P2, .Needs, .WARN, .warning { color: var(--warning); border-color: rgba(154, 95, 0, 0.35); }
-    .P3, .Clean, .READY, .valid, .completed { color: var(--success); border-color: rgba(35, 118, 77, 0.35); }
-    table { width: 100%; border: 1px solid var(--border-default); border-collapse: collapse; background: var(--surface-panel); }
-    th, td { padding: 8px 9px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
-    th { background: var(--surface-inset); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; text-transform: uppercase; }
-    .table-wrap { overflow-x: auto; }
-    .plan-card, .todo-block {
-      margin-top: 10px;
-      padding: 12px;
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      background: var(--surface-overlay);
-    }
-    .plan-card summary {
-      cursor: pointer;
-      font-weight: 800;
-      color: var(--foreground-primary);
-    }
-    .plan-card summary:focus-visible {
-      outline: 3px solid rgba(15, 118, 100, 0.28);
-      outline-offset: 3px;
-    }
-    .plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .todo-stack { display: grid; gap: 10px; }
-    .checklist { margin: 0; padding-left: 18px; }
-    .checklist li + li { margin-top: 4px; }
-    .artifact-link { display: grid; gap: 3px; text-decoration: none; }
-    .artifact-link code { color: var(--foreground-tertiary); overflow-wrap: anywhere; }
-    @media (max-width: 880px) {
-      main { width: min(100% - 20px, 1180px); padding-top: 12px; }
-      .answer-grid, .summary-grid, .artifact-grid, .plan-grid { grid-template-columns: 1fr; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart EDA Report — {{ fixed_report.run_summary.run_id[:8] if fixed_report.run_summary.run_id else 'run' }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral',er:{layoutDirection:'LR',minEntityWidth:90,entityPadding:12,useMaxWidth:true}});</script>
+<style>
+:root{
+  --bg:#f5f7f5;--bg2:#fff;--bg3:#eef2ef;--bg4:#f9faf8;
+  --border:#cfd8d2;--border2:#e3e8e4;
+  --text:#121817;--text2:#46504d;--text3:#68736f;
+  --accent:#0f7664;--radius:10px;
+  --sev-p0:#ef4444;--sev-p1:#f97316;--sev-p2:#d97706;--sev-p3:#2563eb;
+}
+[data-theme="dark"]{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--bg4:#1c2128;
+  --border:#30363d;--border2:#21262d;
+  --text:#e6edf3;--text2:#8b949e;--text3:#6e7681;--accent:#39d353;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:14px}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+code{font-family:'JetBrains Mono','Fira Code',ui-monospace,monospace;font-size:12px}
+a{color:var(--accent);text-decoration:none}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:200;background:var(--bg2);border-bottom:1px solid var(--border);
+  height:52px;padding:0 24px;display:flex;align-items:center;gap:16px}
+.topbar-brand{font-weight:800;font-size:15px;color:var(--text)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.topbar-meta{font-size:12px;color:var(--text3)}
+.theme-btn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:5px 10px;cursor:pointer;font-size:13px;color:var(--text);font-family:inherit}
+.theme-btn:hover{background:var(--border2)}
+
+/* RUN META BAR */
+.run-meta-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 24px;
+  display:flex;gap:20px;flex-wrap:wrap;font-size:12px;color:var(--text3);align-items:center}
+.rm-item{display:flex;align-items:center;gap:4px}
+.rm-time{margin-left:auto;color:var(--text3)}
+
+/* VERDICT */
+.verdict-section{padding:18px 24px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.verdict-row{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch}
+.verdict-main{flex:1;min-width:240px;background:var(--bg4);border:1px solid var(--border);
+  border-left:4px solid #d97706;border-radius:var(--radius);padding:14px 18px}
+.v-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#d97706;margin-bottom:4px}
+.v-status{font-size:24px;font-weight:800;color:#d97706;margin-bottom:2px}
+.v-risk{font-size:13px;color:var(--text2);margin-bottom:4px}
+.v-rat{font-size:12px;color:var(--text3)}
+.sev-pills{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.s-pill{background:var(--bg4);border:1px solid;border-radius:8px;padding:7px 14px;
+  display:flex;align-items:center;gap:10px;min-width:140px}
+.s-pill span:first-child{font-size:20px;font-weight:800;line-height:1}
+.s-pill span:last-child{font-size:11px;color:var(--text3)}
+
+/* TABS */
+.tabs-nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;
+  display:flex;gap:0;position:sticky;top:52px;z-index:100;overflow-x:auto}
+.tab-btn{padding:11px 16px;border:none;border-bottom:3px solid transparent;background:none;
+  cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;color:var(--text3);
+  transition:all .15s;white-space:nowrap}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-pane{display:none;padding:24px}
+.tab-pane.active{display:block}
+
+/* OVERVIEW SECTIONS */
+.ov-section{margin-bottom:28px}
+.ov-title{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text3);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:14px}
+
+/* GATES */
+.gates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.gate-card{display:flex;gap:12px;padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--bg4)}
+.gate-ok{border-left:3px solid #22c55e}.gate-warn{border-left:3px solid #d97706}.gate-fail{border-left:3px solid #ef4444}
+.gate-icon{font-size:20px;flex-shrink:0;margin-top:2px}
+.gate-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px}
+.gate-answer{font-size:13px;color:var(--text2);margin-bottom:2px}
+.gate-expl{font-size:12px;color:var(--text3);margin-bottom:3px}
+.gate-action{font-size:11px;color:var(--accent);font-weight:600}
+
+/* SCHEMA DIAGRAM */
+.er-diagram-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.er-toolbar{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;
+  align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg4)}
+.er-legend{font-size:12px;color:var(--text3);flex:1}
+.er-zoom-btns{display:flex;gap:4px}
+.er-zbtn{background:var(--bg3);border:1px solid var(--border);border-radius:5px;
+  width:28px;height:28px;cursor:pointer;font-size:16px;font-weight:700;color:var(--text);
+  display:flex;align-items:center;justify-content:center;line-height:1;transition:background .1s}
+.er-zbtn:hover{background:var(--border2)}
+.er-container{height:400px;background:var(--bg);cursor:grab;overflow:hidden;position:relative}
+.er-container:active{cursor:grabbing}
+.er-container svg{display:block}
+.er-container .mermaid{width:100%;height:100%}
+
+/* TABLE OVERVIEW */
+.ov-table{width:100%;border-collapse:collapse;background:var(--bg2)}
+.ov-table th{background:var(--bg3);color:var(--text3);padding:8px 10px;text-align:left;
+  font-size:11px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.ov-table td{padding:8px 10px;border-bottom:1px solid var(--border2);font-size:13px;vertical-align:middle}
+.ov-table tr:hover td{background:var(--bg3)}
+.ov-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.issues-warn{color:var(--sev-p1);font-weight:700}
+.health-row{display:flex;align-items:center;gap:8px}
+.health-num{font-size:13px;font-weight:700;width:36px}
+.health-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.health-bar div{height:100%;border-radius:3px}
+.matrix-table tr:hover td{background:var(--bg3);cursor:pointer}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.pill-pass{background:#22c55e20;color:#16a34a;border:1px solid #22c55e40}
+.pill-warn{background:#d9770620;color:#d97706;border:1px solid #d9770640}
+.pill-fail{background:#ef444420;color:#ef4444;border:1px solid #ef444440}
+
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.chart-block{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.chart-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+canvas{max-height:180px}
+
+/* TRACKS (Dual LLM) */
+.tracks-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.track-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.track-tech{border-top:3px solid #2563eb}.track-biz{border-top:3px solid #7c3aed}
+.track-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border2)}
+.track-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.track-tech .track-icon{background:#2563eb15}.track-biz .track-icon{background:#7c3aed15}
+.track-title{font-size:14px;font-weight:700;color:var(--text)}
+.track-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.track-body{padding:14px 16px;font-size:13px;color:var(--text2);line-height:1.75}
+.track-body p{margin-bottom:8px}.track-body ul{padding-left:18px;margin-bottom:8px}
+.track-body li{margin-bottom:4px}.track-body strong{color:var(--text)}
+.track-disclaimer{margin:0 16px 12px;padding:8px 12px;background:#7c3aed10;
+  border:1px solid #7c3aed30;border-radius:6px;font-size:11px;color:#7c3aed}
+.llm-error{color:var(--text3);font-style:italic;font-size:12px}
+
+/* ISSUES LAYOUT */
+.issues-layout{display:grid;grid-template-columns:240px 1fr;gap:0;
+  min-height:calc(100vh - 160px)}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:10px 0;
+  position:sticky;top:96px;height:calc(100vh - 96px);overflow-y:auto;scrollbar-width:thin}
+.sidebar-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text3);padding:0 12px 8px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.nav-group{margin-bottom:2px}
+.nav-table{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;
+  letter-spacing:1px;padding:6px 12px 2px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:5px 12px;
+  border-left:3px solid transparent;color:var(--text);font-size:12px;transition:background .12s}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-icon{font-size:13px;flex-shrink:0}
+.nav-text{flex:1;min-width:0}
+.nav-lbl{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-col{display:block;font-size:11px;color:var(--text3);font-family:monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-rate{font-size:11px;font-weight:700;flex-shrink:0}
+.issues-main{padding:16px 24px}
+.col-matrix-wrapper{margin-bottom:20px;padding:16px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:var(--radius)}
+.col-matrix-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  color:var(--text3);margin-bottom:12px}
+
+/* ISSUE CARD */
+.issue-card{display:flex;background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);margin-bottom:14px;overflow:hidden;scroll-margin-top:110px;
+  transition:border-color .15s}
+.issue-card:hover{border-color:var(--accent)}
+.issue-bar{width:4px;flex-shrink:0}
+.issue-inner{flex:1;min-width:0;padding:14px 18px 0}
+.issue-head{margin-bottom:8px}
+.issue-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.iss-icon{font-size:17px}.iss-label{font-size:14px;font-weight:700;color:var(--text)}
+.sev-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+.sev-p0{background:#ef444420;color:var(--sev-p0);border:1px solid #ef444430}
+.sev-p1{background:#f9731620;color:var(--sev-p1);border:1px solid #f9731630}
+.sev-p2{background:#d9770620;color:var(--sev-p2);border:1px solid #d9770630}
+.sev-p3{background:#2563eb20;color:var(--sev-p3);border:1px solid #2563eb30}
+.iss-id{font-size:11px;font-family:monospace;color:var(--text3);background:var(--bg3);
+  padding:1px 6px;border-radius:4px;margin-left:auto}
+.issue-loc{font-size:13px;color:var(--text3)}
+.issue-loc strong{color:var(--text)}
+.col-chip{background:var(--bg3);color:var(--accent);padding:1px 6px;border-radius:4px;
+  font-size:11px;margin:0 2px}
+.issue-desc{font-size:13px;color:var(--text3);background:var(--bg3);border-left:3px solid var(--border2);
+  padding:7px 12px;border-radius:0 6px 6px 0;margin:8px 0}
+
+/* ISSUE STATS */
+.issue-stats{display:flex;border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);
+  margin:10px -18px 0}
+.stat-cell{flex:1;padding:8px 14px;border-right:1px solid var(--border2)}
+.stat-cell:last-child{border-right:none;flex:1.5}
+.stat-big{display:block;font-size:20px;font-weight:800;color:var(--text);line-height:1.1}
+.stat-lbl{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.prog-bar{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:6px}
+.prog-fill{height:100%;border-radius:3px}
+
+/* LLM SECTION */
+.llm-section{background:var(--bg4);border:1px solid var(--border2);border-radius:8px;
+  padding:12px 14px;margin:14px 0}
+.section-mini-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:8px}
+.llm-content{font-size:13px;color:var(--text2);line-height:1.7}
+.llm-content p{margin-bottom:7px}.llm-content ul{padding-left:18px;margin-bottom:7px}
+.llm-content li{margin-bottom:3px}.llm-content strong{color:var(--text)}
+.llm-content code{background:var(--bg3);padding:1px 4px;border-radius:3px;color:var(--accent)}
+
+/* ROWS SECTION */
+.rows-section{border-top:1px solid var(--border2);margin:0 -18px}
+summary{padding:10px 18px;font-size:13px;color:var(--text3);cursor:pointer;
+  list-style:none;user-select:none;transition:color .12s}
+summary:hover{color:var(--accent)}
+summary::-webkit-details-marker{display:none}
+.sample-wrapper{padding:0 18px 14px}
+.sample-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.sample-count{font-size:12px;color:var(--text3)}
+.sample-note{font-size:11px;color:var(--text3);flex:1}
+.btn-export{background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:4px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--accent);
+  font-family:inherit;transition:background .12s;white-space:nowrap}
+.btn-export:hover{background:var(--border2)}
+.tbl-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+.data-table{width:100%;border-collapse:collapse;font-size:12px;font-family:monospace}
+.data-table th{background:var(--bg3);color:var(--text3);padding:6px 10px;text-align:left;
+  font-weight:700;font-family:'Inter',sans-serif;font-size:11px;text-transform:uppercase;
+  letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+.data-table td{padding:5px 10px;border-bottom:1px solid var(--border2);color:var(--text);
+  max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.data-table tr:hover td{background:var(--bg3)}
+.data-table tr:last-child td{border-bottom:none}
+.no-rows{font-size:13px;color:var(--text3);padding:10px}
+
+/* GUIDE */
+.guide-intro{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 18px;margin-bottom:18px;font-size:13px;color:var(--text2)}
+.guide-group{margin-bottom:24px}
+.guide-group-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:5px}
+.guide-group-desc{font-size:13px;color:var(--text3);margin-bottom:12px}
+.guide-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden}
+.guide-card-header{display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:var(--bg4);border-bottom:1px solid var(--border2)}
+.guide-icon{font-size:17px}.guide-name{font-size:13px;font-weight:700;color:var(--text);flex:1}
+.guide-sev{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+.guide-body{padding:12px 14px;font-size:13px;color:var(--text2);line-height:1.7}
+.guide-body p{margin-bottom:6px}.guide-body strong{color:var(--text)}
+.guide-sev-table{width:100%;border-collapse:collapse;background:var(--bg2)}
+.guide-sev-table th{background:var(--bg3);padding:8px 12px;text-align:left;font-size:11px;
+  font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.guide-sev-table td{padding:9px 12px;border-bottom:1px solid var(--border2);font-size:13px}
+
+/* misc */
+.muted{color:var(--text3)}
+.muted-notice{font-size:12px;color:var(--text3);padding:8px 12px;background:var(--bg3);
+  border-radius:6px;margin-top:8px}
+
+@media(max-width:900px){
+  .issues-layout{grid-template-columns:1fr}
+  .sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border)}
+  .tracks-grid,.col-stats-grid{grid-template-columns:1fr}
+  .issue-body-grid{grid-template-columns:1fr}
+  .verdict-row{flex-direction:column}
+  .sev-pills{flex-direction:row;flex-wrap:wrap}
+  .charts-grid{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body>
-  <main>
-    <header>
-      <p class="eyebrow">VSF Data Profiler</p>
-      <h1>Data Quality Report</h1>
-      <p class="muted">Deterministic CSV+DBML report generated from structured local artifacts.</p>
-      <div class="summary-grid" aria-label="Run summary metrics">
-        <article class="metric-card"><span>Readiness</span><strong>{{ fixed_report.run_summary.readiness }}</strong><p>risk {{ fixed_report.run_summary.risk_score }}</p></article>
-        <article class="metric-card"><span>Issues</span><strong>{{ fixed_report.run_summary.issue_count }}</strong><p>{{ fixed_report.run_summary.p0_p1_count }} P0/P1 blockers</p></article>
-        <article class="metric-card"><span>Tables</span><strong>{{ fixed_report.run_summary.table_count }}</strong><p>{{ fixed_report.run_summary.row_count }} rows · {{ fixed_report.run_summary.column_count }} columns</p></article>
-      </div>
-    </header>
 
-    <section id="run-summary">
-      <h2>Run Summary</h2>
-      <div class="answer-grid">
-        <article class="answer-card {{ fixed_report.run_summary.can_run_analysis.status | replace(' ', '-') }}">
-          <span>Can this dataset run analysis?</span>
-          <strong>{{ fixed_report.run_summary.can_run_analysis.answer or "Needs review." }}</strong>
-          <p>{{ fixed_report.run_summary.can_run_analysis.explanation or "Gate evidence was unavailable." }}</p>
-        </article>
-        <article class="answer-card {{ fixed_report.run_summary.can_trust_joins.status | replace(' ', '-') }}">
-          <span>Can joins be trusted?</span>
-          <strong>{{ fixed_report.run_summary.can_trust_joins.answer or "Needs review." }}</strong>
-          <p>{{ fixed_report.run_summary.can_trust_joins.explanation or "Gate evidence was unavailable." }}</p>
-        </article>
-        <article class="answer-card">
-          <span>Preflight review</span>
-          <strong>{{ fixed_report.run_summary.preflight_status }}</strong>
-          <p>{{ fixed_report.run_summary.preflight_message }}</p>
-        </article>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Run ID</th><th>Status</th><th>Duration seconds</th><th>Tables</th><th>Columns</th><th>Rows</th></tr></thead>
-          <tbody><tr><td><code>{{ fixed_report.run_summary.run_id or "unknown" }}</code></td><td>{{ fixed_report.run_summary.status }}</td><td>{{ fixed_report.run_summary.duration_seconds or "unknown" }}</td><td>{{ fixed_report.run_summary.table_count }}</td><td>{{ fixed_report.run_summary.column_count }}</td><td>{{ fixed_report.run_summary.row_count }}</td></tr></tbody>
-        </table>
-      </div>
-    </section>
+<div class="topbar">
+  <span class="topbar-brand">📊 Smart EDA Report</span>
+  <div class="topbar-right">
+    <span class="topbar-meta">{{ fixed_report.run_summary.finished_at[:16] | replace('T',' ') if fixed_report.run_summary.finished_at else '' }}</span>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
+  </div>
+</div>
 
-    <section id="quality-gates">
-      <h2>Quality Gates</h2>
-      {% if fixed_report.quality_gates.available %}
-      <p class="muted">Source: deterministic. Blocked gates: {{ fixed_report.quality_gates.summary.blocked_count or 0 }} of {{ fixed_report.quality_gates.summary.gate_count or fixed_report.quality_gates.gates|length }}.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Gate</th><th>Status</th><th>Answer</th><th>Explanation</th><th>Next action</th></tr></thead>
-          <tbody>
-            {% for gate in fixed_report.quality_gates.gates %}
-            <tr><td>{{ gate.label }}</td><td><span class="pill {{ gate.status }}">{{ gate.status }}</span></td><td>{{ fixed_report.quality_gates.answers[gate.gate_id].answer }}</td><td>{{ gate.explanation }}</td><td>{{ gate.recommended_next_action.label if gate.recommended_next_action else "" }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% for gate in fixed_report.quality_gates.gates %}
-      <h3>{{ gate.label }} Evidence Values</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Label</th><th>Raw value</th><th>Meaning</th></tr></thead>
-          <tbody>
-            {% for value in gate.evidence_values %}
-            <tr><td>{{ value.label }}</td><td>{{ value.raw_value }}</td><td>{{ value.meaning }}</td></tr>
-            {% else %}
-            <tr><td>none</td><td>none</td><td>No evidence values were present for this gate.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+<div class="run-meta-bar">
+  <span class="rm-item">🏷 Run <code>{{ fixed_report.run_summary.run_id[:12] }}…</code></span>
+  <span class="rm-item"><span style="color:#22c55e">●</span> {{ fixed_report.run_summary.status | default('success') }}</span>
+  <span class="rm-item">⏱ {{ fixed_report.run_summary.elapsed_s | default('') }}{{ 's' if fixed_report.run_summary.elapsed_s else '' }}</span>
+  <span class="rm-item">📋 {{ fixed_report.run_summary.table_count }} bảng · {{ fixed_report.run_summary.issue_count }} issues</span>
+  <span class="rm-item rm-time">{{ fixed_report.run_summary.started_at[:16] | replace('T',' ') if fixed_report.run_summary.started_at else '' }}</span>
+</div>
+
+{% set verdict = dataset_verdict %}
+{% set v_color = '#ef4444' if verdict.verdict == 'FAIL' else ('#d97706' if verdict.verdict == 'WARN' else '#22c55e') %}
+<div class="verdict-section">
+  <div class="verdict-row">
+    <div class="verdict-main" style="border-left-color:{{ v_color }}">
+      <div class="v-label" style="color:{{ v_color }}">Kết quả đánh giá</div>
+      <div class="v-status" style="color:{{ v_color }}">{{ verdict.verdict | default('OK') }}</div>
+      <div class="v-risk">Risk Score: <strong>{{ verdict.risk_score | default(0) }} / 100</strong> &middot; {{ fixed_report.run_summary.issue_count }} vấn đề phát hiện</div>
+      <div class="v-rat">{{ verdict.verdict_rationale | default('') }}</div>
+    </div>
+    <div class="sev-pills">
+      {% set sev_counts = fixed_report.run_summary.severity_counts | default({}) %}
+      {% for sev_key, sev_emoji, sev_name, sev_color in [('P0','🔴','Nghiêm trọng','#ef4444'), ('P1','🟠','Cao','#f97316'), ('P2','🟡','Trung bình','#d97706'), ('P3','🔵','Cảnh báo','#2563eb')] %}
+      {% set count = sev_counts.get(sev_key, 0) %}
+      {% if count > 0 %}
+      <div class="s-pill" style="border-color:{{ sev_color }}"><span style="color:{{ sev_color }}">{{ count }}</span><span>{{ sev_emoji }} {{ sev_name }}</span></div>
+      {% endif %}
       {% endfor %}
-      {% else %}
-      <p>{{ fixed_report.quality_gates.message }}</p>
-      {% endif %}
-    </section>
+    </div>
+  </div>
+</div>
 
-    <section id="table-overview">
-      <h2>Table Overview</h2>
-      {% if fixed_report.table_overview.available %}
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Rows</th><th>Columns</th><th>Issues</th><th>Relationship risks</th><th>Affected columns</th><th>First fix step</th></tr></thead>
-          <tbody>
-            {% for row in fixed_report.table_overview.rows %}
-            <tr><td><code>{{ row.table }}</code></td><td>{{ row.role }}</td><td><span class="pill {{ row.readiness }}">{{ row.readiness }}</span></td><td>{{ row.health_score }}</td><td>{{ row.row_count }}</td><td>{{ row.column_count }}</td><td>{{ row.issue_total }}</td><td>{{ row.relationship_risk_count }}</td><td>{{ row.affected_columns_text }}</td><td>{{ row.next_step }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p>Table overview is unavailable because table profile evidence was missing.</p>
-      {% endif %}
-    </section>
+<div class="tabs-nav">
+  <button class="tab-btn active" onclick="switchTab('overview',this)">📋 Tổng quan</button>
+  <button class="tab-btn" onclick="switchTab('issues',this)">🐛 Vấn đề ({{ issue_cards | length }})</button>
+  <button class="tab-btn" onclick="switchTab('guide',this)">📖 Hướng dẫn</button>
+</div>
 
-    <section id="column-issue-matrix">
-      <h2>Column Issue Matrix</h2>
-      {% if fixed_report.column_issue_matrix.rows %}
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Field</th><th>Status</th><th>Issue</th><th>Severity</th><th>Bad rows</th><th>Meaning</th><th>What should be fixed?</th></tr></thead>
-          <tbody>
-            {% for row in fixed_report.column_issue_matrix.rows %}
-            <tr><td><code>{{ row.field }}</code></td><td>{{ row.status }}</td><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td><span class="pill {{ row.severity }}">{{ row.severity }}</span></td><td>{{ row.bad_rows }}</td><td>{{ row.meaning }}</td><td>{{ row.fix }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p>No column or table issues were generated for this run.</p>
-      {% endif %}
-    </section>
+<!-- TAB: OVERVIEW -->
+<div id="tab-overview" class="tab-pane active">
 
-    <section id="issue-action-plans">
-      <h2>Issue Action Plans</h2>
-      {% if fixed_report.issue_action_plans.available and fixed_report.issue_action_plans.summary_rows %}
-      <p class="muted">Plans: {{ fixed_report.issue_action_plans.summary.plan_count }} · human review: {{ fixed_report.issue_action_plans.summary.human_review_count }} · average actionability: {{ fixed_report.issue_action_plans.summary.average_actionability_score }}/100.</p>
-      <p class="muted">Main report expands the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans. Full deterministic action-plan evidence remains in <code>{{ fixed_report.issue_action_plans.path }}</code>.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Issue</th><th>Priority</th><th>Table</th><th>Columns</th><th>First fix</th><th>First verification</th><th>Metrics</th></tr></thead>
-          <tbody>
-            {% for row in fixed_report.issue_action_plans.summary_rows %}
-            <tr><td><code>{{ row.issue_id }}</code> {{ row.issue_type }}</td><td>{{ row.priority }}</td><td><code>{{ row.table }}</code></td><td>{{ row.columns }}</td><td>{{ row.first_fix }}</td><td>{{ row.first_verify }}</td><td>coverage {{ row.evidence_coverage }}/100 · actionability {{ row.actionability }}/100</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+  {% if quality_gates and quality_gates.gates %}
+  <div class="ov-section">
+    <p class="ov-title">🚦 Quality Gates — Trả lời 4 câu hỏi quan trọng</p>
+    <div class="gates-grid">
+    {% for gate in quality_gates.gates %}
+    {% set g_status = gate.status | default('Needs Review') %}
+    {% set gate_class = 'gate-ok' if g_status == 'Clean' else ('gate-fail' if g_status == 'Blocked' else 'gate-warn') %}
+    {% set gate_icon = '✅' if g_status == 'Clean' else ('❌' if g_status == 'Blocked' else '⚠️') %}
+    <div class="gate-card {{ gate_class }}">
+      <div class="gate-icon">{{ gate_icon }}</div>
+      <div class="gate-info">
+        <p class="gate-name">{{ gate.gate_id | default('') | replace('_',' ') | title }}</p>
+        <p class="gate-answer">{{ g_status }}</p>
+        <p class="gate-expl">{{ gate.explanation | default('') }}</p>
+        {% set act = gate.recommended_next_action %}
+        {% if act and act.label %}<p class="gate-action">→ {{ act.label }}</p>{% endif %}
       </div>
-      {% if fixed_report.issue_action_plans.remaining_count > 0 %}
-      <p class="muted">{{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in <code>{{ fixed_report.issue_action_plans.path }}</code> and the todo exports.</p>
-      {% endif %}
-      {% for plan in fixed_report.issue_action_plans.display_plans %}
-      <details class="plan-card">
-        <summary>{{ plan.issue_id }} {{ plan.issue_type }} · {{ plan.priority }}</summary>
-        <p><strong>Finding:</strong> {{ plan.finding_summary }}</p>
-        <p><strong>Source:</strong> {{ plan.source }} · <strong>Table:</strong> <code>{{ plan.table }}</code></p>
-        <h3>Finding Values</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Finding value</th><th>Raw value</th><th>Meaning</th></tr></thead>
-            <tbody>
-              {% for value in plan.evidence_values %}
-              <tr><td>{{ value.label }}</td><td>{{ value.raw_value }}</td><td>{{ value.meaning }}</td></tr>
-              {% else %}
-              <tr><td>none</td><td>none</td><td>No finding values were available.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    </div>
+    {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="ov-section">
+    <p class="ov-title">🗺 Sơ đồ quan hệ bảng</p>
+    {% if schema_diagram_html %}
+    {{ schema_diagram_html | safe }}
+    {% else %}
+    <div class="er-diagram-wrap">
+      <div class="er-toolbar">
+        <span class="er-legend">Kéo thả để di chuyển, cuộn chuột để zoom</span>
+        <div class="er-zoom-btns">
+          <button class="er-zbtn" onclick="erZoomIn()">+</button>
+          <button class="er-zbtn" onclick="erZoomReset()">↺</button>
+          <button class="er-zbtn" onclick="erZoomOut()">-</button>
         </div>
-        {% if plan.hidden_evidence_value_count > 0 %}
-        <p class="muted">{{ plan.hidden_evidence_value_count }} additional finding values are available in <code>{{ fixed_report.issue_action_plans.path }}</code>.</p>
-        {% endif %}
-        <div class="plan-grid">
-          <div><h3>Fix data checklist</h3><ul class="checklist">{% for item in plan.fix_data_checklist %}<li>{{ item }}</li>{% else %}<li>No deterministic fix checklist was generated.</li>{% endfor %}</ul></div>
-          <div><h3>Verify after fix checklist</h3><ul class="checklist">{% for item in plan.verify_after_fix_checklist %}<li>{{ item }}</li>{% else %}<li>No deterministic verification checklist was generated.</li>{% endfor %}</ul></div>
-          <div><h3>Guidelines</h3><ul class="checklist">{% for item in plan.guidelines %}<li>{{ item }}</li>{% else %}<li>No deterministic guidelines were generated.</li>{% endfor %}</ul></div>
-          <div><h3>Metrics</h3><p>Evidence coverage: {{ plan.evidence_coverage.score }}/100. {{ plan.evidence_coverage.explanation }}</p><p>Actionability: {{ plan.actionability_score.score }}/100. {{ plan.actionability_score.explanation }}</p></div>
-        </div>
-      </details>
-      {% endfor %}
-      {% else %}
-      <p>{{ fixed_report.issue_action_plans.message }}</p>
-      {% endif %}
-    </section>
-
-    <section id="todos">
-      <h2>Todos</h2>
-      {% if fixed_report.todos.available %}
-      <p class="muted">Todo groups: {{ fixed_report.todos.summary.todo_group_count }} · Fix data: {{ fixed_report.todos.summary.fix_data_group_count }} · Verify after fix: {{ fixed_report.todos.summary.verify_after_fix_group_count }}.</p>
-      <p class="muted">This report shows the first {{ fixed_report.todos.display_limit }} todo groups per type. Full grouped todos remain in <code>{{ fixed_report.todos.path }}</code>.</p>
-      <div class="todo-stack">
-        <article class="todo-block">
-          <h3>Fix data</h3>
-          <ul class="checklist">
-            {% for group in fixed_report.todos.fix_display_groups %}
-            <li><strong>{{ group.todo_id }}</strong> {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})</li>
-            {% else %}
-            <li>No Fix data todos were generated.</li>
-            {% endfor %}
-            {% if fixed_report.todos.fix_remaining_count > 0 %}
-            <li>{{ fixed_report.todos.fix_remaining_count }} additional Fix data groups are available in <code>{{ fixed_report.todos.path }}</code>.</li>
-            {% endif %}
-          </ul>
-        </article>
-        <article class="todo-block">
-          <h3>Verify after fix</h3>
-          <ul class="checklist">
-            {% for group in fixed_report.todos.verify_display_groups %}
-            <li><strong>{{ group.todo_id }}</strong> {{ group.text }} ({{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }})</li>
-            {% else %}
-            <li>No Verify after fix todos were generated.</li>
-            {% endfor %}
-            {% if fixed_report.todos.verify_remaining_count > 0 %}
-            <li>{{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups are available in <code>{{ fixed_report.todos.path }}</code>.</li>
-            {% endif %}
-          </ul>
-        </article>
       </div>
-      {% else %}
-      <p>{{ fixed_report.todos.message }}</p>
-      {% endif %}
-    </section>
-
-    <section id="developer-artifacts">
-      <h2>Developer Artifacts</h2>
-      <p class="muted">Raw JSON and runtime artifacts are listed here for debugging and package compatibility. Normal report reading should use the sections above.</p>
-      {% if connector_metadata.available or lineage_graph.available or schema_evaluation.available or relationship_graph.available or execution_flow.available %}
-      <article class="report-card">
-        <h3>Developer Evidence Summary</h3>
-        <ul class="checklist">
-          {% if connector_metadata.available %}
-          <li><strong>Connector Metadata</strong>: {{ connector_metadata.source_type }} source; tables={{ connector_metadata.table_count }}; raw_extracts_persisted={{ connector_metadata.raw_extracts_persisted }}; secrets_redacted={{ connector_metadata.secrets_redacted }} (<code>{{ connector_metadata.path }}</code>)</li>
-          {% endif %}
-          {% if lineage_graph.available %}
-          <li><strong>Developer Runtime Context</strong>: {{ lineage_graph.artifact_count }} artifacts, {{ lineage_graph.stage_count }} stages, {{ lineage_graph.edge_count }} edges (<code>{{ lineage_graph.path }}</code>)</li>
-          {% endif %}
-          {% if schema_evaluation.available %}
-          <li><strong>Schema Mapping Summary</strong>: mapped={{ schema_evaluation.mapped_table_count }}, missing={{ schema_evaluation.missing_table_count }}, methods={{ schema_evaluation.mapping_method_counts_text }} (<code>{{ schema_evaluation.path }}</code>)</li>
-          {% endif %}
-          {% if relationship_graph.available %}
-          <li><strong>Relationship Cardinality Summary</strong>: {{ relationship_graph.cardinality_counts_text }}; junction tables={{ relationship_graph.junction_tables_text }} (<code>{{ relationship_graph.path }}</code>)</li>
-          {% endif %}
-          {% if execution_flow.available %}
-          <li><strong>Execution Flow</strong>: {{ execution_flow.stages|length }} stages; status={{ execution_flow.status }} (<code>run_summary.json</code>, <code>run_events.jsonl</code>)</li>
-          {% endif %}
-        </ul>
-      </article>
-      {% endif %}
-      {% if l4_report.available %}
-      <article class="report-card">
-        <h3>Compatibility LLM Guardrail Artifact</h3>
-        <p>LLM guardrail status: <strong>{{ l4_report.status }}</strong> · provider={{ l4_report.provider }}{% if l4_report.model %} · model={{ l4_report.model }}{% endif %}{% if l4_report.fallback_reason %} · fallback={{ l4_report.fallback_reason }}{% endif %}</p>
-        <p class="muted">Optional compatibility LLM report artifacts: <code>{{ l4_report.path }}</code>{% if l4_report.guardrail_path %}, <code>{{ l4_report.guardrail_path }}</code>{% endif %}.</p>
-      </article>
-      {% endif %}
-      <div class="artifact-grid">
-        {% for artifact in fixed_report.developer_artifacts.artifacts %}
-        <a class="artifact-link" href="{{ artifact.path }}"><strong>{{ artifact.name }}</strong><code>{{ artifact.path }}</code></a>
+      <div id="er-container" class="er-container">
+        {% if schema_diagram and schema_diagram.mermaid %}
+        <pre id="er-mermaid" class="mermaid">{{ schema_diagram.mermaid }}</pre>
         {% else %}
-        <p>No developer artifacts were listed.</p>
-        {% endfor %}
+        <p style="padding:20px;color:var(--text3)">Không có ER diagram</p>
+        {% endif %}
       </div>
-    </section>
+    </div>
+    {% endif %}
+  </div>
 
-    <section id="evaluation-summary">
-      <h2>Evaluation Summary</h2>
-      {% if fixed_report.evaluation_summary.available %}
-      <p>Evaluation status: {{ fixed_report.evaluation_summary.status }}</p>
-      {% else %}
-      <p>{{ fixed_report.evaluation_summary.message }}</p>
+  {% if chart_specs and chart_specs.available %}
+  <div class="ov-section">
+    <p class="ov-title">📊 Biểu đồ tổng thể</p>
+    <div class="charts-grid">
+
+      {# 1. Issue Counts by Severity #}
+      {% if chart_specs.issue_severity and chart_specs.issue_severity.available %}
+      {% set cs = chart_specs.issue_severity %}
+      <div class="chart-block">
+        <p class="chart-title">{{ cs.title | default('Issue Counts by Severity') }}</p>
+        <canvas id="chart_sev" height="180"></canvas>
+        <script>
+        (function(){
+          var labels = [{% for r in cs.data %}"{{ r.severity }}"{% if not loop.last %},{% endif %}{% endfor %}];
+          var values = [{% for r in cs.data %}{{ r.count | default(0) }}{% if not loop.last %},{% endif %}{% endfor %}];
+          new Chart(document.getElementById('chart_sev').getContext('2d'),{
+            type:'bar',data:{labels:labels,datasets:[{label:'Issues',data:values,
+              backgroundColor:['#ef4444','#f97316','#d97706','#2563eb'].slice(0,labels.length),borderRadius:4}]},
+            options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+          });
+        })();
+        </script>
+      </div>
       {% endif %}
-    </section>
-  </main>
+
+      {# 2. Missingness by Table #}
+      {% if chart_specs.missingness_tables and chart_specs.missingness_tables.available %}
+      {% set cm = chart_specs.missingness_tables %}
+      <div class="chart-block">
+        <p class="chart-title">{{ cm.title | default('Missingness by Table') }}</p>
+        <canvas id="chart_miss_tbl" height="180"></canvas>
+        <script>
+        (function(){
+          var labels = [{% for r in cm.data %}"{{ r.table }}"{% if not loop.last %},{% endif %}{% endfor %}];
+          var values = [{% for r in cm.data %}{{ r.null_rate | default(0) }}{% if not loop.last %},{% endif %}{% endfor %}];
+          new Chart(document.getElementById('chart_miss_tbl').getContext('2d'),{
+            type:'bar',data:{labels:labels,datasets:[{label:'Null Rate',data:values,backgroundColor:'#0f7664',borderRadius:4}]},
+            options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+          });
+        })();
+        </script>
+      </div>
+      {% endif %}
+
+      {# 3. Top Columns by Missingness #}
+      {% if chart_specs.missingness_columns and chart_specs.missingness_columns.available %}
+      {% set mc = chart_specs.missingness_columns %}
+      {% set cc = chart_specs.missingness_columns %}
+      <div class="chart-block">
+        <p class="chart-title">{{ cc.title | default('Top 10 Columns by Missingness') }}</p>
+        <canvas id="chart_miss_col" height="180"></canvas>
+        <script>
+        (function(){
+          var labels = [{% for r in cc.data %}"{{ r.field }}"{% if not loop.last %},{% endif %}{% endfor %}];
+          var values = [{% for r in cc.data %}{{ r.null_rate | default(0) }}{% if not loop.last %},{% endif %}{% endfor %}];
+          new Chart(document.getElementById('chart_miss_col').getContext('2d'),{
+            type:'bar',data:{labels:labels,datasets:[{label:'Null Rate',data:values,backgroundColor:'#f59e0b',borderRadius:4}]},
+            options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}
+          });
+        })();
+        </script>
+      </div>
+      {% endif %}
+
+      {# 4. Top Numeric Columns by IQR Outliers #}
+      {% if chart_specs.outlier_columns and chart_specs.outlier_columns.available %}
+      {% set oc = chart_specs.outlier_columns %}
+      <div class="chart-block">
+        <p class="chart-title">{{ oc.title | default('Top 10 Numeric Columns by IQR Outliers') }}</p>
+        <canvas id="chart_outlier" height="180"></canvas>
+        <script>
+        (function(){
+          var labels = [{% for r in oc.data %}"{{ r.field }}"{% if not loop.last %},{% endif %}{% endfor %}];
+          var values = [{% for r in oc.data %}{{ r.outlier_count | default(0) }}{% if not loop.last %},{% endif %}{% endfor %}];
+          new Chart(document.getElementById('chart_outlier').getContext('2d'),{
+            type:'bar',data:{labels:labels,datasets:[{label:'Outlier Count',data:values,backgroundColor:'#f97316',borderRadius:4}]},
+            options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}
+          });
+        })();
+        </script>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endif %}
+
+  {% if fixed_report.table_overview and fixed_report.table_overview.available %}
+  <div class="ov-section">
+    <p class="ov-title">🗂 Tình trạng từng bảng</p>
+    <div class="tbl-scroll">
+    <table class="ov-table">
+      <thead>
+        <tr><th>Bảng</th><th>Vai trò</th><th>Sẵn sàng</th><th>Health</th>
+            <th>Số dòng</th><th>Cột</th><th>Issues</th><th>Cột bị ảnh hưởng</th></tr>
+      </thead>
+      <tbody>
+      {% for tbl in fixed_report.table_overview.rows %}
+      {% set h_score = tbl.health_score if tbl.health_score is number else 100 %}
+      {% set h_color = '#22c55e' if h_score >= 95 else ('#f59e0b' if h_score >= 75 else '#ef4444') %}
+      {% set ready_class = 'pill-pass' if tbl.readiness == 'READY' else ('pill-fail' if tbl.readiness == 'NOT_READY' else 'pill-warn') %}
+      <tr>
+        <td><code>{{ tbl.table }}</code></td>
+        <td class="muted">{{ tbl.role | default('unknown') }}</td>
+        <td><span class="pill {{ ready_class }}">{{ tbl.readiness | default('READY') }}</span></td>
+        <td>
+          <div class="health-row">
+            <span class="health-num" style="color:{{ h_color }}">{{ h_score }}</span>
+            <div class="health-bar"><div style="width:{{ h_score }}%;background:{{ h_color }}"></div></div>
+          </div>
+        </td>
+        <td class="num">{{ tbl.row_count | default(0) | int | string }}</td>
+        <td class="num">{{ tbl.column_count | default('—') }}</td>
+        <td class="num {% if tbl.issue_total > 0 %}issues-warn{% endif %}">{{ tbl.issue_total | default(0) }}</td>
+        <td class="muted" style="font-size:11px;font-family:monospace">{{ tbl.affected_columns_text | default('—') }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="ov-section">
+    <p class="ov-title">💡 Phân tích AI — Hai góc nhìn</p>
+    <div class="tracks-grid">
+      <div class="track-card track-tech">
+        <div class="track-head">
+          <div class="track-icon">🔬</div>
+          <div><p class="track-title">Phân tích Kỹ thuật</p>
+               <p class="track-sub">Đánh giá khách quan · Chỉ dữ kiện, không suy diễn</p></div>
+        </div>
+        <div class="track-body">
+          {% if dual_track_llm and dual_track_llm.technical %}
+            {{ dual_track_llm.technical | safe }}
+          {% else %}
+            <p class="llm-error">⚠️ Không có đánh giá kỹ thuật (hoặc LLM bị tắt).</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="track-card track-biz">
+        <div class="track-head">
+          <div class="track-icon">💼</div>
+          <div><p class="track-title">Đánh giá Nghiệp vụ (Auto-Persona)</p>
+               <p class="track-sub">AI tự nhận diện lĩnh vực · Góc nhìn quản lý</p></div>
+        </div>
+        <div class="track-body">
+          {% if dual_track_llm and dual_track_llm.business %}
+            {{ dual_track_llm.business | safe }}
+          {% else %}
+            <p class="llm-error">⚠️ Không có đánh giá nghiệp vụ (hoặc LLM bị tắt).</p>
+          {% endif %}
+        </div>
+        <div class="track-disclaimer">⚠️ Nhận định AI từ tên bảng/cột — chỉ mang tính gợi ý.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TAB: ISSUES -->
+<div id="tab-issues" class="tab-pane">
+  {% if issue_cards %}
+  <div class="col-matrix-wrapper">
+    <p class="col-matrix-title">📋 Bảng tổng hợp nhanh — Click vào dòng để xem chi tiết</p>
+    <div class="tbl-scroll">
+    <table class="ov-table matrix-table">
+      <thead>
+        <tr>
+          <th>Bảng</th><th>Cột bị ảnh hưởng</th><th>Loại vấn đề</th>
+          <th>Mức độ</th><th>Dòng lỗi</th><th>Tỉ lệ</th><th>Bước sửa đầu tiên</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for card in issue_cards %}
+      <tr onclick="document.getElementById('{{ card.issue_id }}').scrollIntoView({behavior:'smooth'});switchTab('issues',document.querySelector('.tab-btn:nth-child(2)'));" style="cursor:pointer">
+        <td><code>{{ card.table }}</code></td>
+        <td>{% for col in card.columns %}<code class="col-chip">{{ col }}</code>{% endfor %}</td>
+        <td>{{ card.issue_type_icon | default('') }} {{ card.issue_type_label | default(card.issue_type) }}</td>
+        <td><span class="sev-badge sev-{{ card.normalized_severity | lower }}">{{ card.severity_label | default(card.severity) }}</span></td>
+        <td class="num">{{ card.bad_count_display }}/{{ card.total_count | default(0) | int | string }}</td>
+        <td class="num" style="color:{{ card.sev_color | default('#2563eb') }};font-weight:700">{{ card.bad_rate }}</td>
+        <td class="muted" style="font-size:12px">{{ card.first_action | default('—') }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="muted-notice">💡 Click vào bất kỳ dòng nào để xem chi tiết issue đó.</p>
+  </div>
+
+  <div class="issues-layout">
+    <nav class="sidebar">
+      <p class="sidebar-title">Danh sách vấn đề</p>
+      {% set ns = namespace(current_table='') %}
+      {% for card in issue_cards %}
+      {% if card.table != ns.current_table %}
+      {% if not loop.first %}</div>{% endif %}
+      {% set ns.current_table = card.table %}
+      <div class="nav-group">
+        <p class="nav-table">📋 {{ card.table }}</p>
+      {% endif %}
+      <a class="nav-item" href="#{{ card.issue_id }}" style="border-left-color:{{ card.sev_color | default('#2563eb') }}"
+         onclick="switchTab('issues',document.querySelector('.tab-btn:nth-child(2)'))">
+        <span class="nav-icon">{{ card.issue_type_icon | default('📋') }}</span>
+        <span class="nav-text">
+          <span class="nav-lbl">{{ card.issue_type_label | default(card.issue_type) }}</span>
+          <span class="nav-col">{% for col in card.columns %}{{ col }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+        </span>
+        <span class="nav-rate" style="color:{{ card.sev_color | default('#2563eb') }}">{{ card.bad_rate }}</span>
+      </a>
+      {% if loop.last %}</div>{% endif %}
+      {% endfor %}
+    </nav>
+    <div class="issues-main">
+      {% for card in issue_cards %}
+      <div class="issue-card" id="{{ card.issue_id }}">
+        <div class="issue-bar" style="background:{{ card.sev_color | default('#2563eb') }}"></div>
+        <div class="issue-inner">
+          <div class="issue-head">
+            <div class="issue-title-row">
+              <span class="iss-icon">{{ card.issue_type_icon | default('📋') }}</span>
+              <span class="iss-label">{{ card.issue_type_label | default(card.issue_type) }}</span>
+              <span class="sev-badge sev-{{ card.normalized_severity | lower }}">{{ card.severity_label | default(card.severity) }}</span>
+              <span class="iss-id">{{ card.issue_id }}</span>
+            </div>
+            <div class="issue-loc">
+              Bảng <strong>{{ card.table }}</strong> &middot;
+              {% for col in card.columns %}<code class="col-chip">{{ col }}</code>{% endfor %}
+            </div>
+          </div>
+
+          <p class="issue-desc">{{ card.description }}</p>
+
+          <div class="issue-stats">
+            <div class="stat-cell">
+              <span class="stat-big">{{ card.bad_count_display }}</span>
+              <span class="stat-lbl">dòng bị lỗi</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-big">{{ card.total_count | default(0) | int | string }}</span>
+              <span class="stat-lbl">tổng dòng</span>
+            </div>
+            <div class="stat-cell stat-rate">
+          <span class="stat-big" style="color:{{ card.sev_color | default('#2563eb') }}">{{ card.bad_rate }}</span>
+              <span class="stat-lbl">tỉ lệ lỗi</span>
+              <div class="prog-bar">
+                <div class="prog-fill" style="width:{{ ((card.bad_rate_raw | default(0) | float) * 100) | int }}%;background:{{ card.sev_color | default('#2563eb') }}"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="llm-section">
+            <p class="section-mini-title">🔍 Phân tích AI — Bảng {{ card.table }}</p>
+            <div class="llm-content">
+              {% if card.llm_analysis %}
+                {{ card.llm_analysis | safe }}
+              {% else %}
+                <p class="llm-error">⚠️ Chưa có phân tích AI (LLM chưa bật hoặc chưa có API key).</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <details class="rows-section">
+            {% set ev_headers = (card.evidence_headers or []) %}
+            {% set ev_rows = (card.evidence_rows or []) %}
+            {% set ev_count = ev_rows | length %}
+            <summary>👁 Xem {{ ev_count }} dòng dữ liệu thực tế bị ảnh hưởng ▾</summary>
+            <div class="sample-wrapper">
+              <div class="sample-toolbar">
+                <span class="sample-count">{{ ev_count }} dòng mẫu</span>
+                <span class="sample-note">
+                  {% if ev_count > 0 %}
+                  ⚠️ {{ ev_count }}/{{ card.bad_count_display }} dòng mẫu. Tổng lỗi thực tế: {{ card.bad_count_display }}
+                  {% endif %}
+                </span>
+                <button class="btn-export" onclick="exportTableCSV('tbl-{{ card.issue_id }}', '{{ card.issue_id }}_sample.csv')">⬇ Export CSV</button>
+              </div>
+              <div class="tbl-scroll">
+                <table class="data-table" id="tbl-{{ card.issue_id }}">
+                  <thead>
+                    <tr>{% for h in ev_headers %}<th>{{ h }}</th>{% endfor %}</tr>
+                  </thead>
+                  <tbody>
+                    {% for row in ev_rows %}
+                      <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                    {% else %}
+                      <tr><td class="no-rows" colspan="{{ [ev_headers | length, 1] | max }}">Không có evidence.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+
+        </div>
+      </div>
+      {% else %}
+      <p class="muted" style="padding:20px">Không có vấn đề nào được phát hiện.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <p style="padding:40px;text-align:center;color:var(--text3)">✅ Không có vấn đề nào được phát hiện.</p>
+  {% endif %}
+</div>
+
+<!-- TAB: GUIDE -->
+<div id="tab-guide" class="tab-pane">
+
+<div class="guide-intro">
+  <p>Báo cáo này phát hiện các vấn đề dữ liệu theo <strong>9 loại lỗi chuẩn</strong> chia thành 3 nhóm.
+  Mỗi loại được giải thích bằng ngôn ngữ nghiệp vụ để bất kỳ ai cũng có thể hiểu và hành động.</p>
+</div>
+
+<div class="guide-group">
+  <h3 class="guide-group-title">🔑 Nhóm 1 — Tính toàn vẹn khóa</h3>
+  <p class="guide-group-desc">Ảnh hưởng đến khả năng liên kết dữ liệu giữa các bảng — nhóm nguy hiểm nhất.</p>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">🔑</span><span class="guide-name">Khóa chính bị rỗng (PK_NULL)</span><span class="guide-sev sev-p0">Nghiêm trọng</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Cột ID đang để trống.</p><p><strong>Phát hiện:</strong> Đếm NULL trong cột Primary Key.</p><p><strong>Ảnh hưởng:</strong> Bản ghi không có danh tính → không thể JOIN → mất dữ liệu.</p><p><strong>Cách sửa:</strong> Điền ID còn thiếu hoặc xóa bản ghi.</p></div></div>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">🔑</span><span class="guide-name">Khóa chính trùng lặp (PK_DUPLICATE)</span><span class="guide-sev sev-p0">Nghiêm trọng</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Nhiều dòng cùng một ID.</p><p><strong>Phát hiện:</strong> Nhóm theo ID, đếm dòng trùng.</p><p><strong>Ảnh hưởng:</strong> JOIN bị nhân đôi → báo cáo số liệu sai.</p><p><strong>Cách sửa:</strong> Xác định dòng đúng, xóa bản sao, kiểm tra pipeline nhập dữ liệu.</p></div></div>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">🔗</span><span class="guide-name">Khóa ngoại bị rỗng (FOREIGN_KEY_NULL)</span><span class="guide-sev sev-p1">Cao</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Cột liên kết đến bảng khác đang để trống.</p><p><strong>Phát hiện:</strong> Đếm NULL trong cột FK.</p><p><strong>Ảnh hưởng:</strong> Bản ghi mồ côi — mất khi JOIN.</p><p><strong>Cách sửa:</strong> Điền giá trị hoặc khai báo NULL là hợp lệ trong schema.</p></div></div>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">⛓️</span><span class="guide-name">Khóa ngoại sai tham chiếu (FOREIGN_KEY_VIOLATION)</span><span class="guide-sev sev-p1">Cao</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> FK trỏ đến bản ghi không tồn tại ở bảng cha.</p><p><strong>Phát hiện:</strong> LEFT JOIN tìm dòng không có cặp.</p><p><strong>Ảnh hưởng:</strong> Dữ liệu không nhất quán — báo cáo thiếu thông tin.</p><p><strong>Cách sửa:</strong> Đồng bộ lại hoặc xóa bản ghi vi phạm.</p></div></div>
+</div>
+
+<div class="guide-group">
+  <h3 class="guide-group-title">📊 Nhóm 2 — Chất lượng giá trị</h3>
+  <p class="guide-group-desc">Ảnh hưởng đến độ chính xác của dữ liệu — không gây đứt liên kết nhưng làm sai tính toán.</p>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">📊</span><span class="guide-name">Giá trị bất thường (NUMERIC_OUTLIER)</span><span class="guide-sev sev-p3">Cảnh báo</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Con số quá cao/thấp so với phần còn lại.</p><p><strong>Phát hiện:</strong> Thuật toán IQR fence.</p><p><strong>Ảnh hưởng:</strong> Kéo lệch trung bình → báo cáo không đại diện.</p><p><strong>Cách sửa:</strong> Hỏi nghiệp vụ → chấp nhận hoặc loại bỏ.</p></div></div>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">❓</span><span class="guide-name">Dữ liệu thiếu (MISSING_DATA)</span><span class="guide-sev sev-p2">Trung bình</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Cột có nhiều ô trống (NULL).</p><p><strong>Phát hiện:</strong> Đếm tỉ lệ NULL.</p><p><strong>Ảnh hưởng:</strong> Phân tích thiếu dữ liệu.</p><p><strong>Cách sửa:</strong> Tìm lý do thiếu → điền hoặc ghi nhận.</p></div></div>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">⚠️</span><span class="guide-name">Sai kiểu dữ liệu (TYPE_MISMATCH)</span><span class="guide-sev sev-p1">Cao</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Cột số nhưng chứa giá trị không thể chuyển đổi.</p><p><strong>Phát hiện:</strong> TRY_CAST và đếm thất bại.</p><p><strong>Ảnh hưởng:</strong> Tính toán bị lỗi hoặc bỏ qua dòng này.</p><p><strong>Cách sửa:</strong> Xóa ký tự lạ, chuẩn hóa format.</p></div></div>
+</div>
+
+<div class="guide-group">
+  <h3 class="guide-group-title">🗂️ Nhóm 3 — Cấu trúc dữ liệu</h3>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">🗂️</span><span class="guide-name">Dòng trùng lặp (DUPLICATE_ROWS)</span><span class="guide-sev sev-p2">Trung bình</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Nhiều dòng hoàn toàn giống nhau.</p><p><strong>Phát hiện:</strong> Nhóm theo tất cả cột.</p><p><strong>Ảnh hưởng:</strong> Phồng số liệu tổng hợp.</p><p><strong>Cách sửa:</strong> DISTINCT hoặc xóa bản sao, kiểm tra pipeline import.</p></div></div>
+  <div class="guide-card"><div class="guide-card-header"><span class="guide-icon">📅</span><span class="guide-name">Sai định dạng ngày (DATETIME_FORMAT)</span><span class="guide-sev sev-p2">Trung bình</span></div>
+  <div class="guide-body"><p><strong>Là gì:</strong> Cột ngày/giờ chứa chuỗi không parse được.</p><p><strong>Phát hiện:</strong> TRY_CAST sang TIMESTAMP.</p><p><strong>Ảnh hưởng:</strong> Không lọc được theo thời gian.</p><p><strong>Cách sửa:</strong> Chuẩn hóa sang ISO 8601 (YYYY-MM-DD).</p></div></div>
+</div>
+
+<div class="guide-group">
+  <h3 class="guide-group-title">📋 Bảng phân loại mức độ nghiêm trọng</h3>
+  <table class="guide-sev-table">
+    <thead><tr><th>Mức độ</th><th>Ký hiệu</th><th>Ý nghĩa</th><th>Nên làm gì?</th></tr></thead>
+    <tbody>
+      <tr><td><span class="guide-sev sev-p0">P0 Nghiêm trọng</span></td><td>🔴</td><td>Dữ liệu không thể dùng, gây lỗi ngay</td><td>Sửa ngay trước khi dùng</td></tr>
+      <tr><td><span class="guide-sev sev-p1">P1 Cao</span></td><td>🟠</td><td>Gây kết quả sai, ảnh hưởng lớn</td><td>Lên kế hoạch sửa trong tuần này</td></tr>
+      <tr><td><span class="guide-sev sev-p2">P2 Trung bình</span></td><td>🟡</td><td>Ảnh hưởng một phần, cần review</td><td>Ghi nhận, xử lý khi có thể</td></tr>
+      <tr><td><span class="guide-sev sev-p3">P3 Cảnh báo</span></td><td>🔵</td><td>Cần xác nhận với nghiệp vụ</td><td>Hỏi domain expert, document lại</td></tr>
+    </tbody>
+  </table>
+</div>
+</div>
+
+<script>
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+function toggleTheme() {
+  var html = document.documentElement;
+  var isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = isDark ? '🌙 Dark' : '☀️ Light';
+  localStorage.setItem('eda-theme', isDark ? 'light' : 'dark');
+}
+
+(function() {
+  var saved = localStorage.getItem('eda-theme');
+  if (saved === 'dark') {
+    document.documentElement.setAttribute('data-theme','dark');
+    var btn = document.getElementById('themeBtn');
+    if(btn) btn.textContent = '☀️ Light';
+  }
+})();
+
+function exportTableCSV(tableId, filename) {
+  var tbl = document.getElementById(tableId);
+  if (!tbl) return;
+  var rows = [];
+  tbl.querySelectorAll('tr').forEach(function(tr) {
+    var cells = [];
+    tr.querySelectorAll('th,td').forEach(function(td) {
+      cells.push('"' + td.innerText.replace(/"/g, '""') + '"');
+    });
+    if (cells.length) rows.push(cells.join(','));
+  });
+  var csv = rows.join('\n');
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ER Diagram pan/zoom
+(function() {
+  var _pz = null;
+  function _initPz() {
+    var svg = document.querySelector('#er-container svg');
+    if (!svg) { setTimeout(_initPz, 300); return; }
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.maxWidth = 'none';
+    svg.style.overflow = 'visible';
+    _pz = svgPanZoom(svg, {
+      zoomEnabled: true, panEnabled: true,
+      controlIconsEnabled: false,
+      fit: true, center: true,
+      minZoom: 0.2, maxZoom: 8,
+      zoomScaleSensitivity: 0.3,
+    });
+    var con = document.getElementById('er-container');
+    if(con) con.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      if (e.deltaY < 0) _pz.zoomIn(); else _pz.zoomOut();
+    }, {passive: false});
+  }
+  window.erZoomIn    = function() { if(_pz) _pz.zoomIn(); };
+  window.erZoomOut   = function() { if(_pz) _pz.zoomOut(); };
+  window.erZoomReset = function() { if(_pz) { _pz.fit(); _pz.center(); } };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { setTimeout(_initPz, 600); });
+  } else {
+    setTimeout(_initPz, 600);
+  }
+})();
+</script>
 </body>
 </html>

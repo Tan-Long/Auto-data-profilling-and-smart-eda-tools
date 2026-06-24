@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import duckdb
 
-from vsf_profiler.csv_catalog import CsvCatalog
-from vsf_profiler.duckdb_utils import csv_relation, non_empty_expr, null_or_empty_expr, quote_ident, run_scalar
-from vsf_profiler.issue_catalog import IssueCatalog
+from vsf_profiler.ingestion.csv_catalog import CsvCatalog
+from vsf_profiler.ingestion.duckdb_utils import csv_relation, non_empty_expr, null_or_empty_expr, quote_ident, run_scalar
+from vsf_profiler.profiling.issue_catalog import IssueCatalog
 from vsf_profiler.models import ProfileSummary, Relationship, Schema
 
 

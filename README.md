@@ -6,7 +6,7 @@ provide CSV plus DBML inputs, review mapping/schema evidence, run local
 profiling, inspect table/column issues, and open deterministic reports with
 data-quality next steps.
 
-The repository still contains older advanced code paths for rules, target-based
+The repository still contains older advanced code paths for target-based
 association artifacts, database connectors, lineage artifacts, package export,
 Olist samples, and optional LLM summaries. They are compatibility and developer
 surfaces for now; they are not the main product workflow.
@@ -185,7 +185,6 @@ vsf-profiler run \
 vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
   --target order_reviews.review_score \
   --out outputs/demo_small_l4 \
   --use-llm \
@@ -196,7 +195,6 @@ cp .env.example .env
 vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
   --target order_reviews.review_score \
   --out outputs/demo_small_l4_openai \
   --use-llm \
@@ -315,7 +313,7 @@ The local runner binds only to `127.0.0.1`. It preserves CLI artifact contracts
 and can run upload-mode jobs for demo/small-medium CSV+DBML inputs or local
 path mode jobs where browser-entered DBML and CSV directory paths are validated
 locally without uploading CSV bytes through the browser. Legacy controls for
-rule config, association fields, database sources, and optional compatibility
+association fields, database sources, and optional compatibility
 LLM report artifacts remain available for compatibility but are not the main
 workflow.
 After a run completes, the local runner can show an interactive dashboard from

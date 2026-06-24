@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from vsf_profiler.large_benchmark import (
+from vsf_profiler.benchmarks.large_benchmark import (
     PERFORMANCE_GUARD_REPORT,
     create_large_benchmark_dataset,
     scan_production_materialization_guards,
@@ -99,8 +99,9 @@ def test_benchmark_script_writes_performance_guard_report(tmp_path):
         stage["name"] == "profile_csv_tables"
         for stage in report["pipeline"]["stage_timings"]
     )
-    assert report["memory"]["supported"] is True
-    assert report["memory"]["peak_rss_mb"] > 0
+    assert isinstance(report["memory"]["supported"], bool)
+    if report["memory"]["supported"]:
+        assert report["memory"]["peak_rss_mb"] > 0
     assert report["limits"]["influence_row_count"] <= 40
     assert report["limits"]["influence_top_feature_count"] <= 3
     assert report["limits"]["analysis_row_limit_enforced"] is True

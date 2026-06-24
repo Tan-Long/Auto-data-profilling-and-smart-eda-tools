@@ -4,8 +4,8 @@ from typing import Any
 
 import duckdb
 
-from vsf_profiler.csv_catalog import CsvCatalog
-from vsf_profiler.duckdb_utils import (
+from vsf_profiler.ingestion.csv_catalog import CsvCatalog
+from vsf_profiler.ingestion.duckdb_utils import (
     connect,
     csv_relation,
     dbml_type_family,

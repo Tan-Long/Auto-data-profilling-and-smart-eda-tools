@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from vsf_profiler.cli import run_pipeline
-from vsf_profiler.connectors import MySQLConnector
+from vsf_profiler.ingestion.connectors import MySQLConnector
 
 
 def test_mysql_acceptance_uses_local_fixture_or_skips(tmp_path):
@@ -69,7 +69,6 @@ def test_mysql_acceptance_uses_local_fixture_or_skips(tmp_path):
         run_pipeline(
             dbml_path=None,
             csv_dir=None,
-            rules_path=None,
             target=None,
             out_dir=out_dir,
             source_connector=connector,

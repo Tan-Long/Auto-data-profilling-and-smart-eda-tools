@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from vsf_profiler.csv_catalog import build_catalog
-from vsf_profiler.dbml_parser import parse_dbml
-from vsf_profiler.duckdb_utils import connect, fetch_bounded_df
+from vsf_profiler.ingestion.csv_catalog import build_catalog
+from vsf_profiler.ingestion.dbml_parser import parse_dbml
+from vsf_profiler.ingestion.duckdb_utils import connect, fetch_bounded_df
 from vsf_profiler.influence_analyzer import analyze_influence
 
 

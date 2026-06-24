@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from vsf_profiler.pdf_export import PdfExportResult, write_simple_pdf_report
+from vsf_profiler.reporting.pdf_export import PdfExportResult, write_simple_pdf_report
 
 
 PACKAGE_VERSION = 1

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from vsf_profiler.dataset_verdict import SEVERITIES, normalize_severity
+from vsf_profiler.artifacts.dataset_verdict import SEVERITIES, normalize_severity
 
 
 ALLOWED_SOURCE_ARTIFACTS = {

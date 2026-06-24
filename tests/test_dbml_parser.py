@@ -1,6 +1,6 @@
 import pytest
 
-from vsf_profiler.dbml_parser import DbmlParseError, parse_dbml_text, parse_dbml_text_with_report
+from vsf_profiler.ingestion.dbml_parser import DbmlParseError, parse_dbml_text, parse_dbml_text_with_report
 
 
 def test_parse_inline_refs_and_composite_pk():

@@ -10,10 +10,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from vsf_profiler.artifact_audit import REQUIRED_CHARTS, audit_artifacts
+from vsf_profiler.reporting.artifact_audit import REQUIRED_CHARTS, audit_artifacts
 from vsf_profiler.cli import run_pipeline
-from vsf_profiler.connectors import DEFAULT_POSTGRES_CHUNK_ROWS
-from vsf_profiler.export_package import create_analysis_package
+from vsf_profiler.ingestion.connectors import DEFAULT_POSTGRES_CHUNK_ROWS
+from vsf_profiler.reporting.export_package import create_analysis_package
 from vsf_profiler.influence_analyzer import MAX_ANALYSIS_ROWS, MAX_FEATURE_COLUMNS
 
 
@@ -163,7 +163,6 @@ def run_large_dataset_benchmark(
     run_pipeline(
         dbml_path=dataset.dbml_path,
         csv_dir=dataset.csv_dir,
-        rules_path=dataset.rules_path,
         target=dataset.target,
         out_dir=run_dir,
         max_analysis_rows=max_analysis_rows,

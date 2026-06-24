@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from collections import Counter, defaultdict
 import json
 from pathlib import Path
@@ -7,7 +8,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from vsf_profiler.dataset_verdict import SEVERITIES, issue_sort_key, normalize_severity
+from vsf_profiler.artifacts.dataset_verdict import SEVERITIES, issue_sort_key, normalize_severity
 from vsf_profiler.models import InfluenceResult, Issue, ProfileSummary
 
 
@@ -16,6 +17,48 @@ RELATIONSHIP_ISSUES = {
     "PARENT_KEY_DUPLICATE",
     "FOREIGN_KEY_NULL",
     "CHILD_RELATIONSHIP_DUPLICATE",
+}
+
+# Display helpers for issue cards in the HTML report
+_ISSUE_TYPE_ICONS: dict[str, str] = {
+    "NUMERIC_OUTLIER": "📊",
+    "MISSING_DATA": "❓",
+    "TYPE_MISMATCH": "⚠️",
+    "DUPLICATE_ROWS": "🗂️",
+    "DATETIME_FORMAT": "📅",
+    "PK_NULL": "🔑",
+    "PK_DUPLICATE": "🔑",
+    "FOREIGN_KEY_NULL": "🔗",
+    "FOREIGN_KEY_VIOLATION": "⛓️",
+    "ORPHAN_FOREIGN_KEY": "⛓️",
+    "PARENT_KEY_DUPLICATE": "🔑",
+    "CHILD_RELATIONSHIP_DUPLICATE": "🗂️",
+}
+_ISSUE_TYPE_LABELS: dict[str, str] = {
+    "NUMERIC_OUTLIER": "Giá trị bất thường",
+    "MISSING_DATA": "Dữ liệu thiếu",
+    "TYPE_MISMATCH": "Sai kiểu dữ liệu",
+    "DUPLICATE_ROWS": "Dòng trùng lặp",
+    "DATETIME_FORMAT": "Sai định dạng ngày",
+    "PK_NULL": "Khóa chính bị rỗng",
+    "PK_DUPLICATE": "Khóa chính trùng lặp",
+    "FOREIGN_KEY_NULL": "Khóa ngoại bị rỗng",
+    "FOREIGN_KEY_VIOLATION": "Khóa ngoại sai tham chiếu",
+    "ORPHAN_FOREIGN_KEY": "Bản ghi mồ côi (FK)",
+    "PARENT_KEY_DUPLICATE": "Khóa cha trùng lặp",
+    "CHILD_RELATIONSHIP_DUPLICATE": "Quan hệ con trùng lặp",
+}
+_SEV_COLORS: dict[str, str] = {
+    "P0": "#ef4444",
+    "P1": "#f97316",
+    "P2": "#d97706",
+    "P3": "#2563eb",
+}
+_SEV_LABELS: dict[str, str] = {
+    "P0": "🔴 Nghiêm trọng",
+    "P1": "🟠 Cao",
+    "P2": "🟡 Trung bình",
+    "P3": "🔵 Cảnh báo",
 }
 MAIN_REPORT_ACTION_PLAN_LIMIT = 5
 MAIN_REPORT_EVIDENCE_VALUE_LIMIT = 6
@@ -54,6 +97,8 @@ def generate_reports(
     table_assessments: dict[str, Any] | None = None,
     chart_specs: dict[str, dict[str, Any]] | None = None,
     run_summary: dict[str, Any] | None = None,
+    per_table_llm: dict[str, str] | None = None,
+    dual_track_llm: dict[str, str] | None = None,
 ) -> None:
     context = _build_context(
         out_dir,
@@ -70,15 +115,38 @@ def generate_reports(
         table_assessments,
         chart_specs,
         run_summary,
+        per_table_llm,
+        dual_track_llm,
     )
     env = _template_env()
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "report.md").write_text(env.get_template("report.md.j2").render(**context))
-    (out_dir / "report.html").write_text(env.get_template("report.html.j2").render(**context))
+    import logging as _logging
+    import traceback as _tb
+    _log = _logging.getLogger(__name__)
+    try:
+        (out_dir / "report.md").write_text(env.get_template("report.md.j2").render(**context), encoding="utf-8")
+    except Exception as _e:
+        _err_msg = f"report.md render failed at template line {getattr(_e, 'lineno', '?')}: {_e}"
+        _log.error(_err_msg)
+        (out_dir / "render_error.txt").write_text(_err_msg + "\n\n" + _tb.format_exc(), encoding="utf-8")
+        raise
+    try:
+        (out_dir / "report.html").write_text(env.get_template("report.html.j2").render(**context), encoding="utf-8")
+    except Exception as _e:
+        _cards_sample = list(context.get("issue_cards", [{}])[0].keys()) if context.get("issue_cards") else []
+        _err_msg = (
+            f"report.html render failed at template line {getattr(_e, 'lineno', '?')}: {_e}\n"
+            f"issue_cards keys: {_cards_sample}\n"
+            f"THIS MODULE FILE: {__file__}\n"
+            f"template_dir: {Path(__file__).resolve().parents[3] / 'templates'}\n"
+        )
+        _log.error(_err_msg)
+        (out_dir / "render_error.txt").write_text(_err_msg + "\n\nFULL TRACEBACK:\n" + _tb.format_exc(), encoding="utf-8")
+        raise
 
 
 def _template_env() -> Environment:
-    template_dir = Path(__file__).resolve().parents[2] / "templates"
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
     env = Environment(
         loader=FileSystemLoader(str(template_dir)),
         autoescape=select_autoescape(enabled_extensions=("html", "xml")),
@@ -104,6 +172,8 @@ def _build_context(
     table_assessments: dict[str, Any] | None,
     chart_specs: dict[str, dict[str, Any]] | None,
     run_summary: dict[str, Any] | None,
+    per_table_llm: dict[str, str] | None,
+    dual_track_llm: dict[str, str] | None,
 ) -> dict[str, Any]:
     sorted_issues = sorted(issues, key=issue_sort_key)
     verdict_context = _dataset_verdict_context(dataset_verdict)
@@ -212,6 +282,10 @@ def _build_context(
         "issue_todos": todos_context,
         "fixed_report": fixed_report,
         "recommended_actions": _recommended_actions(sorted_issues, verdict_context),
+        "per_table_llm": per_table_llm or {},
+        "dual_track_llm": dual_track_llm or {},
+        "issue_cards": _issue_cards_context(sorted_issues, profile, out_dir, issue_enrichments_context, per_table_llm),
+        "schema_diagram_html": _schema_diagram_html_context(schema_diagram),
     }
 
 
@@ -683,11 +757,15 @@ def _fixed_run_summary_context(
         "run_id": run_summary.get("run_id", ""),
         "status": run_summary.get("status", "unknown"),
         "duration_seconds": run_summary.get("duration_seconds", ""),
+        "elapsed_s": run_summary.get("duration_seconds", ""),
+        "started_at": run_summary.get("started_at", ""),
+        "finished_at": run_summary.get("finished_at", ""),
         "table_count": table_count,
         "column_count": column_count,
         "row_count": row_count,
         "issue_count": len(issues),
         "p0_p1_count": severity_counts["P0"] + severity_counts["P1"],
+        "severity_counts": dict(severity_counts),
         "readiness": dataset_verdict.get("verdict", "unknown")
         if dataset_verdict.get("available")
         else "unknown",
@@ -1531,3 +1609,241 @@ def _format_detail_value(value: Any) -> str:
     if isinstance(value, dict):
         return "{" + ", ".join(f"{key}: {item}" for key, item in list(value.items())[:8]) + "}"
     return str(value)
+
+
+def _load_csv_evidence(out_dir: Path, sample_bad_rows_path: str | None) -> tuple[list[str], list[list[str]]]:
+    """Read an issue's sample CSV and return (headers, data_rows). Max 50 data rows."""
+    if not sample_bad_rows_path:
+        return [], []
+    csv_path = out_dir / sample_bad_rows_path
+    if not csv_path.is_file():
+        return [], []
+    try:
+        with csv_path.open(encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            all_rows = list(reader)
+        if not all_rows:
+            return [], []
+        headers = all_rows[0]
+        data_rows = all_rows[1:51]  # at most 50 data rows
+        return headers, data_rows
+    except Exception:
+        return [], []
+
+
+def _issue_cards_context(
+    issues: list[Issue],
+    profile: ProfileSummary,
+    out_dir: Path,
+    issue_enrichments_context: dict[str, Any] | None = None,
+    per_table_llm: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Format issues for the modern UI cards with real CSV evidence and LLM analysis."""
+    per_table_llm = per_table_llm or {}
+    # Build a map of issue_id -> LLM analysis text from the enrichments artifact
+    enrichment_map: dict[str, str] = {}
+    raw_enrichments: dict[str, Any] | None = None
+    if out_dir and (out_dir / "issue_llm_enrichments.json").is_file():
+        raw_enrichments = _read_json_artifact(out_dir / "issue_llm_enrichments.json")
+    if raw_enrichments:
+        for item in raw_enrichments.get("enrichments", []):
+            if isinstance(item, dict) and item.get("issue_id"):
+                enrichment_map[item["issue_id"]] = item.get("narrative", "") or item.get("analysis_html", "")
+
+    cards = []
+    for issue in issues:
+        evidence_headers, evidence_rows = _load_csv_evidence(out_dir, issue.sample_bad_rows_path)
+        # Format bad_count with thousands separator for display
+        try:
+            bad_count_display = f"{int(issue.bad_count):,}"
+        except (TypeError, ValueError):
+            bad_count_display = str(issue.bad_count)
+        # Compute bad_rate as percentage string for display
+        try:
+            bad_rate_str = f"{float(issue.bad_rate) * 100:.1f}%" if issue.bad_rate is not None else "—"
+        except (TypeError, ValueError):
+            bad_rate_str = str(issue.bad_rate) if issue.bad_rate else "—"
+        # Normalize severity for CSS classes and colors
+        norm_sev = normalize_severity(issue.severity)
+        cards.append({
+            "issue_id": issue.issue_id,
+            "table": issue.table,
+            "columns": issue.columns,
+            "issue_type": issue.issue_type,
+            "issue_type_icon": _ISSUE_TYPE_ICONS.get(issue.issue_type, "📋"),
+            "issue_type_label": _ISSUE_TYPE_LABELS.get(issue.issue_type, issue.issue_type),
+            "severity": issue.severity,
+            "normalized_severity": norm_sev,
+            "severity_label": _SEV_LABELS.get(norm_sev, issue.severity),
+            "sev_color": _SEV_COLORS.get(norm_sev, "#6b7280"),
+            "bad_count": issue.bad_count,
+            "bad_count_display": bad_count_display,
+            "total_count": issue.total_count,
+            "bad_rate": bad_rate_str,
+            "bad_rate_raw": issue.bad_rate,
+            "description": (
+                "; ".join(issue.probable_causes[:1]) if issue.probable_causes
+                else f"{issue.issue_type} in {issue.table}"
+            ),
+            "first_action": issue.suggested_fix[0] if issue.suggested_fix else "",
+            # Real CSV evidence data
+            "evidence_headers": evidence_headers,
+            "evidence_rows": evidence_rows,
+            "evidence_count": len(evidence_rows),
+            # LLM per-issue analysis (empty string if LLM not enabled or no file)
+            "llm_analysis": enrichment_map.get(issue.issue_id) or per_table_llm.get(issue.table, ""),
+        })
+    return cards
+
+
+def _schema_diagram_html_context(schema_diagram: dict[str, Any]) -> str:
+    """Build a complete ER diagram HTML block with pan/zoom controls or iframe.
+    
+    NOTE: mermaid.js reads the text content of .mermaid elements directly,
+    so we must NOT html-escape the syntax — just inject it raw into the pre tag.
+    """
+    if not schema_diagram:
+        return ""
+    mermaid_syntax = schema_diagram.get("mermaid_syntax") or schema_diagram.get("mermaid") or ""
+    if not mermaid_syntax:
+        return ""
+    return (
+        '<div class="er-diagram-wrap">'
+        '<div class="er-toolbar">'
+        '<span class="er-legend">Cuộn chuột để zoom · Kéo thả để di chuyển</span>'
+        '<div class="er-zoom-btns">'
+        '<button class="er-zbtn" onclick="erZoomIn()">+</button>'
+        '<button class="er-zbtn" onclick="erZoomReset()">&#8635;</button>'
+        '<button class="er-zbtn" onclick="erZoomOut()">-</button>'
+        '</div>'
+        '</div>'
+        '<div id="er-container" class="er-container">'
+        f'<pre id="er-mermaid" class="mermaid">{mermaid_syntax}</pre>'
+        '</div>'
+        '</div>'
+    )
+
+
+def _abs_numeric(value: Any) -> float:
+    return abs(_numeric(value))
+
+
+def _numeric(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _execution_flow_context(run_summary: dict[str, Any] | None) -> dict[str, Any]:
+    if not run_summary:
+        return {"available": False, "stages": [], "artifacts": []}
+
+    stages = []
+    for stage in run_summary.get("stage_timings", []):
+        stages.append(
+            {
+                "name": stage.get("display_name") or stage.get("name", ""),
+                "status": stage.get("status", ""),
+                "duration_seconds": _format_duration(stage.get("duration_seconds")),
+                "details": _format_details(stage.get("details") or {}),
+                "error": stage.get("error_message") or "",
+            }
+        )
+
+    artifact_paths = run_summary.get("artifact_paths") or {}
+    artifacts = [
+        {"name": name, "path": path}
+        for name, path in sorted(artifact_paths.items())
+        if not name.startswith("sample:")
+    ]
+    return {
+        "available": True,
+        "run_id": run_summary.get("run_id", ""),
+        "status": run_summary.get("status", ""),
+        "duration_seconds": _format_duration(run_summary.get("duration_seconds")),
+        "output_dir": run_summary.get("output_dir", ""),
+        "stages": stages,
+        "artifacts": artifacts,
+    }
+
+
+def _l4_report_context(run_summary: dict[str, Any] | None, out_dir: Path) -> dict[str, Any]:
+    if not run_summary:
+        return _l4_not_enabled_context()
+    artifact_paths = run_summary.get("artifact_paths") or {}
+    l4_path = artifact_paths.get("l4_report")
+    if not l4_path:
+        return _l4_not_enabled_context()
+    details = _l4_stage_details(run_summary)
+    status = details.get("guardrail_status", "")
+    provider = details.get("provider", "")
+    fallback_reason = details.get("fallback_reason", "")
+    preview_lines = _l4_preview_lines(out_dir / l4_path)
+    return {
+        "available": True,
+        "path": l4_path,
+        "guardrail_path": artifact_paths.get("guardrail_report", ""),
+        "status": status or "unknown",
+        "status_class": status or "unknown",
+        "provider": provider or "unknown",
+        "model": details.get("model", ""),
+        "fallback_reason": fallback_reason,
+        "preview_lines": preview_lines,
+        "state_text": "Guarded optional LLM summary artifact available.",
+    }
+
+
+def _l4_not_enabled_context() -> dict[str, Any]:
+    return {
+        "available": False,
+        "path": "",
+        "guardrail_path": "",
+        "status": "not_enabled",
+        "status_class": "not_enabled",
+        "provider": "none",
+        "model": "",
+        "fallback_reason": "",
+        "preview_lines": [],
+        "state_text": "Optional LLM summary artifact was not generated for this deterministic run.",
+    }
+
+
+def _l4_preview_lines(path: Path, *, limit: int = 10) -> list[str]:
+    if not path.is_file():
+        return []
+    lines = []
+    for raw_line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line = line.lstrip("#").strip()
+        if line:
+            lines.append(line)
+        if len(lines) >= limit:
+            break
+    return lines
+
+
+def _l4_stage_details(run_summary: dict[str, Any]) -> dict[str, Any]:
+    for stage in run_summary.get("stage_timings", []):
+        if stage.get("name") == "llm_narrative":
+            return stage.get("details") or {}
+    return {}
+
+
+def _format_duration(value: Any) -> str:
+    if value is None:
+        return ""
+    return f"{float(value):.3f}"
+
+
+def _format_details(details: dict[str, Any]) -> str:
+    if not details:
+        return ""
+    parts = []
+    for key, value in details.items():
+        parts.append(f"{key}={_format_detail_value(value)}")
+    return ", ".join(parts)
+
+

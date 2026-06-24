@@ -1,6 +1,6 @@
 import json
 
-from vsf_profiler.llm_issue_enrichment import (
+from vsf_profiler.llm.issue_enrichment import (
     ISSUE_ENRICHMENT_FILENAME,
     MAX_CONTEXT_BYTES,
     build_issue_enrichment_context,

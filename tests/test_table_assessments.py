@@ -1,5 +1,5 @@
 from vsf_profiler.models import Issue, ProfileSummary, TableProfile
-from vsf_profiler.table_assessments import build_table_assessments
+from vsf_profiler.artifacts.table_assessments import build_table_assessments
 
 
 def test_table_assessments_score_roles_and_analysis_impact():

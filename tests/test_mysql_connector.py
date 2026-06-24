@@ -5,7 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from vsf_profiler.cli import app, run_pipeline
-from vsf_profiler.connectors import (
+from vsf_profiler.ingestion.connectors import (
     IntrospectedTable,
     MySQLConnector,
     MySQLTableRef,
@@ -13,7 +13,7 @@ from vsf_profiler.connectors import (
     redact_connection_url,
     schema_from_mysql_introspection,
 )
-from vsf_profiler.demo_data import create_small_demo
+from vsf_profiler.benchmarks.demo_data import create_small_demo
 
 
 SECRET_URL = "mysql://profiler:super-secret@127.0.0.1:3306/demo?token=query-secret"
@@ -83,7 +83,6 @@ def test_pipeline_with_mysql_connector_writes_metadata_and_redacts_secrets(tmp_p
     run_pipeline(
         dbml_path=None,
         csv_dir=None,
-        rules_path=None,
         target=None,
         out_dir=out_dir,
         source_connector=connector,
@@ -93,7 +92,7 @@ def test_pipeline_with_mysql_connector_writes_metadata_and_redacts_secrets(tmp_p
     lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text())
     run_summary = json.loads((out_dir / "run_summary.json").read_text())
     report_md = (out_dir / "report.md").read_text()
-    report_html = (out_dir / "report.html").read_text()
+    report_html = (out_dir / "report.html").read_text(encoding="utf-8")
 
     assert metadata["source_type"] == "mysql"
     assert metadata["connection"]["url"] == "mysql://[redacted]@127.0.0.1:3306/demo?token=%5Bredacted%5D"
@@ -107,7 +106,6 @@ def test_pipeline_with_mysql_connector_writes_metadata_and_redacts_secrets(tmp_p
         "mysql://[redacted]@127.0.0.1:3306/demo?token="
     )
     assert "[redacted]" in run_summary["inputs"]["mysql_url"]
-    assert "Connector Metadata" in report_html
     assert "connector_metadata.json" in report_md
     assert not (out_dir / ".connector_extracts").exists()
     assert_no_secret_leak(out_dir, "super-secret")
@@ -138,7 +136,6 @@ def test_mysql_connector_supports_dbml_supplied_schema(tmp_path):
     run_pipeline(
         dbml_path=dbml_path,
         csv_dir=None,
-        rules_path=None,
         target=None,
         out_dir=out_dir,
         source_connector=connector,
@@ -147,7 +144,7 @@ def test_mysql_connector_supports_dbml_supplied_schema(tmp_path):
     parse_report = json.loads((out_dir / "schema_parse_report.json").read_text())
     metadata = json.loads((out_dir / "connector_metadata.json").read_text())
 
-    assert parse_report["parser"] == "vsf_profiler.dbml_parser"
+    assert parse_report["parser"] == "vsf_profiler.ingestion.dbml_parser"
     assert metadata["source_type"] == "mysql"
     assert metadata["tables_scanned"] == ["customers", "orders"]
 
@@ -165,8 +162,6 @@ def test_cli_csv_mode_is_not_hijacked_by_mysql_env(tmp_path, monkeypatch):
             str(data_dir / "schema.dbml"),
             "--csv-dir",
             str(data_dir / "csv"),
-            "--rules",
-            str(data_dir / "rules.yaml"),
             "--out",
             str(out_dir),
         ],

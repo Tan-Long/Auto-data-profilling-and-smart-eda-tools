@@ -6,10 +6,10 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from vsf_profiler.artifact_audit import audit_artifacts
+from vsf_profiler.reporting.artifact_audit import audit_artifacts
 from vsf_profiler.cli import app, run_pipeline
-from vsf_profiler.demo_data import create_small_demo
-from vsf_profiler.export_package import create_analysis_package
+from vsf_profiler.benchmarks.demo_data import create_small_demo
+from vsf_profiler.reporting.export_package import create_analysis_package
 
 
 def test_doctor_command_redacts_secret_environment_values(monkeypatch):
@@ -204,7 +204,6 @@ def _demo_output(tmp_path: Path) -> Path:
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
         target="order_reviews.review_score",
         out_dir=out_dir,
     )

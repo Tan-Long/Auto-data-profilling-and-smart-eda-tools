@@ -116,7 +116,7 @@ class _ReportBuilder:
         return {
             "artifact": "schema_parse_report",
             "version": 1,
-            "parser": "vsf_profiler.dbml_parser",
+            "parser": "vsf_profiler.ingestion.dbml_parser",
             "status": status,
             "source": {"path": self.source_path or ""},
             "counts": dict(self.counts),

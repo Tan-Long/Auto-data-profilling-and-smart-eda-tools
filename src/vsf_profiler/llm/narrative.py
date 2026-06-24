@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 from urllib.parse import urlparse
 
-from vsf_profiler.table_assessments import (
+from vsf_profiler.artifacts.table_assessments import (
     KNOWN_BUSINESS_IMPACT_CATEGORIES,
     KNOWN_BUSINESS_IMPACT_LABELS,
 )
@@ -193,27 +194,35 @@ class OpenAINarrativeProvider:
         return self.config.safe_dict()
 
     def generate(self, context: dict[str, Any]) -> str:
+        sys_msg = context.get("system_instructions", OPENAI_NARRATIVE_INSTRUCTIONS)
+        user_prompt = context.get("user_prompt", json.dumps(
+            {
+                "task": "Generate the guarded LLM data-quality summary artifact.",
+                "guardrail_safe_draft": context.get("guardrail_safe_draft", ""),
+                "guardrail_contract": context.get("guardrail_contract", {}),
+                "context": context,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ))
+        
         payload = {
             "model": self.model,
-            "instructions": OPENAI_NARRATIVE_INSTRUCTIONS,
-            "input": json.dumps(
-                {
-                    "task": "Generate the guarded LLM data-quality summary artifact.",
-                    "guardrail_safe_draft": context.get("guardrail_safe_draft", ""),
-                    "guardrail_contract": context.get("guardrail_contract", {}),
-                    "context": context,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
-            "max_output_tokens": self.max_output_tokens,
+            "messages": [
+                {"role": "system", "content": sys_msg},
+                {"role": "user", "content": user_prompt}
+            ],
+            "max_completion_tokens": self.max_output_tokens,
+            "temperature": 0.0,
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        
+        url = f"{self.base_url}/chat/completions" if "chat/completions" not in self.base_url else self.base_url
         response = self._transport(
-            f"{self.base_url}/responses",
+            url,
             headers,
             payload,
             self.timeout_seconds,
@@ -1187,6 +1196,16 @@ def _default_openai_transport(
 
 
 def _extract_openai_text(response: dict[str, Any]) -> str:
+    # Standard OpenAI format
+    choices = response.get("choices")
+    if choices and isinstance(choices, list) and len(choices) > 0:
+        msg = choices[0].get("message")
+        if msg and isinstance(msg, dict):
+            content = msg.get("content")
+            if isinstance(content, str):
+                return content.strip()
+    
+    # Custom/Proxy format fallback
     output_text = response.get("output_text")
     if isinstance(output_text, str) and output_text.strip():
         return output_text.strip()
@@ -1204,4 +1223,272 @@ def _extract_openai_text(response: dict[str, Any]) -> str:
 
     if text_parts:
         return "\n".join(text_parts)
-    raise RuntimeError("OpenAI Responses API response did not include output text.")
+    
+    # If error is returned in response body
+    if "error" in response:
+        raise RuntimeError(f"OpenAI API returned error: {response['error']}")
+        
+    raise RuntimeError("OpenAI API response did not include output text.")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PER-TABLE & DUAL-TRACK INSIGHT GENERATION
+# Mở rộng narrative.py với 2 hàm mới dùng cùng NarrativeProvider (có guardrail)
+# nhưng với system prompt chuyên biệt cho per-table và overview context.
+# ──────────────────────────────────────────────────────────────────────────────
+
+_SYS_PER_TABLE = (
+    "[VAI TRO] Ban la Data Analyst dang tu van cho ky su da biet van de va dang can biet PHAI LAM GI.\n"
+    "[MUC DICH] Viet annotation ngan cho tung issue card: bo qua thu da hien thi (so luong, ti le), "
+    "chi cho biet: 1. Tai sao loi nay xay ra (nguyen nhan thuc te) "
+    "2. Hanh dong cu the can lam ngay (bang tieng Viet, khong dung tieng Anh)\n\n"
+    "[NGUYEN TAC]\n"
+    "- GIU NGUYEN ten bang/cot goc, boc trong backtick. Noi dung hoan toan tieng Viet\n"
+    "- KHONG giai thich ly thuyet, KHONG nhac lai so lieu (nguoi dung da thay roi)\n"
+    "- Moi buoc xu ly phai du cu the de ky su lam ngay khong can hoi them\n"
+    "- Neu duoc cung cap action goc tieng Anh, hay dich va cai thien thanh tieng Viet\n"
+    "- Chi de cap so lieu co trong du lieu dau vao, khong bia dat\n"
+    "- Output: HTML thuan, KHONG markdown. Gioi han toi da 500 tokens."
+)
+
+_SYS_OVERALL_TECH = (
+    "[VAI TRO] Ban la Data Quality Lead dang tom tat toan bo dataset cho ky su.\n"
+    "[MUC DICH] Viet nhan dinh tong quan ky thuat: CAI GI bi hong nhat, HE QUA gi, LAM GI truoc.\n\n"
+    "[NGUYEN TAC VANG]\n"
+    "1. Moi cau phai mang GIA TRI - khong viet thu nguoi doc da biet tu so lieu\n"
+    "2. Neu SO LIEU cu the tu du lieu dau vao (ti le loi, so bang, severity)\n"
+    "3. Chi ro HE QUA thuc te: query nao sai, join nao vo, report nao khong tin duoc\n"
+    "4. GIU NGUYEN ten bang/cot goc, boc trong backtick. Noi dung viet tieng Viet\n"
+    "5. Chi de cap so lieu co trong du lieu dau vao, khong bia dat\n"
+    "- Output: HTML thuan, KHONG markdown. Gioi han toi da 400 tokens."
+)
+
+_SYS_OVERALL_BIZ = (
+    "[VAI TRO] Ban la Business Intelligence Analyst. Giai thich rui ro du lieu cho QUAN LY.\n"
+    "[MUC DICH] Tra loi: Dieu nay anh huong gi den cong viec cua toi?\n\n"
+    "[NGUYEN TAC VANG]\n"
+    "1. KHONG dung thuat ngu ky thuat (null, FK, outlier, IQR, index...)\n"
+    "2. GIU NGUYEN ten bang/cot goc, boc trong backtick\n"
+    "3. Moi rui ro gan voi he qua THUC TE: dan den bao cao sai, anh huong quyet dinh X\n"
+    "4. Ngon ngu mem: co the, can kiem tra, de xuat\n"
+    "5. Chi de cap thong tin co trong schema va issues, khong suy dien them\n"
+    "- Output: HTML thuan, KHONG markdown. Gioi han toi da 350 tokens."
+)
+
+
+def _deterministic_per_table_insight(table: str, issues: list[dict]) -> str:
+    """Fallback per-table insight khi khong co provider hoac guardrail fail."""
+    if not issues:
+        return f"<p>Bang <code>{table}</code>: Khong co van de nao duoc ghi nhan.</p>"
+    top = issues[0]
+    sev = top.get("severity", "")
+    itype = top.get("issue_type", "")
+    cols_html = ", ".join(f"<code>{c}</code>" for c in (top.get("columns") or []))
+    bad_count = top.get("bad_count", 0)
+    return (
+        f"<p><strong>Bang <code>{table}</code>:</strong> "
+        f"Phat hien {len(issues)} van de, nghiem trong nhat la <code>{itype}</code> "
+        f"(Severity: {sev}) voi {bad_count:,} dong bi anh huong.</p>"
+        f"<ul><li><strong>Cot bi anh huong:</strong> {cols_html or 'table-level'}<br>"
+        f"<strong>Hanh dong:</strong> Kiem tra va lam sach du lieu truoc khi su dung.</li></ul>"
+    )
+
+
+def _deterministic_overview_tech(issues: list[dict], verdict: dict) -> str:
+    """Fallback technical overview khi khong co provider."""
+    v = verdict.get("verdict", "UNKNOWN")
+    risk = verdict.get("risk_score", 0)
+    p0p1 = [i for i in issues if i.get("severity") in {"P0", "P1"}]
+    lines = [
+        f"<p><strong>Tinh trang:</strong> {v} &#8212; Risk score: {risk}/100. "
+        f"Co {len(issues)} van de, trong do {len(p0p1)} can xu ly ngay (P0/P1).</p>",
+        "<p><strong>Van de can xu ly ngay:</strong></p><ul>",
+    ]
+    for issue in p0p1[:3]:
+        table = issue.get("table", "")
+        cols = issue.get("columns") or []
+        ref = f"`{table}.{cols[0]}`" if cols else f"`{table}`"
+        itype = issue.get("issue_type", "")
+        bad = issue.get("bad_count", 0)
+        lines.append(f"<li>{ref} &#8212; {itype}: {bad:,} dong bi anh huong</li>")
+    lines.append("</ul>")
+    return "\n".join(lines)
+
+
+def _deterministic_overview_biz(issues: list[dict], dbml_text: str) -> str:
+    """Fallback business overview khi khong co provider."""
+    top_tables = list({i.get("table", "") for i in issues[:5] if i.get("table")})
+    return (
+        "<p><strong>Linh vuc:</strong> Chua xac dinh &#8212; "
+        "<strong>Muc rui ro:</strong> Can xem xet</p>"
+        "<p><strong>Nhung gi co the bi sai:</strong></p><ul>"
+        + "".join(
+            f"<li>Bang <code>{t}</code> co the chua du lieu khong chinh xac, "
+            f"can kiem tra truoc khi su dung cho bao cao.</li>"
+            for t in top_tables[:3]
+        )
+        + "</ul><p><strong>Quyet dinh can dua ra:</strong> Yeu cau ky thuat kiem tra "
+        "va xac nhan du lieu truoc khi dung cho cac quyet dinh quan trong.</p>"
+    )
+
+
+def generate_per_table_insights(
+    *,
+    issues_by_table: "dict[str, list[dict[str, Any]]]",
+    action_plans_map: "dict[str, dict[str, Any]] | None" = None,
+    provider: "Any | None" = None,
+) -> "dict[str, str]":
+    """
+    Sinh nhan dinh AI tieng Viet cho tung bang co issue.
+
+    Dung cung NarrativeProvider cua generate_l4_narrative() nhung voi
+    system prompt chuyen biet cho per-table context.
+    Co guardrail nhe: kiem tra causal wording.
+
+    Returns:
+        dict mapping table_name -> HTML string voi nhan dinh tieng Viet
+    """
+    results: "dict[str, str]" = {}
+    for table, table_issues in issues_by_table.items():
+        if not table_issues:
+            continue
+        items: "list[dict[str, Any]]" = []
+        for issue in table_issues:
+            iid = issue.get("issue_id", "")
+            entry: "dict[str, Any]" = {
+                "issue_id": iid,
+                "type": issue.get("issue_type"),
+                "columns": issue.get("columns"),
+                "severity": issue.get("severity"),
+                "bad_count": issue.get("bad_count", 0),
+                "bad_rate": f"{issue.get('bad_rate', 0) * 100:.1f}%",
+            }
+            if action_plans_map and iid:
+                ap = action_plans_map.get(iid, {})
+                raw_steps = ap.get("fix_data_checklist") or []
+                if isinstance(raw_steps, str):
+                    raw_steps = [raw_steps]
+                if raw_steps:
+                    entry["action_steps_en"] = raw_steps[:3]
+            items.append(entry)
+
+        if provider is None:
+            results[table] = _deterministic_per_table_insight(table, table_issues)
+            continue
+
+        try:
+            per_table_context: "dict[str, Any]" = {
+                "guardrail_safe_draft": _deterministic_per_table_insight(table, table_issues),
+                "guardrail_contract": {
+                    "required_output": "Return HTML only, no markdown.",
+                    "forbidden_causal_terms": sorted(CAUSAL_PATTERNS),
+                    "style": ["No markdown. HTML only.", "Vietnamese language.", "No invented numbers."],
+                },
+                "system_instructions": _SYS_PER_TABLE,
+                "task": f"Phan tich bang `{table}` va sinh nhan dinh tieng Viet.",
+                "user_prompt": (
+                    f"Bang: `{table}`\n"
+                    f"Danh sach van de:\n{json.dumps(items, ensure_ascii=False, indent=2)}"
+                ),
+                "table": table,
+                "issues": items,
+            }
+            candidate = provider.generate(per_table_context)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"[LLM Error] Per-table insight generation failed for table '{table}': {e}", exc_info=True)
+            results[table] = _deterministic_per_table_insight(table, table_issues)
+            continue
+
+        causal_violations = _check_causal_wording(candidate)
+        if candidate.strip() and not causal_violations:
+            results[table] = candidate
+        else:
+            results[table] = _deterministic_per_table_insight(table, table_issues)
+
+    return results
+
+
+def generate_dual_track_overview(
+    *,
+    issues: "list[dict[str, Any]]",
+    dbml_text: str = "",
+    verdict: "dict[str, Any] | None" = None,
+    provider: "Any | None" = None,
+) -> "dict[str, str]":
+    """
+    Sinh 2 loai nhan dinh AI tong quan:
+    - Track 1 (tech): Nhan dinh ky thuat khach quan cho Data Engineer
+    - Track 2 (biz): Auto-Persona business insight cho Manager
+
+    Ca hai deu co guardrail causal wording check va fallback deterministic.
+
+    Returns:
+        dict voi keys 'technical' va 'business'
+    """
+    verdict = verdict or {}
+    top_issues_payload = [
+        {
+            "type": i.get("issue_type"),
+            "table": i.get("table"),
+            "columns": i.get("columns"),
+            "severity": i.get("severity"),
+            "bad_count": i.get("bad_count", 0),
+            "bad_rate": f"{i.get('bad_rate', 0) * 100:.1f}%",
+        }
+        for i in issues[:8]
+    ]
+
+    # ── Track 1: Technical ────────────────────────────────────────────────────
+    tech_html = _deterministic_overview_tech(issues, verdict)
+    if provider is not None:
+        try:
+            tech_context: "dict[str, Any]" = {
+                "guardrail_safe_draft": tech_html,
+                "guardrail_contract": {
+                    "required_output": "Return HTML only.",
+                    "forbidden_causal_terms": sorted(CAUSAL_PATTERNS),
+                    "style": ["No markdown.", "Vietnamese.", "Cite only supplied numbers."],
+                },
+                "system_instructions": _SYS_OVERALL_TECH,
+                "task": "Tong quan ky thuat ve chat luong du lieu.",
+                "user_prompt": (
+                    f"Du lieu:\n{json.dumps({'verdict': verdict.get('verdict'), 'risk_score': verdict.get('risk_score'), 'issues': top_issues_payload}, ensure_ascii=False, indent=2)}"
+                ),
+            }
+            candidate = provider.generate(tech_context)
+            if candidate.strip() and not _check_causal_wording(candidate):
+                tech_html = candidate
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Dual-track tech LLM generation failed: {e}", exc_info=True)
+            pass
+
+    # ── Track 2: Business Auto-Persona ────────────────────────────────────────
+    biz_html = _deterministic_overview_biz(issues, dbml_text)
+    if provider is not None:
+        try:
+            schema_hint = (dbml_text or "")[:1500]
+            biz_context: "dict[str, Any]" = {
+                "guardrail_safe_draft": biz_html,
+                "guardrail_contract": {
+                    "required_output": "Return HTML only.",
+                    "forbidden_causal_terms": sorted(CAUSAL_PATTERNS),
+                    "style": ["No markdown.", "Vietnamese.", "No technical jargon."],
+                },
+                "system_instructions": _SYS_OVERALL_BIZ,
+                "task": "Nhan dinh nghiep vu dua tren schema va cac van de du lieu.",
+                "user_prompt": (
+                    f"Schema (ten bang/cot):\n{schema_hint}\n\n"
+                    f"Issues:\n{json.dumps(top_issues_payload, ensure_ascii=False, indent=2)}"
+                ),
+            }
+            candidate = provider.generate(biz_context)
+            if candidate.strip() and not _check_causal_wording(candidate):
+                biz_html = candidate
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Dual-track biz LLM generation failed: {e}", exc_info=True)
+            pass
+
+    return {"technical": tech_html, "business": biz_html}

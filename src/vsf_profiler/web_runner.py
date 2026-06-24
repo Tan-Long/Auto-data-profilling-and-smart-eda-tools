@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, unquote, urlparse
 
-from vsf_profiler.connectors import (
+from vsf_profiler.ingestion.connectors import (
     DEFAULT_MYSQL_CHUNK_ROWS,
     DEFAULT_MYSQL_SCHEMA,
     DEFAULT_POSTGRES_CHUNK_ROWS,
@@ -144,7 +144,6 @@ class WebRunStore:
         *,
         dbml: UploadedFile,
         csv_files: list[UploadedFile],
-        rules: UploadedFile | None = None,
         target: str | None = None,
         mapping_overrides: dict[str, str] | None = None,
         preflight_review: dict[str, Any] | None = None,
@@ -174,10 +173,6 @@ class WebRunStore:
             (csv_dir / safe_name).write_bytes(csv_file.content)
             stored_csv_names[csv_file.filename] = safe_name
             stored_csv_names[Path(csv_file.filename).stem] = Path(safe_name).stem
-        rules_path: Path | None = None
-        if rules is not None and rules.content.strip():
-            rules_path = input_dir / _safe_filename(rules.filename, fallback="rules.yaml")
-            rules_path.write_bytes(rules.content)
         stored_mapping_overrides = _translate_uploaded_mapping_overrides(
             _clean_mapping_overrides(mapping_overrides or {}),
             stored_csv_names=stored_csv_names,
@@ -201,7 +196,6 @@ class WebRunStore:
                 job,
                 dbml_path,
                 csv_dir,
-                rules_path,
                 target or None,
                 stored_mapping_overrides,
                 _clean_preflight_review(preflight_review),
@@ -219,7 +213,6 @@ class WebRunStore:
         *,
         dbml_path: str | Path,
         csv_dir: str | Path,
-        rules_path: str | Path | None = None,
         target: str | None = None,
         mapping_overrides: dict[str, str] | None = None,
         preflight_review: dict[str, Any] | None = None,
@@ -232,13 +225,6 @@ class WebRunStore:
             extensions={".dbml"},
         )
         validated_csv_dir = _validated_csv_dir(csv_dir)
-        validated_rules_path: Path | None = None
-        if rules_path is not None and str(rules_path).strip():
-            validated_rules_path = _validated_file_path(
-                rules_path,
-                label="Rules path",
-                extensions={".yaml", ".yml"},
-            )
         validated_target = _validated_target(target)
         validated_use_llm, validated_llm_provider = _validated_llm_options(
             use_llm=use_llm,
@@ -255,7 +241,6 @@ class WebRunStore:
             "input_mode": "path",
             "dbml_path": str(validated_dbml_path),
             "csv_dir": str(validated_csv_dir),
-            "rules_path": str(validated_rules_path) if validated_rules_path else None,
             "target": validated_target,
             "mapping_overrides": _clean_mapping_overrides(mapping_overrides or {}),
             "preflight_review": _clean_preflight_review(preflight_review),
@@ -285,7 +270,6 @@ class WebRunStore:
                 job,
                 validated_dbml_path,
                 validated_csv_dir,
-                validated_rules_path,
                 validated_target,
                 _clean_mapping_overrides(mapping_overrides or {}),
                 _clean_preflight_review(preflight_review),
@@ -306,7 +290,6 @@ class WebRunStore:
         schema: str | None = None,
         tables: str | None = None,
         chunk_rows: int | str | None = None,
-        rules_path: str | Path | None = None,
         target: str | None = None,
         preflight_review: dict[str, Any] | None = None,
         use_llm: bool = False,
@@ -323,13 +306,6 @@ class WebRunStore:
             chunk_rows,
             source_type=validated_source_type,
         )
-        validated_rules_path: Path | None = None
-        if rules_path is not None and str(rules_path).strip():
-            validated_rules_path = _validated_file_path(
-                rules_path,
-                label="Rules path",
-                extensions={".yaml", ".yml"},
-            )
         validated_target = _validated_target(target)
         validated_use_llm, validated_llm_provider = _validated_llm_options(
             use_llm=use_llm,
@@ -356,7 +332,6 @@ class WebRunStore:
             "schema": validated_schema,
             "tables": validated_tables,
             "chunk_rows": validated_chunk_rows,
-            "rules_path": str(validated_rules_path) if validated_rules_path else None,
             "target": validated_target,
             "preflight_review": _clean_preflight_review(preflight_review),
             "use_llm": validated_use_llm,
@@ -387,7 +362,6 @@ class WebRunStore:
                 job,
                 source_connector,
                 validated_connection_url,
-                validated_rules_path,
                 validated_target,
                 _clean_preflight_review(preflight_review),
                 validated_use_llm,
@@ -400,7 +374,7 @@ class WebRunStore:
         return job
 
     def evaluation_catalog_payload(self) -> dict[str, Any]:
-        from vsf_profiler.evaluation_benchmark import evaluation_catalog_payload
+        from vsf_profiler.benchmarks.evaluation_benchmark import evaluation_catalog_payload
 
         return evaluation_catalog_payload()
 
@@ -454,7 +428,7 @@ class WebRunStore:
         issue_id: str,
         provider: str,
     ) -> dict[str, Any]:
-        from vsf_profiler.llm_issue_enrichment import (
+        from vsf_profiler.llm.issue_enrichment import (
             ISSUE_ENRICHMENT_FILENAME,
             generate_issue_llm_enrichment,
         )
@@ -626,7 +600,6 @@ class WebRunStore:
         job: WebRunJob,
         dbml_path: Path,
         csv_dir: Path,
-        rules_path: Path | None,
         target: str | None,
         mapping_overrides: dict[str, str] | None,
         preflight_review: dict[str, Any] | None,
@@ -644,7 +617,6 @@ class WebRunStore:
                 dbml_path=dbml_path,
                 csv_dir=csv_dir,
                 mapping_overrides=mapping_overrides,
-                rules_path=rules_path,
                 target=target,
                 out_dir=job.out_dir,
                 use_llm=use_llm,
@@ -663,7 +635,6 @@ class WebRunStore:
         job: WebRunJob,
         source_connector: TabularSourceConnector,
         connection_url: str,
-        rules_path: Path | None,
         target: str | None,
         preflight_review: dict[str, Any] | None,
         use_llm: bool,
@@ -679,7 +650,6 @@ class WebRunStore:
             run_pipeline(
                 dbml_path=None,
                 csv_dir=None,
-                rules_path=rules_path,
                 target=target,
                 out_dir=job.out_dir,
                 source_connector=source_connector,
@@ -695,7 +665,7 @@ class WebRunStore:
             job.finished_at = _iso_now()
 
     def _run_evaluation_job(self, job: WebRunJob, dataset_id: str) -> None:
-        from vsf_profiler.evaluation_benchmark import run_evaluation_benchmark
+        from vsf_profiler.benchmarks.evaluation_benchmark import run_evaluation_benchmark
 
         job.status = "running"
         job.started_at = _iso_now()
@@ -804,7 +774,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                 job = self.store.start_job(
                     dbml=payload["dbml"],
                     csv_files=payload["csv_files"],
-                    rules=payload.get("rules"),
                     target=payload.get("target"),
                     mapping_overrides=payload.get("mapping_overrides"),
                     preflight_review=payload.get("preflight_review"),
@@ -816,7 +785,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                 job = self.store.start_path_job(
                     dbml_path=payload["dbml_path"],
                     csv_dir=payload["csv_dir"],
-                    rules_path=payload.get("rules_path"),
                     target=payload.get("target"),
                     mapping_overrides=payload.get("mapping_overrides"),
                     preflight_review=payload.get("preflight_review"),
@@ -831,7 +799,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                     schema=payload.get("schema"),
                     tables=payload.get("tables"),
                     chunk_rows=payload.get("chunk_rows"),
-                    rules_path=payload.get("rules_path"),
                     target=payload.get("target"),
                     preflight_review=payload.get("preflight_review"),
                     use_llm=bool(payload.get("use_llm", False)),
@@ -953,7 +920,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
             raise ValueError("Upload payload is not multipart.")
 
         dbml: UploadedFile | None = None
-        rules: UploadedFile | None = None
         csv_files: list[UploadedFile] = []
         fields: dict[str, str] = {}
 
@@ -967,8 +933,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                 upload = UploadedFile(filename=filename, content=content)
                 if field_name == "dbml":
                     dbml = upload
-                elif field_name == "rules":
-                    rules = upload
                 elif field_name in {"csv", "csvFiles"}:
                     csv_files.append(upload)
             else:
@@ -980,7 +944,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
         return {
             "dbml": dbml,
             "csv_files": csv_files,
-            "rules": rules,
             "target": fields.get("target") or None,
             "mapping_overrides": _parse_mapping_overrides_field(fields.get("mapping_overrides")),
             "preflight_review": _parse_preflight_review_field(fields.get("preflight_review")),
@@ -1007,7 +970,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
         return {
             "dbml_path": _required_string(payload, "dbml_path"),
             "csv_dir": _required_string(payload, "csv_dir"),
-            "rules_path": _optional_string(payload, "rules_path"),
             "target": _optional_string(payload, "target"),
             "mapping_overrides": _optional_mapping_overrides(payload, "mapping_overrides"),
             "preflight_review": _optional_preflight_review(payload, "preflight_review"),
@@ -1037,7 +999,6 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
             "schema": _optional_string(payload, "schema"),
             "tables": _optional_string(payload, "tables"),
             "chunk_rows": payload.get("chunk_rows"),
-            "rules_path": _optional_string(payload, "rules_path"),
             "target": _optional_string(payload, "target"),
             "preflight_review": _optional_preflight_review(payload, "preflight_review"),
             "use_llm": _optional_bool(payload, "use_llm"),
@@ -1720,12 +1681,29 @@ def _validated_evaluation_dataset_id(dataset_id: str) -> str:
         raise ValueError("dataset_id is required.")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", stripped):
         raise ValueError("dataset_id contains unsupported characters.")
-    from vsf_profiler.evaluation_benchmark import get_evaluation_dataset
+    from vsf_profiler.benchmarks.evaluation_benchmark import get_evaluation_dataset
 
     return get_evaluation_dataset(stripped).dataset_id
 
 
 def _validated_llm_options(*, use_llm: bool, llm_provider: str | None) -> tuple[bool, str | None]:
+    import os
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+        
+    if not use_llm:
+        if os.environ.get("OPENAI_API_KEY"):
+            use_llm = True
+            if not llm_provider:
+                llm_provider = os.environ.get("VSF_PROFILER_LLM_PROVIDER", "openai")
+        elif os.environ.get("GEMINI_API_KEY"):
+            use_llm = True
+            if not llm_provider:
+                llm_provider = os.environ.get("VSF_PROFILER_LLM_PROVIDER", "gemini")
+                
     provider = _optional_llm_provider_string(llm_provider)
     if provider and not use_llm:
         raise ValueError("llm_provider requires use_llm.")

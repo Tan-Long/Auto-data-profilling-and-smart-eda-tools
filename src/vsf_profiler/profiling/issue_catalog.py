@@ -4,7 +4,7 @@ from pathlib import Path
 
 import duckdb
 
-from vsf_profiler.duckdb_utils import run_scalar, safe_rate, sql_literal
+from vsf_profiler.ingestion.duckdb_utils import run_scalar, safe_rate, sql_literal
 from vsf_profiler.models import Issue
 
 

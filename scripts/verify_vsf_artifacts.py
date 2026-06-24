@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Sequence
 
-from vsf_profiler.artifact_audit import audit_artifacts
+from vsf_profiler.reporting.artifact_audit import audit_artifacts
 
 
 def main(argv: Sequence[str] | None = None) -> int:

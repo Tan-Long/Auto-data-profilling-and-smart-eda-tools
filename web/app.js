@@ -209,6 +209,7 @@ const els = {
   edgeList: document.querySelector("#edgeList"),
   mappingBody: document.querySelector("#mappingBody"),
   loadDemoButton: document.querySelector("#loadDemoButton"),
+  clearFilesButton: document.querySelector("#clearFilesButton"),
 };
 
 const demoDbml = `Table customers {
@@ -621,6 +622,25 @@ els.autoLinkButton.addEventListener("click", () => {
 
 els.loadDemoButton.addEventListener("click", () => {
   loadDemoState("small");
+});
+
+els.clearFilesButton.addEventListener("click", () => {
+  if (typeof resetPreflightReview === "function") resetPreflightReview();
+  state.selectedDemoPreset = "custom";
+  state.dbmlText = "";
+  state.dbmlName = "";
+  state.dbmlFile = null;
+  state.csvFiles = [];
+  state.csvReadErrors = [];
+  state.mapping = new Map();
+  state.manualMappings = new Set();
+  state.tables = [];
+  state.relationships = [];
+  state.dbmlParseError = "";
+  if (els.dbmlInput) els.dbmlInput.value = "";
+  if (els.csvInput) els.csvInput.value = "";
+  renderAll();
+  renderDiagram();
 });
 
 els.runnerModeUpload.addEventListener("click", () => {

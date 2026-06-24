@@ -5,9 +5,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from vsf_profiler.connectors import redact_secret_text
+from vsf_profiler.ingestion.connectors import redact_secret_text
 from vsf_profiler.models import CsvCatalog, Schema
-from vsf_profiler.relationship_metadata import child_columns, parent_columns, relationship_id
+from vsf_profiler.ingestion.relationship_metadata import child_columns, parent_columns, relationship_id
 
 
 SENSITIVE_KEY_PARTS = ("secret", "token", "credential", "password", "api_key")

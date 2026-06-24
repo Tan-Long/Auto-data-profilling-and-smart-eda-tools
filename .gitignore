@@ -35,3 +35,11 @@ test-results/
 
 data/
 outputs/
+
+# Local test outputs and scripts
+smoke_test_output/
+*.ps1
+
+# Local data files
+*.csv
+*.dbml

@@ -11,7 +11,6 @@ demo-small:
 	vsf-profiler run \
 		--dbml data/demo_small/schema.dbml \
 		--csv-dir data/demo_small/csv \
-		--rules data/demo_small/rules.yaml \
 		--target order_reviews.review_score \
 		--out outputs/demo_small
 

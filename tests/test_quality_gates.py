@@ -1,4 +1,4 @@
-from vsf_profiler.quality_gates import build_quality_gates
+from vsf_profiler.profiling.quality_gates import build_quality_gates
 
 
 def test_quality_gates_emit_clean_states_for_empty_run():

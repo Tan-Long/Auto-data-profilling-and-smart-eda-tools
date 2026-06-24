@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from vsf_profiler.csv_catalog import CsvCatalog
+from vsf_profiler.ingestion.csv_catalog import CsvCatalog
 from vsf_profiler.models import ColumnSchema, Issue, Schema, TableSchema
-from vsf_profiler.relationship_metadata import (
+from vsf_profiler.ingestion.relationship_metadata import (
     child_columns,
     detect_junction_tables,
     parent_columns,

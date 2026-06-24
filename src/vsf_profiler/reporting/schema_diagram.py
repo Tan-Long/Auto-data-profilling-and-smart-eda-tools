@@ -4,7 +4,7 @@ import base64
 from pathlib import Path
 from urllib.parse import quote
 
-from vsf_profiler.csv_catalog import CsvCatalog
+from vsf_profiler.ingestion.csv_catalog import CsvCatalog
 from vsf_profiler.models import ColumnSchema, Schema, TableSchema
 
 
@@ -36,8 +36,40 @@ def build_schema_diagram(schema: Schema, catalog: CsvCatalog, out_dir: Path) -> 
             {"table": stem, "csv_path": f"{stem}.csv", "status": "extra_csv"}
             for stem in catalog.extra_csvs
         ],
+        "mermaid": render_mermaid_for_diagram(schema),
     }
     return diagram
+
+import re
+
+def render_mermaid_for_diagram(schema: Schema) -> str:
+    blocks = ["erDiagram"]
+    for table_name, table_schema in schema.tables.items():
+        safe_table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
+        blocks.append(f"  {safe_table_name} {{")
+        for column in table_schema.columns.values():
+            key_marker = ""
+            if column.is_pk and column.foreign_key:
+                key_marker = " PK,FK"
+            elif column.is_pk:
+                key_marker = " PK"
+            elif column.foreign_key:
+                key_marker = " FK"
+            
+            # Escape type strings for mermaid
+            col_type = re.sub(r'[^a-zA-Z0-9_]', '_', column.type)
+            safe_col_name = re.sub(r'[^a-zA-Z0-9_]', '_', column.name)
+            blocks.append(f"    {col_type} {safe_col_name}{key_marker}")
+        blocks.append("  }")
+        
+    for rel in schema.relationships:
+        # Default to one-to-many relationship as a safe approximation
+        safe_parent = re.sub(r'[^a-zA-Z0-9_]', '_', rel.parent_table)
+        safe_child = re.sub(r'[^a-zA-Z0-9_]', '_', rel.child_table)
+        blocks.append(f'  {safe_parent} ||--o{{ {safe_child} : "{rel.parent_column} -> {rel.child_column}"')
+        
+    return "\n".join(blocks)
+
 
 
 def render_dbml_for_diagram(schema: Schema, catalog: CsvCatalog) -> str:

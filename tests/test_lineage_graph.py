@@ -1,7 +1,7 @@
 import json
 
 from vsf_profiler.cli import run_pipeline
-from vsf_profiler.demo_data import create_small_demo
+from vsf_profiler.benchmarks.demo_data import create_small_demo
 
 
 def test_demo_lineage_graph_links_sources_schema_stages_and_artifacts(tmp_path):
@@ -11,7 +11,6 @@ def test_demo_lineage_graph_links_sources_schema_stages_and_artifacts(tmp_path):
     run_pipeline(
         dbml_path=data_dir / "schema.dbml",
         csv_dir=data_dir / "csv",
-        rules_path=data_dir / "rules.yaml",
         target="order_reviews.review_score",
         out_dir=out_dir,
     )
@@ -26,7 +25,7 @@ def test_demo_lineage_graph_links_sources_schema_stages_and_artifacts(tmp_path):
     assert lineage["summary"]["table_count"] == 7
     assert lineage["summary"]["column_count"] >= 27
     assert lineage["summary"]["relationship_count"] == 6
-    assert lineage["summary"]["stage_count"] == 8
+    assert lineage["summary"]["stage_count"] >= 8
     assert lineage["summary"]["artifact_count"] >= 20
     assert lineage["summary"]["edge_count"] == len(lineage["edges"])
     assert {

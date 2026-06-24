@@ -5,7 +5,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from vsf_profiler.export_package import (
+from vsf_profiler.reporting.export_package import (
     BEARER_TOKEN_RE,
     CONNECTION_CREDENTIAL_RE,
     INDEX_NAME,
@@ -184,7 +184,7 @@ def _check_run_summary(root: Path, violations: list[dict[str, Any]]) -> None:
     )
     for key, expected_path in expected.items():
         actual_path = artifact_paths.get(key)
-        if actual_path != expected_path:
+        if actual_path is None or str(actual_path).replace("\\", "/") != expected_path:
             violations.append(
                 _violation(
                     "ARTIFACT_PATH_MISMATCH",

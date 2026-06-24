@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
-from vsf_profiler.connectors import redact_secret_text
-from vsf_profiler.llm_narrative import (
+from vsf_profiler.ingestion.connectors import redact_secret_text
+from vsf_profiler.llm.narrative import (
     DEFAULT_OPENAI_BASE_URL,
     DEFAULT_OPENAI_MODEL,
     OpenAIModelConfig,

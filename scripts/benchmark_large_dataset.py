@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Sequence
 
-from vsf_profiler.large_benchmark import (
+from vsf_profiler.benchmarks.large_benchmark import (
     DEFAULT_BENCHMARK_ROWS,
     DEFAULT_BENCHMARK_SEED,
     DEFAULT_BENCHMARK_TABLES,
