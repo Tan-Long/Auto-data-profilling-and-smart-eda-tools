@@ -137,9 +137,9 @@
         </div>
       </section>
 
-      <div class="profile-flow" id="profileFlow" hidden>
-      <section class="status-strip" aria-label="Profile workflow stages">
-        <article class="status-card complete">
+      <div class="profile-flow" id="profileFlow" data-profile-step="connect" hidden>
+      <section class="status-strip profile-step-strip" aria-label="Profile workflow stages">
+        <article class="status-card active" data-profile-step-card="connect" role="button" tabindex="0">
           <span class="step-number">01</span>
           <div>
             <strong>Connect</strong>
@@ -147,7 +147,7 @@
             <p id="csvStatus">No CSV files selected</p>
           </div>
         </article>
-        <article class="status-card">
+        <article class="status-card" data-profile-step-card="preflight" role="button" tabindex="-1">
           <span class="step-number">02</span>
           <div>
             <strong>Preflight Review</strong>
@@ -155,16 +155,23 @@
             <p id="mappingStatus">Run auto-link after upload</p>
           </div>
         </article>
-        <article class="status-card">
+        <article class="status-card" data-profile-step-card="run" role="button" tabindex="-1">
           <span class="step-number">03</span>
           <div>
             <strong>Run</strong>
             <p id="runnerStatus">Checking local backend</p>
           </div>
         </article>
+        <article class="status-card" data-profile-step-card="review" role="button" tabindex="-1">
+          <span class="step-number">04</span>
+          <div>
+            <strong>Review</strong>
+            <p>Quality gates, issues, todos, reports</p>
+          </div>
+        </article>
       </section>
 
-      <section class="panel source-state-panel" id="sourceState" aria-labelledby="sourceStateTitle">
+      <section class="panel source-state-panel" id="sourceState" data-profile-step-section="connect" aria-labelledby="sourceStateTitle">
         <div class="panel-heading compact">
           <div>
             <p class="eyebrow">Connected source</p>
@@ -184,7 +191,7 @@
         </div>
       </section>
 
-      <section class="panel preflight-review-panel" id="preflightReview" aria-labelledby="preflightReviewTitle">
+      <section class="panel preflight-review-panel" id="preflightReview" data-profile-step-section="preflight" aria-labelledby="preflightReviewTitle">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Preflight Review</p>
@@ -215,7 +222,7 @@
         </div>
       </section>
 
-      <section class="panel runner-panel console-primary" id="runner">
+      <section class="panel runner-panel console-primary" id="runner" data-profile-step-section="connect run">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Profile data</p>
@@ -375,7 +382,7 @@
         </div>
       </section>
 
-      <section class="panel run-history-panel" id="runHistory" aria-labelledby="runHistoryTitle">
+      <section class="panel run-history-panel" id="runHistory" data-profile-step-section="review" aria-labelledby="runHistoryTitle">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Persisted runs</p>
@@ -405,7 +412,7 @@
         </div>
       </section>
 
-      <section class="panel dashboard-panel" id="dashboard">
+      <section class="panel dashboard-panel" id="dashboard" data-profile-step-section="review">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Post-run review</p>
@@ -590,12 +597,12 @@
         </div>
       </section>
 
-      <section class="section-label" id="inputSetup">
+      <section class="section-label" id="inputSetup" data-profile-step-section="connect">
         <p class="eyebrow">Input setup</p>
         <h3>Upload preflight and DBML mapping</h3>
       </section>
 
-      <section class="upload-grid" id="upload">
+      <section class="upload-grid" id="upload" data-profile-step-section="connect">
         <article class="panel upload-panel">
           <div class="panel-heading">
             <div>
@@ -635,7 +642,7 @@
         </article>
       </section>
 
-      <section class="content-grid">
+      <section class="content-grid" data-profile-step-section="connect">
         <article class="panel diagram-panel" id="diagram">
           <div class="panel-heading">
             <div>
@@ -696,7 +703,7 @@
         </aside>
       </section>
 
-      <section class="panel mapping-panel" id="mapping">
+      <section class="panel mapping-panel" id="mapping" data-profile-step-section="connect">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Mapping</p>
@@ -723,6 +730,13 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </section>
+      <section class="profile-step-footer" aria-label="Profile step navigation">
+        <p id="profileStepHint">Add a DBML contract and CSV files, or choose a local demo path.</p>
+        <div class="profile-step-actions">
+          <button class="button secondary" id="profileStepBack" type="button" disabled>Back</button>
+          <button class="button primary" id="profileStepNext" type="button" disabled>Next: Preflight Review</button>
         </div>
       </section>
       </div>

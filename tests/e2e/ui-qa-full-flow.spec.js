@@ -74,6 +74,7 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
 
     await page.locator("#profileFlowButton").click();
     await expect(page.locator("#profileFlow")).toBeVisible();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "connect");
     await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
     await expect(page.locator("#csvList")).not.toContainText("customers.csv");
     await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");
@@ -118,7 +119,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#csvList")).not.toContainText("customers.csv");
     await expect(page.locator("#mappingStatus")).toContainText("1/1 tables mapped");
     await expect(page.locator("#preflightGateBadge")).toContainText("Run enabled");
-    await expect(page.locator("#runProfilerButton")).toBeEnabled();
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
+    await expect(page.locator("#runProfilerButton")).toBeDisabled();
     record(
       matrix,
       "Custom upload mapping",
@@ -143,10 +145,14 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       await screenshot(page.locator("#profileFlow"), "06-reupload-source-state.png"),
     );
 
+    await goToProfileStep(page, "preflight");
+    await goToProfileStep(page, "run");
+    await expect(page.locator("#runProfilerButton")).toBeEnabled();
     await page.locator("#runProfilerButton").click();
     await expect(page.locator("#runnerMessage")).toContainText("Run complete", {
       timeout: 60_000,
     });
+    await goToProfileStep(page, "run");
     await expect(page.locator("#artifactList")).toContainText("Issue counts");
     record(
       matrix,
@@ -175,6 +181,10 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#runDatabaseProfilerButton")).toBeDisabled();
     await page.locator("#databaseUrlInput").fill("postgresql://profiler:secret@127.0.0.1:5432/demo");
     await page.locator("#databaseTablesInput").fill("customers, orders");
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
+    await expect(page.locator("#runDatabaseProfilerButton")).toBeDisabled();
+    await goToProfileStep(page, "preflight");
+    await goToProfileStep(page, "run");
     await expect(page.locator("#runDatabaseProfilerButton")).toBeEnabled();
     await page.locator("#runnerModePath").click();
     await openDetails(page, "#pathCompatibilityOptions");
@@ -182,7 +192,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await page.locator("#csvDirPathInput").fill("data/demo_small/csv");
     await page.locator("#rulesPathInput").fill("data/demo_small/rules.yaml");
     await page.locator("#pathTargetInput").fill("order_reviews.review_score");
-    await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
+    await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
     record(
       matrix,
       "Advanced controls",
@@ -191,6 +202,9 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
       await screenshot(page.locator("#runner"), "08-advanced-controls.png"),
     );
 
+    await goToProfileStep(page, "preflight");
+    await goToProfileStep(page, "run");
+    await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
     await page.locator("#runPathProfilerButton").click();
     await expect(page.locator("#runnerMessage")).toContainText("Run complete", {
       timeout: 60_000,
@@ -286,6 +300,11 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
 
     await page.reload();
     await page.locator("#profileFlowButton").click();
+    await expect(page.locator('[data-profile-step-card="review"]')).toHaveAttribute("aria-disabled", "false", {
+      timeout: 10_000,
+    });
+    await page.locator('[data-profile-step-card="review"]').click();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
     await expect(page.locator("#runHistoryStatus")).toContainText("History ready", {
       timeout: 10_000,
     });
@@ -332,6 +351,33 @@ async function screenshot(target, filename, options = {}) {
   const screenshotPath = path.join(qaDir, filename);
   await target.screenshot({ path: screenshotPath, ...options });
   return screenshotPath;
+}
+
+async function goToProfileStep(page, targetStep) {
+  const order = ["connect", "preflight", "run", "review"];
+  const targetIndex = order.indexOf(targetStep);
+  if (targetIndex === -1) {
+    throw new Error(`Unknown profile step: ${targetStep}`);
+  }
+  for (let attempt = 0; attempt < order.length + 2; attempt += 1) {
+    const currentStep = await page.locator("#profileFlow").getAttribute("data-profile-step");
+    if (currentStep === targetStep) {
+      await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", targetStep);
+      return;
+    }
+    const currentIndex = order.indexOf(currentStep);
+    if (currentIndex === -1) {
+      throw new Error(`Unknown current profile step: ${currentStep}`);
+    }
+    if (currentIndex < targetIndex) {
+      await expect(page.locator("#profileStepNext")).toBeEnabled();
+      await page.locator("#profileStepNext").click();
+    } else {
+      await expect(page.locator("#profileStepBack")).toBeEnabled();
+      await page.locator("#profileStepBack").click();
+    }
+  }
+  throw new Error(`Unable to navigate to profile step: ${targetStep}`);
 }
 
 async function openDetails(page, selector) {

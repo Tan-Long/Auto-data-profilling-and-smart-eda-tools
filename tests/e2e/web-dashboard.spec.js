@@ -65,16 +65,19 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await page.locator("#profileFlowButton").click();
   await expect(page.locator("#profileFlow")).toBeVisible();
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "connect");
   await expect(page.locator("#evaluateFlow")).toBeHidden();
   fs.mkdirSync("outputs/us073_goal3", { recursive: true });
-  await expect(page.locator("#preflightReview")).toBeVisible();
+  await expect(page.locator("#sourceState")).toBeVisible();
+  await expect(page.locator("#preflightReview")).toBeHidden();
   await expect(page.locator("#preflightGateBadge")).toContainText("Run locked");
   await expect(page.locator("#preflightBlockerList")).toContainText("Uploaded DBML is missing");
   await expect(page.locator("#preflightBlockerList")).toContainText("Uploaded CSV source is missing");
+  await expect(page.locator("#profileStepNext")).toBeDisabled();
   await expect(page.locator("#runProfilerButton")).toBeDisabled();
   await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
   await expect(page.locator("#sourceStateSummary")).toContainText("Upload a DBML contract");
-  await page.locator("#preflightReview").screenshot({
+  await page.locator("#profileFlow").screenshot({
     path: "outputs/us073_goal3/profile-preflight-blocked.png",
   });
   await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
@@ -107,7 +110,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#csvList")).toContainText("accounts.csv");
   await expect(page.locator("#csvList")).not.toContainText("customers.csv");
   await expect(page.locator("#mappingStatus")).toContainText("1/1 tables mapped");
-  await expect(page.locator("#runProfilerButton")).toBeEnabled();
+  await expect(page.locator("#profileStepNext")).toBeEnabled();
+  await expect(page.locator("#runProfilerButton")).toBeDisabled();
   await page.locator("#clearUploadButton").click();
   await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
   await expect(page.locator("#csvList")).not.toContainText("accounts.csv");
@@ -147,21 +151,23 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#demoPresetSmall")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#llmModeStatus")).toContainText("LLM off");
   await expect(page.locator("#llmModeOff")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#preflightGateBadge")).toContainText("Run enabled");
-  await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
+  await expect(page.locator("#profileStepNext")).toBeEnabled();
+  await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
 
   await page.locator('.mapping-select[data-table="customers"]').selectOption("");
   await page.locator('.mapping-select[data-table="orders"]').selectOption("customers");
+  await goToProfileStep(page, "preflight");
   await expect(page.locator("#preflightGateBadge")).toContainText("Review warnings");
   await expect(page.locator("#preflightWarningList")).toContainText("Manual mapping selected");
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
   await page.locator("[data-preflight-accept-all]").click();
   await expect(page.locator("#preflightGateBadge")).toContainText("Run enabled");
   await expect(page.locator("#preflightWarningList")).toContainText("Accepted");
-  await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
   await page.locator("#preflightReview").screenshot({
     path: "outputs/us073_goal3/profile-preflight-warnings-accepted.png",
   });
+  await goToProfileStep(page, "run");
+  await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
   await page.locator("#loadDemoButton").click();
   await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
 
@@ -179,13 +185,17 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#databaseTablesInput").fill("customers, orders, order_items");
   await page.locator("#databaseTargetInput").fill("orders.order_total");
   await expect(page.locator("#csvStatus")).toContainText("Postgres selected tables ready");
-  await expect(page.locator("#runDatabaseProfilerButton")).toBeEnabled();
+  await expect(page.locator("#profileStepNext")).toBeEnabled();
+  await expect(page.locator("#runDatabaseProfilerButton")).toBeDisabled();
   await page.locator("#databaseSourceType").selectOption("mysql");
   await expect(page.locator("#databaseSchemaInput")).toHaveValue("");
   await page
     .locator("#databaseUrlInput")
     .fill("mysql://profiler:secret@127.0.0.1:3306/demo");
   await expect(page.locator("#csvStatus")).toContainText("MySQL/MariaDB selected tables ready");
+  await goToProfileStep(page, "preflight");
+  await goToProfileStep(page, "run");
+  await expect(page.locator("#runDatabaseProfilerButton")).toBeEnabled();
   fs.mkdirSync("outputs/us072_database_mode", { recursive: true });
   await page.locator("#runner").screenshot({
     path: "outputs/us072_database_mode/database-mode-runner.png",
@@ -226,6 +236,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#rulesPathInput").fill("data/demo_small/rules.yaml");
   await page.locator("#pathTargetInput").fill("order_reviews.review_score");
 
+  await goToProfileStep(page, "preflight");
+  await goToProfileStep(page, "run");
   await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
   await page.locator("#runPathProfilerButton").click();
 
@@ -244,6 +256,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("readiness");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("gates");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
+
+  await goToProfileStep(page, "connect");
   await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
   await expect(page.locator("#diagramMessage")).toContainText("Generated artifacts");
   await expect(page.locator("#diagramWarnings")).toContainText("schema_parse_report.json");
@@ -263,6 +278,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#diagramDensityToggle").click();
   await expect(page.locator("#diagramDensityToggle")).toHaveAttribute("aria-pressed", "true");
 
+  await goToProfileStep(page, "run");
   await expect(page.getByText("Issue review snapshot")).toBeVisible();
   const generatedResults = page.locator("#artifactList");
   await expect(generatedResults).toContainText("Data-quality readiness");
@@ -290,6 +306,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: "outputs/us070_visual_review/dashboard-generated-results-desktop.png",
   });
 
+  await goToProfileStep(page, "review");
   const dashboard = page.locator("#dashboardPanelGrid");
   await expect(dashboard).toContainText("Table -> Column -> Issue");
   await expect(dashboard).toContainText("customers");
@@ -355,6 +372,11 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#flowChooser")).toBeVisible();
   await page.locator("#profileFlowButton").click();
   await expect(page.locator("#runnerMessage")).toContainText("Local backend is ready");
+  await expect(page.locator('[data-profile-step-card="review"]')).toHaveAttribute("aria-disabled", "false", {
+    timeout: 10_000,
+  });
+  await page.locator('[data-profile-step-card="review"]').click();
+  await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "review");
   await expect(page.locator("#runHistoryStatus")).toContainText("History ready", {
     timeout: 10_000,
   });
@@ -627,6 +649,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.screenshot({
     path: "outputs/web_demo_ux_screenshots/mobile-dashboard.png",
   });
+  await goToProfileStep(page, "run");
   await page.locator("#artifactList").scrollIntoViewIfNeeded();
   await page.waitForTimeout(100);
   await page.screenshot({
@@ -636,3 +659,30 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: "outputs/us070_visual_review/dashboard-generated-results-mobile.png",
   });
 });
+
+async function goToProfileStep(page, targetStep) {
+  const order = ["connect", "preflight", "run", "review"];
+  const targetIndex = order.indexOf(targetStep);
+  if (targetIndex === -1) {
+    throw new Error(`Unknown profile step: ${targetStep}`);
+  }
+  for (let attempt = 0; attempt < order.length + 2; attempt += 1) {
+    const currentStep = await page.locator("#profileFlow").getAttribute("data-profile-step");
+    if (currentStep === targetStep) {
+      await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", targetStep);
+      return;
+    }
+    const currentIndex = order.indexOf(currentStep);
+    if (currentIndex === -1) {
+      throw new Error(`Unknown current profile step: ${currentStep}`);
+    }
+    if (currentIndex < targetIndex) {
+      await expect(page.locator("#profileStepNext")).toBeEnabled();
+      await page.locator("#profileStepNext").click();
+    } else {
+      await expect(page.locator("#profileStepBack")).toBeEnabled();
+      await page.locator("#profileStepBack").click();
+    }
+  }
+  throw new Error(`Unable to navigate to profile step: ${targetStep}`);
+}

@@ -4,6 +4,7 @@ const state = {
   dbmlFile: null,
   rulesFile: null,
   flowMode: "choose",
+  profileStep: "connect",
   evaluationCatalog: [],
   evaluationCatalogLoading: false,
   evaluationCatalogError: "",
@@ -69,6 +70,9 @@ const els = {
   profileFlowButton: document.querySelector("#profileFlowButton"),
   evaluateFlowButton: document.querySelector("#evaluateFlowButton"),
   flowModeStatus: document.querySelector("#flowModeStatus"),
+  profileStepBack: document.querySelector("#profileStepBack"),
+  profileStepNext: document.querySelector("#profileStepNext"),
+  profileStepHint: document.querySelector("#profileStepHint"),
   evaluateStatusBadge: document.querySelector("#evaluateStatusBadge"),
   evaluationCatalogCount: document.querySelector("#evaluationCatalogCount"),
   evaluationDatasetList: document.querySelector("#evaluationDatasetList"),
@@ -237,6 +241,14 @@ const {
   severityOrder,
 } = window.VSF_DASHBOARD_CONFIG;
 
+const profileSteps = ["connect", "preflight", "run", "review"];
+const profileStepLabels = {
+  connect: "Connect",
+  preflight: "Preflight Review",
+  run: "Run",
+  review: "Review",
+};
+
 function severityRank(severity) {
   const index = severityOrder.indexOf(severity);
   return index === -1 ? severityOrder.length : index;
@@ -248,6 +260,40 @@ els.profileFlowButton.addEventListener("click", () => {
 
 els.evaluateFlowButton.addEventListener("click", () => {
   setFlowMode("evaluate");
+});
+
+els.profileStepBack.addEventListener("click", () => {
+  moveProfileStep(-1);
+});
+
+els.profileStepNext.addEventListener("click", () => {
+  moveProfileStep(1);
+});
+
+els.profileFlow.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-profile-step-card]");
+  if (!card) {
+    return;
+  }
+  const step = card.dataset.profileStepCard;
+  if (canOpenProfileStep(step)) {
+    setProfileStep(step);
+  }
+});
+
+els.profileFlow.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) {
+    return;
+  }
+  const card = event.target.closest("[data-profile-step-card]");
+  if (!card) {
+    return;
+  }
+  event.preventDefault();
+  const step = card.dataset.profileStepCard;
+  if (canOpenProfileStep(step)) {
+    setProfileStep(step);
+  }
 });
 
 els.startEvaluationButton.addEventListener("click", async () => {
@@ -658,6 +704,7 @@ async function loadRunHistory(options = {}) {
   } finally {
     state.runHistoryLoading = false;
     renderRunHistory();
+    renderProfileStepper();
   }
 }
 
@@ -803,6 +850,7 @@ async function selectRunHistory(jobId) {
     state.runEvents = [];
     renderJob();
     await loadDashboard(jobId, { force: true });
+    state.profileStep = "review";
     renderRunnerMessage(`Loaded run ${jobId} from history.`, "success");
   } catch (error) {
     renderRunnerMessage(error.message || "Unable to load the selected run.", "error");
@@ -812,6 +860,7 @@ async function selectRunHistory(jobId) {
 }
 
 async function startProfilerRun() {
+  state.profileStep = "run";
   const preflightReview = buildPreflightReview();
   if (!preflightReview.runAllowed) {
     renderRunnerMessage(preflightGateMessage(preflightReview), "error");
@@ -865,6 +914,7 @@ async function startProfilerRun() {
 }
 
 async function startPathRun() {
+  state.profileStep = "run";
   const preflightReview = buildPreflightReview();
   if (!preflightReview.runAllowed) {
     renderRunnerMessage(preflightGateMessage(preflightReview), "error");
@@ -929,6 +979,7 @@ async function startPathRun() {
 }
 
 async function startDatabaseRun() {
+  state.profileStep = "run";
   const preflightReview = buildPreflightReview();
   if (!preflightReview.runAllowed) {
     renderRunnerMessage(preflightGateMessage(preflightReview), "error");
@@ -1011,6 +1062,7 @@ async function startDatabaseRun() {
 function setRunnerMode(mode) {
   resetPreflightReview();
   state.runnerMode = ["upload", "path", "database"].includes(mode) ? mode : "upload";
+  state.profileStep = "connect";
   if (state.runnerMode === "path") {
     syncDemoPresetFromPathInputs();
   }
@@ -1046,6 +1098,36 @@ function setFlowMode(mode) {
   }
 }
 
+function setProfileStep(step, options = {}) {
+  const nextStep = profileSteps.includes(step) ? step : "connect";
+  const changed = state.profileStep !== nextStep;
+  state.profileStep = nextStep;
+  if (options.render !== false) {
+    renderAll();
+  }
+  if (changed && options.focus !== false && state.flowMode === "profile") {
+    els.profileFlow.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+}
+
+function moveProfileStep(direction) {
+  const currentIndex = profileSteps.indexOf(state.profileStep);
+  if (currentIndex === -1) {
+    setProfileStep("connect");
+    return;
+  }
+  if (direction < 0) {
+    setProfileStep(profileSteps[Math.max(currentIndex - 1, 0)]);
+    return;
+  }
+  const nextStep = profileSteps[currentIndex + 1];
+  if (!nextStep || !profileStepGuard(state.profileStep).allowed) {
+    renderProfileStepper();
+    return;
+  }
+  setProfileStep(nextStep);
+}
+
 function setLlmMode(mode) {
   state.llmMode = ["off", "fake", "openai"].includes(mode) ? mode : "off";
   renderControls();
@@ -1077,8 +1159,14 @@ function connectEventStream(eventsUrl) {
         state.currentJob.status === "succeeded" ? "success" : "error",
       );
       loadRunHistory({ preferredJobId: state.currentJob.job_id });
-      loadDashboard(state.currentJob.job_id);
-      renderAll();
+      if (state.currentJob.status === "succeeded") {
+        loadDashboard(state.currentJob.job_id)
+          .then(() => setProfileStep("review"))
+          .catch(() => renderAll());
+      } else {
+        loadDashboard(state.currentJob.job_id);
+        renderAll();
+      }
     }
   });
   state.eventSource.onerror = () => {
@@ -1096,6 +1184,7 @@ function renderRunnerMessage(message, status) {
 function loadDemoState(presetName = "small", options = {}) {
   resetPreflightReview();
   resetRunResultsForInputChange();
+  state.profileStep = "connect";
   const preset = demoPresets[presetName] || demoPresets.small;
   state.selectedDemoPreset = presetName in demoPresets ? presetName : "small";
   state.dbmlText = preset.dbmlText;
@@ -1124,6 +1213,7 @@ function loadDemoState(presetName = "small", options = {}) {
 function clearProfileInputs(options = {}) {
   resetPreflightReview();
   resetRunResultsForInputChange();
+  state.profileStep = "connect";
   clearDbmlState();
   state.dbmlFile = null;
   state.rulesFile = null;
@@ -1250,6 +1340,7 @@ function setupDropzone(element, onDrop) {
 async function loadDbmlFile(file) {
   resetPreflightReview();
   resetRunResultsForInputChange();
+  state.profileStep = "connect";
   markCustomUploadSource();
   if (!state.csvFiles.some((csvFile) => csvFile.sourceFile)) {
     state.csvFiles = [];
@@ -1270,6 +1361,7 @@ async function loadCsvFiles(files) {
   }
   resetPreflightReview();
   resetRunResultsForInputChange();
+  state.profileStep = "connect";
   const hasUploadedDbml = Boolean(state.dbmlFile);
   markCustomUploadSource();
   if (!hasUploadedDbml) {
@@ -1335,6 +1427,7 @@ function renderAll() {
   renderRunHistory();
   renderDashboard();
   renderControls();
+  renderProfileStepper();
 }
 
 function renderFlowShell() {
@@ -1355,6 +1448,127 @@ function renderFlowShell() {
     card.classList.toggle("active", active);
     button.setAttribute("aria-pressed", active ? "true" : "false");
   });
+}
+
+function renderProfileStepper() {
+  if (!els.profileFlow) {
+    return;
+  }
+  if (!profileSteps.includes(state.profileStep)) {
+    state.profileStep = "connect";
+  }
+  const currentStep = state.profileStep;
+  const currentIndex = profileSteps.indexOf(currentStep);
+  const nextStep = profileSteps[currentIndex + 1];
+  const guard = profileStepGuard(currentStep);
+  els.profileFlow.dataset.profileStep = currentStep;
+  document.querySelectorAll("[data-profile-step-section]").forEach((section) => {
+    const sectionSteps = (section.dataset.profileStepSection || "").split(/\s+/).filter(Boolean);
+    section.hidden = !sectionSteps.includes(currentStep);
+  });
+  document.querySelectorAll("[data-profile-step-card]").forEach((card) => {
+    const cardStep = card.dataset.profileStepCard;
+    const cardIndex = profileSteps.indexOf(cardStep);
+    const canOpen = canOpenProfileStep(cardStep);
+    card.classList.toggle("active", cardStep === currentStep);
+    card.classList.toggle("complete", profileStepComplete(cardStep));
+    card.classList.toggle("pending", cardIndex > currentIndex);
+    card.classList.toggle("unavailable", !canOpen && cardStep !== currentStep);
+    card.setAttribute("aria-disabled", canOpen ? "false" : "true");
+    card.tabIndex = canOpen ? 0 : -1;
+  });
+
+  els.profileStepBack.disabled = currentIndex <= 0;
+  els.profileStepNext.disabled = !nextStep || !guard.allowed;
+  els.profileStepNext.textContent = nextStep
+    ? `Next: ${profileStepLabels[nextStep]}`
+    : "Review ready";
+  els.profileStepHint.textContent = guard.message;
+  els.profileStepHint.dataset.status = guard.allowed ? "ready" : "blocked";
+}
+
+function profileStepGuard(step) {
+  if (step === "connect") {
+    const ready = profileSourceReady();
+    return {
+      allowed: ready,
+      message: ready
+        ? "Source connected. Continue to Preflight Review."
+        : "Add DBML and CSV files, choose local paths, or configure a developer database source before continuing.",
+    };
+  }
+  if (step === "preflight") {
+    const review = buildPreflightReview();
+    return {
+      allowed: review.runAllowed,
+      message: review.runAllowed
+        ? "Preflight is accepted. Continue to Run."
+        : preflightGateMessage(review),
+    };
+  }
+  if (step === "run") {
+    const running = ["queued", "running"].includes(state.currentJob?.status);
+    const succeeded = profileRunComplete();
+    return {
+      allowed: succeeded,
+      message: succeeded
+        ? "Run complete. Continue to Review."
+        : running
+          ? "Runtime stages are streaming. Review unlocks after a successful run."
+          : "Start the profiler here. Review unlocks after a successful run.",
+    };
+  }
+  return {
+    allowed: false,
+    message: "Review generated quality gates, issues, todos, reports, and run history.",
+  };
+}
+
+function profileSourceReady() {
+  if (state.runnerMode === "database") {
+    return Boolean(els.databaseUrlInput.value.trim());
+  }
+  if (state.runnerMode === "path") {
+    return Boolean(els.dbmlPathInput.value.trim() && els.csvDirPathInput.value.trim());
+  }
+  return Boolean(
+    state.dbmlFile &&
+    state.csvFiles.some((file) => file.sourceFile) &&
+    !state.dbmlParseError,
+  );
+}
+
+function profileRunComplete() {
+  return state.currentJob?.status === "succeeded" && !state.dashboardLoadingJobId;
+}
+
+function canOpenProfileStep(step) {
+  if (step === "connect") {
+    return true;
+  }
+  if (step === "preflight") {
+    return profileSourceReady();
+  }
+  if (step === "run") {
+    return buildPreflightReview().runAllowed;
+  }
+  if (step === "review") {
+    return profileRunComplete() || Boolean(state.dashboardArtifactIndex) || state.runHistory.length > 0;
+  }
+  return false;
+}
+
+function profileStepComplete(step) {
+  if (step === "connect") {
+    return profileSourceReady();
+  }
+  if (step === "preflight") {
+    return buildPreflightReview().runAllowed;
+  }
+  if (step === "run") {
+    return profileRunComplete();
+  }
+  return Boolean(state.dashboardArtifactIndex);
 }
 
 function renderEvaluation() {
@@ -2181,11 +2395,12 @@ function renderControls() {
   const evaluationRunning = evaluationJobRunning();
   const preflightReview = buildPreflightReview();
   const preflightAllowsRun = preflightReview.runAllowed;
+  const runStepActive = state.flowMode === "profile" && state.profileStep === "run";
   els.visualizeButton.disabled = !hasDbml;
   els.autoLinkButton.disabled = !hasDbml || !state.csvFiles.length;
-  els.runProfilerButton.disabled = !state.runnerAvailable || !hasUploadedDbml || !hasUploadedCsvs || !preflightAllowsRun || jobRunning;
-  els.runPathProfilerButton.disabled = !state.runnerAvailable || !hasPathInputs || !preflightAllowsRun || jobRunning;
-  els.runDatabaseProfilerButton.disabled = !state.runnerAvailable || !hasDatabaseUrl || !preflightAllowsRun || jobRunning;
+  els.runProfilerButton.disabled = !runStepActive || !state.runnerAvailable || !hasUploadedDbml || !hasUploadedCsvs || !preflightAllowsRun || jobRunning;
+  els.runPathProfilerButton.disabled = !runStepActive || !state.runnerAvailable || !hasPathInputs || !preflightAllowsRun || jobRunning;
+  els.runDatabaseProfilerButton.disabled = !runStepActive || !state.runnerAvailable || !hasDatabaseUrl || !preflightAllowsRun || jobRunning;
   els.startEvaluationButton.disabled = !state.runnerAvailable || !selectedEvaluationDataset() || evaluationRunning;
   els.runnerModeUpload.classList.toggle("active", state.runnerMode === "upload");
   els.runnerModePath.classList.toggle("active", state.runnerMode === "path");
