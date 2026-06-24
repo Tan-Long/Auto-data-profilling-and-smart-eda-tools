@@ -2,8 +2,8 @@
 
 This is the current live-demo path for the guided CSV+DBML data-quality
 profiler. It runs locally, uses built-in sample data, keeps raw artifacts behind
-developer links, and does not require internet access, OpenAI credentials, or
-Great Expectations to be installed.
+developer links, and does not require internet access or OpenAI credentials.
+Install the `evaluation` extra to show a real Great Expectations comparison.
 
 ## 5-10 Minute Demo Script
 
@@ -42,7 +42,7 @@ Install and prepare the local environment:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,evaluation]"
 ```
 
 Regenerate the deterministic CLI demo report:
@@ -135,8 +135,10 @@ are not the primary Goal 12 demo path.
 
 - The default Profile demo is deterministic and does not require OpenAI.
 - Evaluate uses built-in datasets only; it does not accept arbitrary uploads.
-- Great Expectations is optional for this local demo. Missing GE should render
-  as an explicit unavailable baseline state.
+- Great Expectations is optional for the app to run, but the recommended demo
+  install includes it through `.[dev,evaluation]` so Evaluate can compare VSF
+  against GE-native checks. Missing GE still renders as an explicit unavailable
+  baseline state.
 - Selected-issue LLM enrichment is advisory. It never changes deterministic
   action plans, todos, quality gates, severity, readiness, or evaluation scores.
 - OpenAI mode must be opt-in and may show `unavailable` when no key is

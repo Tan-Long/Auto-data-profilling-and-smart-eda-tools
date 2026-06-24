@@ -15,7 +15,7 @@ COPY web ./web
 COPY examples ./examples
 COPY data/evaluation_public ./data/evaluation_public
 
-RUN python -m pip install --no-cache-dir -e .
+RUN python -m pip install --no-cache-dir -e ".[evaluation]"
 
 EXPOSE 8765
 

@@ -65,7 +65,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#evaluationExpectedList")).toContainText("Great Expectations");
     await expect(page.locator("#evaluationExpectedList")).toContainText("caught");
     await expect(page.locator("#evaluationUsefulnessList")).toContainText("Actionability");
-    await expect(page.locator("#evaluationExpectedList")).toContainText(/GE not installed|Not covered by baseline/);
+    await expect(page.locator("#evaluationExpectedList")).toContainText("Not covered by baseline");
+    await expect(page.locator("#evaluationComparison")).not.toContainText("GE not installed");
     await expect(page.locator("#evaluationComparison")).not.toContainText("ModuleNotFoundError");
     await expect(page.locator("#evaluationArtifactLinks")).toContainText("evaluation_summary.json");
     await expect(page.locator("#evaluationArtifactLinks")).toContainText("ground_truth_issues.json");

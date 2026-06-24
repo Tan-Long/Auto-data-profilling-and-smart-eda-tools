@@ -915,9 +915,19 @@ def _run_great_expectations_native_checks(
         column = str((expected.get("columns") or [""])[0])
         csv_path = input_paths.csv_dir / f"{table}.csv"
         if table not in frames:
-            frames[table] = pandas_dataset(_dataframe_from_csv(csv_path, pandas_module))
-        dataset = frames[table]
-        result = _run_ge_expectation(dataset, column, check)
+            frames[table] = _dataframe_from_csv(csv_path, pandas_module)
+        frame = frames[table].copy()
+        if check.get("type") == "between" and column in frame.columns:
+            frame[column] = pandas_module.to_numeric(frame[column], errors="coerce")
+        dataset = pandas_dataset(frame)
+        try:
+            result = _run_ge_expectation(dataset, column, check)
+        except Exception as exc:  # pragma: no cover - depends on optional GE API.
+            result = {
+                "caught": False,
+                "unexpected_count": None,
+                "reason": f"Great Expectations check error: {exc.__class__.__name__}: {exc}",
+            }
         results[str(expected["ground_truth_id"])] = {
             "caught": result["caught"],
             "unexpected_count": result.get("unexpected_count"),
@@ -928,7 +938,8 @@ def _run_great_expectations_native_checks(
 
 def _dataframe_from_csv(csv_path: Path, pandas_module: Any) -> Any:
     with csv_path.open("r", newline="", encoding="utf-8") as handle:
-        return pandas_module.DataFrame(list(csv.DictReader(handle)))
+        frame = pandas_module.DataFrame(list(csv.DictReader(handle)))
+    return frame.replace("", pandas_module.NA)
 
 
 def _run_ge_expectation(dataset: Any, column: str, check: dict[str, Any]) -> dict[str, Any]:
@@ -958,9 +969,9 @@ def _run_ge_expectation(dataset: Any, column: str, check: dict[str, Any]) -> dic
     return {
         "caught": result_payload.get("success") is False,
         "unexpected_count": unexpected_count if isinstance(unexpected_count, int) else None,
-        "reason": "Native Great Expectations expectation failed."
+        "reason": "GE flagged this seeded defect."
         if result_payload.get("success") is False
-        else "Native Great Expectations expectation passed.",
+        else "GE expectation passed; no defect was detected.",
     }
 
 

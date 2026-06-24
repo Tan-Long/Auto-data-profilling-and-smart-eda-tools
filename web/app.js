@@ -736,7 +736,11 @@ async function pollEvaluationJob(jobId) {
     state.evaluationJob = payload;
     renderEvaluation();
     if (payload.status === "succeeded") {
-      await loadEvaluationArtifacts(payload);
+      const artifactPayload = await waitForEvaluationArtifactPayload(jobId, payload);
+      await loadEvaluationArtifacts(artifactPayload);
+      if (!state.evaluationArtifacts["evaluation_summary.json"]) {
+        throw new Error("Evaluation completed but comparison artifacts were not ready.");
+      }
       state.evaluationLoadingJobId = "";
       renderEvaluationMessage("Evaluation complete. Comparison Summary is ready.", "success");
       renderEvaluation();
@@ -753,12 +757,39 @@ async function pollEvaluationJob(jobId) {
   }
 }
 
-async function loadEvaluationArtifacts(job) {
-  const artifactPaths = [
+function evaluationRequiredArtifactPaths() {
+  return [
     "evaluation_summary.json",
     "ground_truth_issues.json",
     "baseline_comparison.json",
   ];
+}
+
+async function waitForEvaluationArtifactPayload(jobId, initialPayload) {
+  let payload = initialPayload;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const artifacts = payload?.artifacts || [];
+    const ready = evaluationRequiredArtifactPaths().every((artifactPath) => (
+      Boolean(evaluationArtifactUrl(artifactPath, artifacts))
+    ));
+    if (ready) {
+      state.evaluationJob = payload;
+      return payload;
+    }
+    await wait(250);
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, { cache: "no-store" });
+    const nextPayload = await response.json();
+    if (!response.ok) {
+      throw new Error(nextPayload.error || "Unable to refresh evaluation artifacts.");
+    }
+    payload = nextPayload;
+  }
+  state.evaluationJob = payload;
+  return payload;
+}
+
+async function loadEvaluationArtifacts(job) {
+  const artifactPaths = evaluationRequiredArtifactPaths();
   const loaded = {};
   await Promise.all(
     artifactPaths.map(async (artifactPath) => {

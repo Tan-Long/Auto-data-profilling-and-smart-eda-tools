@@ -127,6 +127,25 @@ def test_public_evaluation_datasets_run_from_local_snapshots(
     assert summary["correctness"]["bad_count_exact_group_count"] == expected_group_count
 
 
+def test_great_expectations_native_baseline_runs_when_installed(tmp_path):
+    pytest.importorskip("great_expectations")
+
+    summary = evaluation.run_evaluation_benchmark(
+        dataset_id="public_manufacturing_defects_seeded_faults",
+        input_dir=tmp_path / "input",
+        out_dir=tmp_path / "artifacts",
+    )
+
+    assert summary["baseline"]["status"] == "available"
+    assert summary["baseline"]["ge_caught_group_count"] == 6
+    assert summary["baseline"]["ge_unavailable_group_count"] == 0
+    native_rows = [
+        row for row in summary["baseline_rows"] if row["baseline_coverage"] == "native"
+    ]
+    assert {row["ge_status"] for row in native_rows} == {"caught"}
+    assert {row["observed_bad_count"] for row in native_rows} >= {1, 2}
+
+
 def test_evaluation_benchmark_rejects_unknown_dataset(tmp_path):
     with pytest.raises(ValueError, match="Unknown evaluation dataset_id"):
         evaluation.run_evaluation_benchmark(

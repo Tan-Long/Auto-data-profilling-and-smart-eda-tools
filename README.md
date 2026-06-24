@@ -26,7 +26,7 @@ git clone https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools.g
 cd Auto-data-profilling-and-smart-eda-tools
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,evaluation]"
 ```
 
 Use `python -m venv .venv` instead if your system provides `python` as Python
@@ -57,16 +57,18 @@ faulty dataset comparison. Profile and Evaluate artifacts are written under
 `outputs/web_runs/<job_id>/artifacts` by default, or under the directory set by
 `--run-root` / `VSF_PROFILER_OUTPUT_DIR`.
 
-Optional OpenAI, Great Expectations, Postgres, MySQL/MariaDB, Kaggle, Node, and
-Playwright paths are not required for the default local demo. They either stay
-hidden, show explicit unavailable states, or skip in release checks when their
-dependencies or credentials are missing.
+Great Expectations is included above through the `evaluation` extra so the
+Evaluate tool can run a real baseline comparison. Optional OpenAI, Postgres,
+MySQL/MariaDB, Kaggle, Node, and Playwright paths are not required for the
+default local demo. They either stay hidden, show explicit unavailable states,
+or skip in release checks when their dependencies or credentials are missing.
 
 ## Docker Local Runner
 
-Docker runs the same Python web runner inside a container and publishes it on
-the host at `http://127.0.0.1:8765`. The container creates the small demo data
-on startup so the Profile preset works immediately.
+Docker runs the same Python web runner with the evaluation extra installed
+inside a container and publishes it on the host at `http://127.0.0.1:8765`.
+The container creates the small demo data on startup so the Profile preset
+works immediately.
 
 ```bash
 docker build -t vsf-profiler-local .

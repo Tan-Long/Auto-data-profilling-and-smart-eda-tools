@@ -32,7 +32,7 @@ mysql = [
   "pymysql>=1.1",
 ]
 evaluation = [
-  "great-expectations>=0.18",
+  "great-expectations>=0.18,<1",
 ]
 
 [project.scripts]
