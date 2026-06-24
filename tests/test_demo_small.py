@@ -88,6 +88,9 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert relationship_graph["summary"]["edge_count"] == 6
     assert dataset_verdict["verdict"] == "NOT_READY"
     assert 0 <= dataset_verdict["risk_score"] <= 100
+    assert dataset_verdict["risk_breakdown"]["score"] == dataset_verdict["risk_score"]
+    assert dataset_verdict["risk_breakdown"]["raw_score"] >= dataset_verdict["risk_score"]
+    assert dataset_verdict["risk_breakdown"]["active_components"]
     assert dataset_verdict["issue_counts"]["total"] == len(issues)
     assert dataset_verdict["top_blockers"]
     assert dataset_verdict["affected_tables"]

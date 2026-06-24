@@ -42,7 +42,8 @@ def build_dataset_verdict(
     issue_counts = _issue_counts(issue_rows)
     schema_summary = _schema_summary(schema_evaluation)
     relationship_status_counts = _relationship_status_counts(relationship_graph)
-    risk_score = _risk_score(issue_counts, schema_summary, relationship_status_counts)
+    risk_breakdown = _risk_breakdown(issue_counts, schema_summary, relationship_status_counts)
+    risk_score = risk_breakdown["score"]
     verdict = _verdict(issue_counts, schema_summary, relationship_status_counts)
 
     return {
@@ -50,6 +51,7 @@ def build_dataset_verdict(
         "version": 1,
         "verdict": verdict,
         "risk_score": risk_score,
+        "risk_breakdown": risk_breakdown,
         "verdict_rationale": _verdict_rationale(
             verdict,
             issue_counts,
@@ -138,20 +140,93 @@ def _risk_score(
     schema_summary: dict[str, int],
     relationship_status_counts: dict[str, int],
 ) -> int:
+    return int(_risk_breakdown(issue_counts, schema_summary, relationship_status_counts)["score"])
+
+
+def _risk_breakdown(
+    issue_counts: dict[str, Any],
+    schema_summary: dict[str, int],
+    relationship_status_counts: dict[str, int],
+) -> dict[str, Any]:
     severity_counts = issue_counts["by_severity"]
-    score = sum(
-        severity_counts[severity] * ISSUE_RISK_WEIGHTS[severity]
-        for severity in SEVERITIES
-    )
-    score += sum(
-        relationship_status_counts.get(status, 0) * weight
-        for status, weight in RELATIONSHIP_RISK_WEIGHTS.items()
-    )
-    score += sum(
-        schema_summary.get(name, 0) * weight
-        for name, weight in SCHEMA_RISK_WEIGHTS.items()
-    )
-    return min(100, int(score))
+    components: list[dict[str, Any]] = []
+    for severity in SEVERITIES:
+        count = int(severity_counts.get(severity, 0))
+        weight = ISSUE_RISK_WEIGHTS[severity]
+        components.append(
+            _risk_component(
+                component_id=f"issue_severity_{severity.lower()}",
+                label=f"{severity} issue findings",
+                count=count,
+                weight=weight,
+                artifact="issues.json",
+                explanation=f"{severity} findings add {weight} risk point(s) each.",
+            )
+        )
+    for status, weight in RELATIONSHIP_RISK_WEIGHTS.items():
+        count = int(relationship_status_counts.get(status, 0))
+        components.append(
+            _risk_component(
+                component_id=f"relationship_{status}",
+                label=f"{status.title()} relationship checks",
+                count=count,
+                weight=weight,
+                artifact="relationship_graph.json",
+                explanation=f"{status.title()} relationship checks add {weight} risk point(s) each.",
+            )
+        )
+    schema_labels = {
+        "missing_table_count": "Missing DBML table CSVs",
+        "extra_csv_count": "Extra CSV files",
+    }
+    for name, weight in SCHEMA_RISK_WEIGHTS.items():
+        count = int(schema_summary.get(name, 0))
+        components.append(
+            _risk_component(
+                component_id=f"schema_{name}",
+                label=schema_labels.get(name, name.replace("_", " ").title()),
+                count=count,
+                weight=weight,
+                artifact="schema_evaluation.json",
+                explanation=f"{schema_labels.get(name, name)} add {weight} risk point(s) each.",
+            )
+        )
+    raw_score = sum(int(component["points"]) for component in components)
+    score = min(100, int(raw_score))
+    active = [component for component in components if int(component["points"]) > 0]
+    return {
+        "score": score,
+        "raw_score": raw_score,
+        "capped": raw_score > score,
+        "scale": "0 means no deterministic risk; 100 is the displayed maximum risk.",
+        "components": components,
+        "active_components": active,
+        "explanation": (
+            f"Raw risk is {raw_score}; displayed risk is capped at 100."
+            if raw_score > score
+            else f"Risk is {score} from deterministic issue, relationship, and schema evidence."
+        ),
+    }
+
+
+def _risk_component(
+    *,
+    component_id: str,
+    label: str,
+    count: int,
+    weight: int,
+    artifact: str,
+    explanation: str,
+) -> dict[str, Any]:
+    return {
+        "component_id": component_id,
+        "label": label,
+        "count": count,
+        "weight": weight,
+        "points": count * weight,
+        "artifact": artifact,
+        "explanation": explanation,
+    }
 
 
 def _verdict(

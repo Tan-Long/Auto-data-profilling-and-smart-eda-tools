@@ -3772,6 +3772,7 @@ function renderDashboardSummary(issues) {
       ? "success"
       : "pending";
   const riskTone = riskValue >= 80 ? "danger" : riskValue >= 40 ? "warning" : "success";
+  const riskBreakdown = riskBreakdownForVerdict(verdict, riskValue);
   const tableCount = assessmentArtifact.summary?.table_count ?? assessments.length;
   const blockedGates = qualityGates ? gateSummary.blocked_count || 0 : null;
   els.dashboardSummaryStrip.innerHTML = `
@@ -3780,15 +3781,7 @@ function renderDashboardSummary(issues) {
         <span>readiness</span>
         <strong>${escapeHtml(verdictLabel)}</strong>
       </div>
-      <div class="dashboard-risk-meter" aria-label="Risk score ${escapeHtml(riskLabel)}">
-        <div class="dashboard-risk-heading">
-          <span>risk</span>
-          <strong>${escapeHtml(riskLabel)}</strong>
-        </div>
-        <div class="dashboard-risk-track" aria-hidden="true">
-          <span class="dashboard-risk-fill ${riskTone}" style="width: ${riskValue}%"></span>
-        </div>
-      </div>
+      ${renderDashboardRiskMeter({ riskLabel, riskValue, riskTone, riskBreakdown })}
     </div>
     <div class="dashboard-summary-metrics">
       <div class="dashboard-summary-metric">
@@ -3809,6 +3802,151 @@ function renderDashboardSummary(issues) {
       </div>
     </div>
   `;
+}
+
+function riskBreakdownForVerdict(verdict, riskValue) {
+  const artifactBreakdown = verdict?.risk_breakdown || verdict?.summary?.risk_breakdown;
+  if (
+    artifactBreakdown &&
+    (Array.isArray(artifactBreakdown.components) || Array.isArray(artifactBreakdown.active_components))
+  ) {
+    return {
+      ...artifactBreakdown,
+      score: Number.isFinite(Number(artifactBreakdown.score)) ? Number(artifactBreakdown.score) : riskValue,
+    };
+  }
+  const components = fallbackRiskComponentsFromVerdict();
+  const rawScore = components.reduce((sum, component) => sum + component.points, 0);
+  return {
+    score: riskValue,
+    raw_score: rawScore,
+    capped: rawScore > riskValue,
+    components,
+    active_components: components.filter((component) => component.points > 0),
+    explanation: rawScore > riskValue
+      ? `Raw risk is ${integerText(rawScore)}; displayed risk is capped at ${integerText(riskValue)}.`
+      : "Risk score comes from deterministic issue, relationship, and schema evidence.",
+  };
+}
+
+function renderDashboardRiskMeter({ riskLabel, riskValue, riskTone, riskBreakdown }) {
+  return `
+    <details class="dashboard-risk-meter" data-risk-tone="${escapeHtml(riskTone)}">
+      <summary aria-label="Risk score ${escapeHtml(riskLabel)}. Open risk breakdown.">
+        <div class="dashboard-risk-heading">
+          <span>risk</span>
+          <strong>${escapeHtml(riskLabel)}</strong>
+          <span class="dashboard-risk-toggle">breakdown</span>
+        </div>
+        <div class="dashboard-risk-track" aria-hidden="true">
+          <span class="dashboard-risk-fill ${riskTone}" style="width: ${riskValue}%"></span>
+        </div>
+      </summary>
+      ${renderDashboardRiskBreakdown(riskBreakdown)}
+    </details>
+  `;
+}
+
+function renderDashboardRiskBreakdown(breakdown) {
+  const components = dashboardRiskComponents(breakdown);
+  const activeComponents = components.filter((component) => component.points > 0);
+  const rows = activeComponents.length ? activeComponents : [
+    {
+      label: "No active risk components",
+      count: 0,
+      weight: 0,
+      points: 0,
+      artifact: "dataset_verdict.json",
+      explanation: "No deterministic issue, relationship, or schema risk was counted.",
+    },
+  ];
+  const rawScore = Number.isFinite(Number(breakdown?.raw_score))
+    ? Number(breakdown.raw_score)
+    : components.reduce((sum, component) => sum + component.points, 0);
+  const score = Number.isFinite(Number(breakdown?.score)) ? Number(breakdown.score) : clampNumber(rawScore, 0, 100);
+  const capped = Boolean(breakdown?.capped) || rawScore > score;
+  const summaryText = capped
+    ? `Raw ${integerText(rawScore)} points, capped to ${integerText(score)}/100.`
+    : `${integerText(score)}/100 from deterministic evidence.`;
+  return `
+    <div class="dashboard-risk-breakdown" role="tooltip">
+      <div class="dashboard-risk-breakdown-heading">
+        <strong>Risk breakdown</strong>
+        <span>${escapeHtml(summaryText)}</span>
+      </div>
+      <div class="dashboard-risk-components">
+        ${rows
+          .sort((a, b) => b.points - a.points || String(a.label).localeCompare(String(b.label)))
+          .slice(0, 8)
+          .map((component) => renderDashboardRiskComponent(component))
+          .join("")}
+      </div>
+      <p>${escapeHtml(breakdown?.explanation || "Risk score comes from dataset_verdict.json.")}</p>
+    </div>
+  `;
+}
+
+function renderDashboardRiskComponent(component) {
+  const width = clampNumber(component.points, 0, 100);
+  const formula = component.weight
+    ? `${integerText(component.count)} x ${integerText(component.weight)} = ${integerText(component.points)}`
+    : integerText(component.points);
+  return `
+    <div class="dashboard-risk-component">
+      <div>
+        <span>${escapeHtml(component.label)}</span>
+        <small>${escapeHtml(component.artifact || "dataset_verdict.json")}</small>
+      </div>
+      <strong>${escapeHtml(formula)}</strong>
+      <div class="dashboard-risk-component-track" aria-hidden="true">
+        <span style="width: ${width}%"></span>
+      </div>
+    </div>
+  `;
+}
+
+function dashboardRiskComponents(breakdown) {
+  const rawComponents = Array.isArray(breakdown?.components) && breakdown.components.length
+    ? breakdown.components
+    : Array.isArray(breakdown?.active_components) && breakdown.active_components.length
+      ? breakdown.active_components
+      : fallbackRiskComponentsFromVerdict();
+  return rawComponents.map((component) => ({
+    label: String(component.label || "Risk component"),
+    count: Number.isFinite(Number(component.count)) ? Number(component.count) : 0,
+    weight: Number.isFinite(Number(component.weight)) ? Number(component.weight) : 0,
+    points: Number.isFinite(Number(component.points)) ? Number(component.points) : 0,
+    artifact: String(component.artifact || "dataset_verdict.json"),
+    explanation: String(component.explanation || ""),
+  }));
+}
+
+function fallbackRiskComponentsFromVerdict() {
+  const verdict = state.dashboardArtifacts["dataset_verdict.json"] || {};
+  const severityCounts = verdict.issue_counts?.by_severity || {};
+  const relationshipCounts = verdict.relationship_status_counts || {};
+  const schemaSummary = verdict.schema_summary || {};
+  const rows = [
+    ["P0 issue findings", severityCounts.P0, 30, "issues.json"],
+    ["P1 issue findings", severityCounts.P1, 15, "issues.json"],
+    ["P2 issue findings", severityCounts.P2, 5, "issues.json"],
+    ["P3 issue findings", severityCounts.P3, 1, "issues.json"],
+    ["Invalid relationship checks", relationshipCounts.invalid, 10, "relationship_graph.json"],
+    ["Warning relationship checks", relationshipCounts.warning, 4, "relationship_graph.json"],
+    ["Skipped relationship checks", relationshipCounts.skipped, 2, "relationship_graph.json"],
+    ["Missing DBML table CSVs", schemaSummary.missing_table_count, 25, "schema_evaluation.json"],
+    ["Extra CSV files", schemaSummary.extra_csv_count, 2, "schema_evaluation.json"],
+  ];
+  return rows.map(([label, count, weight, artifact]) => {
+    const numericCount = Number.isFinite(Number(count)) ? Number(count) : 0;
+    return {
+      label,
+      count: numericCount,
+      weight,
+      points: numericCount * weight,
+      artifact,
+    };
+  });
 }
 
 function renderQualityGatesSection() {

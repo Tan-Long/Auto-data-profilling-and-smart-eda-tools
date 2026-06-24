@@ -473,6 +473,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("readiness");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("NOT_READY");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("100/100");
+  await page.locator(".dashboard-risk-meter > summary").click();
+  await expect(page.locator(".dashboard-risk-breakdown")).toBeVisible();
+  await expect(page.locator(".dashboard-risk-breakdown")).toContainText("Risk breakdown");
+  await expect(page.locator(".dashboard-risk-breakdown")).toContainText("Raw");
+  await expect(page.locator(".dashboard-risk-breakdown")).toContainText("P0 issue findings");
+  await expect(page.locator(".dashboard-risk-breakdown")).toContainText("P1 issue findings");
+  await page.locator(".dashboard-risk-meter > summary").click();
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("gates");
   await expect(page.locator("#dashboardSummaryStrip")).toContainText("artifacts");
   await expect(page.locator("#dashboardPanelGrid .issue-visual-summary")).toBeVisible();

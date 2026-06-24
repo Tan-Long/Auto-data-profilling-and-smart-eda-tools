@@ -398,6 +398,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "loadDashboard",
         "renderDashboard",
         "renderDashboardSummary",
+        "renderDashboardRiskMeter",
+        "renderDashboardRiskBreakdown",
+        "fallbackRiskComponentsFromVerdict",
         "renderIssueInbox",
         "renderIssueDetailDrawer",
         "renderIssueLlmEnrichment",
@@ -550,6 +553,9 @@ def test_web_review_surfaces_use_single_flow_layouts():
     assert "max-height:" in _css_block(css, ".issue-review-body")
     assert "overflow: auto;" in _css_block(css, ".issue-review-body")
     assert "grid-template-columns:" in _css_block(css, ".issue-inbox-row")
+    assert "position: absolute;" in _css_block(css, ".dashboard-risk-breakdown")
+    assert ".dashboard-risk-meter[open] .dashboard-risk-breakdown" in css
+    assert ".dashboard-risk-meter:hover .dashboard-risk-breakdown" in css
     assert "Avoid primary two-column split layouts for review surfaces" in design
 
 
