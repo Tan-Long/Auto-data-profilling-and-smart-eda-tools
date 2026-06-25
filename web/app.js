@@ -6877,27 +6877,101 @@ function renderIssueRows(issues) {
     return `<p class="muted">No issues match this selection.</p>`;
   }
   return `
-    <div class="dashboard-issue-list">
-      ${sortedIssues.slice(0, 12).map((issue) => {
+    <div class="dashboard-issue-list" role="table" aria-label="Matching issues by severity">
+      ${renderDrilldownSeverityStrip(sortedIssues)}
+      <div class="dashboard-issue-header" role="row">
+        <span role="columnheader">Priority</span>
+        <span role="columnheader">Issue</span>
+        <span role="columnheader">Where</span>
+        <span role="columnheader">Affected</span>
+        <span role="columnheader">Evidence</span>
+      </div>
+      ${sortedIssues.slice(0, 12).map(renderDrilldownIssueRow).join("")}
+    </div>
+  `;
+}
+
+function renderDrilldownSeverityStrip(issues) {
+  const counts = drilldownIssueSeverityRows(issues);
+  return `
+    <div class="drilldown-severity-strip" aria-label="Severity counts for current drilldown">
+      <strong>Severity order</strong>
+      ${severityOrder.map((severity) => {
+        const count = counts.get(severity) || 0;
+        const meta = todoUrgencyMeta(severity);
         return `
-          <article class="dashboard-issue-row">
-            <div>
-              <strong>${escapeHtml(issue.issue_type || "UNKNOWN")}</strong>
-              <p><code>${escapeHtml(issue.table || "unknown")}</code>${issue.columns?.length ? ` · <code>${escapeHtml(issue.columns.join(", "))}</code>` : ""}</p>
-            </div>
-            <span class="pill-status ${issue.severity === "P0" || issue.severity === "P1" ? "missing" : "mapped"}">${escapeHtml(issue.severity || "")}</span>
-            <div class="issue-counts">
-              <span>${integerText(issue.bad_count)} rows</span>
-              <span>${percentText(issue.bad_rate)}</span>
-            </div>
-            ${issue.sample_bad_rows_path
-              ? `<button class="sample-preview-button" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueGuid(issue))}" data-dashboard-label="${escapeHtml(issueGuid(issue))}" data-dashboard-scroll="drilldown">Preview rows</button>`
-              : `<span class="muted">no sample</span>`}
-          </article>
+          <span class="drilldown-severity-chip ${todoPriorityClass(severity)}" title="${escapeHtml(meta.priority)}">
+            <span>${escapeHtml(severity)}</span>
+            <b>${integerText(count)}</b>
+          </span>
         `;
       }).join("")}
     </div>
   `;
+}
+
+function drilldownIssueSeverityRows(issues) {
+  return issues.reduce((counts, issue) => {
+    const severity = todoPriorityToken(issue.severity);
+    counts.set(severity, (counts.get(severity) || 0) + 1);
+    return counts;
+  }, new Map());
+}
+
+function renderDrilldownIssueRow(issue) {
+  const severity = todoPriorityToken(issue.severity);
+  const urgency = todoUrgencyMeta(severity);
+  const priorityClass = todoPriorityClass(severity);
+  const affectedPercent = Math.min(100, Math.max(0, Number(issue.bad_rate || 0) * 100));
+  const affectedWidth = Number(issue.bad_count || 0) > 0 ? Math.max(2, affectedPercent) : 0;
+  return `
+    <button class="dashboard-issue-row ${priorityClass}" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueGuid(issue))}" data-dashboard-label="${escapeHtml(issueGuid(issue))}" data-dashboard-scroll="drilldown" role="row" aria-label="${escapeHtml(`${severity} ${issueGuid(issue)} ${issueTypeLabel(issue)} ${drilldownIssueLocationText(issue)}`)}">
+      <span class="drilldown-priority-cell" role="cell">
+        <span class="drilldown-priority-token">${escapeHtml(severity)}</span>
+        <span>
+          <strong>${escapeHtml(urgency.label)}</strong>
+          <small>${escapeHtml(urgency.detail)}</small>
+        </span>
+      </span>
+      <span class="drilldown-issue-main" role="cell">
+        <strong>${escapeHtml(issueTypeLabel(issue))}</strong>
+        <small><code>${escapeHtml(issueGuid(issue))}</code></small>
+      </span>
+      <span class="drilldown-issue-location" role="cell">
+        ${drilldownIssueLocation(issue)}
+      </span>
+      <span class="issue-counts drilldown-issue-counts" role="cell">
+        <span>${integerText(issue.bad_count)} rows</span>
+        <span class="issue-row-meter" aria-label="${escapeHtml(percentText(issue.bad_rate))} affected"><span style="width: ${affectedWidth}%"></span></span>
+        <span>${percentText(issue.bad_rate)}</span>
+      </span>
+      <span class="drilldown-issue-action" role="cell">
+        ${issue.sample_bad_rows_path
+          ? `<span class="sample-preview-button as-label">Preview rows</span>`
+          : `<span class="muted">no sample</span>`}
+      </span>
+    </button>
+  `;
+}
+
+function drilldownIssueLocation(issue) {
+  const table = issue.table || "unknown";
+  const columns = Array.isArray(issue.columns) && issue.columns.length ? issue.columns.join(", ") : "table scope";
+  const parentColumns = Array.isArray(issue.parent_columns) && issue.parent_columns.length ? issue.parent_columns.join(", ") : "key";
+  const relationship = issue.parent_table ? `
+    <small><code>${escapeHtml(table)}.${escapeHtml(columns)}</code> -> <code>${escapeHtml(issue.parent_table)}.${escapeHtml(parentColumns)}</code></small>
+  ` : "";
+  return `
+    <strong><code>${escapeHtml(table)}</code></strong>
+    <small><code>${escapeHtml(columns)}</code></small>
+    ${relationship}
+  `;
+}
+
+function drilldownIssueLocationText(issue) {
+  const table = issue.table || "unknown";
+  const columns = Array.isArray(issue.columns) && issue.columns.length ? issue.columns.join(", ") : "table scope";
+  return `${table} ${columns}`;
 }
 
 function renderDrilldownArtifacts(artifacts) {

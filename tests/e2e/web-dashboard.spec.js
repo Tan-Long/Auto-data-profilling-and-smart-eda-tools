@@ -511,6 +511,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   expect(await page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="issue_type"]').count()).toBeGreaterThan(1);
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("P1");
   await expect(page.locator("#dashboardDrilldown")).toContainText("8");
+  await expect(page.locator("#dashboardDrilldown .drilldown-severity-strip")).toBeVisible();
+  await expect(page.locator("#dashboardDrilldown .drilldown-severity-chip.priority-p1")).toContainText("8");
+  await expect(page.locator("#dashboardDrilldown .dashboard-issue-header")).toContainText("Priority");
+  await expect(page.locator("#dashboardDrilldown .dashboard-issue-list")).toHaveAttribute("role", "table");
+  await expect(page.locator("#dashboardDrilldown .dashboard-issue-row").first()).toHaveClass(/priority-p1/);
+  await expect(page.locator("#dashboardDrilldown .dashboard-issue-row .drilldown-priority-token").first()).toContainText("P1");
   await page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="table"][data-dashboard-value="orders"]').click();
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("table orders");
   await expect(page.locator("#dashboardIssueCount")).toContainText("6/12 issues");
@@ -518,6 +524,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown .drilldown-summary > div").nth(0)).toContainText(/6\s*matching issues/);
   await expect(page.locator("#dashboardDrilldown .drilldown-summary > div").nth(1)).toContainText(/1\s*table$/);
   await expect(page.locator("#dashboardDrilldown .drilldown-summary > div").nth(2)).toContainText(/10\s*bad rows/);
+  await expect(page.locator("#dashboardDrilldown .dashboard-issue-row").first()).toHaveClass(/priority-p0/);
+  await expect(page.locator("#dashboardDrilldown .dashboard-issue-row .drilldown-priority-token").first()).toContainText("P0");
+  fs.mkdirSync("outputs/us073_drilldown_horizontal", { recursive: true });
+  await page.locator("#dashboardDrilldown").screenshot({
+    path: "outputs/us073_drilldown_horizontal/issue-drilldown-horizontal.png",
+  });
   await expect(page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="table"][data-dashboard-value="orders"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="table"][data-dashboard-value="customers"]')).toBeVisible();
   await expect(page.locator("#dashboardPanelGrid .severity-priority-card[data-dashboard-value=\"P0\"]")).toBeVisible();

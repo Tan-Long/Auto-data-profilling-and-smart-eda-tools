@@ -338,6 +338,12 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".severity-priority-panel",
         ".severity-priority-card",
         ".issue-severity-token",
+        ".drilldown-severity-strip",
+        ".drilldown-severity-chip",
+        ".dashboard-issue-header",
+        ".drilldown-priority-cell",
+        ".drilldown-priority-token",
+        ".drilldown-issue-location",
         ".sample-preview-button",
         ".issue-focus-map",
         ".developer-options",
@@ -472,6 +478,10 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderL4GuardrailPanel",
         "renderTableImpactSection",
         "renderDashboardDrilldown",
+        "renderDrilldownSeverityStrip",
+        "drilldownIssueSeverityRows",
+        "renderDrilldownIssueRow",
+        "drilldownIssueLocation",
         "Show full review",
         'data-dashboard-scroll="drilldown"',
         "renderL4GuardrailDetails",
@@ -582,7 +592,6 @@ def test_web_review_surfaces_use_single_flow_layouts():
         ".table-impact-grid",
         ".dashboard-detail-grid",
         ".table-assessment-detail",
-        ".dashboard-issue-row",
         ".issue-detail-grid div",
         ".evidence-value",
         ".action-plan-metrics",
@@ -599,6 +608,14 @@ def test_web_review_surfaces_use_single_flow_layouts():
     assert "overflow: auto;" in _css_block(css, ".issue-review-body")
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in _css_block(css, ".drilldown-summary")
     assert "grid-template-columns:" in _css_block(css, ".issue-inbox-row")
+    assert ".dashboard-issue-header,\n.dashboard-issue-row" in css
+    assert "grid-template-columns: minmax(118px, 0.72fr) minmax(160px, 1.1fr)" in css
+    assert "role=\"table\"" in (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    assert "border-top: 1px solid var(--border-subtle);" in css
+    assert ".dashboard-issue-row.priority-p0" in css
+    assert ".dashboard-issue-row.priority-p1" in css
+    assert ".priority-p0 .drilldown-priority-token" in css
+    assert ".drilldown-severity-chip.priority-p0" in css
     assert "position: absolute;" in _css_block(css, ".dashboard-risk-breakdown")
     assert ".dashboard-risk-meter[open] .dashboard-risk-breakdown" in css
     assert ".dashboard-risk-meter:hover .dashboard-risk-breakdown" in css
