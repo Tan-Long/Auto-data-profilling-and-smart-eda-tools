@@ -409,6 +409,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderGeneratedReportLinks",
         "renderReportExportSection",
         "renderReportExportLinks",
+        "renderReportIssueLlmAction",
+        "reportIssueForLlmAction",
+        "data-dashboard-open-llm",
         "artifactUrlFromArtifacts",
         "loadDashboard",
         "renderDashboard",
@@ -653,6 +656,7 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderTodosSection" in js
     assert "renderReportExportSection" in js
     assert "issueForTodoOccurrence" in js
+    assert "Open optional selected-issue enrichment evidence." not in js
     assert "todoOccurrenceEvidenceText" in js
     assert "data-dashboard-scroll=\"drilldown\"" in js
     assert "todo-issue-chip" in js

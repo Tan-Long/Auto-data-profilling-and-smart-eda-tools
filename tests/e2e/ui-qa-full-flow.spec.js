@@ -321,6 +321,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#reportExport")).toContainText("Report preview");
     await expect(page.locator("#reportExport")).toContainText("Todo exports");
     await expect(page.locator("#reportExport [data-todo-export]")).toHaveCount(0);
+    await expect(page.locator('#reportExport a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
+    await expect(page.locator('#reportExport button[data-dashboard-open-llm="true"]')).toContainText("Open issue LLM add-on");
     await expect(page.locator("#reportExport")).toContainText("Issue types");
     await expect(page.locator("#reportExport")).toContainText("Missing values");
     const reportHref = await page.locator('#reportExport a[href*="report.html"]').first().getAttribute("href");

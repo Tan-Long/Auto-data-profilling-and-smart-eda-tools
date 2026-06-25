@@ -4628,6 +4628,19 @@ h3 {
   text-decoration: none;
 }
 
+button.report-export-card {
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-export-action-card {
+  border-color: rgba(15, 118, 100, 0.32);
+  background: rgba(15, 118, 100, 0.05);
+}
+
 .report-export-card:hover,
 .report-export-card:focus-visible {
   border-color: var(--accent);

@@ -496,8 +496,11 @@ function handleDashboardSelectionClick(event) {
   }
   const nextKind = target.dataset.dashboardKind;
   const nextValue = target.dataset.dashboardValue || "";
+  const shouldOpenLlm = target.dataset.dashboardOpenLlm === "true";
   if (state.dashboardSelection?.kind !== nextKind || state.dashboardSelection?.value !== nextValue) {
-    state.issueLlmPanelOpen = false;
+    state.issueLlmPanelOpen = shouldOpenLlm;
+  } else if (shouldOpenLlm) {
+    state.issueLlmPanelOpen = true;
   }
   state.dashboardSelection = {
     kind: nextKind,
@@ -513,6 +516,14 @@ function handleDashboardSelectionClick(event) {
   if (target.dataset.dashboardScroll === "drilldown") {
     window.requestAnimationFrame(() => {
       els.dashboardDrilldown.scrollIntoView({
+        block: "start",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    });
+  } else if (target.dataset.dashboardScroll === "llm") {
+    window.requestAnimationFrame(() => {
+      const anchor = els.dashboardDrilldown.querySelector(".issue-llm-enrichment") || els.dashboardDrilldown;
+      anchor.scrollIntoView({
         block: "start",
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       });
@@ -4465,33 +4476,66 @@ function renderReportExportSection() {
 }
 
 function renderReportExportLinks() {
-  const links = [
-    {
-      path: "report.html",
-      label: "HTML report",
-      detail: "Open the fixed-section report for review.",
-    },
-  ];
-  if (artifactUrlFor("issue_llm_enrichments.json")) {
-    links.push({
-      path: "issue_llm_enrichments.json",
-      label: "Issue LLM enrichments",
-      detail: "Open optional selected-issue enrichment evidence.",
-    });
+  const reportUrl = artifactUrlFor("report.html");
+  if (!reportUrl) {
+    return "";
   }
-  return links.map((link) => {
-    const url = artifactUrlFor(link.path);
-    if (!url) {
-      return "";
+  return `
+    <a class="report-export-card" href="${escapeHtml(reportUrl)}" target="_blank" rel="noopener">
+      <strong>HTML report</strong>
+      <span>Open the fixed-section report for review.</span>
+      <code>report.html</code>
+    </a>
+    ${renderReportIssueLlmAction()}
+  `;
+}
+
+function renderReportIssueLlmAction() {
+  const issue = reportIssueForLlmAction();
+  if (!issue) {
+    return "";
+  }
+  const issueId = issueGuid(issue);
+  return `
+    <button
+      class="report-export-card report-export-action-card"
+      type="button"
+      data-dashboard-kind="issue"
+      data-dashboard-value="${escapeHtml(issueId)}"
+      data-dashboard-label="${escapeHtml(issueId)}"
+      data-dashboard-open-llm="true"
+      data-dashboard-scroll="llm"
+    >
+      <strong>Open issue LLM add-on</strong>
+      <span>Review the selected issue evidence, then run or view the advisory OpenAI context in the drawer.</span>
+      <code>${escapeHtml(issueLlmActionTarget(issue))}</code>
+    </button>
+  `;
+}
+
+function reportIssueForLlmAction() {
+  const issues = getDashboardIssues();
+  if (!issues.length) {
+    return null;
+  }
+  if (state.dashboardSelection?.kind === "issue") {
+    const selectedIssue = issues.find((issue) => issueGuid(issue) === state.dashboardSelection.value);
+    if (selectedIssue) {
+      return selectedIssue;
     }
-    return `
-      <a class="report-export-card" href="${escapeHtml(url)}" target="_blank" rel="noopener">
-        <strong>${escapeHtml(link.label)}</strong>
-        <span>${escapeHtml(link.detail)}</span>
-        <code>${escapeHtml(link.path)}</code>
-      </a>
-    `;
-  }).filter(Boolean).join("");
+  }
+  return issues.slice().sort((a, b) => (
+    severityRank(a.severity) - severityRank(b.severity) ||
+    Number(b.bad_count || 0) - Number(a.bad_count || 0) ||
+    issueGuid(a).localeCompare(issueGuid(b))
+  ))[0] || null;
+}
+
+function issueLlmActionTarget(issue) {
+  const columns = Array.isArray(issue.columns) && issue.columns.length
+    ? issue.columns.join(", ")
+    : "table-level";
+  return `${issueGuid(issue)} · ${issue.table || "dataset"}.${columns}`;
 }
 
 function renderReportVisualPreview() {

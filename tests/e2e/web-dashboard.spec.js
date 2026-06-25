@@ -611,6 +611,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportExport).not.toContainText("Copy Fix data Markdown");
   await expect(reportExport).not.toContainText("Copy Verify after fix Markdown");
   await expect(reportExport.locator("[data-todo-export]")).toHaveCount(0);
+  await expect(reportExport.locator('a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
+  const reportLlmAction = reportExport.locator('button.report-export-action-card[data-dashboard-open-llm="true"]');
+  await expect(reportLlmAction).toContainText("Open issue LLM add-on");
   await expect(reportExport).toContainText("Report preview");
   await expect(reportExport).toContainText("Issue types");
   await expect(reportExport).toContainText("Missing values");
@@ -622,6 +625,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await reportExport.screenshot({
     path: `${goal12Dir}/report-export-surface.png`,
   });
+  await reportLlmAction.click();
+  await expect(page.locator("#dashboardDrilldown")).toContainText("LLM enrichment add-on");
+  await expect(page.locator("#dashboardDrilldown .issue-llm-enrichment")).toBeVisible();
   const reportHref = await reportExport.locator('a[href*="report.html"]').first().getAttribute("href");
   const reportPage = await context.newPage();
   await reportPage.goto(new URL(reportHref, page.url()).toString());
@@ -664,11 +670,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: `${goal12Dir}/profile-post-run-review-surface.png`,
   });
 
-  await expect(page.locator("#dashboardDrilldown .sample-preview-button").first()).toContainText("Preview rows");
-  const samplePreviewDownload = page.waitForEvent("download", { timeout: 1000 }).catch(() => null);
-  await page.locator("#dashboardDrilldown .sample-preview-button").first().click();
-  expect(await samplePreviewDownload).toBeNull();
   await expect(page.locator("#dashboardDrilldown .issue-row-evidence")).toContainText("Previewing sample");
+  await expect(page.locator("#dashboardDrilldown .issue-sample-table td.highlighted").first()).toBeVisible();
 
   await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
