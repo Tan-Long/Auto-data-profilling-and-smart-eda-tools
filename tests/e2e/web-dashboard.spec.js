@@ -616,7 +616,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportLlmAction).toContainText("Open issue LLM add-on");
   await expect(reportExport).toContainText("Report preview");
   await expect(reportExport).toContainText("Issue types");
-  await expect(reportExport).toContainText("Missing values");
+  await expect(reportExport).toContainText("Missing values by table");
+  await expect(reportExport.locator(".report-preview-table-group").first()).toBeVisible();
   await expect(reportExport.locator('[data-dashboard-kind="issue"]').first()).toBeVisible();
   await reportExport.scrollIntoViewIfNeeded();
   await reportExport.screenshot({
@@ -633,6 +634,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await reportPage.goto(new URL(reportHref, page.url()).toString());
   await expect(reportPage.locator("h2", { hasText: "Run Summary" })).toBeVisible();
   await expect(reportPage.locator("h2", { hasText: "Where are the problems?" })).toBeVisible();
+  await expect(reportPage.getByText("Missing values by table")).toBeVisible();
+  await expect(reportPage.locator(".missing-table-group").first()).toBeVisible();
   await expect(reportPage.locator("h2", { hasText: "What should be fixed first?" })).toBeVisible();
   await expect(reportPage.getByText("Sample row preview").first()).toBeVisible();
   await expect(reportPage.locator(".sample-preview-row").first()).toBeVisible();

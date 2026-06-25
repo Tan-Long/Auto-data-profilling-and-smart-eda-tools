@@ -918,6 +918,11 @@ def _visual_report_context(
             row for row in (chart_context.get("missingness_columns") or {}).get("data", [])
             if _numeric(row.get("null_count")) > 0
         ][:6],
+        "missingness_table_groups": _missingness_table_groups_for_report(
+            (chart_context.get("missingness_columns") or {}).get("data", []),
+            table_limit=6,
+            column_limit=8,
+        ),
         "outlier_chart": (chart_context.get("outlier_columns") or {}).get("data", [])[:6],
         "table_hotspots": table_hotspots,
         "column_issue_rows": (column_matrix.get("rows") or [])[:16],
@@ -925,6 +930,50 @@ def _visual_report_context(
         "can_run_analysis": run_summary.get("can_run_analysis", {}),
         "can_trust_joins": run_summary.get("can_trust_joins", {}),
     }
+
+
+def _missingness_table_groups_for_report(
+    rows: list[dict[str, Any]],
+    *,
+    table_limit: int,
+    column_limit: int,
+) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    source_rows = rows if isinstance(rows, list) else []
+    for row in source_rows:
+        if not isinstance(row, dict):
+            continue
+        null_count = _numeric(row.get("null_count"))
+        if null_count <= 0:
+            continue
+        field = str(row.get("field") or "")
+        table = str(row.get("table") or field.split(".", 1)[0] or "unknown")
+        column = str(row.get("column") or (field.split(".", 1)[1] if "." in field else field) or "column")
+        group = grouped.setdefault(
+            table,
+            {
+                "table": table,
+                "null_count": 0,
+                "columns": [],
+            },
+        )
+        group["null_count"] += int(null_count)
+        group["columns"].append(
+            {
+                "column": column,
+                "null_count": int(null_count),
+                "null_rate": float(row.get("null_rate") or 0),
+                "row_count": int(row.get("row_count") or 0),
+            }
+        )
+    result = []
+    for group in grouped.values():
+        columns = sorted(
+            group["columns"],
+            key=lambda item: (-int(item["null_count"]), str(item["column"])),
+        )[:column_limit]
+        result.append({**group, "columns": columns})
+    return sorted(result, key=lambda item: (-int(item["null_count"]), str(item["table"])))[:table_limit]
 
 
 def _visual_issue_card(*, out_dir: Path, issue: Issue, plan: dict[str, Any]) -> dict[str, Any]:

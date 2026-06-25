@@ -4567,6 +4567,64 @@ h3 {
   font-weight: 800;
 }
 
+.report-preview-table-list {
+  display: grid;
+  gap: 7px;
+}
+
+.report-preview-table-group {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.report-preview-table-head,
+.report-preview-column-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.report-preview-table-head code {
+  color: var(--foreground-primary);
+  font-size: 12px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.report-preview-table-head span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.report-preview-column-list {
+  display: grid;
+  gap: 3px;
+}
+
+.report-preview-column-row span {
+  min-width: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-preview-column-row code {
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .report-fix-list {
   display: grid;
   gap: 6px;

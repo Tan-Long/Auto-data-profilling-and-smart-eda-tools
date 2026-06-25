@@ -30,9 +30,14 @@ Run status: {{ fixed_report.run_summary.status }}. Runtime seconds: {{ fixed_rep
 
 ### Missing values
 
-{% if visual_report.missingness_chart -%}
-{% for row in visual_report.missingness_chart -%}
-- **{{ row.field }}**: {{ row.null_count }} missing rows ({{ row.null_rate | pct }})
+{% if visual_report.missingness_table_groups -%}
+Missing values by table:
+
+{% for group in visual_report.missingness_table_groups -%}
+- **{{ group.table }}**: {{ group.null_count }} missing values
+{% for column in group.columns -%}
+  - `{{ column.column }}`: {{ column.null_count }} missing rows ({{ column.null_rate | pct }})
+{% endfor %}
 {% endfor %}
 {% else -%}
 - No missing-value columns were detected in the chart evidence.

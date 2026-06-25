@@ -4554,7 +4554,8 @@ function renderReportVisualPreview() {
     "count",
     4,
   );
-  const missingRows = topChartRows(missingSpec.data || [], "field", "null_count", 3);
+  const missingRows = topChartRows(missingSpec.data || [], "field", "null_count", 6);
+  const missingTableGroups = missingTableGroupsForPreview(missingSpec.data || [], 3, 4);
   const outlierRows = topChartRows(outlierSpec.data || [], "field", "outlier_count", 3);
   const topIssues = issues
     .slice()
@@ -4582,7 +4583,7 @@ function renderReportVisualPreview() {
       </div>
       <div class="report-preview-signal-grid">
         ${renderReportPreviewBars("Issue types", issueTypeRows, (row) => issueTypeText(row.label), "No issue counts available yet.")}
-        ${renderReportPreviewBars("Missing values", missingRows, (row) => row.label, "No missing-value columns in the report preview.")}
+        ${renderReportMissingTables(missingTableGroups)}
         ${renderReportPreviewBars("Outliers", outlierRows, (row) => row.label, "No outlier columns in the report preview.")}
       </div>
       <div class="report-fix-list">
@@ -4590,6 +4591,68 @@ function renderReportVisualPreview() {
         ${topIssues.length ? topIssues.map(renderReportFixPreviewCard).join("") : `<p class="muted">No issues are available for this run.</p>`}
       </div>
     </section>
+  `;
+}
+
+function missingTableGroupsForPreview(rows, tableLimit, columnLimit) {
+  const grouped = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const nullCount = Number(row.null_count ?? row.value ?? 0);
+    if (nullCount <= 0) {
+      return;
+    }
+    const table = String(row.table || String(row.field || "").split(".")[0] || "unknown");
+    const column = String(row.column || String(row.field || "").split(".").slice(1).join(".") || row.field || "column");
+    if (!grouped.has(table)) {
+      grouped.set(table, { table, nullCount: 0, columns: [] });
+    }
+    const group = grouped.get(table);
+    group.nullCount += nullCount;
+    group.columns.push({
+      column,
+      nullCount,
+      nullRate: Number(row.null_rate ?? 0),
+      rowCount: Number(row.row_count ?? 0),
+    });
+  });
+  return [...grouped.values()]
+    .map((group) => ({
+      ...group,
+      columns: group.columns
+        .sort((a, b) => b.nullCount - a.nullCount || a.column.localeCompare(b.column))
+        .slice(0, columnLimit),
+    }))
+    .sort((a, b) => b.nullCount - a.nullCount || a.table.localeCompare(b.table))
+    .slice(0, tableLimit);
+}
+
+function renderReportMissingTables(groups) {
+  return `
+    <div class="report-preview-chart">
+      <div class="report-preview-chart-heading">
+        <strong>Missing values by table</strong>
+      </div>
+      ${groups.length ? `
+        <div class="report-preview-table-list">
+          ${groups.map((group) => `
+            <div class="report-preview-table-group">
+              <div class="report-preview-table-head">
+                <code>${escapeHtml(group.table)}</code>
+                <span>${integerText(group.nullCount)} missing</span>
+              </div>
+              <div class="report-preview-column-list">
+                ${group.columns.map((column) => `
+                  <div class="report-preview-column-row">
+                    <span>${escapeHtml(column.column)}</span>
+                    <code>${integerText(column.nullCount)}</code>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No missing-value columns in the report preview.</p>`}
+    </div>
   `;
 }
 

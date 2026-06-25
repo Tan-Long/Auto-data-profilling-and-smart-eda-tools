@@ -116,6 +116,41 @@
     .bar-fill.danger { background: var(--destructive); }
     .bar-value { color: var(--foreground-secondary); font: 800 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: right; }
     .chart-empty { margin: 0; color: var(--foreground-secondary); }
+    .missing-table-list { display: grid; gap: 8px; }
+    .missing-table-group {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--surface-panel);
+    }
+    .missing-table-head,
+    .missing-column-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) max-content;
+      gap: 10px;
+      align-items: center;
+      min-width: 0;
+    }
+    .missing-table-head code { color: var(--foreground-primary); font-weight: 900; overflow-wrap: anywhere; }
+    .missing-table-head span {
+      color: var(--foreground-tertiary);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .missing-column-list { display: grid; gap: 4px; }
+    .missing-column-row span {
+      min-width: 0;
+      color: var(--foreground-secondary);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .missing-column-row code { color: var(--warning); font-size: 12px; font-weight: 900; text-align: right; }
     .pill {
       display: inline-flex;
       min-height: 24px;
@@ -354,11 +389,18 @@
           </div>
         </div>
         <div class="visual-column">
-          <span>Missing values by column</span>
-          {% if visual_report.missingness_chart %}
-          <div class="bar-list">
-            {% for row in visual_report.missingness_chart %}
-            <div class="bar-row"><div class="bar-label">{{ row.field }}</div><div class="bar-track"><div class="bar-fill warn" style="width: {{ row.bar_width_pct }}%"></div></div><div class="bar-value">{{ row.null_rate | pct }}</div></div>
+          <span>Missing values by table</span>
+          {% if visual_report.missingness_table_groups %}
+          <div class="missing-table-list">
+            {% for group in visual_report.missingness_table_groups %}
+            <div class="missing-table-group">
+              <div class="missing-table-head"><code>{{ group.table }}</code><span>{{ group.null_count }} missing</span></div>
+              <div class="missing-column-list">
+                {% for column in group.columns %}
+                <div class="missing-column-row"><span>{{ column.column }}</span><code>{{ column.null_count }}</code></div>
+                {% endfor %}
+              </div>
+            </div>
             {% endfor %}
           </div>
           {% else %}

@@ -221,6 +221,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "Issue severity",
         "Issue types",
         "Missing values",
+        "Missing values by table",
         "Outliers",
         "Sample row preview",
         "Fix data",
@@ -228,6 +229,8 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     ]:
         assert visual_report_text in report_md
         assert visual_report_text in report_html
+    assert "missing-table-group" in report_html
+    assert "Missing values by column" not in report_html
     assert report_md.count("Sample row preview:") >= 1
     assert report_html.count("sample-table") >= 1
     assert "sample-preview-row" in report_html

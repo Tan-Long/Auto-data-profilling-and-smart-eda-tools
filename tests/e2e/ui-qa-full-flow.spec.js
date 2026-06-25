@@ -324,11 +324,14 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator('#reportExport a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
     await expect(page.locator('#reportExport button[data-dashboard-open-llm="true"]')).toContainText("Open issue LLM add-on");
     await expect(page.locator("#reportExport")).toContainText("Issue types");
-    await expect(page.locator("#reportExport")).toContainText("Missing values");
+    await expect(page.locator("#reportExport")).toContainText("Missing values by table");
+    await expect(page.locator("#reportExport .report-preview-table-group").first()).toBeVisible();
     const reportHref = await page.locator('#reportExport a[href*="report.html"]').first().getAttribute("href");
     const reportPage = await context.newPage();
     await reportPage.goto(new URL(reportHref, page.url()).toString());
     await expect(reportPage.locator("h2", { hasText: "Where are the problems?" })).toBeVisible();
+    await expect(reportPage.getByText("Missing values by table")).toBeVisible();
+    await expect(reportPage.locator(".missing-table-group").first()).toBeVisible();
     await expect(reportPage.locator("h2", { hasText: "What should be fixed first?" })).toBeVisible();
     await expect(reportPage.getByText("Sample row preview").first()).toBeVisible();
     await expect(reportPage.locator(".sample-preview-row").first()).toBeVisible();
