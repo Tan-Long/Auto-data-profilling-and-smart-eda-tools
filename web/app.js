@@ -451,6 +451,10 @@ els.dashboardPanelGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
 });
 
+els.dashboardPanelGrid.addEventListener("change", (event) => {
+  handleDashboardControlChange(event);
+});
+
 els.todosGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
 });
@@ -524,6 +528,22 @@ function handleDashboardSelectionClick(event) {
       });
     });
   }
+}
+
+function handleDashboardControlChange(event) {
+  const tableFilter = event.target.closest("[data-issue-table-filter]");
+  if (!tableFilter) {
+    return;
+  }
+  const nextTable = tableFilter.value || "all";
+  resetDashboardFilters();
+  if (nextTable === "all") {
+    state.dashboardSelection = { kind: "overview", value: "", label: "Review Issues" };
+  } else {
+    state.dashboardFilters.table = nextTable;
+    state.dashboardSelection = { kind: "table", value: nextTable, label: nextTable };
+  }
+  renderDashboard();
 }
 
 function applyDashboardSelectionFilter(kind, value) {
@@ -3903,7 +3923,7 @@ function renderDashboard() {
 
   els.dashboardPanelGrid.innerHTML = `
     ${renderIssueVisualSummary(issues, filteredIssues)}
-    ${renderIssueInbox(filteredIssues)}
+    ${renderIssueInbox(filteredIssues, issues)}
   `;
   renderDashboardDrilldown();
 
@@ -5493,13 +5513,9 @@ function renderDashboardBars(rows, options = {}) {
   `;
 }
 
-function renderIssueInbox(filteredIssues) {
-  const issues = [...filteredIssues].sort((a, b) => (
-    issueStatusOrder(issueStatus(a)) - issueStatusOrder(issueStatus(b)) ||
-    (a.table || "").localeCompare(b.table || "") ||
-    issuePrimaryColumn(a).localeCompare(issuePrimaryColumn(b)) ||
-    issueGuid(a).localeCompare(issueGuid(b))
-  ));
+function renderIssueInbox(filteredIssues, allIssues = filteredIssues) {
+  const issues = sortIssuesForReview(filteredIssues);
+  const availableTables = uniqueSorted((allIssues || []).map((issue) => issue.table).filter(Boolean));
   const tableCount = uniqueSorted(issues.map((issue) => issue.table).filter(Boolean)).length;
   const columnCount = new Set(issues.map((issue) => `${issue.table || "Schema / dataset"}.${issuePrimaryColumn(issue)}`)).size;
   if (!issues.length) {
@@ -5519,10 +5535,13 @@ function renderIssueInbox(filteredIssues) {
           <h4>Issue table</h4>
           <p>Click a row to see the exact table, column, evidence, explanation, and fix checklist.</p>
         </div>
-        <div class="issue-inbox-totals" aria-label="Issue inbox summary">
-          <span>${integerText(issues.length)} issues</span>
-          <span>${integerText(columnCount)} columns</span>
-          <span>${integerText(tableCount)} tables</span>
+        <div class="issue-inbox-side">
+          ${renderIssueTableControls(availableTables)}
+          <div class="issue-inbox-totals" aria-label="Issue inbox summary">
+            <span>${integerText(issues.length)} issues</span>
+            <span>${integerText(columnCount)} columns</span>
+            <span>${integerText(tableCount)} tables</span>
+          </div>
         </div>
       </div>
       <div class="issue-review-table" role="table" aria-label="Issues by table and column">
@@ -5540,6 +5559,38 @@ function renderIssueInbox(filteredIssues) {
       </div>
     </section>
   `;
+}
+
+function renderIssueTableControls(availableTables) {
+  const selectedTable = state.dashboardFilters.table || "all";
+  const tableOptions = [
+    `<option value="all"${selectedTable === "all" ? " selected" : ""}>All tables</option>`,
+    ...availableTables.map((table) => (
+      `<option value="${escapeHtml(table)}"${selectedTable === table ? " selected" : ""}>${escapeHtml(table)}</option>`
+    )),
+  ].join("");
+  return `
+    <div class="issue-table-controls" aria-label="Issue table controls">
+      <label class="issue-table-filter">
+        <span>Table</span>
+        <select data-issue-table-filter aria-label="Filter Issue table by table">
+          ${tableOptions}
+        </select>
+      </label>
+      <span class="issue-sort-note">Sort: P0 first</span>
+    </div>
+  `;
+}
+
+function sortIssuesForReview(issues) {
+  return [...(issues || [])].sort((a, b) => (
+    severityRank(a.severity) - severityRank(b.severity) ||
+    Number(b.bad_count || 0) - Number(a.bad_count || 0) ||
+    issueStatusOrder(issueStatus(a)) - issueStatusOrder(issueStatus(b)) ||
+    (a.table || "").localeCompare(b.table || "") ||
+    issuePrimaryColumn(a).localeCompare(issuePrimaryColumn(b)) ||
+    issueGuid(a).localeCompare(issueGuid(b))
+  ));
 }
 
 function renderInboxIssueRow(issue) {
@@ -6644,12 +6695,13 @@ function renderTableAssessmentDetails(selection) {
 }
 
 function renderIssueRows(issues) {
-  if (!issues.length) {
+  const sortedIssues = sortIssuesForReview(issues);
+  if (!sortedIssues.length) {
     return `<p class="muted">No issues match this selection.</p>`;
   }
   return `
     <div class="dashboard-issue-list">
-      ${issues.slice(0, 12).map((issue) => {
+      ${sortedIssues.slice(0, 12).map((issue) => {
         return `
           <article class="dashboard-issue-row">
             <div>

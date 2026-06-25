@@ -2516,6 +2516,66 @@ h3 {
   gap: 6px;
 }
 
+.issue-inbox-side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  min-width: min(100%, 340px);
+}
+
+.issue-table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.issue-table-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 5px 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.issue-table-filter span,
+.issue-sort-note {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.issue-table-filter select {
+  min-width: 150px;
+  height: 28px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  color: var(--foreground-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.issue-table-filter select:focus-visible {
+  border-color: var(--accent);
+  outline: 3px solid color-mix(in srgb, var(--focus-ring) 22%, transparent);
+  outline-offset: 1px;
+}
+
+.issue-sort-note {
+  min-height: 32px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  white-space: nowrap;
+}
+
 .issue-inbox-totals span {
   min-height: 24px;
   padding: 4px 7px;
@@ -6875,6 +6935,23 @@ details.runtime-stage-item:focus-within {
 
   .issue-inbox-totals {
     justify-content: flex-start;
+  }
+
+  .issue-inbox-side,
+  .issue-table-controls {
+    justify-items: start;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .issue-table-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .issue-table-filter select {
+    min-width: 0;
+    flex: 1;
   }
 
   .local-diagram {

@@ -497,6 +497,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardPanelGrid .severity-priority-card[data-dashboard-value=\"P1\"]")).toBeVisible();
   await expect(page.locator("#dashboardPanelGrid .issue-visual-chart")).toHaveCount(2);
   expect(await page.locator("#dashboardPanelGrid .issue-visual-row").count()).toBeGreaterThan(3);
+  await expect(page.locator("#dashboardPanelGrid [data-issue-table-filter]")).toHaveValue("all");
+  await expect(page.locator("#dashboardPanelGrid .issue-sort-note")).toContainText("P0 first");
+  await expect(page.locator("#dashboardPanelGrid .issue-inbox-row .issue-severity-token").first()).toContainText("P0");
   await page.locator('#dashboardPanelGrid .severity-priority-card[data-dashboard-kind="severity"][data-dashboard-value="P1"]').click();
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("severity P1");
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("Show full review");
@@ -521,6 +524,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#dashboardPanelGrid [data-dashboard-reset-filters]").click();
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toHaveCount(0);
+  await page.locator("#dashboardPanelGrid [data-issue-table-filter]").selectOption("orders");
+  await expect(page.locator("#dashboardPanelGrid [data-issue-table-filter]")).toHaveValue("orders");
+  await expect(page.locator("#dashboardIssueCount")).toContainText("6/12 issues");
+  await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("table orders");
+  await expect(page.locator("#dashboardPanelGrid .issue-inbox-row").first()).toContainText("orders");
+  await page.locator("#dashboardPanelGrid [data-issue-table-filter]").selectOption("all");
+  await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
 
   await goToProfileStep(page, "connect");
   await expect(page.locator("#diagramSourceBadge")).toContainText("schema_diagram.json");
