@@ -1686,6 +1686,10 @@ def _issue_cards_context(
                 else f"{issue.issue_type} in {issue.table}"
             ),
             "first_action": issue.suggested_fix[0] if issue.suggested_fix else "",
+            # Extracted diagnostic fields
+            "probable_causes": getattr(issue, "probable_causes", []),
+            "suggested_fixes": getattr(issue, "suggested_fix", []),
+            "evidence_sql": getattr(issue, "evidence_sql", ""),
             # Real CSV evidence data
             "evidence_headers": evidence_headers,
             "evidence_rows": evidence_rows,

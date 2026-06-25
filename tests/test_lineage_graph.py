@@ -15,7 +15,7 @@ def test_demo_lineage_graph_links_sources_schema_stages_and_artifacts(tmp_path):
         out_dir=out_dir,
     )
 
-    lineage = json.loads((out_dir / "lineage_graph.json").read_text())
+    lineage = json.loads((out_dir / "lineage_graph.json").read_text(encoding='utf-8'))
     nodes = {node["id"]: node for node in lineage["nodes"]}
     edges = {(edge["source"], edge["target"], edge["type"]) for edge in lineage["edges"]}
 

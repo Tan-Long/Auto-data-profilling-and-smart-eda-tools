@@ -45,9 +45,9 @@ def test_evaluation_benchmark_writes_ground_truth_baseline_and_summary(
     assert (out_dir / evaluation.BASELINE_COMPARISON_ARTIFACT).exists()
     assert (out_dir / evaluation.EVALUATION_SUMMARY_ARTIFACT).exists()
 
-    ground_truth = json.loads((out_dir / evaluation.GROUND_TRUTH_ARTIFACT).read_text())
-    baseline = json.loads((out_dir / evaluation.BASELINE_COMPARISON_ARTIFACT).read_text())
-    persisted_summary = json.loads((out_dir / evaluation.EVALUATION_SUMMARY_ARTIFACT).read_text())
+    ground_truth = json.loads((out_dir / evaluation.GROUND_TRUTH_ARTIFACT).read_text(encoding='utf-8'))
+    baseline = json.loads((out_dir / evaluation.BASELINE_COMPARISON_ARTIFACT).read_text(encoding='utf-8'))
+    persisted_summary = json.loads((out_dir / evaluation.EVALUATION_SUMMARY_ARTIFACT).read_text(encoding='utf-8'))
 
     assert summary["artifact"] == "evaluation_summary"
     assert persisted_summary["dataset"]["dataset_id"] == "support_tickets_seeded_faults"

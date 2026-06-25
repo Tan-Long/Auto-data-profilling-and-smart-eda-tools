@@ -11,10 +11,10 @@ def _css_block(css: str, selector: str) -> str:
 def test_web_ui_contains_upload_mapping_and_visualization_regions():
     root = Path(__file__).resolve().parents[1] / "web"
     design_system = Path(__file__).resolve().parents[1] / ".interface-design" / "system.md"
-    html = (root / "index.html").read_text()
-    css = (root / "styles.css").read_text()
-    js = (root / "app.js").read_text()
-    design = design_system.read_text()
+    html = (root / "index.html").read_text(encoding='utf-8')
+    css = (root / "styles.css").read_text(encoding='utf-8')
+    js = (root / "app.js").read_text(encoding='utf-8')
+    design = design_system.read_text(encoding='utf-8')
 
     required_html = [
         "Data Quality Profiler",
@@ -384,8 +384,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
 
 def test_web_review_surfaces_use_single_flow_layouts():
     root = Path(__file__).resolve().parents[1]
-    css = (root / "web" / "styles.css").read_text()
-    design = (root / ".interface-design" / "system.md").read_text()
+    css = (root / "web" / "styles.css").read_text(encoding='utf-8')
+    design = (root / ".interface-design" / "system.md").read_text(encoding='utf-8')
 
     single_flow_selectors = [
         ".dashboard-layout",
@@ -417,7 +417,7 @@ def test_web_review_surfaces_use_single_flow_layouts():
 
 
 def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
-    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text(encoding='utf-8')
     assert 'fetch("/api/health"' in js
     assert 'fetch("/api/jobs"' in js
     assert 'fetch("/api/path-jobs"' in js
@@ -490,15 +490,15 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
 
 def test_web_ui_path_mode_avoids_browser_directory_permission_api():
     root = Path(__file__).resolve().parents[1] / "web"
-    html = (root / "index.html").read_text()
-    js = (root / "app.js").read_text()
+    html = (root / "index.html").read_text(encoding='utf-8')
+    js = (root / "app.js").read_text(encoding='utf-8')
 
     assert "webkitdirectory" not in html
     assert "showDirectoryPicker" not in js
 
 
 def test_web_dashboard_uses_artifacts_not_raw_csv_fetches():
-    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text(encoding='utf-8')
 
     assert "fetchCsv" not in js
     assert "fetchRawCsv" not in js

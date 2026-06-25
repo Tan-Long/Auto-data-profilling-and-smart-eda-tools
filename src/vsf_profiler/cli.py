@@ -775,7 +775,7 @@ def _write_json(
     runtime: RuntimeRecorder | None = None,
     key: str | None = None,
 ) -> None:
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     if runtime is not None:
         runtime.artifact_written(path, key=key, kind="json")
 

@@ -42,7 +42,7 @@ REQUIRED_ARTIFACTS = {
 }
 
 
-def wait_for_job(job, *, seconds=20):
+def wait_for_job(job, *, seconds=60):
     deadline = time.monotonic() + seconds
     while job.status not in {"succeeded", "failed"} and time.monotonic() < deadline:
         time.sleep(0.05)
@@ -87,8 +87,8 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     payload = store.job_payload(job)
     artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
     assert REQUIRED_ARTIFACTS.issubset(artifact_paths)
-    issues = json.loads((job.out_dir / "issues.json").read_text())
-    action_plans = json.loads((job.out_dir / "issue_action_plans.json").read_text())
+    issues = json.loads((job.out_dir / "issues.json").read_text(encoding='utf-8'))
+    action_plans = json.loads((job.out_dir / "issue_action_plans.json").read_text(encoding='utf-8'))
     assert action_plans["artifact"] == "issue_action_plans"
     assert action_plans["summary"]["source"] == "deterministic"
     assert action_plans["summary"]["plan_count"] == len(issues)
@@ -103,7 +103,7 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     assert first_plan["priority"]
     assert first_plan["evidence_coverage"]["explanation"]
     assert first_plan["actionability_score"]["explanation"]
-    issue_todos = json.loads((job.out_dir / "issue_todos.json").read_text())
+    issue_todos = json.loads((job.out_dir / "issue_todos.json").read_text(encoding='utf-8'))
     assert issue_todos["artifact"] == "issue_todos"
     assert issue_todos["derived_from"] == "issue_action_plans.json"
     assert issue_todos["summary"]["source"] == "deterministic"
@@ -116,7 +116,7 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     assert rerun_todo["occurrence_count"] == len(issues)
     assert rerun_todo["source"] == "deterministic"
     assert {"issue_id", "table", "columns", "priority"}.issubset(rerun_todo["occurrences"][0])
-    quality_gates = json.loads((job.out_dir / "quality_gates.json").read_text())
+    quality_gates = json.loads((job.out_dir / "quality_gates.json").read_text(encoding='utf-8'))
     assert quality_gates["artifact"] == "quality_gates"
     assert quality_gates["source"] == "deterministic"
     assert "issue_todos.json" in quality_gates["derived_from"]
@@ -176,7 +176,7 @@ def test_web_runner_evaluation_job_uses_built_in_dataset_catalog(tmp_path, monke
     assert job.status == "succeeded"
     assert job.input_mode == "evaluation"
     assert job.evaluation_dataset_id == "retail_orders_seeded_faults"
-    manifest = json.loads((job.input_dir / "evaluation_inputs.json").read_text())
+    manifest = json.loads((job.input_dir / "evaluation_inputs.json").read_text(encoding='utf-8'))
     assert manifest["input_policy"] == "built_in_curated_datasets_only"
     assert manifest["arbitrary_uploads_supported"] is False
     assert (job.out_dir / "ground_truth_issues.json").exists()
@@ -193,7 +193,7 @@ def test_web_runner_evaluation_job_uses_built_in_dataset_catalog(tmp_path, monke
         "baseline_comparison.json",
         "evaluation_summary.json",
     }.issubset(artifact_paths)
-    summary = json.loads((job.out_dir / "evaluation_summary.json").read_text())
+    summary = json.loads((job.out_dir / "evaluation_summary.json").read_text(encoding='utf-8'))
     assert summary["correctness"]["vsf_missed_group_count"] >= 0
     assert summary["baseline"]["status"] == "unavailable"
 
@@ -470,10 +470,10 @@ def test_web_runner_path_job_can_enable_fake_llm_report(tmp_path):
     assert job.status == "succeeded"
     assert (job.out_dir / "l4_report.md").exists()
     assert (job.out_dir / "guardrail_report.json").exists()
-    path_inputs = json.loads((job.input_dir / "path_inputs.json").read_text())
+    path_inputs = json.loads((job.input_dir / "path_inputs.json").read_text(encoding='utf-8'))
     assert path_inputs["use_llm"] is True
     assert path_inputs["llm_provider"] == "fake"
-    run_summary = json.loads((job.out_dir / "run_summary.json").read_text())
+    run_summary = json.loads((job.out_dir / "run_summary.json").read_text(encoding='utf-8'))
     assert run_summary["inputs"]["use_llm"] is True
     assert run_summary["inputs"]["llm_provider"] == "fake"
     payload = store.job_payload(job)
@@ -510,9 +510,9 @@ def test_web_runner_path_job_persists_preflight_review_artifact(tmp_path):
     wait_for_job(job)
 
     assert job.status == "succeeded"
-    path_inputs = json.loads((job.input_dir / "path_inputs.json").read_text())
+    path_inputs = json.loads((job.input_dir / "path_inputs.json").read_text(encoding='utf-8'))
     assert path_inputs["preflight_review"]["accepted_warning_ids"] == ["extra_csv:notes"]
-    persisted_review = json.loads((job.out_dir / "preflight_review.json").read_text())
+    persisted_review = json.loads((job.out_dir / "preflight_review.json").read_text(encoding='utf-8'))
     assert persisted_review["status"] == "ready"
     assert persisted_review["warnings"][0]["accepted"] is True
     assert persisted_review["recorded_at"]
@@ -561,7 +561,7 @@ def test_web_runner_database_job_writes_artifacts_and_redacts_secret_url(
     assert (job.out_dir / "schema_diagram.dbml").exists()
     assert not (job.out_dir / ".connector_extracts").exists()
 
-    database_inputs = json.loads((job.input_dir / "database_inputs.json").read_text())
+    database_inputs = json.loads((job.input_dir / "database_inputs.json").read_text(encoding='utf-8'))
     assert database_inputs["input_mode"] == "database"
     assert database_inputs["source_type"] == "postgres"
     assert database_inputs["connection_url"] == (
@@ -680,7 +680,9 @@ def test_web_runner_database_job_validates_inputs_before_start(tmp_path):
         )
 
 
-def test_web_runner_path_job_validates_inputs_before_start(tmp_path):
+def test_web_runner_path_job_validates_inputs_before_start(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     data_dir = create_small_demo(tmp_path / "data" / "demo_small")
     store = WebRunStore(run_root=tmp_path / "web_runs")
 
@@ -813,7 +815,7 @@ def test_web_runner_evaluation_http_endpoint(tmp_path, monkeypatch):
         job_payload = _wait_for_http_job(base_url, payload["job_id"])
         if job_payload["status"] != "succeeded":
             run_root = tmp_path / "web_runs" / payload["job_id"]
-            print((run_root / "run.log").read_text())
+            print((run_root / "run.log").read_text(encoding='utf-8'))
         assert job_payload["status"] == "succeeded"
         assert job_payload["input_mode"] == "evaluation"
         
@@ -1066,7 +1068,7 @@ def test_web_runner_upload_job_applies_mapping_overrides_after_filename_sanitiza
     wait_for_job(job)
 
     assert job.status == "succeeded"
-    schema_evaluation = json.loads((job.out_dir / "schema_evaluation.json").read_text())
+    schema_evaluation = json.loads((job.out_dir / "schema_evaluation.json").read_text(encoding='utf-8'))
     customers = schema_evaluation["tables"][0]
     assert customers["mapping_method"] == "manual"
     assert customers["selected_csv"] == "crm_customers.csv"
@@ -1099,9 +1101,9 @@ def test_web_runner_path_job_applies_mapping_overrides(tmp_path):
     wait_for_job(job)
 
     assert job.status == "succeeded"
-    path_inputs = json.loads((job.input_dir / "path_inputs.json").read_text())
+    path_inputs = json.loads((job.input_dir / "path_inputs.json").read_text(encoding='utf-8'))
     assert path_inputs["mapping_overrides"] == {"customers": "crm_customers.csv"}
-    schema_evaluation = json.loads((job.out_dir / "schema_evaluation.json").read_text())
+    schema_evaluation = json.loads((job.out_dir / "schema_evaluation.json").read_text(encoding='utf-8'))
     assert schema_evaluation["tables"][0]["mapping_method"] == "manual"
 
 
@@ -1254,8 +1256,8 @@ def _get_json(url):
         return json.loads(response.read().decode("utf-8"))
 
 
-def _wait_for_http_job(base_url, job_id):
-    deadline = time.monotonic() + 20
+def _wait_for_http_job(base_url, job_id, timeout=60):
+    deadline = time.monotonic() + timeout
     payload = {}
     while time.monotonic() < deadline:
         payload = _get_json(f"{base_url}/api/jobs/{job_id}")

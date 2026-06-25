@@ -49,26 +49,26 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert (out_dir / "report.md").exists()
     assert (out_dir / "report.html").exists()
 
-    issues = json.loads((out_dir / "issues.json").read_text())
-    influence = json.loads((out_dir / "influence.json").read_text())
-    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text())
-    schema_parse_report = json.loads((out_dir / "schema_parse_report.json").read_text())
-    lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text())
-    relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text())
-    dataset_verdict = json.loads((out_dir / "dataset_verdict.json").read_text())
-    table_assessments = json.loads((out_dir / "table_assessments.json").read_text())
-    issue_action_plans = json.loads((out_dir / "issue_action_plans.json").read_text())
-    issue_todos = json.loads((out_dir / "issue_todos.json").read_text())
-    quality_gates = json.loads((out_dir / "quality_gates.json").read_text())
-    profile_summary = json.loads((out_dir / "profile_summary.json").read_text())
+    issues = json.loads((out_dir / "issues.json").read_text(encoding='utf-8'))
+    influence = json.loads((out_dir / "influence.json").read_text(encoding='utf-8'))
+    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text(encoding='utf-8'))
+    schema_parse_report = json.loads((out_dir / "schema_parse_report.json").read_text(encoding='utf-8'))
+    lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text(encoding='utf-8'))
+    relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text(encoding='utf-8'))
+    dataset_verdict = json.loads((out_dir / "dataset_verdict.json").read_text(encoding='utf-8'))
+    table_assessments = json.loads((out_dir / "table_assessments.json").read_text(encoding='utf-8'))
+    issue_action_plans = json.loads((out_dir / "issue_action_plans.json").read_text(encoding='utf-8'))
+    issue_todos = json.loads((out_dir / "issue_todos.json").read_text(encoding='utf-8'))
+    quality_gates = json.loads((out_dir / "quality_gates.json").read_text(encoding='utf-8'))
+    profile_summary = json.loads((out_dir / "profile_summary.json").read_text(encoding='utf-8'))
     chart_specs = {
-        path.name: json.loads(path.read_text())
+        path.name: json.loads(path.read_text(encoding='utf-8'))
         for path in sorted((out_dir / "charts").glob("*.json"))
     }
-    schema_diagram = json.loads((out_dir / "schema_diagram.json").read_text())
-    run_summary = json.loads((out_dir / "run_summary.json").read_text())
+    schema_diagram = json.loads((out_dir / "schema_diagram.json").read_text(encoding='utf-8'))
+    run_summary = json.loads((out_dir / "run_summary.json").read_text(encoding='utf-8'))
     run_events = _events(out_dir)
-    report_md = (out_dir / "report.md").read_text()
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     report_html = (out_dir / "report.html").read_text(encoding="utf-8")
     issue_types = {issue["issue_type"] for issue in issues}
     pass # assert REQUIRED_ISSUES.issubset(issue_types)
@@ -322,7 +322,7 @@ def test_production_code_does_not_use_unbounded_pandas_read_csv():
     src_root = Path(__file__).resolve().parents[1] / "src" / "vsf_profiler"
     offenders = []
     for path in src_root.glob("*.py"):
-        text = path.read_text()
+        text = path.read_text(encoding='utf-8')
         if "pandas.read_csv" in text or "pd.read_csv" in text:
             offenders.append(path.name)
     assert offenders == []
@@ -331,6 +331,6 @@ def test_production_code_does_not_use_unbounded_pandas_read_csv():
 def _events(out_dir: Path) -> list[dict]:
     return [
         json.loads(line)
-        for line in (out_dir / "run_events.jsonl").read_text().splitlines()
+        for line in (out_dir / "run_events.jsonl").read_text(encoding='utf-8').splitlines()
         if line.strip()
     ]

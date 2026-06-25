@@ -287,13 +287,15 @@ summary::-webkit-details-marker{display:none}
 </div>
 
 {% set verdict = dataset_verdict %}
-{% set v_color = '#ef4444' if verdict.verdict == 'NOT_READY' else ('#d97706' if verdict.verdict == 'WARN' else '#22c55e') %}
+{% set risk = verdict.risk_score | default(0) | float %}
+{% set v_color = '#ef4444' if (verdict.verdict == 'NOT_READY' or risk >= 60) else ('#d97706' if (verdict.verdict == 'WARN' or risk >= 30) else '#22c55e') %}
 <div class="verdict-section">
   <div class="verdict-row">
     <div class="verdict-main" style="border-left-color:{{ v_color }}">
       <div class="v-label" style="color:{{ v_color }}">Kết quả đánh giá</div>
       <div class="v-status" style="color:{{ v_color }}">{{ verdict.verdict | default('OK') }}</div>
-      <div class="v-risk">Risk Score: <strong>{{ verdict.risk_score | default(0) }} / 100</strong> &middot; {{ fixed_report.run_summary.issue_count }} vấn đề phát hiện</div>
+      {% set risk_color = '#ef4444' if risk >= 60 else ('#d97706' if risk >= 30 else '#22c55e') %}
+      <div class="v-risk">Risk Score: <strong style="color:{{ risk_color }}">{{ verdict.risk_score | default(0) }} / 100</strong> &middot; {{ fixed_report.run_summary.issue_count }} vấn đề phát hiện</div>
       <div class="v-rat">{{ verdict.verdict_rationale | default('') }}</div>
     </div>
     <div class="sev-pills">
@@ -599,6 +601,28 @@ summary::-webkit-details-marker{display:none}
 
           <p class="issue-desc">{{ card.description }}</p>
 
+          {% if card.probable_causes %}
+          <div style="font-size:13px; color:var(--text2); margin-top:-2px; margin-bottom:8px; padding: 0 12px;">
+            <strong style="color:var(--text); font-size:12px;">Nguyên nhân khả thi:</strong>
+            <ul style="margin-top: 4px; padding-left: 20px;">
+              {% for cause in card.probable_causes %}
+              <li>{{ cause }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          {% if card.suggested_fixes %}
+          <div style="font-size:13px; color:var(--text2); margin-top:-2px; margin-bottom:12px; padding: 0 12px;">
+            <strong style="color:var(--text); font-size:12px;">HÀNH ĐỘNG KHUYẾN NGHỊ:</strong>
+            <ul style="margin-top: 4px; padding-left: 20px; color:var(--text);">
+              {% for fix in card.suggested_fixes %}
+              <li>{{ fix }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
           <div class="issue-stats">
             <div class="stat-cell">
               <span class="stat-big">{{ card.bad_count_display }}</span>
@@ -627,6 +651,18 @@ summary::-webkit-details-marker{display:none}
               {% endif %}
             </div>
           </div>
+
+          {% if card.evidence_sql %}
+          <details class="rows-section">
+            <summary>📝 Xem câu lệnh SQL phát hiện lỗi ▾</summary>
+            <div class="sample-wrapper">
+              <div style="position: relative; background: var(--bg3); padding: 12px; border-radius: 6px; border: 1px solid var(--border2); margin-bottom: 6px;">
+                <button onclick="navigator.clipboard.writeText(this.nextElementSibling.textContent); this.textContent='Đã copy!'; setTimeout(()=>this.textContent='Copy SQL', 2000)" style="position: absolute; top: 8px; right: 8px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: var(--text2); font-weight: 600;">Copy SQL</button>
+                <code style="display: block; font-size: 12px; color: var(--text); white-space: pre-wrap; font-family: monospace; padding-right: 70px;">{{ card.evidence_sql }}</code>
+              </div>
+            </div>
+          </details>
+          {% endif %}
 
           <details class="rows-section">
             {% set ev_headers = (card.evidence_headers or []) %}

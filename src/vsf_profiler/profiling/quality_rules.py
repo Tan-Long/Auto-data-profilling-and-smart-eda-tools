@@ -167,7 +167,7 @@ def _dbml_value_checks(
                 )
 
         pk_columns = _primary_key_columns(table_schema)
-        if pk_columns:
+        if pk_columns and all(column_name in catalog_table.columns for column_name in pk_columns):
             _duplicate_key_issue(
                 issues=issues,
                 table_name=table_name,

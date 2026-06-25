@@ -74,9 +74,9 @@ def test_mysql_acceptance_uses_local_fixture_or_skips(tmp_path):
             source_connector=connector,
         )
 
-        metadata = json.loads((out_dir / "connector_metadata.json").read_text())
-        relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text())
-        run_summary = json.loads((out_dir / "run_summary.json").read_text())
+        metadata = json.loads((out_dir / "connector_metadata.json").read_text(encoding='utf-8'))
+        relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text(encoding='utf-8'))
+        run_summary = json.loads((out_dir / "run_summary.json").read_text(encoding='utf-8'))
 
         assert metadata["source_type"] == "mysql"
         assert metadata["tables_scanned"] == [customers_table, orders_table]

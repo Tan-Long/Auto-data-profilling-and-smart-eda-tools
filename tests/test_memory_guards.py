@@ -101,7 +101,7 @@ def test_production_duckdb_to_pandas_calls_go_through_bounded_helper():
     for path in src_root.glob("*.py"):
         if path.name == "duckdb_utils.py":
             continue
-        if ".fetchdf(" in path.read_text():
+        if ".fetchdf(" in path.read_text(encoding='utf-8'):
             offenders.append(path.name)
     assert offenders == []
 
@@ -112,7 +112,7 @@ def test_production_pandas_usage_is_limited_to_bounded_analysis_modules():
     import_offenders = []
     read_csv_offenders = []
     for path in src_root.glob("*.py"):
-        text = path.read_text()
+        text = path.read_text(encoding='utf-8')
         if ("import pandas" in text or "from pandas" in text) and path.name not in allowed_imports:
             import_offenders.append(path.name)
         if "pandas.read_csv" in text or "pd.read_csv" in text:

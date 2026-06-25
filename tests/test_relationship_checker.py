@@ -16,7 +16,7 @@ def test_relationship_checker_finds_orphans(tmp_path):
         out_dir=out_dir,
     )
 
-    issues = json.loads((out_dir / "issues.json").read_text())
+    issues = json.loads((out_dir / "issues.json").read_text(encoding='utf-8'))
     orphan_issues = [issue for issue in issues if issue["issue_type"] == "ORPHAN_FOREIGN_KEY"]
     assert orphan_issues
     assert any(issue["table"] == "orders" and issue["parent_table"] == "customers" for issue in orphan_issues)
@@ -167,9 +167,9 @@ def test_extended_relationship_cardinality_composite_fk_and_junction_detection(t
         out_dir=out_dir,
     )
 
-    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text())
-    relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text())
-    report_md = (out_dir / "report.md").read_text()
+    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text(encoding='utf-8'))
+    relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text(encoding='utf-8'))
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
 
     assert schema_evaluation["summary"]["relationship_cardinality_counts"] == {
         "MANY_TO_ONE": 5,

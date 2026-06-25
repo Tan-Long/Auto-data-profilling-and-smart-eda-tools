@@ -202,9 +202,9 @@ def test_pipeline_manual_mapping_override_writes_mapping_evidence_and_reports(tm
         out_dir=out_dir,
     )
 
-    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text())
-    schema_diagram = json.loads((out_dir / "schema_diagram.json").read_text())
-    report_md = (out_dir / "report.md").read_text()
+    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text(encoding='utf-8'))
+    schema_diagram = json.loads((out_dir / "schema_diagram.json").read_text(encoding='utf-8'))
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     report_html = (out_dir / "report.html").read_text(encoding="utf-8")
 
     customers = schema_evaluation["tables"][0]
@@ -251,7 +251,7 @@ def test_cli_run_accepts_mapping_override_file(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text())
+    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text(encoding='utf-8'))
     assert schema_evaluation["tables"][0]["mapping_method"] == "manual"
 
 
@@ -266,10 +266,10 @@ def test_pipeline_writes_relationship_graph_metrics_and_evidence(tmp_path):
         out_dir=out_dir,
     )
 
-    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text())
-    schema_parse_report = json.loads((out_dir / "schema_parse_report.json").read_text())
-    relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text())
-    report_md = (out_dir / "report.md").read_text()
+    schema_evaluation = json.loads((out_dir / "schema_evaluation.json").read_text(encoding='utf-8'))
+    schema_parse_report = json.loads((out_dir / "schema_parse_report.json").read_text(encoding='utf-8'))
+    relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text(encoding='utf-8'))
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     report_html = (out_dir / "report.html").read_text(encoding="utf-8")
 
     assert schema_parse_report["artifact"] == "schema_parse_report"

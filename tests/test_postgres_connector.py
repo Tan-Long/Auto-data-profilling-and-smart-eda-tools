@@ -103,10 +103,10 @@ def test_pipeline_with_connector_writes_metadata_and_redacts_secrets(tmp_path):
     assert (out_dir / "lineage_graph.json").exists()
     assert not (out_dir / ".connector_extracts").exists()
 
-    metadata = json.loads((out_dir / "connector_metadata.json").read_text())
-    lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text())
-    run_summary = json.loads((out_dir / "run_summary.json").read_text())
-    report_md = (out_dir / "report.md").read_text()
+    metadata = json.loads((out_dir / "connector_metadata.json").read_text(encoding='utf-8'))
+    lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text(encoding='utf-8'))
+    run_summary = json.loads((out_dir / "run_summary.json").read_text(encoding='utf-8'))
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     report_html = (out_dir / "report.html").read_text(encoding="utf-8")
 
     assert metadata["source_type"] == "postgres"
@@ -144,7 +144,7 @@ def test_runtime_redacts_secret_strings_on_connector_failure(tmp_path):
         )
 
     assert_no_secret_leak(tmp_path / "out", "super-secret")
-    summary = json.loads((tmp_path / "out" / "run_summary.json").read_text())
+    summary = json.loads((tmp_path / "out" / "run_summary.json").read_text(encoding='utf-8'))
     assert "[redacted]" in summary["error"]["error_message"]
 
 
@@ -228,8 +228,8 @@ def test_postgres_integration_uses_local_fixture_or_skips(tmp_path):
             out_dir=out_dir,
             source_connector=connector,
         )
-        metadata = json.loads((out_dir / "connector_metadata.json").read_text())
-        relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text())
+        metadata = json.loads((out_dir / "connector_metadata.json").read_text(encoding='utf-8'))
+        relationship_graph = json.loads((out_dir / "relationship_graph.json").read_text(encoding='utf-8'))
         assert metadata["source_type"] == "postgres"
         assert metadata["tables_scanned"] == ["customers", "orders"]
         assert relationship_graph["summary"]["edge_count"] == 1

@@ -88,10 +88,10 @@ def test_pipeline_with_mysql_connector_writes_metadata_and_redacts_secrets(tmp_p
         source_connector=connector,
     )
 
-    metadata = json.loads((out_dir / "connector_metadata.json").read_text())
-    lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text())
-    run_summary = json.loads((out_dir / "run_summary.json").read_text())
-    report_md = (out_dir / "report.md").read_text()
+    metadata = json.loads((out_dir / "connector_metadata.json").read_text(encoding='utf-8'))
+    lineage_graph = json.loads((out_dir / "lineage_graph.json").read_text(encoding='utf-8'))
+    run_summary = json.loads((out_dir / "run_summary.json").read_text(encoding='utf-8'))
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     report_html = (out_dir / "report.html").read_text(encoding="utf-8")
 
     assert metadata["source_type"] == "mysql"
@@ -141,8 +141,8 @@ def test_mysql_connector_supports_dbml_supplied_schema(tmp_path):
         source_connector=connector,
     )
 
-    parse_report = json.loads((out_dir / "schema_parse_report.json").read_text())
-    metadata = json.loads((out_dir / "connector_metadata.json").read_text())
+    parse_report = json.loads((out_dir / "schema_parse_report.json").read_text(encoding='utf-8'))
+    metadata = json.loads((out_dir / "connector_metadata.json").read_text(encoding='utf-8'))
 
     assert parse_report["parser"] == "vsf_profiler.ingestion.dbml_parser"
     assert metadata["source_type"] == "mysql"

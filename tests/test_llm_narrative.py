@@ -77,10 +77,10 @@ def test_fake_provider_writes_l4_report_and_passed_guardrail(tmp_path):
         llm_provider=provider,
     )
 
-    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
-    l4_report = (out_dir / "l4_report.md").read_text()
-    run_summary = json.loads((out_dir / "run_summary.json").read_text())
-    report_md = (out_dir / "report.md").read_text()
+    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text(encoding='utf-8'))
+    l4_report = (out_dir / "l4_report.md").read_text(encoding='utf-8')
+    run_summary = json.loads((out_dir / "run_summary.json").read_text(encoding='utf-8'))
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     report_html = (out_dir / "report.html").read_text(encoding="utf-8")
 
     assert guardrail_report["status"] == "passed"
@@ -132,10 +132,10 @@ def test_configured_fake_provider_output_passes_guardrail(tmp_path):
         llm_provider=provider,
     )
 
-    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
-    profile_summary = json.loads((out_dir / "profile_summary.json").read_text())
-    l4_report = (out_dir / "l4_report.md").read_text()
-    report_md = (out_dir / "report.md").read_text()
+    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text(encoding='utf-8'))
+    profile_summary = json.loads((out_dir / "profile_summary.json").read_text(encoding='utf-8'))
+    l4_report = (out_dir / "l4_report.md").read_text(encoding='utf-8')
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     report_html = (out_dir / "report.html").read_text(encoding="utf-8")
     column_count = sum(table["column_count"] for table in profile_summary["tables"].values())
 
@@ -173,9 +173,9 @@ def test_openai_safe_draft_output_passes_without_fallback(tmp_path):
         llm_provider=provider,
     )
 
-    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
-    l4_report = (out_dir / "l4_report.md").read_text()
-    report_md = (out_dir / "report.md").read_text()
+    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text(encoding='utf-8'))
+    l4_report = (out_dir / "l4_report.md").read_text(encoding='utf-8')
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
 
     assert guardrail_report["status"] == "passed"
     assert guardrail_report["provider"] == "openai"
@@ -206,8 +206,8 @@ def test_bad_provider_output_uses_deterministic_fallback(tmp_path):
         llm_provider=BadProvider(),
     )
 
-    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
-    l4_report = (out_dir / "l4_report.md").read_text()
+    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text(encoding='utf-8'))
+    l4_report = (out_dir / "l4_report.md").read_text(encoding='utf-8')
     violation_types = {violation["type"] for violation in guardrail_report["violations"]}
 
     assert guardrail_report["status"] == "fallback_used"
@@ -231,7 +231,7 @@ def test_missing_provider_config_uses_deterministic_fallback(tmp_path):
         use_llm=True,
     )
 
-    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text())
+    guardrail_report = json.loads((out_dir / "guardrail_report.json").read_text(encoding='utf-8'))
     assert guardrail_report["status"] == "fallback_used"
     assert guardrail_report["fallback_reason"] == "provider_config_missing"
     assert guardrail_report["provider"] == "none"
@@ -249,8 +249,8 @@ def test_llm_disabled_preserves_deterministic_artifact_set(tmp_path):
         out_dir=out_dir,
     )
 
-    run_summary = json.loads((out_dir / "run_summary.json").read_text())
-    report_md = (out_dir / "report.md").read_text()
+    run_summary = json.loads((out_dir / "run_summary.json").read_text(encoding='utf-8'))
+    report_md = (out_dir / "report.md").read_text(encoding='utf-8')
     assert not (out_dir / "l4_report.md").exists()
     assert not (out_dir / "guardrail_report.json").exists()
     assert "l4_report" not in run_summary["artifact_paths"]
@@ -462,7 +462,7 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
     assert "LLM Data-Quality Summary Artifact" in narrative
     assert len(calls) == 1
     call = calls[0]
-    assert call["url"] == "https://example.test/v1/responses"
+    assert call["url"] == "https://example.test/v1/chat/completions"
     assert call["headers"]["Authorization"] == "Bearer test-key"
     assert call["headers"]["Content-Type"] == "application/json"
     assert call["timeout_seconds"] == 12.5

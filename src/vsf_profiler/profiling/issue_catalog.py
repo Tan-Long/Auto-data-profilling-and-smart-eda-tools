@@ -9,60 +9,60 @@ from vsf_profiler.models import Issue
 
 
 CAUSES = {
-    "TABLE_MISSING": ["CSV extract did not include a table required by the DBML contract."],
-    "COLUMN_MISSING": ["CSV header is missing a column required by the DBML contract."],
-    "EXTRA_COLUMN": ["CSV extract includes a column not declared in the DBML contract."],
-    "TYPE_CAST_INVALID": ["Source data contains values that do not match the declared DBML type."],
-    "REQUIRED_FIELD_NULL": ["Required source field was emitted as null or blank."],
-    "PRIMARY_KEY_NULL": ["Primary key generation or extraction produced null or blank keys."],
-    "DUPLICATE_PRIMARY_KEY": ["Primary key uniqueness is not enforced before export."],
-    "UNIQUE_DUPLICATE": ["Unique field has duplicate values in the CSV extract."],
+    "TABLE_MISSING": ["Bản trích xuất CSV không có bảng nào được yêu cầu bởi DBML contract."],
+    "COLUMN_MISSING": ["Dòng tiêu đề CSV thiếu một cột được yêu cầu bởi DBML contract."],
+    "EXTRA_COLUMN": ["Bản trích xuất CSV bao gồm một cột không được khai báo trong DBML contract."],
+    "TYPE_CAST_INVALID": ["Dữ liệu nguồn chứa các giá trị không khớp với kiểu dữ liệu được khai báo trong DBML."],
+    "REQUIRED_FIELD_NULL": ["Trường bắt buộc (required field) đang bị trống hoặc null từ nguồn."],
+    "PRIMARY_KEY_NULL": ["Cột khóa chính (primary key) bị trống hoặc null khi tạo ra."],
+    "DUPLICATE_PRIMARY_KEY": ["Tính duy nhất của khóa chính chưa được đảm bảo trước khi export."],
+    "UNIQUE_DUPLICATE": ["Trường duy nhất (unique field) có chứa các giá trị trùng lặp trong bản export CSV."],
     "ORPHAN_FOREIGN_KEY": [
-        "Parent table may be missing a batch.",
-        "Child rows may have loaded before parent rows.",
-        "Join key transformation may be inconsistent across tables.",
+        "Bảng cha có thể đang bị thiếu một batch dữ liệu.",
+        "Dòng dữ liệu của bảng con có thể đã được tải (load) trước bảng cha.",
+        "Logic biến đổi khóa join không đồng nhất giữa các bảng.",
     ],
-    "PARENT_KEY_DUPLICATE": ["Parent key is not unique, so joins can multiply child rows."],
+    "PARENT_KEY_DUPLICATE": ["Khóa cha không duy nhất, do đó các phép join có thể làm nhân đôi (multiply) số dòng của bảng con."],
     "CHILD_RELATIONSHIP_DUPLICATE": [
-        "Child foreign-key values are not unique for a declared one-to-one relationship."
+        "Các giá trị khóa ngoại của bảng con không duy nhất đối với một mối quan hệ one-to-one đã được khai báo."
     ],
-    "VALUE_OUT_OF_RANGE": ["A configured range constraint was violated."],
-    "NEGATIVE_VALUE_NOT_ALLOWED": ["A configured non-negative numeric rule was violated."],
-    "DATE_ORDER_INVALID": ["Timestamp ordering violates the configured chronological rule."],
-    "ACCEPTED_VALUE_VIOLATION": ["A categorical column contains undeclared values."],
-    "REGEX_MISMATCH": ["A text value does not match the expected pattern."],
-    "EMPTY_STRING": ["Text fields contain blank strings that may behave differently from null."],
-    "INVALID_PLACEHOLDER_TOKEN": ["Placeholder tokens are present instead of normalized nulls."],
-    "NUMERIC_OUTLIER": ["Numeric values fall outside the profiled IQR fence for this column."],
+    "VALUE_OUT_OF_RANGE": ["Dữ liệu vi phạm giới hạn đã cấu hình (range constraint)."],
+    "NEGATIVE_VALUE_NOT_ALLOWED": ["Dữ liệu vi phạm quy tắc số không âm đã cấu hình."],
+    "DATE_ORDER_INVALID": ["Thứ tự thời gian vi phạm quy tắc logic theo trình tự đã cấu hình."],
+    "ACCEPTED_VALUE_VIOLATION": ["Cột phân loại (categorical) chứa các giá trị không được khai báo trước."],
+    "REGEX_MISMATCH": ["Giá trị text không khớp với mẫu (pattern) mong đợi."],
+    "EMPTY_STRING": ["Các trường text chứa chuỗi rỗng có thể gây ảnh hưởng khác với null."],
+    "INVALID_PLACEHOLDER_TOKEN": ["Có chứa các placeholder token thay vì các giá trị null chuẩn hóa."],
+    "NUMERIC_OUTLIER": ["Các giá trị số nằm ngoài khoảng an toàn (IQR fence) đối với cột này."],
 }
 
 FIXES = {
-    "TABLE_MISSING": ["Regenerate the extract with all DBML tables included."],
-    "COLUMN_MISSING": ["Update the export query or DBML contract so headers match."],
-    "EXTRA_COLUMN": ["Confirm whether the DBML contract needs this column or remove it from export."],
-    "TYPE_CAST_INVALID": ["Normalize source values before export and quarantine uncastable rows."],
-    "REQUIRED_FIELD_NULL": ["Add a not-null validation before publish and backfill missing values."],
-    "PRIMARY_KEY_NULL": ["Reject rows with missing primary keys before downstream joins."],
-    "DUPLICATE_PRIMARY_KEY": ["Deduplicate by primary key or fix upstream key generation."],
-    "UNIQUE_DUPLICATE": ["Audit the uniqueness contract and deduplicate upstream records."],
+    "TABLE_MISSING": ["Tạo lại bản trích xuất (extract) và đảm bảo bao gồm tất cả các bảng trong DBML."],
+    "COLUMN_MISSING": ["Cập nhật câu lệnh export hoặc DBML contract để các cột khớp nhau."],
+    "EXTRA_COLUMN": ["Xác nhận xem DBML contract có cần cột này không, hoặc loại bỏ cột này khỏi bản export."],
+    "TYPE_CAST_INVALID": ["Chuẩn hóa các giá trị của nguồn dữ liệu trước khi export và cách ly các dòng không thể ép kiểu (cast)."],
+    "REQUIRED_FIELD_NULL": ["Thêm bước kiểm tra not-null trước khi publish và bổ sung các giá trị còn thiếu."],
+    "PRIMARY_KEY_NULL": ["Loại bỏ các dòng bị thiếu khóa chính trước khi thực hiện các phép JOIN ở luồng sau."],
+    "DUPLICATE_PRIMARY_KEY": ["Loại bỏ trùng lặp (deduplicate) dựa trên khóa chính hoặc sửa lỗi logic tạo khóa từ nguồn."],
+    "UNIQUE_DUPLICATE": ["Kiểm tra lại tính duy nhất (uniqueness) trong contract và loại bỏ trùng lặp ở dữ liệu gốc."],
     "ORPHAN_FOREIGN_KEY": [
-        "Check the parent table load pipeline.",
-        "Add anti-join validation before publish.",
-        "Quarantine child rows whose parent key is missing.",
+        "Kiểm tra lại pipeline tải dữ liệu của bảng cha.",
+        "Thêm bước anti-join validation trước khi publish.",
+        "Cách ly các dòng dữ liệu con bị thiếu khóa cha.",
     ],
-    "PARENT_KEY_DUPLICATE": ["Deduplicate parent keys before using the table as a dimension."],
+    "PARENT_KEY_DUPLICATE": ["Loại bỏ trùng lặp (deduplicate) khóa cha trước khi sử dụng bảng này làm bảng dimension."],
     "CHILD_RELATIONSHIP_DUPLICATE": [
-        "Deduplicate child foreign-key values or change the DBML relationship cardinality."
+        "Loại bỏ trùng lặp khóa ngoại của bảng con hoặc thay đổi thiết lập cardinality trong DBML."
     ],
-    "VALUE_OUT_OF_RANGE": ["Clamp, reject, or correct values outside the accepted configured range."],
-    "NEGATIVE_VALUE_NOT_ALLOWED": ["Reject negative numeric values or correct sign handling upstream."],
-    "DATE_ORDER_INVALID": ["Fix timestamp derivation and add ordering validation in the pipeline."],
-    "ACCEPTED_VALUE_VIOLATION": ["Update the allowed set or normalize unexpected category values."],
-    "REGEX_MISMATCH": ["Normalize the text field or update the regex if the contract changed."],
-    "EMPTY_STRING": ["Convert blank strings to null or enforce non-empty text rules."],
-    "INVALID_PLACEHOLDER_TOKEN": ["Normalize placeholder tokens to null at ingestion."],
+    "VALUE_OUT_OF_RANGE": ["Giới hạn (clamp), loại bỏ, hoặc sửa lại các giá trị nằm ngoài vùng an toàn đã cấu hình."],
+    "NEGATIVE_VALUE_NOT_ALLOWED": ["Loại bỏ các giá trị số âm hoặc sửa lại logic xử lý dấu từ nguồn."],
+    "DATE_ORDER_INVALID": ["Sửa lại logic tính toán thời gian và thêm bước kiểm tra thứ tự trong pipeline."],
+    "ACCEPTED_VALUE_VIOLATION": ["Cập nhật tập giá trị cho phép hoặc chuẩn hóa các giá trị category không hợp lệ."],
+    "REGEX_MISMATCH": ["Chuẩn hóa trường văn bản hoặc cập nhật lại regex nếu contract có thay đổi."],
+    "EMPTY_STRING": ["Chuyển các chuỗi rỗng thành null hoặc bắt buộc áp dụng quy tắc văn bản không rỗng."],
+    "INVALID_PLACEHOLDER_TOKEN": ["Chuẩn hóa các token giữ chỗ (placeholder) thành null tại bước ingestion."],
     "NUMERIC_OUTLIER": [
-        "Review bounded sample rows and decide whether to correct, cap, transform, or keep the values."
+        "Xem xét các dòng dữ liệu mẫu và quyết định nên sửa, giới hạn (cap), transform, hoặc giữ nguyên giá trị."
     ],
 }
 
