@@ -5726,7 +5726,7 @@ function renderIssueLlmPriorityPanel(actionPlan, issue) {
       <div class="issue-llm-priority-heading">
         <div>
           <span>OpenAI issue guidance</span>
-          <strong>Issue-specific fix context</strong>
+          <strong>Additional review context</strong>
         </div>
         <code>issue_llm_enrichments.json</code>
       </div>
@@ -6055,6 +6055,10 @@ function renderIssueActionPlan(plan, issue) {
   const coverage = plan.evidence_coverage || {};
   const actionability = plan.actionability_score || {};
   const sourceValue = plan.source === "deterministic" ? "source=deterministic" : `source=${plan.source || "deterministic"}`;
+  const llmEntry = getIssueLlmEnrichment(issue, "openai");
+  const llmFixAdditions = issueLlmActionAdditions(plan, llmEntry, "fix");
+  const llmVerifyAdditions = issueLlmActionAdditions(plan, llmEntry, "verify");
+  const hasLlmAdditions = llmFixAdditions.length || llmVerifyAdditions.length;
   return `
     <div class="action-plan">
       ${renderIssueExportControls(plan)}
@@ -6063,7 +6067,10 @@ function renderIssueActionPlan(plan, issue) {
           <span>Recommended work</span>
           <strong>${escapeHtml(plan.priority || "Needs human review")}</strong>
         </div>
-        <code>${escapeHtml(sourceValue)}</code>
+        <span class="action-plan-source-chips">
+          <code>${escapeHtml(sourceValue)}</code>
+          ${hasLlmAdditions ? `<code>OpenAI additions applied</code>` : ""}
+        </span>
       </div>
       ${plan.human_review_required ? `
         <div class="action-plan-human-review">
@@ -6079,6 +6086,7 @@ function renderIssueActionPlan(plan, issue) {
             showEvidence: false,
             showWhy: false,
           })}
+          ${renderIssueLlmActionAdditions("OpenAI fix additions", llmFixAdditions)}
         </div>
         <div class="action-plan-block">
           <strong>Verify after fix checklist</strong>
@@ -6087,6 +6095,7 @@ function renderIssueActionPlan(plan, issue) {
             showEvidence: false,
             showWhy: false,
           })}
+          ${renderIssueLlmActionAdditions("OpenAI verify additions", llmVerifyAdditions)}
         </div>
       </div>
       <details class="issue-detail-disclosure action-plan-more">
@@ -6094,7 +6103,13 @@ function renderIssueActionPlan(plan, issue) {
         <div class="issue-detail-disclosure-body">
           <div class="action-plan-metrics" aria-label="Action plan metrics">
             ${renderActionPlanMetric("Priority", plan.priority || "Needs human review", "")}
-            ${renderActionPlanMetric("Source", sourceValue, "Generated without LLM enrichment.")}
+            ${renderActionPlanMetric(
+              "Source",
+              hasLlmAdditions ? `${sourceValue} + OpenAI advisory` : sourceValue,
+              hasLlmAdditions
+                ? "OpenAI additions are shown in Fix / Todo but require human review."
+                : "Generated without LLM enrichment.",
+            )}
             ${renderActionPlanMetric(
               "Evidence coverage",
               `${coverage.label || "Unknown"} · ${integerText(coverage.score)}/100`,
@@ -6112,6 +6127,40 @@ function renderIssueActionPlan(plan, issue) {
           </div>
         </div>
       </details>
+    </div>
+  `;
+}
+
+function issueLlmActionAdditions(plan, entry, kind) {
+  if (!entry || entry.status !== "succeeded") {
+    return [];
+  }
+  const response = entry.structured_response || {};
+  const key = kind === "verify" ? "extra_verification" : "extra_fix_suggestion";
+  return filterDuplicateLlmItems(response[key], deterministicPlanTexts(plan, kind));
+}
+
+function renderIssueLlmActionAdditions(title, items) {
+  if (!items.length) {
+    return "";
+  }
+  return `
+    <div class="action-plan-llm-additions" data-llm-action-additions>
+      <div class="action-plan-llm-heading">
+        <strong>${escapeHtml(title)}</strong>
+        <span>human review required</span>
+      </div>
+      <div class="action-plan-step-list">
+        ${items.map((item, index) => `
+          <div class="action-plan-step llm">
+            <div class="action-plan-step-heading">
+              <span>AI${integerText(index + 1)}</span>
+              <strong>Advisory addition</strong>
+            </div>
+            <p>${escapeHtml(item)}</p>
+          </div>
+        `).join("")}
+      </div>
     </div>
   `;
 }
@@ -6139,20 +6188,20 @@ function renderIssueLlmEnrichment(plan, issue) {
     <div class="issue-llm-enrichment" data-issue-llm-status="${escapeHtml(status)}">
       <div class="issue-llm-controls" aria-label="Issue LLM enrichment controls">
         <div class="issue-llm-callout">
-          <strong>Runs on bounded issue context only</strong>
-          <span>Issue, action plan, table context, quality gates, todos, and sample preview metadata.</span>
+          <strong>Updates Fix / Todo when available</strong>
+          <span>OpenAI additions are merged into the Fix / Todo checklist below and require human review.</span>
         </div>
         <button class="button secondary compact" type="button" data-issue-llm-run data-issue-id="${escapeHtml(issueId)}" ${running ? "disabled" : ""}>
           ${issueLlmButtonLabel(provider, Boolean(entry))}
         </button>
       </div>
       <p class="form-message issue-llm-message" data-status="${escapeHtml(state.issueLlmMessageStatus || issueLlmStatusToMessageStatus(status))}" role="status">${escapeHtml(message)}</p>
-      ${renderIssueLlmStructuredResponse(entry, provider)}
+      ${renderIssueLlmStructuredResponse(entry, provider, plan)}
     </div>
   `;
 }
 
-function renderIssueLlmStructuredResponse(entry, provider) {
+function renderIssueLlmStructuredResponse(entry, provider, plan = null) {
   if (!entry) {
     return `
       <div class="issue-llm-result empty">
@@ -6163,10 +6212,11 @@ function renderIssueLlmStructuredResponse(entry, provider) {
   const response = entry.structured_response || {};
   const review = response.human_review_needed || {};
   const status = entry.status || "unknown";
+  const extraFixItems = filterDuplicateLlmItems(response.extra_fix_suggestion, deterministicPlanTexts(plan, "fix"));
+  const extraVerifyItems = filterDuplicateLlmItems(response.extra_verification, deterministicPlanTexts(plan, "verify"));
+  const actionAdditionCount = extraFixItems.length + extraVerifyItems.length;
   const guidanceAvailable = [
     response.why_this_was_flagged,
-    response.extra_fix_suggestion,
-    response.extra_verification,
   ].some((items) => Array.isArray(items) && items.filter(Boolean).length);
   const reviewReason = review.reason || entry.error?.message || "Human review is required before using this advisory LLM enrichment.";
   return `
@@ -6177,9 +6227,10 @@ function renderIssueLlmStructuredResponse(entry, provider) {
       </div>
       ${guidanceAvailable ? `
         ${renderIssueLlmSection("Why this was flagged", response.why_this_was_flagged)}
-        ${renderIssueLlmSection("Extra fix suggestion", response.extra_fix_suggestion)}
-        ${renderIssueLlmSection("Extra verification", response.extra_verification)}
       ` : `<p class="muted">OpenAI guidance is unavailable for this issue. Use the deterministic Fix / Todo checklist below, then retry after provider configuration is available.</p>`}
+      ${actionAdditionCount
+        ? `<p class="issue-llm-footnote">${integerText(actionAdditionCount)} OpenAI fix/verify addition${actionAdditionCount === 1 ? "" : "s"} merged into Fix / Todo below.</p>`
+        : ""}
       <div class="issue-llm-review">
         <strong>Human review needed</strong>
         <p>${escapeHtml(reviewReason)}</p>
@@ -6196,16 +6247,61 @@ function issueLlmButtonLabel(provider, hasEntry) {
   return "Run OpenAI guidance";
 }
 
-function renderIssueLlmSection(title, items) {
+function renderIssueLlmSection(title, items, emptyText = "No LLM guidance was generated for this section.") {
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
   return `
     <div class="issue-llm-section">
       <strong>${escapeHtml(title)}</strong>
       ${list.length
         ? `<ul class="issue-detail-list">${list.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-        : `<p class="muted">No LLM guidance was generated for this section.</p>`}
+        : `<p class="muted">${escapeHtml(emptyText)}</p>`}
     </div>
   `;
+}
+
+function deterministicPlanTexts(plan, kind) {
+  if (!plan) {
+    return [];
+  }
+  const stepKey = kind === "verify" ? "verify_after_fix_steps" : "fix_data_steps";
+  const checklistKey = kind === "verify" ? "verify_after_fix_checklist" : "fix_data_checklist";
+  const stepTexts = Array.isArray(plan[stepKey])
+    ? plan[stepKey].flatMap((step) => [step.title, step.detail, step.evidence, step.why])
+    : [];
+  const checklistTexts = Array.isArray(plan[checklistKey]) ? plan[checklistKey] : [];
+  return [...stepTexts, ...checklistTexts]
+    .map((item) => normalizeGuidanceText(item))
+    .filter(Boolean);
+}
+
+function filterDuplicateLlmItems(items, deterministicTexts) {
+  const normalizedDeterministic = deterministicTexts.filter(Boolean);
+  return (Array.isArray(items) ? items : []).filter((item) => {
+    const normalized = normalizeGuidanceText(item);
+    if (!normalized) {
+      return false;
+    }
+    return !normalizedDeterministic.some((candidate) => guidanceTextOverlaps(normalized, candidate));
+  });
+}
+
+function guidanceTextOverlaps(left, right) {
+  if (!left || !right) {
+    return false;
+  }
+  if (left === right) {
+    return true;
+  }
+  const minLength = Math.min(left.length, right.length);
+  return minLength >= 36 && (left.includes(right) || right.includes(left));
+}
+
+function normalizeGuidanceText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/issue-\d+/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function renderIssueExportControls(plan) {
@@ -6280,11 +6376,15 @@ async function copyText(text) {
 }
 
 function issueActionPlanMarkdown(plan) {
+  const llmEntry = getIssueLlmEnrichment(plan, "openai");
+  const llmFixAdditions = issueLlmActionAdditions(plan, llmEntry, "fix");
+  const llmVerifyAdditions = issueLlmActionAdditions(plan, llmEntry, "verify");
   const lines = [
     `# ${plan.issue_id || "UNKNOWN"} ${plan.issue_type || "Issue"}`,
     "",
     `- Priority: ${plan.priority || "Needs human review"}`,
     `- Source: ${plan.source || "deterministic"}`,
+    `- OpenAI additions: ${llmFixAdditions.length || llmVerifyAdditions.length ? "included, human review required" : "none"}`,
     `- Table: ${plan.table || "unknown"}`,
     `- Columns: ${arrayOfStrings(plan.columns).join(", ") || "table scope"}`,
     "",
@@ -6293,14 +6393,28 @@ function issueActionPlanMarkdown(plan) {
     "",
     "## Fix data checklist",
     ...actionPlanMarkdownSteps(plan.fix_data_steps, plan.fix_data_checklist),
+    ...actionPlanMarkdownLlmAdditions("OpenAI fix additions", llmFixAdditions),
     "",
     "## Verify after fix checklist",
     ...actionPlanMarkdownSteps(plan.verify_after_fix_steps, plan.verify_after_fix_checklist),
+    ...actionPlanMarkdownLlmAdditions("OpenAI verify additions", llmVerifyAdditions),
     "",
     "## Guidelines",
     ...actionPlanMarkdownItems(plan.guidelines),
   ];
   return lines.join("\n");
+}
+
+function actionPlanMarkdownLlmAdditions(title, items) {
+  if (!items.length) {
+    return [];
+  }
+  return [
+    "",
+    `### ${title}`,
+    "_Advisory OpenAI additions. Human review is required before changing data or contracts._",
+    ...items.map((item) => `- ${item}`),
+  ];
 }
 
 function actionPlanMarkdownSteps(steps, fallbackItems) {

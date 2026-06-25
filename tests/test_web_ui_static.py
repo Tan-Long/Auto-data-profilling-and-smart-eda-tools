@@ -297,6 +297,10 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".issue-llm-enrichment",
         ".issue-llm-controls",
         ".issue-llm-section",
+        ".action-plan-source-chips",
+        ".action-plan-llm-additions",
+        ".action-plan-llm-heading",
+        ".action-plan-step.llm",
         ".workflow-nav",
         ".nav-stage-item",
         ".nav-substep-list",
@@ -454,10 +458,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Detection query",
         "Recommended work",
         "OpenAI issue guidance",
-        "Issue-specific fix context",
+        "Additional review context",
         "Why this was flagged",
-        "Extra fix suggestion",
-        "Extra verification",
+        "OpenAI additions applied",
+        "OpenAI fix additions",
+        "OpenAI verify additions",
         "Human review needed",
         "renderL4GuardrailPanel",
         "renderTableImpactSection",
@@ -703,14 +708,20 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Run OpenAI guidance" in js
     assert "/issue-enrichments" in js
     assert "Why this was flagged" in js
-    assert "Extra fix suggestion" in js
-    assert "Extra verification" in js
+    assert "Additional review context" in js
+    assert "OpenAI additions applied" in js
+    assert "OpenAI fix additions" in js
+    assert "OpenAI verify additions" in js
+    assert "Updates Fix / Todo when available" in js
+    assert "issueLlmActionAdditions" in js
+    assert "renderIssueLlmActionAdditions" in js
     assert "Human review needed" in js
     assert "Copy Markdown" in js
     assert "Copy CSV row" in js
     assert "Copy JSON" in js
     assert "data-action-plan-export" in js
     assert "issueActionPlanMarkdown" in js
+    assert "actionPlanMarkdownLlmAdditions" in js
     assert "actionPlanMarkdownSteps" in js
     assert "issueActionPlanCsvRow" in js
     assert "issueActionPlanJson" in js

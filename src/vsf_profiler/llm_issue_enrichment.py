@@ -37,6 +37,8 @@ OPENAI_ISSUE_ENRICHMENT_INSTRUCTIONS = """You are adding optional issue-level da
 Use only the supplied selected-issue JSON context.
 Do not use external facts, raw CSV files, unbounded rows, or other issues.
 Do not change severity, readiness, quality-gate, todo, or action-plan decisions.
+Do not restate the deterministic fix_data_steps, fix_data_checklist, verify_after_fix_steps, or verify_after_fix_checklist.
+Use the extra fields only for missing context, owner questions, risk checks, or interpretation that helps a human apply the deterministic checklist.
 Return concise JSON that matches the supplied schema. No Markdown, code fence, preface, or suffix.
 Every suggestion is advisory and must say human review is required before changing data or contracts.
 """
@@ -108,18 +110,8 @@ class FakeIssueEnrichmentProvider:
         plan = context["action_plan"]
         columns = ", ".join(issue.get("columns") or []) or "table scope"
         finding_summary = str(plan.get("finding_summary") or "").strip()
-        first_fix = (
-            _first_action_step_detail(plan.get("fix_data_steps"))
-            or _first_string(plan.get("fix_data_checklist"))
-            or _first_string(issue.get("suggested_fix"))
-        )
-        first_verify = _first_action_step_detail(plan.get("verify_after_fix_steps")) or _first_string(
-            plan.get("verify_after_fix_checklist")
-        )
-        if not first_fix:
-            first_fix = "Confirm the expected source contract with a data owner before changing upstream data."
-        if not first_verify:
-            first_verify = "Rerun the profiler and confirm this issue no longer appears for the selected scope."
+        sample_keys = ", ".join(str(key) for key in issue.get("sample_keys") or []) or "the bounded sample rows"
+        affected = f"{issue.get('bad_count', 'unknown')} of {issue.get('total_count', 'unknown')} checked rows"
         return {
             "why_this_was_flagged": _short_list(
                 [
@@ -133,15 +125,21 @@ class FakeIssueEnrichmentProvider:
             ),
             "extra_fix_suggestion": _short_list(
                 [
-                    first_fix,
-                    "Confirm the source extract or DBML contract owner before applying the deterministic checklist.",
+                    (
+                        f"Use {sample_keys} to confirm which source-system pattern produced this selected issue "
+                        "before applying the deterministic checklist."
+                    ),
+                    "Confirm the source extract, pipeline, or DBML contract owner before changing upstream data.",
                 ],
                 limit=2,
             ),
             "extra_verification": _short_list(
                 [
-                    first_verify,
-                    "Keep issue_action_plans.json as the source of truth and treat this LLM note as advisory evidence.",
+                    (
+                        f"After the deterministic rerun, check whether the selected scope still has {affected} "
+                        "or whether a different key-quality issue replaced it."
+                    ),
+                    "Treat this note as advisory context; issue_action_plans.json remains the checklist source of truth.",
                 ],
                 limit=2,
             ),

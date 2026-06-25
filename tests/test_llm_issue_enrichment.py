@@ -52,6 +52,12 @@ def test_fake_issue_enrichment_persists_advisory_artifact_without_overwriting_ac
     assert entry["structured_response"]["why_this_was_flagged"]
     assert entry["structured_response"]["extra_fix_suggestion"]
     assert entry["structured_response"]["extra_verification"]
+    fix_text = " ".join(entry["structured_response"]["extra_fix_suggestion"])
+    verify_text = " ".join(entry["structured_response"]["extra_verification"])
+    assert "Backfill customer_id from the source order feed." not in fix_text
+    assert "Confirm affected rows for orders.customer_id are 0 in the rerun." not in verify_text
+    assert "deterministic checklist" in fix_text
+    assert "issue_action_plans.json remains the checklist source of truth" in verify_text
     assert entry["structured_response"]["human_review_needed"]["required"] is True
     assert artifact["summary"]["enrichment_count"] == 1
     assert artifact["summary"]["provider_counts"] == {"fake": 1}

@@ -4242,6 +4242,13 @@ h3 {
   font-size: 11px;
 }
 
+.action-plan-source-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .action-plan-metrics {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -4328,6 +4335,11 @@ h3 {
   background: var(--surface-panel);
 }
 
+.action-plan-step.llm {
+  border-color: rgba(15, 118, 100, 0.34);
+  background: rgba(15, 118, 100, 0.055);
+}
+
 .action-plan-step-heading {
   display: flex;
   align-items: center;
@@ -4375,6 +4387,40 @@ h3 {
 
 .action-plan-step small b {
   color: var(--foreground-tertiary);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.action-plan-llm-additions {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(15, 118, 100, 0.35);
+}
+
+.action-plan-llm-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.action-plan-llm-heading strong {
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.action-plan-llm-heading span {
+  min-height: 22px;
+  padding: 4px 7px;
+  border: 1px solid rgba(154, 95, 0, 0.28);
+  border-radius: 999px;
+  background: rgba(154, 95, 0, 0.08);
+  color: var(--warning);
   font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;

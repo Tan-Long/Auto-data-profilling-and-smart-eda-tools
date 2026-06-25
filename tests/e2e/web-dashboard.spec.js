@@ -724,7 +724,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("Fix data checklist");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Verify after fix checklist");
   await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI issue guidance");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Issue-specific fix context");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Additional review context");
   await expect(page.locator("#dashboardDrilldown .action-plan-step").first()).toBeVisible();
   await expect(page.locator("#dashboardDrilldown")).toContainText("Guidelines");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence coverage");
@@ -755,8 +755,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   expect(Math.abs(fakeResultAnchorTop - fakeRunAnchorTop)).toBeLessThan(8);
   expect(fakeResultScrollY).toBeGreaterThanOrEqual(fakeRunScrollY - 80);
   await expect(page.locator("#dashboardDrilldown")).toContainText(/Why this was flagged|OpenAI guidance is unavailable/i);
-  await expect(page.locator("#dashboardDrilldown")).toContainText(/Extra fix suggestion|deterministic Fix \/ Todo checklist/i);
-  await expect(page.locator("#dashboardDrilldown")).toContainText(/Extra verification|provider configuration/i);
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/Fix \/ Todo checklist|merged into Fix \/ Todo|OpenAI additions/i);
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/provider configuration|OPENAI_API_KEY|Human review is required/i);
   await expect(page.locator("#dashboardDrilldown")).toContainText("Human review needed");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Deterministic action plans remain the source of truth");
   await issueDetailPanel.screenshot({
