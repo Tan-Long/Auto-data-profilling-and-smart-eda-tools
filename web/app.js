@@ -17,7 +17,7 @@ const state = {
   evaluationMessageStatus: "idle",
   runnerMode: "upload",
   selectedDemoPreset: "small",
-  llmMode: "off",
+  llmMode: "openai",
   runnerAvailable: false,
   runnerHost: "",
   currentJob: null,
@@ -39,7 +39,7 @@ const state = {
   dashboardSelection: null,
   issueSampleRows: {},
   issueLlmProvider: "openai",
-  issueLlmPanelOpen: false,
+  issueLlmPanelOpen: true,
   issueLlmRunningIssueId: "",
   issueLlmMessage: "",
   issueLlmMessageStatus: "",
@@ -228,7 +228,8 @@ const runtimeStageDescriptions = {
   data_quality_checks: "Runs deterministic column and table checks from the DBML contract, then writes issue rows for missing, duplicate, invalid, and outlier findings.",
   relationship_checks: "Validates DBML foreign-key relationships against the CSV data, including orphan child rows, null keys, and duplicate parent keys.",
   write_machine_artifacts: "Writes the machine-readable artifacts used by Review: issues, table readiness, action plans, todos, quality gates, charts, and schema evidence.",
-  llm_narrative: "Optionally generates the compatibility LLM summary artifact. OpenAI is called only when selected and configured; missing provider config uses deterministic fallback.",
+  issue_llm_enrichment: "Generates concise OpenAI issue guidance for every detected issue using bounded selected-issue context. If OpenAI is unavailable, Review shows a human-review fallback.",
+  llm_narrative: "Generates the compatibility LLM summary artifact. This is secondary to issue-level guidance; missing provider config uses deterministic fallback.",
   render_reports: "Renders the human-readable Markdown and HTML reports locally from existing artifacts. This step does not call OpenAI or any external provider.",
 };
 
@@ -459,15 +460,6 @@ els.tableImpactGrid.addEventListener("click", (event) => {
 });
 
 els.dashboardDrilldown.addEventListener("click", async (event) => {
-  const providerTarget = event.target.closest("[data-issue-llm-provider]");
-  if (providerTarget) {
-    state.issueLlmProvider = providerTarget.dataset.issueLlmProvider || "openai";
-    state.issueLlmPanelOpen = true;
-    state.issueLlmMessage = "";
-    state.issueLlmMessageStatus = "";
-    renderDashboardDrilldownPreservingViewport();
-    return;
-  }
   const enrichmentTarget = event.target.closest("[data-issue-llm-run]");
   if (enrichmentTarget) {
     state.issueLlmPanelOpen = true;
@@ -498,7 +490,7 @@ function handleDashboardSelectionClick(event) {
   const nextValue = target.dataset.dashboardValue || "";
   const shouldOpenLlm = target.dataset.dashboardOpenLlm === "true";
   if (state.dashboardSelection?.kind !== nextKind || state.dashboardSelection?.value !== nextValue) {
-    state.issueLlmPanelOpen = shouldOpenLlm;
+    state.issueLlmPanelOpen = true;
   } else if (shouldOpenLlm) {
     state.issueLlmPanelOpen = true;
   }
@@ -1199,10 +1191,11 @@ function syncDemoPresetFromPathInputs() {
 
 function llmRunOptions() {
   if (state.llmMode === "off") {
-    return { use_llm: false };
+    return { use_llm: false, use_issue_llm: false };
   }
   return {
     use_llm: true,
+    use_issue_llm: true,
     llm_provider: state.llmMode,
   };
 }
@@ -1210,13 +1203,14 @@ function llmRunOptions() {
 function appendLlmFormFields(form) {
   const options = llmRunOptions();
   form.append("use_llm", options.use_llm ? "true" : "false");
+  form.append("use_issue_llm", options.use_issue_llm ? "true" : "false");
   if (options.llm_provider) {
     form.append("llm_provider", options.llm_provider);
   }
 }
 
 function llmRunSuffix() {
-  return state.llmMode === "off" ? "" : " with LLM report enrichment";
+  return state.llmMode === "off" ? "" : " with OpenAI issue guidance";
 }
 
 function setupDropzone(element, onDrop) {
@@ -2757,7 +2751,7 @@ function renderLlmModeControls() {
   els.llmModeToggle.setAttribute("aria-checked", enabled ? "true" : "false");
   els.llmModeToggle.setAttribute(
     "aria-label",
-    enabled ? "Disable LLM report enrichment" : "Enable LLM report enrichment",
+    enabled ? "Disable OpenAI issue guidance" : "Enable OpenAI issue guidance",
   );
 }
 
@@ -2840,6 +2834,12 @@ function insertInferredRuntimeStages(stageMap, job) {
   const machineArtifactsStage = stageMap.get("write_machine_artifacts");
   if (machineArtifactsStage?.status !== "completed") {
     return;
+  }
+  if (job.llm?.issue_enrichment_enabled) {
+    const issueLlmStage = stageMap.get("issue_llm_enrichment");
+    if (!issueLlmStage || !["completed", "skipped", "failed"].includes(issueLlmStage.status)) {
+      return;
+    }
   }
   const provider = job.llm.provider || state.llmMode || "openai";
   stageMap.set("llm_narrative", {
@@ -3696,6 +3696,7 @@ function resetDashboardState() {
   state.todoFilter = "all";
   state.dashboardSelection = null;
   state.issueLlmRunningIssueId = "";
+  state.issueLlmPanelOpen = true;
   state.issueLlmMessage = "";
   state.issueLlmMessageStatus = "";
   state.diagramSelection = null;
@@ -4511,8 +4512,8 @@ function renderReportIssueLlmAction() {
       data-dashboard-open-llm="true"
       data-dashboard-scroll="llm"
     >
-      <strong>Open issue LLM add-on</strong>
-      <span>Review the selected issue evidence, then run or view the advisory OpenAI context in the drawer.</span>
+      <strong>Open OpenAI issue guidance</strong>
+      <span>Jump to the selected issue drawer and review the OpenAI guidance panel at the top.</span>
       <code>${escapeHtml(issueLlmActionTarget(issue))}</code>
     </button>
   `;
@@ -5641,11 +5642,26 @@ function renderIssueDetailDrawer(issue) {
         <span class="pill-status ${issueStatusClass(status)}">${escapeHtml(status)}</span>
       </div>
       ${renderIssueFocusMap(issue, parent)}
+      ${renderIssueLlmPriorityPanel(actionPlan, issue)}
       ${renderIssueSampleRows(issue)}
       ${renderIssueActionDisclosure("Evidence", "Counts, sample, query", renderIssueEvidencePack(issue, parent), { open: true })}
       ${renderIssueActionDisclosure("Fix / Todo", "Actions only", renderIssueActionPlan(actionPlan, issue), { open: true })}
-      ${renderIssueActionDisclosure("LLM enrichment add-on", "OpenAI context for this issue", renderIssueLlmEnrichment(actionPlan, issue), { open: state.issueLlmPanelOpen })}
     </article>
+  `;
+}
+
+function renderIssueLlmPriorityPanel(actionPlan, issue) {
+  return `
+    <section class="issue-llm-priority-panel" aria-label="OpenAI issue guidance">
+      <div class="issue-llm-priority-heading">
+        <div>
+          <span>OpenAI issue guidance</span>
+          <strong>Issue-specific fix context</strong>
+        </div>
+        <code>issue_llm_enrichments.json</code>
+      </div>
+      ${renderIssueLlmEnrichment(actionPlan, issue)}
+    </section>
   `;
 }
 
@@ -6003,10 +6019,6 @@ function renderIssueActionPlan(plan, issue) {
           })}
         </div>
       </div>
-      <div class="action-plan-llm-nudge">
-        <strong>Need issue-specific reasoning?</strong>
-        <p>OpenAI enrichment can add concise context for this selected issue using bounded issue evidence, action steps, and sample metadata only.</p>
-      </div>
       <details class="issue-detail-disclosure action-plan-more">
         <summary><h5>More deterministic context</h5><span>Metrics and guidelines</span></summary>
         <div class="issue-detail-disclosure-body">
@@ -6036,7 +6048,7 @@ function renderIssueActionPlan(plan, issue) {
 
 function renderIssueLlmEnrichment(plan, issue) {
   const issueId = issueGuid(issue);
-  const provider = ["fake", "openai"].includes(state.issueLlmProvider) ? state.issueLlmProvider : "openai";
+  const provider = "openai";
   const entry = getIssueLlmEnrichment(issue, provider);
   const running = state.issueLlmRunningIssueId === issueId;
   const status = running ? "pending" : entry?.status || "not_run";
@@ -6056,9 +6068,9 @@ function renderIssueLlmEnrichment(plan, issue) {
   return `
     <div class="issue-llm-enrichment" data-issue-llm-status="${escapeHtml(status)}">
       <div class="issue-llm-controls" aria-label="Issue LLM enrichment controls">
-        <div class="runner-mode-switch issue-llm-provider-switch" role="group" aria-label="Issue LLM provider">
-          <button class="mode-button ${provider === "fake" ? "active" : ""}" type="button" data-issue-llm-provider="fake" aria-pressed="${provider === "fake" ? "true" : "false"}">Fake</button>
-          <button class="mode-button ${provider === "openai" ? "active" : ""}" type="button" data-issue-llm-provider="openai" aria-pressed="${provider === "openai" ? "true" : "false"}">OpenAI</button>
+        <div class="issue-llm-callout">
+          <strong>Runs on bounded issue context only</strong>
+          <span>Issue, action plan, table context, quality gates, todos, and sample preview metadata.</span>
         </div>
         <button class="button secondary compact" type="button" data-issue-llm-run data-issue-id="${escapeHtml(issueId)}" ${running ? "disabled" : ""}>
           ${issueLlmButtonLabel(provider, Boolean(entry))}
@@ -6074,26 +6086,33 @@ function renderIssueLlmStructuredResponse(entry, provider) {
   if (!entry) {
     return `
       <div class="issue-llm-result empty">
-        <p class="muted">No ${escapeHtml(issueLlmProviderLabel(provider))} enrichment has been generated for this selected issue. Run it after reviewing the deterministic steps above.</p>
+        <p class="muted">No ${escapeHtml(issueLlmProviderLabel(provider))} guidance has been generated for this issue yet. Keep the Stage 3 toggle on before running, or run this selected issue now.</p>
       </div>
     `;
   }
   const response = entry.structured_response || {};
   const review = response.human_review_needed || {};
   const status = entry.status || "unknown";
-  const errorText = entry.error?.message ? ` ${entry.error.message}` : "";
+  const guidanceAvailable = [
+    response.why_this_was_flagged,
+    response.extra_fix_suggestion,
+    response.extra_verification,
+  ].some((items) => Array.isArray(items) && items.filter(Boolean).length);
+  const reviewReason = review.reason || entry.error?.message || "Human review is required before using this advisory LLM enrichment.";
   return `
     <div class="issue-llm-result" data-issue-llm-result-status="${escapeHtml(status)}">
       <div class="issue-llm-result-heading">
         <strong>${escapeHtml(issueLlmProviderLabel(entry.provider || provider))} result</strong>
         <span class="pill-status ${issueLlmStatusClass(status)}">${escapeHtml(status)}</span>
       </div>
-      ${renderIssueLlmSection("Why this was flagged", response.why_this_was_flagged)}
-      ${renderIssueLlmSection("Extra fix suggestion", response.extra_fix_suggestion)}
-      ${renderIssueLlmSection("Extra verification", response.extra_verification)}
+      ${guidanceAvailable ? `
+        ${renderIssueLlmSection("Why this was flagged", response.why_this_was_flagged)}
+        ${renderIssueLlmSection("Extra fix suggestion", response.extra_fix_suggestion)}
+        ${renderIssueLlmSection("Extra verification", response.extra_verification)}
+      ` : `<p class="muted">OpenAI guidance is unavailable for this issue. Use the deterministic Fix / Todo checklist below, then retry after provider configuration is available.</p>`}
       <div class="issue-llm-review">
         <strong>Human review needed</strong>
-        <p>${escapeHtml(review.reason || "Human review is required before using this advisory LLM enrichment.")}${escapeHtml(errorText)}</p>
+        <p>${escapeHtml(reviewReason)}</p>
       </div>
       <p class="issue-llm-footnote">Deterministic action plans remain the source of truth.</p>
     </div>
@@ -6102,9 +6121,9 @@ function renderIssueLlmStructuredResponse(entry, provider) {
 
 function issueLlmButtonLabel(provider, hasEntry) {
   if (hasEntry) {
-    return provider === "openai" ? "Retry OpenAI enrichment" : "Retry Fake enrichment";
+    return "Retry OpenAI enrichment";
   }
-  return provider === "openai" ? "Run OpenAI enrichment" : "Run Fake enrichment";
+  return "Run OpenAI guidance";
 }
 
 function renderIssueLlmSection(title, items) {

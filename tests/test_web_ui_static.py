@@ -116,13 +116,13 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Review connection and mapping readiness",
         "Blockers stop the run.",
         "Warnings need review.",
-        "LLM enrichment",
-        "LLM report enrichment",
-        "OpenAI calls run only when this is on",
-        "report rendering stays local",
+        "OpenAI issue guidance",
+        "Enrich every issue with OpenAI",
+        "bounded issue-level guidance before Review",
+        "visible human-review fallback",
         'id="llmModeToggle"',
         'role="switch"',
-        'aria-checked="false"',
+        'aria-checked="true"',
         'class="llm-switch-track"',
         'class="llm-switch-thumb"',
         'id="llmModeStatus"',
@@ -178,7 +178,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Table Readiness",
         "Upload CSV + DBML",
         "Local CSV path",
-        "LLM report enrichment",
+        "OpenAI issue guidance",
         "OPENAI_API_KEY",
         "Upload DBML to preview schema",
         "Reset demo",
@@ -288,6 +288,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".issue-detail-disclosure",
         ".issue-context-strip",
         ".evidence-value",
+        ".issue-llm-priority-panel",
+        ".issue-llm-callout",
         ".issue-llm-enrichment",
         ".issue-llm-controls",
         ".issue-llm-section",
@@ -400,6 +402,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "llmRunOptions",
         "appendLlmFormFields",
         "use_llm",
+        "use_issue_llm",
         "llm_provider",
         "checkRunnerHealth",
         "startProfilerRun",
@@ -431,6 +434,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "fallbackRiskComponentsFromVerdict",
         "renderIssueInbox",
         "renderIssueDetailDrawer",
+        "renderIssueLlmPriorityPanel",
         "renderIssueLlmEnrichment",
         "runIssueLlmEnrichment",
         "getIssueLlmEnrichment",
@@ -444,7 +448,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Evidence facts",
         "Detection query",
         "Recommended work",
-        "LLM enrichment add-on",
+        "OpenAI issue guidance",
+        "Issue-specific fix context",
         "Why this was flagged",
         "Extra fix suggestion",
         "Extra verification",
@@ -493,7 +498,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "guardrail_report.json",
         "issue_llm_enrichments.json",
         "/issue-enrichments",
-        "data-issue-llm-provider",
         "data-issue-llm-run",
         "data-diagram-table",
         "data-diagram-relationship",
@@ -687,11 +691,11 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "keepCurrentArtifactsDuringLoad" in js
     assert "preserveViewportSelector" in js
     assert "getIssueLlmEnrichment" in js
-    assert "data-issue-llm-provider" in js
+    assert "data-issue-llm-provider" not in js
     assert "data-issue-llm-run" in js
     assert 'issueLlmProvider: "openai"' in js
-    assert "Need issue-specific reasoning?" in js
-    assert "Run OpenAI enrichment" in js
+    assert "Need issue-specific reasoning?" not in js
+    assert "Run OpenAI guidance" in js
     assert "/issue-enrichments" in js
     assert "Why this was flagged" in js
     assert "Extra fix suggestion" in js

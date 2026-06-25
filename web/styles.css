@@ -4350,6 +4350,49 @@ h3 {
   color: var(--success);
 }
 
+.issue-llm-priority-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(15, 118, 100, 0.42);
+  border-radius: var(--radius-md);
+  background: rgba(15, 118, 100, 0.06);
+}
+
+.issue-llm-priority-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.issue-llm-priority-heading div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.issue-llm-priority-heading span {
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.issue-llm-priority-heading strong {
+  color: var(--foreground-primary);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.issue-llm-priority-heading code {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
 .issue-llm-enrichment {
   display: grid;
   gap: 9px;
@@ -4357,13 +4400,27 @@ h3 {
 
 .issue-llm-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: start;
+  align-items: center;
 }
 
-.issue-llm-provider-switch {
-  justify-content: flex-start;
+.issue-llm-callout {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.issue-llm-callout strong {
+  color: var(--foreground-primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.issue-llm-callout span {
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .issue-llm-message {
@@ -4423,6 +4480,12 @@ h3 {
   color: var(--foreground-secondary);
   font-size: 12px;
   line-height: 1.35;
+}
+
+@media (max-width: 720px) {
+  .issue-llm-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .todos-section {

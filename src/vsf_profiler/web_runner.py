@@ -116,6 +116,7 @@ class WebRunJob:
     database_source_type: str | None = None
     evaluation_dataset_id: str | None = None
     use_llm: bool = False
+    use_issue_llm: bool = False
     llm_provider: str | None = None
     status: str = "queued"
     created_at: str = field(default_factory=_iso_now)
@@ -149,14 +150,17 @@ class WebRunStore:
         mapping_overrides: dict[str, str] | None = None,
         preflight_review: dict[str, Any] | None = None,
         use_llm: bool = False,
+        use_issue_llm: bool = False,
         llm_provider: str | None = None,
     ) -> WebRunJob:
         if not csv_files:
             raise ValueError("At least one CSV file is required.")
         validated_use_llm, validated_llm_provider = _validated_llm_options(
             use_llm=use_llm,
+            use_issue_llm=use_issue_llm,
             llm_provider=llm_provider,
         )
+        validated_use_issue_llm = bool(use_issue_llm)
         job_id = _new_job_id()
         root_dir = self.run_root / job_id
         input_dir = root_dir / "input"
@@ -191,6 +195,7 @@ class WebRunStore:
             out_dir=out_dir,
             input_mode="upload",
             use_llm=validated_use_llm,
+            use_issue_llm=validated_use_issue_llm,
             llm_provider=validated_llm_provider,
         )
         with self._lock:
@@ -206,6 +211,7 @@ class WebRunStore:
                 stored_mapping_overrides,
                 _clean_preflight_review(preflight_review),
                 validated_use_llm,
+                validated_use_issue_llm,
                 validated_llm_provider,
             ),
             name=f"vsf-web-run-{job_id}",
@@ -224,6 +230,7 @@ class WebRunStore:
         mapping_overrides: dict[str, str] | None = None,
         preflight_review: dict[str, Any] | None = None,
         use_llm: bool = False,
+        use_issue_llm: bool = False,
         llm_provider: str | None = None,
     ) -> WebRunJob:
         validated_dbml_path = _validated_file_path(
@@ -242,8 +249,10 @@ class WebRunStore:
         validated_target = _validated_target(target)
         validated_use_llm, validated_llm_provider = _validated_llm_options(
             use_llm=use_llm,
+            use_issue_llm=use_issue_llm,
             llm_provider=llm_provider,
         )
+        validated_use_issue_llm = bool(use_issue_llm)
 
         job_id = _new_job_id()
         root_dir = self.run_root / job_id
@@ -260,6 +269,7 @@ class WebRunStore:
             "mapping_overrides": _clean_mapping_overrides(mapping_overrides or {}),
             "preflight_review": _clean_preflight_review(preflight_review),
             "use_llm": validated_use_llm,
+            "use_issue_llm": validated_use_issue_llm,
             "llm_provider": validated_llm_provider,
         }
         (input_dir / "path_inputs.json").write_text(
@@ -275,6 +285,7 @@ class WebRunStore:
             out_dir=out_dir,
             input_mode="path",
             use_llm=validated_use_llm,
+            use_issue_llm=validated_use_issue_llm,
             llm_provider=validated_llm_provider,
         )
         with self._lock:
@@ -290,6 +301,7 @@ class WebRunStore:
                 _clean_mapping_overrides(mapping_overrides or {}),
                 _clean_preflight_review(preflight_review),
                 validated_use_llm,
+                validated_use_issue_llm,
                 validated_llm_provider,
             ),
             name=f"vsf-web-run-{job_id}",
@@ -310,6 +322,7 @@ class WebRunStore:
         target: str | None = None,
         preflight_review: dict[str, Any] | None = None,
         use_llm: bool = False,
+        use_issue_llm: bool = False,
         llm_provider: str | None = None,
     ) -> WebRunJob:
         validated_source_type = _validated_database_source_type(source_type)
@@ -333,8 +346,10 @@ class WebRunStore:
         validated_target = _validated_target(target)
         validated_use_llm, validated_llm_provider = _validated_llm_options(
             use_llm=use_llm,
+            use_issue_llm=use_issue_llm,
             llm_provider=llm_provider,
         )
+        validated_use_issue_llm = bool(use_issue_llm)
         source_connector = _database_connector_from_options(
             source_type=validated_source_type,
             connection_url=validated_connection_url,
@@ -360,6 +375,7 @@ class WebRunStore:
             "target": validated_target,
             "preflight_review": _clean_preflight_review(preflight_review),
             "use_llm": validated_use_llm,
+            "use_issue_llm": validated_use_issue_llm,
             "llm_provider": validated_llm_provider,
             "secrets_redacted": True,
         }
@@ -377,6 +393,7 @@ class WebRunStore:
             input_mode="database",
             database_source_type=validated_source_type,
             use_llm=validated_use_llm,
+            use_issue_llm=validated_use_issue_llm,
             llm_provider=validated_llm_provider,
         )
         with self._lock:
@@ -391,6 +408,7 @@ class WebRunStore:
                 validated_target,
                 _clean_preflight_review(preflight_review),
                 validated_use_llm,
+                validated_use_issue_llm,
                 validated_llm_provider,
             ),
             name=f"vsf-web-run-{job_id}",
@@ -418,6 +436,7 @@ class WebRunStore:
             "input_policy": "built_in_curated_datasets_only",
             "arbitrary_uploads_supported": False,
             "use_llm": False,
+            "use_issue_llm": False,
             "llm_provider": None,
         }
         (input_dir / "evaluation_inputs.json").write_text(
@@ -543,6 +562,7 @@ class WebRunStore:
             "error": _summary_error(summary or {}) or job.error,
             "llm": {
                 "enabled": job.use_llm,
+                "issue_enrichment_enabled": job.use_issue_llm,
                 "provider": job.llm_provider,
             },
             "database": (
@@ -631,6 +651,7 @@ class WebRunStore:
         mapping_overrides: dict[str, str] | None,
         preflight_review: dict[str, Any] | None,
         use_llm: bool,
+        use_issue_llm: bool,
         llm_provider_name: str | None,
     ) -> None:
         from vsf_profiler.cli import _llm_provider_from_config, run_pipeline
@@ -650,6 +671,8 @@ class WebRunStore:
                 use_llm=use_llm,
                 llm_provider=llm_provider,
                 requested_llm_provider=llm_provider_name if use_llm else None,
+                use_issue_llm=use_issue_llm,
+                issue_llm_provider=llm_provider_name if use_issue_llm else None,
             )
         except Exception as exc:
             job.status = "failed"
@@ -668,6 +691,7 @@ class WebRunStore:
         target: str | None,
         preflight_review: dict[str, Any] | None,
         use_llm: bool,
+        use_issue_llm: bool,
         llm_provider_name: str | None,
     ) -> None:
         from vsf_profiler.cli import _llm_provider_from_config, run_pipeline
@@ -687,6 +711,8 @@ class WebRunStore:
                 use_llm=use_llm,
                 llm_provider=llm_provider,
                 requested_llm_provider=llm_provider_name if use_llm else None,
+                use_issue_llm=use_issue_llm,
+                issue_llm_provider=llm_provider_name if use_issue_llm else None,
             )
         except Exception as exc:
             job.status = "failed"
@@ -768,6 +794,7 @@ class WebRunStore:
             database_source_type=metadata["database_source_type"],
             evaluation_dataset_id=metadata["evaluation_dataset_id"],
             use_llm=metadata["use_llm"],
+            use_issue_llm=metadata["use_issue_llm"],
             llm_provider=metadata["llm_provider"],
             status=status,
             created_at=_created_at_for_run(root_dir, summary),
@@ -812,6 +839,7 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                     mapping_overrides=payload.get("mapping_overrides"),
                     preflight_review=payload.get("preflight_review"),
                     use_llm=payload.get("use_llm", False),
+                    use_issue_llm=payload.get("use_issue_llm", False),
                     llm_provider=payload.get("llm_provider"),
                 )
             elif parsed.path == "/api/path-jobs":
@@ -824,6 +852,7 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                     mapping_overrides=payload.get("mapping_overrides"),
                     preflight_review=payload.get("preflight_review"),
                     use_llm=bool(payload.get("use_llm", False)),
+                    use_issue_llm=bool(payload.get("use_issue_llm", False)),
                     llm_provider=payload.get("llm_provider"),
                 )
             elif parsed.path == "/api/database-jobs":
@@ -838,6 +867,7 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                     target=payload.get("target"),
                     preflight_review=payload.get("preflight_review"),
                     use_llm=bool(payload.get("use_llm", False)),
+                    use_issue_llm=bool(payload.get("use_issue_llm", False)),
                     llm_provider=payload.get("llm_provider"),
                 )
             elif parsed.path == "/api/evaluations":
@@ -988,6 +1018,7 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
             "mapping_overrides": _parse_mapping_overrides_field(fields.get("mapping_overrides")),
             "preflight_review": _parse_preflight_review_field(fields.get("preflight_review")),
             "use_llm": _parse_bool_field(fields.get("use_llm")),
+            "use_issue_llm": _parse_bool_field(fields.get("use_issue_llm")),
             "llm_provider": _optional_llm_provider_string(fields.get("llm_provider")),
         }
 
@@ -1015,6 +1046,7 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
             "mapping_overrides": _optional_mapping_overrides(payload, "mapping_overrides"),
             "preflight_review": _optional_preflight_review(payload, "preflight_review"),
             "use_llm": _optional_bool(payload, "use_llm"),
+            "use_issue_llm": _optional_bool(payload, "use_issue_llm"),
             "llm_provider": _optional_llm_provider_string(payload.get("llm_provider")),
         }
 
@@ -1044,6 +1076,7 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
             "target": _optional_string(payload, "target"),
             "preflight_review": _optional_preflight_review(payload, "preflight_review"),
             "use_llm": _optional_bool(payload, "use_llm"),
+            "use_issue_llm": _optional_bool(payload, "use_issue_llm"),
             "llm_provider": _optional_llm_provider_string(payload.get("llm_provider")),
         }
 
@@ -1248,10 +1281,17 @@ def _historical_input_metadata(
         or evaluation_inputs.get("use_llm")
         or summary_inputs.get("use_llm")
     )
+    use_issue_llm = bool(
+        path_inputs.get("use_issue_llm")
+        or database_inputs.get("use_issue_llm")
+        or evaluation_inputs.get("use_issue_llm")
+        or summary_inputs.get("use_issue_llm")
+    )
     llm_provider = (
         path_inputs.get("llm_provider")
         or database_inputs.get("llm_provider")
         or evaluation_inputs.get("llm_provider")
+        or summary_inputs.get("issue_llm_provider")
         or summary_inputs.get("llm_provider")
     )
     if database_inputs or source_type in ALLOWED_DATABASE_SOURCE_TYPES:
@@ -1261,6 +1301,7 @@ def _historical_input_metadata(
             "evaluation_dataset_id": None,
             "csv_dir": input_dir,
             "use_llm": use_llm,
+            "use_issue_llm": use_issue_llm,
             "llm_provider": llm_provider if isinstance(llm_provider, str) else None,
         }
 
@@ -1272,6 +1313,7 @@ def _historical_input_metadata(
             "evaluation_dataset_id": dataset_id if isinstance(dataset_id, str) else None,
             "csv_dir": input_dir,
             "use_llm": False,
+            "use_issue_llm": False,
             "llm_provider": None,
         }
 
@@ -1283,6 +1325,7 @@ def _historical_input_metadata(
             "evaluation_dataset_id": None,
             "csv_dir": Path(str(csv_dir_value)) if csv_dir_value else input_dir,
             "use_llm": use_llm,
+            "use_issue_llm": use_issue_llm,
             "llm_provider": llm_provider if isinstance(llm_provider, str) else None,
         }
 
@@ -1300,6 +1343,7 @@ def _historical_input_metadata(
         "evaluation_dataset_id": None,
         "csv_dir": csv_dir,
         "use_llm": use_llm,
+        "use_issue_llm": use_issue_llm,
         "llm_provider": llm_provider if isinstance(llm_provider, str) else None,
     }
 
@@ -1735,10 +1779,17 @@ def _validated_evaluation_dataset_id(dataset_id: str) -> str:
     return get_evaluation_dataset(stripped).dataset_id
 
 
-def _validated_llm_options(*, use_llm: bool, llm_provider: str | None) -> tuple[bool, str | None]:
+def _validated_llm_options(
+    *,
+    use_llm: bool,
+    llm_provider: str | None,
+    use_issue_llm: bool = False,
+) -> tuple[bool, str | None]:
     provider = _optional_llm_provider_string(llm_provider)
-    if provider and not use_llm:
-        raise ValueError("llm_provider requires use_llm.")
+    if provider and not (use_llm or use_issue_llm):
+        raise ValueError("llm_provider requires use_llm or use_issue_llm.")
+    if use_issue_llm and provider is None:
+        provider = "openai"
     return bool(use_llm), provider
 
 

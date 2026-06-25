@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
@@ -46,6 +47,10 @@ from vsf_profiler.llm_narrative import (
     NarrativeProvider,
     OpenAINarrativeProvider,
     generate_l4_narrative,
+)
+from vsf_profiler.llm_issue_enrichment import (
+    ISSUE_ENRICHMENT_FILENAME,
+    generate_issue_llm_enrichment,
 )
 from vsf_profiler.models import InfluenceResult
 from vsf_profiler.profiler import profile_dataset
@@ -147,13 +152,18 @@ def run(
     llm_provider: Optional[str] = typer.Option(
         None,
         "--llm-provider",
-        help="Optional LLM summary provider: 'fake' for local validation or 'openai'.",
+        help="Optional LLM provider: 'fake' for local validation or 'openai'.",
+    ),
+    issue_llm_enrichment: bool = typer.Option(
+        False,
+        "--issue-llm-enrichment",
+        help="Generate issue-level LLM guidance for every detected issue before report rendering.",
     ),
 ) -> None:
     """Run the guided CSV+DBML data-quality profile and report generation."""
     dbml_path = dbml or dbml_arg
-    if llm_provider and not use_llm:
-        raise typer.BadParameter("--llm-provider requires --use-llm.")
+    if llm_provider and not (use_llm or issue_llm_enrichment):
+        raise typer.BadParameter("--llm-provider requires --use-llm or --issue-llm-enrichment.")
     source_connector = _source_connector_from_cli(
         postgres_url=postgres_url,
         postgres_url_env=postgres_url_env,
@@ -175,7 +185,7 @@ def run(
     elif mapping is not None:
         raise typer.BadParameter("--mapping is only supported for CSV mode.")
 
-    requested_llm_provider = _llm_provider_name_from_config(llm_provider) if use_llm else None
+    requested_llm_provider = _llm_provider_name_from_config(llm_provider) if (use_llm or issue_llm_enrichment) else None
     result = run_pipeline(
         dbml_path=dbml_path,
         csv_dir=csv_dir,
@@ -187,6 +197,8 @@ def run(
         use_llm=use_llm,
         llm_provider=_llm_provider_from_config(llm_provider) if use_llm else None,
         requested_llm_provider=requested_llm_provider,
+        use_issue_llm=issue_llm_enrichment,
+        issue_llm_provider=requested_llm_provider or "openai",
         max_analysis_rows=max_analysis_rows,
         max_feature_columns=max_feature_columns,
     )
@@ -194,6 +206,8 @@ def run(
     typer.echo(f"Issues found: {result['issue_count']}")
     if result.get("l4_report"):
         typer.echo(f"Wrote LLM summary artifact: {result['l4_report']}")
+    if result.get("issue_llm_enrichments"):
+        typer.echo(f"Wrote issue LLM enrichments: {result['issue_llm_enrichments']}")
 
 
 @demo_app.command("create-small")
@@ -338,6 +352,8 @@ def run_pipeline(
     use_llm: bool = False,
     llm_provider: NarrativeProvider | None = None,
     requested_llm_provider: str | None = None,
+    use_issue_llm: bool = False,
+    issue_llm_provider: str | None = None,
     max_analysis_rows: int = MAX_ANALYSIS_ROWS,
     max_feature_columns: int = MAX_FEATURE_COLUMNS,
 ) -> dict[str, str | int]:
@@ -376,6 +392,11 @@ def run_pipeline(
         runtime_inputs["use_llm"] = True
         runtime_inputs["llm_provider"] = requested_provider
         runtime_inputs["llm_provider_executed"] = getattr(llm_provider, "name", "none")
+    if use_issue_llm:
+        runtime_inputs["use_issue_llm"] = True
+        runtime_inputs["issue_llm_provider"] = _issue_llm_provider_name(
+            issue_llm_provider or requested_llm_provider or getattr(llm_provider, "name", None)
+        )
     if max_analysis_rows != MAX_ANALYSIS_ROWS:
         runtime_inputs["max_analysis_rows"] = max_analysis_rows
     if max_feature_columns != MAX_FEATURE_COLUMNS:
@@ -643,6 +664,15 @@ def run_pipeline(
             )
 
         l4_report_path: Path | None = None
+        issue_llm_enrichments_path: Path | None = None
+        if use_issue_llm:
+            issue_llm_enrichments_path = _run_issue_llm_enrichment_stage(
+                runtime=runtime,
+                out_dir=out_dir,
+                issues=issue_catalog.issues,
+                provider_name=issue_llm_provider or requested_llm_provider or getattr(llm_provider, "name", None),
+            )
+
         if use_llm:
             with runtime.stage("llm_narrative", "Generate optional LLM summary artifact") as stage:
                 requested_provider = _normalized_requested_llm_provider(
@@ -776,7 +806,67 @@ def run_pipeline(
         "report_html": str(out_dir / "report.html"),
         "issue_count": len(issue_catalog.issues),
         "l4_report": str(l4_report_path) if l4_report_path else "",
+        "issue_llm_enrichments": str(issue_llm_enrichments_path) if issue_llm_enrichments_path else "",
     }
+
+
+def _run_issue_llm_enrichment_stage(
+    *,
+    runtime: RuntimeRecorder,
+    out_dir: Path,
+    issues: list[Any],
+    provider_name: str | None,
+) -> Path | None:
+    artifact_path = out_dir / ISSUE_ENRICHMENT_FILENAME
+    provider = _issue_llm_provider_name(provider_name)
+    with runtime.stage("issue_llm_enrichment", "Generate issue LLM guidance") as stage:
+        stage.add_detail("selected_provider", provider)
+        stage.add_detail("issue_count", len(issues))
+        stage.add_detail("context_scope", "bounded selected-issue context only")
+        if not issues:
+            stage.add_detail("external_api_call", "no")
+            stage.mark_skipped("No issues were generated.")
+            return None
+
+        status_counts: Counter[str] = Counter()
+        for issue in issues:
+            result = generate_issue_llm_enrichment(
+                out_dir=out_dir,
+                issue_id=issue.issue_id,
+                provider_name=provider,
+            )
+            entry = result["entry"]
+            status_counts[str(entry.get("status") or "unknown")] += 1
+
+        external_api_call = "yes"
+        if provider != "openai" or status_counts.get("unavailable", 0) == len(issues):
+            external_api_call = "no"
+        stage.add_detail("external_api_call", external_api_call)
+        stage.add_detail("enrichment_count", sum(status_counts.values()))
+        stage.add_detail("status_counts", dict(sorted(status_counts.items())))
+        stage.add_detail("human_review_required", "yes")
+        runtime.artifact_written(
+            artifact_path,
+            key="issue_llm_enrichments",
+            kind="issue_llm_enrichments",
+            details={
+                "provider": provider,
+                "status_counts": dict(sorted(status_counts.items())),
+                "human_review_required": True,
+            },
+        )
+    return artifact_path
+
+
+def _issue_llm_provider_name(name: str | None) -> str:
+    provider = _normalized_requested_llm_provider(name or "openai")
+    if provider in {"", "none"}:
+        return "openai"
+    if provider not in {"fake", "openai"}:
+        raise typer.BadParameter(
+            f"Unsupported issue LLM provider '{provider}'. Supported providers: fake, openai."
+        )
+    return provider
 
 
 def _write_json(

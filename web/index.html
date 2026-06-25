@@ -269,22 +269,22 @@
               </div>
               <div class="developer-options fixed-llm-options" id="profileDeveloperOptions">
                 <div class="option-heading">
-                  <strong>LLM report enrichment</strong>
-                  <span>OpenAI</span>
+                  <strong>OpenAI issue guidance</strong>
+                  <span>Default on</span>
                 </div>
-                <button class="llm-toggle-button" id="llmModeToggle" type="button" role="switch" aria-checked="false">
+                <button class="llm-toggle-button" id="llmModeToggle" type="button" role="switch" aria-checked="true">
                   <span class="llm-toggle-copy">
-                    <span class="llm-toggle-title">Use LLM enrichment with OpenAI</span>
-                    <span class="llm-toggle-subtext">Adds the optional LLM summary artifact after deterministic checks.</span>
+                    <span class="llm-toggle-title">Enrich every issue with OpenAI</span>
+                    <span class="llm-toggle-subtext">After deterministic checks, adds bounded issue-level guidance before Review.</span>
                   </span>
                   <span class="llm-switch-control">
                     <span class="llm-switch-track" aria-hidden="true">
                       <span class="llm-switch-thumb"></span>
                     </span>
-                    <strong class="llm-switch-status" id="llmModeStatus">Off</strong>
+                    <strong class="llm-switch-status" id="llmModeStatus">On</strong>
                   </span>
                 </button>
-                <p class="option-note">OpenAI calls run only when this is on and <code>OPENAI_API_KEY</code> is configured; report rendering stays local.</p>
+                <p class="option-note">Runs only with configured <code>OPENAI_API_KEY</code>. If unavailable or invalid, the run continues and Review shows a visible human-review fallback.</p>
               </div>
               <button class="button primary" id="runPathProfilerButton" type="submit" disabled>Run profiler</button>
             </form>

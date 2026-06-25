@@ -208,18 +208,18 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#pathRunnerForm")).toBeVisible();
     await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
     await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
-    await expect(page.locator("#llmModeStatus")).toContainText("Off");
+    await expect(page.locator("#llmModeStatus")).toContainText("On");
     await expect(page.locator("#profileDeveloperOptions")).toBeVisible();
     await expect(page.locator("#llmModeToggle .llm-switch-track")).toBeVisible();
     await expect(page.locator("#llmModeToggle .llm-switch-thumb")).toBeVisible();
     await expect(page.locator("#llmModeFake")).toHaveCount(0);
     await page.locator("#llmModeToggle").click();
+    await expect(page.locator("#llmModeStatus")).toContainText("Off");
+    await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
+    await page.locator("#llmModeToggle").click();
     await expect(page.locator("#llmModeStatus")).toContainText("On");
     await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "true");
     await expect(page.locator("#llmModeToggle")).toHaveClass(/active/);
-    await page.locator("#llmModeToggle").click();
-    await expect(page.locator("#llmModeStatus")).toContainText("Off");
-    await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
     await expect(page.locator("#runnerModeDatabase")).toHaveCount(0);
     await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
     await expect(page.locator("#rulesPathInput")).toHaveCount(0);
@@ -290,16 +290,9 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator(".issue-export-status")).toContainText("Copied CSV row for ISSUE-0009.");
     await page.locator('[data-action-plan-export="json"]').click();
     await expect(page.locator(".issue-export-status")).toContainText("Copied JSON for ISSUE-0009.");
-    await page
-      .locator(".issue-action-disclosure", { hasText: "LLM enrichment add-on" })
-      .locator("summary")
-      .click();
-    await page.locator('[data-issue-llm-provider="fake"]').click();
-    await page.locator("[data-issue-llm-run]").click();
-    await expect(page.locator(".issue-llm-message")).toContainText("Fake enrichment ready for ISSUE-0009", {
-      timeout: 20_000,
-    });
-    await page.locator('[data-issue-llm-provider="openai"]').click();
+    await expect(page.locator("#dashboardDrilldown .issue-llm-priority-panel")).toBeVisible();
+    await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI issue guidance");
+    await expect(page.locator('[data-issue-llm-provider]')).toHaveCount(0);
     await page.locator("[data-issue-llm-run]").click();
     await expect(page.locator(".issue-llm-message")).toContainText(/OPENAI_API_KEY|OpenAI/i, {
       timeout: 20_000,
@@ -322,7 +315,7 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await expect(page.locator("#reportExport")).toContainText("Issue todo summary");
     await expect(page.locator("#reportExport [data-todo-export]")).toHaveCount(0);
     await expect(page.locator('#reportExport a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
-    await expect(page.locator('#reportExport button[data-dashboard-open-llm="true"]')).toContainText("Open issue LLM add-on");
+    await expect(page.locator('#reportExport button[data-dashboard-open-llm="true"]')).toContainText("Open OpenAI issue guidance");
     await expect(page.locator("#reportExport")).toContainText("Issue types");
     await expect(page.locator("#reportExport")).toContainText("Missing values by table");
     await expect(page.locator("#reportExport .report-preview-table-group").first()).toBeVisible();

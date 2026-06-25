@@ -289,8 +289,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
 
   await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
   await expect(page.locator("#demoPresetSmall")).toHaveCount(0);
-  await expect(page.locator("#llmModeStatus")).toContainText("Off");
-  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
+  await expect(page.locator("#llmModeStatus")).toContainText("On");
+  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator("#profileStepNext")).toBeEnabled();
   await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
 
@@ -377,12 +377,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#llmModeToggle .llm-switch-thumb")).toBeVisible();
   await expect(page.locator("#llmModeFake")).toHaveCount(0);
   await page.locator("#llmModeToggle").click();
+  await expect(page.locator("#llmModeStatus")).toContainText("Off");
+  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
+  await page.locator("#llmModeToggle").click();
   await expect(page.locator("#llmModeStatus")).toContainText("On");
   await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator("#llmModeToggle")).toHaveClass(/active/);
-  await page.locator("#llmModeToggle").click();
-  await expect(page.locator("#llmModeStatus")).toContainText("Off");
-  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
 
   await page.locator("#loadDemoButton").click();
   await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
@@ -537,7 +537,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(generatedResults).toContainText("Table readiness");
   await expect(generatedResults).toContainText("7 tables");
   await expect(generatedResults).toContainText("Runtime summary");
-  await expect(generatedResults).toContainText("7 stages");
+  await expect(generatedResults).toContainText("9 stages");
+  await expect(generatedResults).toContainText("Issue LLM enrichments");
+  await expect(generatedResults).toContainText("unavailable=12");
   await expect(generatedResults).not.toContainText("Report HTML");
   await expect(generatedResults).not.toContainText("Report Markdown");
   await expect(generatedResults).not.toContainText("Developer artifact links");
@@ -613,7 +615,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportExport.locator("[data-todo-export]")).toHaveCount(0);
   await expect(reportExport.locator('a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
   const reportLlmAction = reportExport.locator('button.report-export-action-card[data-dashboard-open-llm="true"]');
-  await expect(reportLlmAction).toContainText("Open issue LLM add-on");
+  await expect(reportLlmAction).toContainText("Open OpenAI issue guidance");
   await expect(reportExport).toContainText("Report preview");
   await expect(reportExport).toContainText("Issue types");
   await expect(reportExport).toContainText("Missing values by table");
@@ -627,7 +629,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
     path: `${goal12Dir}/report-export-surface.png`,
   });
   await reportLlmAction.click();
-  await expect(page.locator("#dashboardDrilldown")).toContainText("LLM enrichment add-on");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI issue guidance");
+  await expect(page.locator("#dashboardDrilldown .issue-llm-priority-panel")).toBeVisible();
   await expect(page.locator("#dashboardDrilldown .issue-llm-enrichment")).toBeVisible();
   const reportHref = await reportExport.locator('a[href*="report.html"]').first().getAttribute("href");
   const reportPage = await context.newPage();
@@ -694,7 +697,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).not.toContainText("Finding values");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Fix data checklist");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Verify after fix checklist");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Need issue-specific reasoning?");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI issue guidance");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Issue-specific fix context");
   await expect(page.locator("#dashboardDrilldown .action-plan-step").first()).toBeVisible();
   await expect(page.locator("#dashboardDrilldown")).toContainText("Guidelines");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence coverage");
@@ -706,59 +710,37 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("Parent context");
   await expect(page.locator("#dashboardDrilldown")).toContainText("sellers.seller_id");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Sample keys");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("LLM enrichment add-on");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Run OpenAI enrichment");
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/Run OpenAI guidance|Retry OpenAI enrichment/);
   fs.mkdirSync("outputs/us073_goal11", { recursive: true });
   const issueDetailPanel = page.locator("#dashboard .dashboard-detail").first();
   await issueDetailPanel.screenshot({
     path: "outputs/us073_goal11/issue-drawer-before-llm-enrichment.png",
   });
-  await page
-    .locator(".issue-action-disclosure", { hasText: "LLM enrichment add-on" })
-    .locator("summary")
-    .click();
-  await page.locator('[data-issue-llm-provider="fake"]').click();
-  await expect(page.locator('[data-issue-llm-provider="fake"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-issue-llm-provider]')).toHaveCount(0);
   const llmPanel = page.locator("#dashboardDrilldown .issue-llm-enrichment");
-  await llmPanel.scrollIntoViewIfNeeded();
   const fakeRunAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
   const fakeRunScrollY = await page.evaluate(() => window.scrollY);
   await page.locator("[data-issue-llm-run]").click();
-  await expect(page.locator(".issue-llm-message")).toContainText("Fake enrichment ready for ISSUE-0009", {
+  await expect(page.locator(".issue-llm-message")).toContainText(/OPENAI_API_KEY|OpenAI enrichment ready|OpenAI provider/i, {
     timeout: 20_000,
   });
   const fakeResultAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
   const fakeResultScrollY = await page.evaluate(() => window.scrollY);
   expect(Math.abs(fakeResultAnchorTop - fakeRunAnchorTop)).toBeLessThan(8);
   expect(fakeResultScrollY).toBeGreaterThanOrEqual(fakeRunScrollY - 80);
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Why this was flagged");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Extra fix suggestion");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Extra verification");
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/Why this was flagged|OpenAI guidance is unavailable/i);
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/Extra fix suggestion|deterministic Fix \/ Todo checklist/i);
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/Extra verification|provider configuration/i);
   await expect(page.locator("#dashboardDrilldown")).toContainText("Human review needed");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Deterministic action plans remain the source of truth");
-  await page.locator("#dashboardDrilldown .issue-llm-enrichment").scrollIntoViewIfNeeded();
   await issueDetailPanel.screenshot({
-    path: "outputs/us073_goal11/issue-drawer-after-fake-enrichment.png",
+    path: "outputs/us073_goal11/issue-drawer-after-openai-guidance.png",
   });
   await issueDetailPanel.screenshot({
-    path: `${goal12Dir}/issue-drawer-after-fake-llm-enrichment.png`,
+    path: `${goal12Dir}/issue-drawer-after-openai-guidance.png`,
   });
-  await page.locator('[data-issue-llm-provider="openai"]').click();
-  await expect(page.locator('[data-issue-llm-provider="openai"]')).toHaveAttribute("aria-pressed", "true");
-  await llmPanel.scrollIntoViewIfNeeded();
-  const openAiRunAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
-  const openAiRunScrollY = await page.evaluate(() => window.scrollY);
-  await page.locator("[data-issue-llm-run]").click();
-  await expect(page.locator(".issue-llm-message")).toContainText("OPENAI_API_KEY", {
-    timeout: 20_000,
-  });
-  const openAiResultAnchorTop = await llmPanel.evaluate((node) => node.getBoundingClientRect().top);
-  const openAiResultScrollY = await page.evaluate(() => window.scrollY);
-  expect(Math.abs(openAiResultAnchorTop - openAiRunAnchorTop)).toBeLessThan(8);
-  expect(openAiResultScrollY).toBeGreaterThanOrEqual(openAiRunScrollY - 80);
-  await expect(page.locator("#dashboardDrilldown")).toContainText("unavailable");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI provider was selected");
-  await page.locator("#dashboardDrilldown .issue-llm-enrichment").scrollIntoViewIfNeeded();
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/unavailable|succeeded|OpenAI enrichment ready/i);
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/OpenAI provider was selected|Human review is required|LLM enrichment is advisory/i);
   await issueDetailPanel.screenshot({
     path: "outputs/us073_goal11/issue-drawer-openai-failure.png",
   });

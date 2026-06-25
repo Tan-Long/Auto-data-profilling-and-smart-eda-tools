@@ -532,9 +532,50 @@ def test_web_runner_path_job_can_enable_fake_llm_report(tmp_path):
     assert run_summary["inputs"]["use_llm"] is True
     assert run_summary["inputs"]["llm_provider"] == "fake"
     payload = store.job_payload(job)
-    assert payload["llm"] == {"enabled": True, "provider": "fake"}
+    assert payload["llm"] == {
+        "enabled": True,
+        "issue_enrichment_enabled": False,
+        "provider": "fake",
+    }
     artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
     assert {"l4_report.md", "guardrail_report.json"}.issubset(artifact_paths)
+
+
+def test_web_runner_path_job_can_batch_issue_llm_enrichment_without_summary(tmp_path):
+    data_dir = create_small_demo(tmp_path / "data" / "demo_small")
+    store = WebRunStore(run_root=tmp_path / "web_runs")
+
+    job = store.start_path_job(
+        dbml_path=data_dir / "schema.dbml",
+        csv_dir=data_dir / "csv",
+        use_issue_llm=True,
+        llm_provider="fake",
+    )
+
+    wait_for_job(job)
+
+    assert job.status == "succeeded"
+    assert not (job.out_dir / "l4_report.md").exists()
+    enrichment = json.loads((job.out_dir / "issue_llm_enrichments.json").read_text())
+    assert enrichment["summary"]["issue_count"] > 0
+    assert enrichment["summary"]["provider_counts"] == {"fake": enrichment["summary"]["enrichment_count"]}
+    assert enrichment["summary"]["status_counts"] == {"succeeded": enrichment["summary"]["enrichment_count"]}
+    path_inputs = json.loads((job.input_dir / "path_inputs.json").read_text())
+    assert path_inputs["use_llm"] is False
+    assert path_inputs["use_issue_llm"] is True
+    assert path_inputs["llm_provider"] == "fake"
+    run_summary = json.loads((job.out_dir / "run_summary.json").read_text())
+    assert run_summary["inputs"]["use_issue_llm"] is True
+    assert run_summary["inputs"]["issue_llm_provider"] == "fake"
+    assert any(stage["name"] == "issue_llm_enrichment" for stage in run_summary["stage_timings"])
+    payload = store.job_payload(job)
+    assert payload["llm"] == {
+        "enabled": False,
+        "issue_enrichment_enabled": True,
+        "provider": "fake",
+    }
+    artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
+    assert "issue_llm_enrichments.json" in artifact_paths
 
 
 def test_web_runner_path_job_persists_preflight_review_artifact(tmp_path):
@@ -728,7 +769,7 @@ def test_web_runner_database_job_validates_inputs_before_start(tmp_path):
             target="customer_id",
         )
 
-    with pytest.raises(ValueError, match="llm_provider requires use_llm"):
+    with pytest.raises(ValueError, match="llm_provider requires use_llm or use_issue_llm"):
         store.start_database_job(
             source_type="postgres",
             connection_url=POSTGRES_SECRET_URL,
@@ -784,7 +825,7 @@ def test_web_runner_path_job_validates_inputs_before_start(tmp_path):
             target="review_score",
         )
 
-    with pytest.raises(ValueError, match="llm_provider requires use_llm"):
+    with pytest.raises(ValueError, match="llm_provider requires use_llm or use_issue_llm"):
         store.start_path_job(
             dbml_path=data_dir / "schema.dbml",
             csv_dir=data_dir / "csv",
