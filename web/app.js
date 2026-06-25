@@ -5777,7 +5777,7 @@ function renderIssueDetailDrawer(issue) {
       ${renderIssueFocusMap(issue, parent)}
       ${renderIssueLlmPriorityPanel(actionPlan, issue)}
       ${renderIssueSampleRows(issue)}
-      ${renderIssueActionDisclosure("Evidence", "Counts, sample, query", renderIssueEvidencePack(issue, parent), { open: true })}
+      ${renderIssueActionDisclosure("Evidence", "Sample + query", renderIssueEvidencePack(issue), { open: true })}
       ${renderIssueActionDisclosure("Fix / Todo", "Actions only", renderIssueActionPlan(actionPlan, issue), { open: true })}
     </article>
   `;
@@ -6057,7 +6057,7 @@ function renderIssueActionDisclosure(title, subtitle, body, options = {}) {
   `;
 }
 
-function renderIssueEvidencePack(issue, parent) {
+function renderIssueEvidencePack(issue) {
   const path = issue.sample_bad_rows_path || "";
   const query = String(issue.evidence_sql || "").trim();
   return `
@@ -6066,16 +6066,10 @@ function renderIssueEvidencePack(issue, parent) {
         <strong>Evidence scope</strong>
         <p>${escapeHtml(issueWhatHappened(issue))}</p>
       </div>
-      <section>
-        <h5>Evidence facts</h5>
-        ${renderIssueEvidence(issue, {
-          excludeLabels: ["Issue guid", "Sample rows", "Evidence query"],
-        })}
-      </section>
+      ${renderIssueAdditionalEvidence(issue)}
       ${path ? `
         <p class="issue-evidence-note">Row preview above is the bounded sample for <code>${escapeHtml(path)}</code>; highlighted cells mark the issue columns.</p>
       ` : ""}
-      ${parent ? `<p class="issue-evidence-note">Parent context: ${parent}</p>` : ""}
       ${query ? `
         <details class="issue-detail-disclosure issue-evidence-query">
           <summary><h5>Detection query</h5><span>Show SQL</span></summary>
@@ -6088,9 +6082,35 @@ function renderIssueEvidencePack(issue, parent) {
   `;
 }
 
+function renderIssueAdditionalEvidence(issue) {
+  const evidence = renderIssueEvidence(issue, {
+    excludeLabels: [
+      "Issue guid",
+      "Bad rows",
+      "Affected rate",
+      "Total rows checked",
+      "Parent table",
+      "Sample rows",
+      "Evidence query",
+    ],
+  });
+  if (!evidence) {
+    return "";
+  }
+  return `
+    <section>
+      <h5>Additional evidence</h5>
+      ${evidence}
+    </section>
+  `;
+}
+
 function renderIssueEvidence(issue, options = {}) {
   const excludeLabels = new Set(options.excludeLabels || []);
   const evidenceValues = issueEvidenceValues(issue).filter((item) => !excludeLabels.has(item.label));
+  if (!evidenceValues.length) {
+    return "";
+  }
   return `
     <div class="evidence-value-list">
       ${evidenceValues.map((item) => `

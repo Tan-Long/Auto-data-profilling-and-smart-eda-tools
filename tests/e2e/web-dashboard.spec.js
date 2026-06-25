@@ -730,8 +730,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("Fix / Todo");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Recommended work");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence facts");
+  await expect(page.locator("#dashboardDrilldown .issue-evidence-pack")).toContainText("Additional evidence");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Detection query");
+  await expect(page.locator("#dashboardDrilldown .issue-evidence-pack")).not.toContainText("Bad rows");
+  await expect(page.locator("#dashboardDrilldown .issue-evidence-pack")).not.toContainText("Affected rate");
+  await expect(page.locator("#dashboardDrilldown .issue-evidence-pack")).not.toContainText("Total rows checked");
+  await expect(page.locator("#dashboardDrilldown .issue-evidence-pack")).not.toContainText("Parent table");
+  await expect(page.locator("#dashboardDrilldown .issue-evidence-pack")).not.toContainText("Parent context");
   await expect(page.locator("#dashboardDrilldown")).not.toContainText("Finding values");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Fix data checklist");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Verify after fix checklist");
@@ -745,7 +750,6 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldown")).toContainText("Copy Markdown");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Copy CSV row");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Copy JSON");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Parent context");
   await expect(page.locator("#dashboardDrilldown")).toContainText("sellers.seller_id");
   await expect(page.locator("#dashboardDrilldown")).toContainText("Sample keys");
   await expect(page.locator("#dashboardDrilldown")).toContainText(/Run OpenAI guidance|Retry OpenAI enrichment/);
@@ -826,7 +830,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(linkedTodoIssue).toBeVisible();
   await linkedTodoIssue.click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText(/ISSUE-/);
-  await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence facts");
+  await expect(page.locator("#dashboardDrilldown .issue-evidence-pack")).not.toContainText("Evidence facts");
   await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todosFilterVerify").click();
   await expect(page.locator("#todos")).toContainText("Verify after fix issue queue");

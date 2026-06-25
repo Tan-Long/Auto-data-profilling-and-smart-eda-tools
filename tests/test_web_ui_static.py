@@ -462,10 +462,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "issueStatus",
         "Review warning: numeric outlier",
         "Schema/table-level checks",
-        "Parent context",
         "Where",
         "Evidence",
-        "Evidence facts",
+        "Additional evidence",
         "Detection query",
         "Recommended work",
         "OpenAI issue guidance",
@@ -478,6 +477,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderL4GuardrailPanel",
         "renderTableImpactSection",
         "renderDashboardDrilldown",
+        "renderIssueAdditionalEvidence",
         "renderDrilldownSeverityStrip",
         "drilldownIssueSeverityRows",
         "renderDrilldownIssueRow",
@@ -756,7 +756,12 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "issueActionPlanJson" in js
     assert "Fix data checklist" in js
     assert "Verify after fix checklist" in js
-    assert "Evidence facts" in js
+    assert "Evidence facts" not in js
+    assert "Additional evidence" in js
+    assert '"Bad rows",' in js
+    assert '"Affected rate",' in js
+    assert '"Total rows checked",' in js
+    assert '"Parent table",' in js
     assert "Detection query" in js
     assert "Recommended work" in js
     assert "Finding values" not in js
