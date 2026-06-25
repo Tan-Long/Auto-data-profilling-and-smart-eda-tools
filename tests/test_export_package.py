@@ -103,9 +103,9 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
         "Issue Action Plans",
         "Todos",
         "Developer Artifacts",
-        "Evaluation Summary",
     ]:
         assert section in index_html
+    assert "Evaluation Summary" not in index_html
     for report_copy in [
         "Can this dataset run analysis?",
         "Can joins be trusted?",
@@ -115,9 +115,9 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
         "Verify after fix checklist",
         "Evidence coverage",
         "Actionability",
-        "No evaluation artifact was included",
     ]:
         assert report_copy in index_html
+    assert "No evaluation artifact was included" not in index_html
     expanded_plan_count = min(5, len(issue_action_plans["plans"]))
     assert "Main package index expands the first 5 highest-priority plans" in index_html
     assert "Full deterministic action-plan evidence remains in <code>issue_action_plans.json</code>" in index_html
@@ -194,6 +194,7 @@ def test_package_includes_goal_10_and_11_optional_artifacts_when_present(tmp_pat
         assert path in zip_names
         assert (package_dir / path).exists()
         assert path in index_html
+    assert "Evaluation Summary" in index_html
 
 
 def test_package_checksums_are_stable_for_same_input(tmp_path):

@@ -162,10 +162,8 @@ Relationship cardinality summary: {{ relationship_graph.cardinality_counts_text 
 | none | No developer artifacts were listed. |
 {% endfor %}
 
+{% if fixed_report.evaluation_summary.available -%}
 ## Evaluation Summary
 
-{% if fixed_report.evaluation_summary.available -%}
 Evaluation status: {{ fixed_report.evaluation_summary.status }}
-{% else -%}
-{{ fixed_report.evaluation_summary.message }}
-{% endif %}
+{% endif -%}

@@ -647,14 +647,12 @@
       </details>
     </section>
 
+    {% if fixed_report.evaluation_summary.available %}
     <section id="evaluation-summary">
       <h2>Evaluation Summary</h2>
-      {% if fixed_report.evaluation_summary.available %}
       <p>Evaluation status: {{ fixed_report.evaluation_summary.status }}</p>
-      {% else %}
-      <p>{{ fixed_report.evaluation_summary.message }}</p>
-      {% endif %}
     </section>
+    {% endif %}
   </main>
 </body>
 </html>

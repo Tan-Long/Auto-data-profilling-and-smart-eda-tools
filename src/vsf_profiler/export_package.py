@@ -428,7 +428,15 @@ def _render_index_html(
         chart_paths=chart_paths,
         sample_paths=sample_paths,
     )
-    evaluation_summary_html = package_evaluation_summary_html(evaluation_summary)
+    evaluation_summary_section_html = (
+        f"""
+    <section class="section panel">
+      <h2>Evaluation Summary</h2>
+      {package_evaluation_summary_html(evaluation_summary)}
+    </section>"""
+        if evaluation_summary
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -602,10 +610,7 @@ def _render_index_html(
         {developer_artifact_links_html}
       </div>
     </section>
-    <section class="section panel">
-      <h2>Evaluation Summary</h2>
-      {evaluation_summary_html}
-    </section>
+    {evaluation_summary_section_html}
     <section class="section">
       <h2>Embedded report</h2>
       <iframe src="report.html" title="VSF deterministic data-quality report"></iframe>
@@ -1172,7 +1177,7 @@ def package_developer_artifact_links_html(
 
 def package_evaluation_summary_html(evaluation_summary: dict[str, Any]) -> str:
     if not evaluation_summary:
-        return '<p class="meta">No evaluation artifact was included for this deterministic report/export package.</p>'
+        return ""
     status = evaluation_summary.get("status") or evaluation_summary.get("result") or "included"
     return f"""
       <p class="meta">Evaluation status: {_h(status)}</p>

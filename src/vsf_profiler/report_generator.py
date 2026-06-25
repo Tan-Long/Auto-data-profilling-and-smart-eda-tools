@@ -823,7 +823,7 @@ def _evaluation_summary_context(artifact: dict[str, Any] | None) -> dict[str, An
         return {
             "available": False,
             "status": "not_applicable",
-            "message": "Not evaluated: this Profile my data run did not include an evaluation artifact.",
+            "message": "",
         }
     return {
         "available": True,

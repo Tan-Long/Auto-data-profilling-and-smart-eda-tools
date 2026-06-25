@@ -198,10 +198,11 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "Issue Action Plans",
         "Todos",
         "Developer Artifacts",
-        "Evaluation Summary",
     ]:
         assert section in report_md
         assert section in report_html
+    assert "Evaluation Summary" not in report_md
+    assert "Evaluation Summary" not in report_html
     assert "Visual Overview" in report_md
     assert "What Should Be Fixed First?" in report_md
     assert "Where are the problems?" in report_html
@@ -254,8 +255,8 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert "This report shows the first 10 todo groups per type" not in report_html
     assert "additional Fix data groups" not in report_md
     assert "additional Verify after fix groups" not in report_md
-    assert "Not evaluated" in report_md
-    assert "Not evaluated" in report_html
+    assert "Not evaluated" not in report_md
+    assert "Not evaluated" not in report_html
     developer_section = report_md.index("## Developer Artifacts")
     for artifact_name in [
         "quality_gates.json",
