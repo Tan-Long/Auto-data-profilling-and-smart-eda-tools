@@ -143,6 +143,7 @@ const els = {
   jobStatusBadge: document.querySelector("#jobStatusBadge"),
   eventCount: document.querySelector("#eventCount"),
   stageList: document.querySelector("#stageList"),
+  artifactPanelTitle: document.querySelector("#artifactPanelTitle"),
   artifactCount: document.querySelector("#artifactCount"),
   artifactList: document.querySelector("#artifactList"),
   runHistoryStatus: document.querySelector("#runHistoryStatus"),
@@ -2824,7 +2825,18 @@ function renderJob() {
   els.jobStatusBadge.textContent = job?.status || "No job";
   els.eventCount.textContent = `${state.runEvents.length} events`;
   const artifacts = job?.artifacts || [];
-  els.artifactCount.textContent = `${artifacts.length} files`;
+  const reviewReady = generatedReviewResultsReady();
+  els.artifactPanelTitle.textContent = reviewReady ? "Issue review snapshot" : "Generated results";
+  if (reviewReady) {
+    const artifactTotal = Object.keys(state.dashboardArtifactIndex?.artifact_urls || {}).length || artifacts.length;
+    els.artifactCount.textContent = `${artifactTotal} files`;
+  } else if (state.dashboardLoadingJobId) {
+    els.artifactCount.textContent = "Loading results";
+  } else if (jobIsRunning(job)) {
+    els.artifactCount.textContent = "Running";
+  } else {
+    els.artifactCount.textContent = "Waiting for run";
+  }
   renderStages(job);
   renderArtifacts(artifacts);
 }
@@ -3105,8 +3117,8 @@ function stageDetailValueText(value) {
 
 function renderArtifacts(artifacts) {
   els.artifactList.innerHTML = "";
-  if (!artifacts.length) {
-    els.artifactList.innerHTML = `<p class="muted">Issue review previews load from generated run artifacts.</p>`;
+  if (!generatedReviewResultsReady()) {
+    els.artifactList.innerHTML = renderGeneratedResultsPending();
     return;
   }
   els.artifactList.innerHTML = renderGeneratedResults(artifacts);
@@ -3116,6 +3128,21 @@ function renderGeneratedResults(artifacts) {
   return `
     <div class="generated-results">
       ${renderGeneratedResultPreviews(artifacts)}
+    </div>
+  `;
+}
+
+function renderGeneratedResultsPending() {
+  const running = jobIsRunning();
+  const loading = Boolean(state.dashboardLoadingJobId);
+  const message = loading
+    ? "Loading generated Review artifacts from the completed run."
+    : running
+      ? "Pipeline is running. Result previews appear here after Stage 3 completes."
+      : "Run Stage 3 to generate Review Issues, Quality Gates, Todos, and Report / Export.";
+  return `
+    <div class="generated-results pending">
+      <p class="muted">${escapeHtml(message)}</p>
     </div>
   `;
 }
@@ -3279,18 +3306,8 @@ function formatRunTimestamp(value) {
 }
 
 function renderGeneratedResultPreviews(artifacts) {
-  if (state.dashboardLoadingJobId && !state.dashboardArtifactIndex) {
-    return `
-      <section class="run-snapshot-card">
-        <div class="run-snapshot-hero pending">
-          <div>
-            <span>Data-quality readiness</span>
-            <strong>Loading</strong>
-          </div>
-          <p>Fetching generated artifacts for the issue review snapshot.</p>
-        </div>
-      </section>
-    `;
+  if (!generatedReviewResultsReady()) {
+    return renderGeneratedResultsPending();
   }
 
   const optionalCards = [
@@ -3784,6 +3801,13 @@ function generatedRunSummary() {
 function artifactUrlFromArtifacts(path, artifacts = state.currentJob?.artifacts || []) {
   const artifact = artifacts.find((item) => item.path === path);
   return artifact?.url || state.dashboardArtifactIndex?.artifact_urls?.[path] || "";
+}
+
+function generatedReviewResultsReady() {
+  return Boolean(
+    state.dashboardArtifactIndex &&
+    Object.keys(state.dashboardArtifactIndex.artifact_urls || {}).length,
+  );
 }
 
 function resetDashboardState() {

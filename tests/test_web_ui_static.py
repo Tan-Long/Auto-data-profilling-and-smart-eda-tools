@@ -173,7 +173,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "Reset layout",
         "CSV to DBML Table Mapping",
         "Run a local CSV + DBML data-quality profile",
-        "Issue review snapshot",
+        "Generated results",
         "Review Issues",
         "Table Readiness",
         "Upload CSV + DBML",
@@ -191,6 +191,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     assert "Previous runs" not in html
     assert "Run History" not in html
     assert "Select prior run and timeline" not in js
+    assert "Issue review snapshot" not in html
+    assert "Issue review snapshot" in js
+    assert "generatedReviewResultsReady" in js
     assert "Current DBML + CSV source" not in html
     assert "Upload DBML contract" not in html
     assert "Upload related CSV files" not in html

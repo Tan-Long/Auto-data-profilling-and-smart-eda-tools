@@ -397,6 +397,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await goToProfileStep(page, "preflight");
   await goToProfileStep(page, "run");
   await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
+  await expect(page.locator("#artifactPanelTitle")).toContainText("Generated results");
+  await expect(page.locator("#artifactCount")).toContainText("Waiting for run");
+  await expect(page.getByText("Issue review snapshot")).toHaveCount(0);
+  await expect(page.locator("#artifactList")).not.toContainText("Data-quality readiness");
   await page.locator("#runPathProfilerButton").click();
   await expect(page.locator("#llmModeToggle")).toBeDisabled();
   await expect(page.locator("#llmModeToggle")).toHaveClass(/locked/);
@@ -574,7 +578,8 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#diagramDensityToggle")).toHaveCount(0);
 
   await goToProfileStep(page, "run");
-  await expect(page.getByText("Issue review snapshot")).toBeVisible();
+  await expect(page.locator("#artifactPanelTitle")).toContainText("Issue review snapshot");
+  await expect(page.locator("#artifactCount")).toContainText(/\d+ files/);
   const generatedResults = page.locator("#artifactList");
   await expect(generatedResults).toContainText("Data-quality readiness");
   await expect(generatedResults).toContainText("NOT_READY");
