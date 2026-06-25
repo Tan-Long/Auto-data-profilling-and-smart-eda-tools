@@ -4800,13 +4800,33 @@ function renderTodoIssueQueue(groups) {
           <h4>${escapeHtml(title)}</h4>
           <p>${integerText(items.length)} issues · ${integerText(occurrenceCount)} todo occurrences</p>
         </div>
-        <span>Open issue for checklist</span>
+        <div class="todo-queue-heading-side">
+          ${renderTodoQueuePriorityStrip(items)}
+          <span class="todo-queue-open-label">Open issue for checklist</span>
+        </div>
       </div>
       <div class="todo-issue-queue">
         ${visibleItems.map(renderTodoIssueWorkCard).join("")}
       </div>
       ${remainingItems.length ? renderTodoRemainingIssues(remainingItems) : ""}
     </section>
+  `;
+}
+
+function renderTodoQueuePriorityStrip(items) {
+  const rows = todoIssuePriorityRows(items);
+  if (!rows.length) {
+    return "";
+  }
+  return `
+    <div class="todo-queue-priority-strip" aria-label="Todo queue urgency order">
+      <strong>Urgency order</strong>
+      ${rows.map((row) => `
+        <span class="todo-queue-priority-chip ${todoPriorityClass(row.label)}">
+          ${escapeHtml(row.label)} <b>${integerText(row.value)}</b>
+        </span>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -4874,12 +4894,14 @@ function todoIssueWorkItems(groups) {
     occurrences.forEach((occurrence) => {
       const issueId = occurrence.issue_id || "UNKNOWN";
       const issue = issueForTodoOccurrence(occurrence);
+      const severity = todoPriorityToken(occurrence.severity || issue?.severity || occurrence.priority || issue?.priority || "");
       if (!byIssue.has(issueId)) {
         byIssue.set(issueId, {
           issueId,
           issue,
           occurrence,
-          severity: occurrence.severity || issue?.severity || "P?",
+          severity,
+          priority: occurrence.priority || issue?.priority || todoUrgencyMeta(severity).priority,
           table: occurrence.table || issue?.table || "unknown",
           columns: Array.isArray(occurrence.columns) && occurrence.columns.length
             ? occurrence.columns
@@ -4894,6 +4916,10 @@ function todoIssueWorkItems(groups) {
         });
       }
       const item = byIssue.get(issueId);
+      if (severityRank(severity) < severityRank(item.severity)) {
+        item.severity = severity;
+        item.priority = occurrence.priority || issue?.priority || todoUrgencyMeta(severity).priority;
+      }
       const text = todoShortText(group.text || "Todo needs review.", 118);
       if (group.todo_type === "verify_after_fix") {
         item.verifyCount += 1;
@@ -4921,11 +4947,16 @@ function addUniqueTodoText(target, text) {
 
 function renderTodoIssueWorkCard(item) {
   const field = todoIssueField(item);
-  const status = issueStatus(item.issue || item.occurrence);
   const preview = todoIssuePreviewText(item);
+  const urgency = todoUrgencyMeta(item.severity);
+  const priorityClass = todoPriorityClass(item.severity);
   return `
-    <button class="todo-issue-work-card" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(item.issueId)}" data-dashboard-label="${escapeHtml(item.issueId)}" data-dashboard-scroll="drilldown">
-      <span class="issue-pill ${issueStatusClass(status)}">${escapeHtml(item.severity)}</span>
+    <button class="todo-issue-work-card ${priorityClass}" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(item.issueId)}" data-dashboard-label="${escapeHtml(item.issueId)}" data-dashboard-scroll="drilldown">
+      <span class="todo-priority-cell" aria-label="${escapeHtml(`${item.severity} ${urgency.label}: ${urgency.detail}`)}">
+        <span class="todo-priority-token">${escapeHtml(item.severity)}</span>
+        <strong>${escapeHtml(urgency.label)}</strong>
+        <small>${escapeHtml(urgency.detail)}</small>
+      </span>
       <span class="todo-work-main">
         <code>${escapeHtml(item.issueId)}</code>
         <strong>${escapeHtml(field)}</strong>
@@ -4972,15 +5003,26 @@ function renderTodoRemainingIssues(items) {
 }
 
 function renderTodoCompactIssue(item) {
-  const status = issueStatus(item.issue || item.occurrence);
+  const urgency = todoUrgencyMeta(item.severity);
   return `
-    <button class="todo-compact-row" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(item.issueId)}" data-dashboard-label="${escapeHtml(item.issueId)}" data-dashboard-scroll="drilldown">
+    <button class="todo-compact-row ${todoPriorityClass(item.severity)}" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(item.issueId)}" data-dashboard-label="${escapeHtml(item.issueId)}" data-dashboard-scroll="drilldown">
       <code>${escapeHtml(item.issueId)}</code>
       <strong>${escapeHtml(todoIssueField(item))}</strong>
-      <span class="issue-pill ${issueStatusClass(status)}">${escapeHtml(item.severity)}</span>
-      <small>${integerText(item.fixCount)} fix · ${integerText(item.verifyCount)} verify</small>
+      <span class="todo-priority-token">${escapeHtml(item.severity)}</span>
+      <small>${escapeHtml(urgency.label)} · ${integerText(item.fixCount)} fix · ${integerText(item.verifyCount)} verify</small>
     </button>
   `;
+}
+
+function todoIssuePriorityRows(items) {
+  const counts = new Map();
+  items.forEach((item) => {
+    const key = todoPriorityToken(item.severity);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => severityRank(a.label) - severityRank(b.label) || b.value - a.value);
 }
 
 function todoPriorityRows(groups, limit) {
@@ -5035,6 +5077,27 @@ function todoPriorityTags(group) {
 function todoPriorityToken(value) {
   const match = String(value || "").toUpperCase().match(/P[0-3]/);
   return match ? match[0] : "P?";
+}
+
+function todoUrgencyMeta(severity) {
+  if (severity === "P0") {
+    return { label: "Blocker", detail: "Stop and fix first", priority: "P0 - block run/use" };
+  }
+  if (severity === "P1") {
+    return { label: "Fix first", detail: "Before analysis", priority: "P1 - fix before analysis" };
+  }
+  if (severity === "P2") {
+    return { label: "Review", detail: "Owner check", priority: "P2 - review with owner" };
+  }
+  if (severity === "P3") {
+    return { label: "Monitor", detail: "Caution", priority: "P3 - monitor" };
+  }
+  return { label: "Review", detail: "Needs triage", priority: "Needs human review" };
+}
+
+function todoPriorityClass(severity) {
+  const token = todoPriorityToken(severity).toLowerCase().replace("?", "unknown");
+  return `priority-${token}`;
 }
 
 function todoTableTags(group) {

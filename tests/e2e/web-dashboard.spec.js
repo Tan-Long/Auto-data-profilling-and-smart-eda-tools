@@ -804,6 +804,12 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#todos .todo-visual-summary")).toBeVisible();
   await expect(page.locator("#todos .todo-issue-work-card").first()).toBeVisible();
   await expect(page.locator("#todos")).toContainText("Issue work queue");
+  await expect(page.locator("#todos")).toContainText("Urgency order");
+  await expect(page.locator("#todos .todo-queue-priority-chip.priority-p0")).toBeVisible();
+  await expect(page.locator("#todos .todo-queue-priority-chip.priority-p1")).toBeVisible();
+  await expect(page.locator("#todos .todo-issue-work-card").first()).toHaveClass(/priority-p0/);
+  await expect(page.locator("#todos .todo-issue-work-card .todo-priority-token").first()).toContainText("P0");
+  await expect(page.locator("#todos .todo-issue-work-card .todo-priority-cell").first()).toContainText("Blocker");
   const linkedTodoIssue = page.locator("#todos .todo-issue-work-card").first();
   await expect(linkedTodoIssue).toBeVisible();
   await linkedTodoIssue.click();
@@ -813,6 +819,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator("#todosFilterVerify").click();
   await expect(page.locator("#todos")).toContainText("Verify after fix issue queue");
   await expect(page.locator("#todos .todo-issue-work-card").first()).toBeVisible();
+  await expect(page.locator("#todos .todo-issue-work-card .todo-priority-cell").first()).toContainText(/Blocker|Fix first/);
   await expect(page.locator("#todos")).toContainText("Open issue for checklist");
   await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todos").screenshot({

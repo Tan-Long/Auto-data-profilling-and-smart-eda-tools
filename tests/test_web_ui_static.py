@@ -318,6 +318,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".todo-signal-card",
         ".todo-issue-queue",
         ".todo-issue-work-card",
+        ".todo-queue-priority-strip",
+        ".todo-queue-priority-chip",
+        ".todo-priority-cell",
+        ".todo-priority-token",
+        ".todo-queue-open-label",
         ".todo-more-groups",
         ".todo-compact-row",
         ".report-preview-table-group",
@@ -600,6 +605,9 @@ def test_web_review_surfaces_use_single_flow_layouts():
     assert ".todo-visual-summary" in css
     assert ".todo-issue-queue" in css
     assert ".todo-issue-work-card" in css
+    assert ".todo-issue-work-card.priority-p0" in css
+    assert ".todo-issue-work-card.priority-p1" in css
+    assert ".todo-priority-token" in css
     assert ".todo-work-counts" in css
     assert ".todo-more-groups" in css
     assert ".todo-distribution-row" in css
@@ -680,6 +688,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Open optional selected-issue enrichment evidence." not in js
     assert "data-dashboard-scroll=\"drilldown\"" in js
     assert "todoIssueWorkItems" in js
+    assert "todoIssuePriorityRows" in js
+    assert "todoUrgencyMeta" in js
+    assert "todoPriorityClass" in js
+    assert "Urgency order" in js
     assert "Open issue for checklist" in js
     assert "open issue detail" not in js
     assert "Copy Fix data Markdown" not in js

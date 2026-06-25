@@ -5056,13 +5056,69 @@ button.report-export-card {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.todo-queue-heading-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.todo-queue-priority-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.todo-queue-priority-strip strong {
+  color: var(--foreground-tertiary);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.todo-queue-priority-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--foreground-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.todo-queue-priority-chip.priority-p0 {
+  border-color: rgba(180, 59, 45, 0.42);
+  background: rgba(180, 59, 45, 0.08);
+  color: var(--destructive);
+}
+
+.todo-queue-priority-chip.priority-p1 {
+  border-color: rgba(154, 95, 0, 0.38);
+  background: rgba(154, 95, 0, 0.08);
+  color: var(--warning);
+}
+
+.todo-queue-priority-chip.priority-p2 {
+  border-color: rgba(49, 101, 150, 0.34);
+  background: rgba(49, 101, 150, 0.08);
+  color: var(--info);
+}
+
 .todo-type-heading p {
   margin: 3px 0 0;
   color: var(--foreground-secondary);
   font-size: 12px;
 }
 
-.todo-type-heading > span {
+.todo-queue-open-label {
   flex: 0 0 auto;
   padding: 4px 8px;
   border: 1px solid var(--border-subtle);
@@ -5090,7 +5146,7 @@ button.report-export-card {
 
 .todo-issue-work-card {
   display: grid;
-  grid-template-columns: auto minmax(150px, 0.9fr) max-content minmax(220px, 1.25fr);
+  grid-template-columns: minmax(92px, 0.42fr) minmax(150px, 0.9fr) max-content minmax(220px, 1.25fr);
   gap: 10px;
   align-items: center;
   width: 100%;
@@ -5105,6 +5161,25 @@ button.report-export-card {
   cursor: pointer;
 }
 
+.todo-issue-work-card.priority-p0 {
+  border-color: rgba(180, 59, 45, 0.34);
+  box-shadow: inset 4px 0 0 var(--destructive);
+}
+
+.todo-issue-work-card.priority-p1 {
+  border-color: rgba(154, 95, 0, 0.3);
+  box-shadow: inset 4px 0 0 var(--warning);
+}
+
+.todo-issue-work-card.priority-p2 {
+  border-color: rgba(49, 101, 150, 0.26);
+  box-shadow: inset 4px 0 0 var(--info);
+}
+
+.todo-issue-work-card.priority-p3 {
+  box-shadow: inset 4px 0 0 var(--border-strong);
+}
+
 .todo-issue-work-card:hover,
 .todo-issue-work-card:focus-visible {
   border-color: var(--accent);
@@ -5114,6 +5189,77 @@ button.report-export-card {
 
 .todo-issue-work-card:focus-visible {
   box-shadow: 0 0 0 3px rgba(15, 118, 100, 0.16);
+}
+
+.todo-priority-cell {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 7px;
+  align-items: center;
+  min-width: 0;
+}
+
+.todo-priority-cell .todo-priority-token {
+  grid-row: span 2;
+}
+
+.todo-priority-cell strong {
+  min-width: 0;
+  color: var(--foreground-primary);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.todo-priority-cell small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground-secondary);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-priority-token {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.priority-p0 .todo-priority-token {
+  border-color: var(--destructive);
+  background: var(--destructive);
+  color: #ffffff;
+}
+
+.priority-p1 .todo-priority-token {
+  border-color: var(--warning);
+  background: var(--warning);
+  color: #ffffff;
+}
+
+.priority-p2 .todo-priority-token {
+  border-color: var(--info);
+  background: var(--info);
+  color: #ffffff;
+}
+
+.priority-p3 .todo-priority-token {
+  border-color: var(--border-strong);
+  background: var(--surface-inset);
+  color: var(--foreground-secondary);
 }
 
 .todo-work-main {
@@ -5203,6 +5349,14 @@ button.report-export-card {
   color: var(--foreground-primary);
   text-align: left;
   cursor: pointer;
+}
+
+.todo-compact-row.priority-p0 {
+  border-color: rgba(180, 59, 45, 0.3);
+}
+
+.todo-compact-row.priority-p1 {
+  border-color: rgba(154, 95, 0, 0.28);
 }
 
 .todo-compact-row > code {
