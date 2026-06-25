@@ -2408,10 +2408,22 @@ h3 {
 }
 
 .issue-visual-row:hover,
-.issue-visual-row:focus-visible {
+.issue-visual-row:focus-visible,
+.issue-visual-row.selected {
   border-color: var(--border-default);
   background: var(--surface-overlay);
   outline: none;
+}
+
+.issue-visual-row.selected {
+  border-color: var(--accent);
+  background: #f6fbf8;
+  box-shadow: inset 0 0 0 1px var(--focus-ring);
+}
+
+.issue-visual-row.selected .issue-visual-row-label,
+.issue-visual-row.selected .issue-visual-row-value {
+  color: var(--accent-strong);
 }
 
 .issue-visual-row-label {

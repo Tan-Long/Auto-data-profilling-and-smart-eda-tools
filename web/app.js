@@ -3902,7 +3902,7 @@ function renderDashboard() {
   }
 
   els.dashboardPanelGrid.innerHTML = `
-    ${renderIssueVisualSummary(filteredIssues)}
+    ${renderIssueVisualSummary(issues, filteredIssues)}
     ${renderIssueInbox(filteredIssues)}
   `;
   renderDashboardDrilldown();
@@ -5232,17 +5232,19 @@ function renderRelationshipHealthPanel() {
   );
 }
 
-function renderIssueVisualSummary(filteredIssues) {
-  const tableRows = [...countBy(filteredIssues, (issue) => issue.table || "Schema / dataset").entries()]
+function renderIssueVisualSummary(allIssues, filteredIssues) {
+  const overviewIssues = Array.isArray(allIssues) ? allIssues : [];
+  const focusedIssues = Array.isArray(filteredIssues) ? filteredIssues : overviewIssues;
+  const tableRows = [...countBy(overviewIssues, (issue) => issue.table || "Schema / dataset").entries()]
     .map(([label, value]) => ({ label, value, kind: "table" }))
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .slice(0, 5);
-  const typeRows = [...countBy(filteredIssues, (issue) => issue.issue_type || "unknown").entries()]
+  const typeRows = [...countBy(overviewIssues, (issue) => issue.issue_type || "unknown").entries()]
     .map(([label, value]) => ({ label, displayLabel: issueTypeText(label), value, kind: "issue_type" }))
     .sort((a, b) => b.value - a.value || a.displayLabel.localeCompare(b.displayLabel))
     .slice(0, 5);
-  const severityRows = severityPriorityRows(filteredIssues);
-  const badRows = sum(filteredIssues.map((issue) => Number(issue.bad_count || 0)));
+  const severityRows = severityPriorityRows(overviewIssues);
+  const totalBadRows = sum(overviewIssues.map((issue) => Number(issue.bad_count || 0)));
   return `
     <section class="issue-visual-summary" aria-label="Issue visual summary">
       <div class="issue-visual-heading">
@@ -5251,17 +5253,17 @@ function renderIssueVisualSummary(filteredIssues) {
           <h4>Issue map</h4>
         </div>
         <div class="issue-visual-heading-side">
-          ${renderIssueActiveLens(filteredIssues.length)}
+          ${renderIssueActiveLens(focusedIssues.length)}
           <div class="issue-visual-total">
-            <strong>${integerText(filteredIssues.length)}</strong>
-            <span>issues · ${integerText(badRows)} bad rows</span>
+            <strong>${integerText(overviewIssues.length)}</strong>
+            <span>issues total · ${integerText(totalBadRows)} bad rows</span>
           </div>
         </div>
       </div>
       <div class="issue-visual-grid">
         ${renderSeverityPriorityPanel(severityRows)}
-        ${renderIssueVisualChart("Top tables", "Where issues cluster", tableRows, "No tables match the current filters.")}
-        ${renderIssueVisualChart("Issue types", "What failed", typeRows, "No issue types match the current filters.")}
+        ${renderIssueVisualChart("Top tables", "Where issues cluster", tableRows, "No table issue clusters were generated.")}
+        ${renderIssueVisualChart("Issue types", "What failed", typeRows, "No issue types were generated.")}
       </div>
     </section>
   `;
@@ -5351,9 +5353,9 @@ function renderIssueActiveLens(filteredCount) {
   }
   return `
     <div class="issue-active-lens" role="status">
-      <span>Showing ${escapeHtml(label)}</span>
+      <span>Focus: ${escapeHtml(label)}</span>
       <strong>${integerText(filteredCount)}/${integerText(getDashboardIssues().length)}</strong>
-      <button type="button" data-dashboard-reset-filters>Clear</button>
+      <button type="button" data-dashboard-reset-filters>Show full review</button>
     </div>
   `;
 }
@@ -5393,8 +5395,9 @@ function renderIssueVisualRow(row, maxValue) {
   const value = Number(row.value || 0);
   const width = value > 0 ? Math.max(5, Math.round(value / maxValue * 100)) : 0;
   const label = row.displayLabel || row.label;
+  const selected = issueVisualRowSelected(row);
   return `
-    <button class="issue-visual-row" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.label)}" data-dashboard-label="${escapeHtml(label)}" data-dashboard-scroll="drilldown">
+    <button class="issue-visual-row ${selected ? "selected" : ""}" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.label)}" data-dashboard-label="${escapeHtml(label)}" data-dashboard-scroll="drilldown" aria-pressed="${selected ? "true" : "false"}">
       <span class="issue-visual-row-label">${escapeHtml(label)}</span>
       <span class="issue-visual-row-track" aria-hidden="true">
         <span class="issue-visual-row-fill ${dashboardTone(row.label)}" style="width: ${width}%"></span>
@@ -5402,6 +5405,20 @@ function renderIssueVisualRow(row, maxValue) {
       <span class="issue-visual-row-value">${integerText(value)}</span>
     </button>
   `;
+}
+
+function issueVisualRowSelected(row) {
+  const filters = state.dashboardFilters;
+  if (row.kind === "table") {
+    return filters.table === row.label;
+  }
+  if (row.kind === "issue_type") {
+    return filters.issueType === row.label;
+  }
+  if (row.kind === "severity") {
+    return filters.severity === row.label;
+  }
+  return false;
 }
 
 function renderInfluencePanel() {

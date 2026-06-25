@@ -321,6 +321,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".table-assessment-detail-heading",
         ".issue-visual-summary",
         ".issue-visual-chart",
+        ".issue-visual-row.selected",
         ".severity-priority-panel",
         ".severity-priority-card",
         ".issue-severity-token",
