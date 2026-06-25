@@ -3997,7 +3997,8 @@ h3 {
 }
 
 .table-score-breakdown,
-.table-column-evidence-table {
+.table-column-evidence-table,
+.table-relationship-risks {
   display: grid;
   grid-column: 1 / -1;
   gap: 8px;
@@ -4071,6 +4072,100 @@ h3 {
   color: var(--foreground-tertiary);
   font-size: 10px;
   font-weight: 800;
+}
+
+.relationship-risk-list {
+  display: grid;
+  gap: 8px;
+}
+
+.relationship-risk-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.relationship-risk-heading,
+.relationship-risk-flow,
+.relationship-risk-metrics,
+.relationship-risk-issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.relationship-risk-heading code {
+  overflow-wrap: anywhere;
+  color: var(--foreground-primary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.relationship-risk-flow {
+  padding: 8px;
+  border: 1px solid rgba(154, 95, 0, 0.22);
+  border-radius: var(--radius-sm);
+  background: rgba(154, 95, 0, 0.06);
+}
+
+.relationship-risk-flow span {
+  color: var(--foreground-tertiary);
+  font-weight: 900;
+}
+
+.relationship-risk-card p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.relationship-risk-metrics span {
+  min-height: 26px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.relationship-risk-metrics strong {
+  color: var(--foreground-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.relationship-risk-issues {
+  padding-top: 2px;
+}
+
+.relationship-risk-issues > span {
+  color: var(--foreground-tertiary);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.relationship-risk-issue {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--foreground-primary);
+  cursor: pointer;
+}
+
+.relationship-risk-issue:hover,
+.relationship-risk-issue:focus-visible {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .table-column-severity-cells {

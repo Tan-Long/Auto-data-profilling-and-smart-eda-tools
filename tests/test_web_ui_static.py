@@ -728,6 +728,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "tableScoreBreakdown" in js
     assert "tableIssueScoreWeights" in js
     assert "tableRelationshipScoreWeights" in js
+    assert "renderTableRelationshipRisks" in js
+    assert "relatedIssueIdsForTableAssessment" in js
+    assert "relationshipEdgeForRisk" in js
+    assert "Invalid FK risk" in js
     assert "Score calculation" in js
     assert "Column readiness evidence" in js
     assert "renderTodosSection" in js

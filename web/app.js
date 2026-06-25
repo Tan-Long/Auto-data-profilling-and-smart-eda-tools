@@ -4492,7 +4492,7 @@ function renderTableImpactSection() {
         <span class="table-impact-meta">
           <span>${escapeHtml(impact.category || "general_analytics")}</span>
           <span>${integerText(columns.length)} columns</span>
-          <span>${integerText(risks.length)} relationship risks</span>
+          <span>${integerText(risks.length)} FK risk${risks.length === 1 ? "" : "s"}</span>
         </span>
       </button>
     `;
@@ -4669,8 +4669,17 @@ function tableScoreFormulaParts(score, severityCounts) {
     .map((severity) => `${severity} ${integerText(severityCounts[severity])}x${tableIssueScoreWeights[severity]}`);
   const relationshipParts = Object.entries(score.relationshipCounts || {})
     .filter(([, count]) => Number(count) > 0)
-    .map(([status, count]) => `${status} relationship ${integerText(count)}x${tableRelationshipScoreWeights[status] || 0}`);
+    .map(([status, count]) => `${relationshipRiskPenaltyLabel(status)} ${integerText(count)}x${tableRelationshipScoreWeights[status] || 0}`);
   return [...severityParts, ...relationshipParts];
+}
+
+function relationshipRiskPenaltyLabel(status) {
+  const labels = {
+    invalid: "Invalid FK risk",
+    warning: "FK warning",
+    skipped: "FK skipped",
+  };
+  return labels[status] || `${status || "unknown"} FK risk`;
 }
 
 function renderTodosSection() {
@@ -6068,7 +6077,9 @@ function dashboardIssuesForSelection(selection) {
     return issues.filter((issue) => issue.table === selection.value);
   }
   if (selection.kind === "table_assessment") {
-    return issues.filter((issue) => issue.table === selection.value);
+    const assessment = getDashboardTableAssessments().find((row) => row.table === selection.value);
+    const relatedIssueIds = new Set(relatedIssueIdsForTableAssessment(assessment));
+    return issues.filter((issue) => issue.table === selection.value || relatedIssueIds.has(issue.issue_id));
   }
   if (selection.kind === "numeric_outlier") {
     const [table, column] = String(selection.value || "").split(".");
@@ -6089,6 +6100,17 @@ function dashboardIssuesForSelection(selection) {
     return issues.filter((issue) => relationshipIssueTypes.has(issue.issue_type));
   }
   return issues;
+}
+
+function relatedIssueIdsForTableAssessment(assessment) {
+  if (!assessment) {
+    return [];
+  }
+  const ids = new Set();
+  (assessment.relationship_risks || []).forEach((risk) => {
+    relatedIssueIdsForRelationshipRisk(risk).forEach((issueId) => ids.add(issueId));
+  });
+  return [...ids].sort((a, b) => a.localeCompare(b));
 }
 
 function renderIssueDetailDrawer(issue) {
@@ -7213,10 +7235,11 @@ function renderTableAssessmentDetails(selection) {
       <span class="pill-status ${readinessPillClass(assessment.readiness)}">${escapeHtml(assessment.readiness || "unknown")}</span>
       ${renderTableScoreBreakdown(evidence, assessment)}
       ${renderTableColumnEvidenceTable(evidence)}
+      ${renderTableRelationshipRisks(assessment)}
       <dl class="graph-metadata table-impact-context">
         <div><dt>analysis impact</dt><dd>${escapeHtml(impact.category || "general_analytics")}</dd></div>
         <div><dt>impact evidence</dt><dd>${escapeHtml(impact.rationale || "")}</dd></div>
-        <div><dt>relationship risks</dt><dd>${integerText(risks.length)}</dd></div>
+        <div><dt>FK risks</dt><dd>${integerText(risks.length)}</dd></div>
       </dl>
     </div>
   `;
@@ -7232,7 +7255,7 @@ function renderTableScoreBreakdown(evidence, assessment) {
         <small>${escapeHtml(parts.length ? parts.join(" · ") : "No penalties")}</small>
       </div>
       ${renderTableSeverityStrip(evidence.severityCounts)}
-      <p>Health score comes from table_assessments.json: P0=${tableIssueScoreWeights.P0}, P1=${tableIssueScoreWeights.P1}, P2=${tableIssueScoreWeights.P2}, P3=${tableIssueScoreWeights.P3}; invalid relationship=${tableRelationshipScoreWeights.invalid}, warning=${tableRelationshipScoreWeights.warning}, skipped=${tableRelationshipScoreWeights.skipped}.</p>
+      <p>Health score combines issue severity penalties and FK relationship penalties from table_assessments.json: P0=${tableIssueScoreWeights.P0}, P1=${tableIssueScoreWeights.P1}, P2=${tableIssueScoreWeights.P2}, P3=${tableIssueScoreWeights.P3}; invalid FK=${tableRelationshipScoreWeights.invalid}, warning FK=${tableRelationshipScoreWeights.warning}, skipped FK=${tableRelationshipScoreWeights.skipped}.</p>
       ${evidence.score.calculatedHealth !== Number(assessment.health_score) ? `
         <p class="muted">Displayed score follows artifact value ${integerText(assessment.health_score)}; calculated preview is ${integerText(evidence.score.calculatedHealth)}.</p>
       ` : ""}
@@ -7272,6 +7295,109 @@ function renderTableColumnEvidenceTable(evidence) {
       ` : `<p class="muted">No per-column missing, outlier, or issue evidence for this table.</p>`}
     </section>
   `;
+}
+
+function renderTableRelationshipRisks(assessment) {
+  const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
+  if (!risks.length) {
+    return `
+      <section class="table-relationship-risks" aria-label="FK relationship risks">
+        <div class="table-column-evidence-heading">
+          <strong>FK relationship risks</strong>
+          <span>0 risks</span>
+        </div>
+        <p class="muted">No FK relationship risk was counted for this table.</p>
+      </section>
+    `;
+  }
+  return `
+    <section class="table-relationship-risks" aria-label="FK relationship risks">
+      <div class="table-column-evidence-heading">
+        <strong>FK relationship risks</strong>
+        <span>${integerText(risks.length)} risk${risks.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="relationship-risk-list">
+        ${risks.map((risk) => renderTableRelationshipRisk(risk)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTableRelationshipRisk(risk) {
+  const roleText = risk.role === "parent"
+    ? "This table is the parent side; fix the child rows or load missing parent keys."
+    : "This table is the child side; fix its FK values or parent coverage.";
+  const source = relationshipEndpointText(risk.source_table, risk.source_columns);
+  const target = relationshipEndpointText(risk.target_table, risk.target_columns);
+  const issueIds = relatedIssueIdsForRelationshipRisk(risk);
+  const joinCoverage = Number.isFinite(Number(risk.join_coverage)) ? percentText(Number(risk.join_coverage)) : "--";
+  return `
+    <article class="relationship-risk-card">
+      <div class="relationship-risk-heading">
+        <span class="pill-status ${risk.status === "invalid" ? "missing" : "mapped"}">${escapeHtml(relationshipRiskPenaltyLabel(risk.status))}</span>
+        <code>${escapeHtml(risk.relationship_id || `${source}->${target}`)}</code>
+      </div>
+      <div class="relationship-risk-flow" aria-label="Relationship endpoints">
+        <code>${escapeHtml(source)}</code>
+        <span>-></span>
+        <code>${escapeHtml(target)}</code>
+      </div>
+      <p>${escapeHtml(roleText)} ${escapeHtml(risk.status_reason || "")}</p>
+      <div class="relationship-risk-metrics">
+        <span><strong>${integerText(risk.orphan_count || 0)}</strong> orphan rows</span>
+        <span><strong>${integerText(risk.parent_duplicate_count || 0)}</strong> parent duplicates</span>
+        <span><strong>${integerText(risk.child_fk_null_count || 0)}</strong> child FK nulls</span>
+        <span><strong>${escapeHtml(joinCoverage)}</strong> join coverage</span>
+      </div>
+      ${issueIds.length ? `
+        <div class="relationship-risk-issues">
+          <span>Open related issue</span>
+          ${issueIds.map((issueId) => `
+            <button class="relationship-risk-issue" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
+              <code>${escapeHtml(issueId)}</code>
+            </button>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">No linked issue row was found for this FK risk; inspect relationship_graph.json.</p>`}
+    </article>
+  `;
+}
+
+function relationshipEndpointText(table, columns) {
+  const columnText = Array.isArray(columns) && columns.length ? columns.join(", ") : "key";
+  return `${table || "table"}.${columnText}`;
+}
+
+function relatedIssueIdsForRelationshipRisk(risk) {
+  const edge = relationshipEdgeForRisk(risk);
+  const ids = new Set();
+  (edge?.evidence_links || []).forEach((link) => {
+    if (link?.issue_id) {
+      ids.add(String(link.issue_id));
+    }
+  });
+  if (!ids.size) {
+    const sourceColumns = new Set(risk.source_columns || []);
+    getDashboardIssues().forEach((issue) => {
+      const issueColumns = Array.isArray(issue.columns) ? issue.columns : [];
+      const matchesSource = issue.table === risk.source_table &&
+        issueColumns.some((column) => sourceColumns.has(column));
+      const matchesParent = issue.parent_table === risk.target_table;
+      if (matchesSource && matchesParent && issue.issue_id) {
+        ids.add(issue.issue_id);
+      }
+    });
+  }
+  return [...ids].sort((a, b) => a.localeCompare(b));
+}
+
+function relationshipEdgeForRisk(risk) {
+  const relationshipId = risk?.relationship_id || "";
+  const edges = state.dashboardArtifacts["relationship_graph.json"]?.edges;
+  if (!relationshipId || !Array.isArray(edges)) {
+    return null;
+  }
+  return edges.find((edge) => edge.id === relationshipId) || null;
 }
 
 function renderIssueRows(issues) {

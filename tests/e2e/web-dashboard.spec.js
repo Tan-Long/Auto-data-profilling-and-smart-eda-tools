@@ -894,6 +894,27 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator('#tableImpactGrid [data-dashboard-value="order_reviews"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toHaveCount(0);
 
+  await page
+    .locator('#tableImpactGrid [data-dashboard-kind="table_assessment"][data-dashboard-value="sellers"]')
+    .click();
+  await expect(page.locator("#dashboardDrilldownMeta")).toContainText("sellers");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("FK relationship risks");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("order_items.seller_id");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("sellers.seller_id");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("orphan rows");
+  await expect(page.locator("#dashboardDrilldown")).toContainText(/ISSUE-\d{4}/);
+  await expect(page.locator("#dashboardDrilldown")).not.toContainText("No issues match this selection");
+  await expect(page.locator("#dashboardDrilldown .dashboard-issue-row")).toContainText("Orphan Foreign Key");
+  await expect(page.locator("#dashboardDrilldown .relationship-risk-issue")).toHaveCount(1);
+  await page.locator("#dashboardDrilldown .relationship-risk-issue").click();
+  await expect(page.locator("#dashboardDrilldownMeta")).toContainText(/ISSUE-\d{4}/);
+  await expect(page.locator("#dashboardDrilldown .issue-detail-drawer")).toContainText("order_items");
+  await expect(page.locator("#dashboardDrilldown .issue-detail-drawer")).toContainText("seller_id");
+  await expect(page.locator("#dashboardDrilldown .issue-detail-drawer")).toContainText("Fix / Todo");
+  await page
+    .locator('#tableImpactGrid [data-dashboard-kind="table_assessment"][data-dashboard-value="sellers"]')
+    .click();
+
   await expect(page.locator("#graphs")).toHaveCount(0);
   await expect(page.locator("#dashboardGraphSvg")).toHaveCount(0);
   await expect(page.locator("#dashboardGraphDrilldown")).toHaveCount(0);
