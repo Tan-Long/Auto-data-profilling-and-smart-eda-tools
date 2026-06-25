@@ -365,6 +365,7 @@ def _render_index_html(
     issue_action_plans = _read_json(source_root / "issue_action_plans.json")
     issue_todos = _read_json(source_root / "issue_todos.json")
     evaluation_summary = _read_json(source_root / "evaluation_summary.json")
+    issue_llm_enrichments = _read_json(source_root / "issue_llm_enrichments.json")
     chart_paths = sorted(path for path in artifact_index if path.startswith("charts/"))
     sample_paths = sorted(path for path in artifact_index if path.startswith("samples/"))
     run_id = source_run.get("run_id", "unknown") if source_run else "unknown"
@@ -423,6 +424,15 @@ def _render_index_html(
     column_issue_matrix_html = package_column_issue_matrix_html(column_issue_blocks)
     action_plans_html = package_action_plans_html(issue_action_plans)
     todos_html = package_todos_html(issue_todos)
+    review_briefing_html = package_review_briefing_html(
+        verdict=verdict,
+        table_assessments=table_assessments,
+        issues=issues,
+        issue_action_plans=issue_action_plans,
+        issue_llm_enrichments=issue_llm_enrichments,
+        profile_summary=profile_summary,
+        outlier_rows=all_outlier_rows,
+    )
     developer_artifact_links_html = package_developer_artifact_links_html(
         artifact_index,
         chart_paths=chart_paths,
@@ -508,6 +518,43 @@ def _render_index_html(
     .metric strong {{ display: block; font-size: 24px; line-height: 1; }}
     .metric span {{ color: var(--foreground-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }}
     .stack {{ display: grid; gap: 10px; }}
+    .briefing-grid,
+    .table-map-grid,
+    .fix-lane-grid {{
+      display: grid;
+      gap: 10px;
+    }}
+    .briefing-grid {{ grid-template-columns: repeat(5, minmax(0, 1fr)); }}
+    .table-map-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }}
+    .fix-lane-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }}
+    .briefing-card,
+    .table-map-card,
+    .fix-lane-card,
+    .lane-action {{
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--surface-panel);
+    }}
+    .briefing-card[data-tone="danger"] {{ border-color: rgba(178, 59, 50, 0.28); background: rgba(178, 59, 50, 0.05); }}
+    .briefing-card[data-tone="warning"] {{ border-color: rgba(154, 95, 0, 0.28); background: rgba(154, 95, 0, 0.05); }}
+    .briefing-card[data-tone="success"] {{ border-color: rgba(35, 118, 77, 0.25); background: rgba(35, 118, 77, 0.05); }}
+    .briefing-card strong,
+    .table-map-card strong,
+    .fix-lane-card strong {{ display: block; margin-bottom: 7px; font-size: 14px; }}
+    .briefing-card ul {{ display: grid; gap: 5px; margin: 0; padding-left: 18px; color: var(--foreground-secondary); font-size: 13px; }}
+    .table-map-card header,
+    .fix-lane-card header {{ display: flex; justify-content: space-between; gap: 8px; margin: 0 0 8px; padding: 0; border: 0; border-radius: 0; background: transparent; }}
+    .table-map-meta,
+    .fix-lane-meta {{ display: flex; flex-wrap: wrap; gap: 6px; }}
+    .table-map-meta span,
+    .fix-lane-meta span {{ display: inline-flex; min-height: 22px; align-items: center; padding: 2px 7px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface-overlay); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; }}
+    .severity-strip {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 8px 0; }}
+    .severity-strip span {{ display: inline-flex; justify-content: space-between; gap: 4px; padding: 3px 6px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--surface-overlay); color: var(--foreground-secondary); font: 900 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
+    .lane-action-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }}
+    .lane-action span {{ display: block; margin-bottom: 5px; color: var(--foreground-tertiary); font-size: 10px; font-weight: 900; text-transform: uppercase; }}
+    .lane-action p {{ margin: 0; color: var(--foreground-secondary); font-size: 13px; line-height: 1.36; }}
     .todo-summary-cards {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }}
     .todo-summary-cards div,
     .todo-card {{ min-width: 0; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--surface-panel); }}
@@ -553,7 +600,7 @@ def _render_index_html(
       background: white;
     }}
     @media (max-width: 820px) {{
-      .grid, .links, .todo-summary-cards {{ grid-template-columns: 1fr; }}
+      .grid, .links, .todo-summary-cards, .briefing-grid, .table-map-grid, .fix-lane-grid, .lane-action-grid {{ grid-template-columns: 1fr; }}
       main {{ width: min(100% - 20px, 1180px); padding-top: 16px; }}
     }}
   </style>
@@ -567,6 +614,10 @@ def _render_index_html(
     </header>
     <section class="grid" aria-label="Package summary">
       {''.join(_metric_card(label, value, detail) for label, value, detail in cards)}
+    </section>
+    <section class="section panel">
+      <h2>Review briefing</h2>
+      {review_briefing_html}
     </section>
     <section class="section panel">
       <h2>Run Summary</h2>
@@ -778,6 +829,248 @@ def package_column_usability_rows_html(rows: list[dict[str, Any]]) -> str:
     if not html_rows:
         return '<tr><td colspan="6">No column usability rows were generated.</td></tr>'
     return "".join(html_rows)
+
+
+def package_review_briefing_html(
+    *,
+    verdict: dict[str, Any],
+    table_assessments: dict[str, Any],
+    issues: list[dict[str, Any]],
+    issue_action_plans: dict[str, Any],
+    issue_llm_enrichments: dict[str, Any],
+    profile_summary: dict[str, Any],
+    outlier_rows: list[dict[str, Any]],
+) -> str:
+    sorted_issues = sorted(
+        issues,
+        key=lambda issue: (
+            _severity_rank(str(issue.get("severity") or "")),
+            -int(issue.get("bad_count") or 0),
+            str(issue.get("issue_id") or ""),
+        ),
+    )
+    top_issue = sorted_issues[0] if sorted_issues else {}
+    top_issue_id = str(top_issue.get("issue_id") or "top issue")
+    plans_by_issue = {
+        str(plan.get("issue_id") or ""): plan
+        for plan in issue_action_plans.get("plans", [])
+        if isinstance(plan, dict)
+    }
+    top_plan = plans_by_issue.get(str(top_issue.get("issue_id") or ""), {})
+    missing_groups = _package_missingness_groups(profile_summary)
+    missing_total = sum(group["null_count"] for group in missing_groups)
+    outlier_total = sum(int(row.get("outlier_count") or 0) for row in outlier_rows)
+    blockers = sum(1 for issue in sorted_issues if str(issue.get("severity") or "") in {"P0", "P1"})
+    cards = [
+        (
+            "Overall readout",
+            "danger" if str(verdict.get("verdict", "")).upper() == "NOT_READY" else "info",
+            [
+                f"{verdict.get('verdict', 'unknown')} with risk {verdict.get('risk_score', 'n/a')}/100.",
+                f"{blockers} P0/P1 blockers should be fixed before analysis.",
+                f"{len(profile_summary.get('tables') or {})} DBML tables were profiled.",
+            ],
+        ),
+        (
+            "Data signals",
+            "warning" if missing_total or outlier_total else "success",
+            [
+                f"{missing_total} missing values across {len(missing_groups)} table groups.",
+                f"{outlier_total} IQR outliers across {len(outlier_rows)} numeric columns.",
+                f"Top issue: {top_issue_id} on {_package_issue_field(top_issue)}.",
+            ],
+        ),
+        (
+            "Default fix route",
+            "danger",
+            [
+                _package_first_plan_item(top_plan, "fix_data_checklist")
+                or "Inspect bounded sample rows, then fix source extract, pipeline, or DBML contract.",
+                "Do not edit generated artifacts.",
+                "Apply the correction upstream and keep DBML aligned with the CSV contract.",
+            ],
+        ),
+        (
+            "Verify route",
+            "info",
+            [
+                _package_first_plan_item(top_plan, "verify_after_fix_checklist")
+                or f"Rerun and confirm {top_issue_id} no longer appears.",
+                "Confirm affected rows are 0 for the same table and column.",
+                "Recheck Quality Gates before using the data for analysis.",
+            ],
+        ),
+        (
+            "OpenAI add-on",
+            "info" if _package_llm_success_count(issue_llm_enrichments) else "warning",
+            _package_llm_bullets(issue_llm_enrichments, top_issue_id),
+        ),
+    ]
+    briefing_html = "".join(
+        f"""
+        <article class="briefing-card" data-tone="{_h(tone)}">
+          <strong>{_h(title)}</strong>
+          <ul>{''.join(f'<li>{_h(item)}</li>' for item in bullets)}</ul>
+        </article>
+        """
+        for title, tone, bullets in cards
+    )
+    table_cards = "".join(_package_table_map_card(row) for row in _package_top_table_assessments(table_assessments))
+    fix_lane = _package_fix_lane_card(top_issue, top_plan, issue_llm_enrichments)
+    return f"""
+      <div class="briefing-grid" aria-label="Package review briefing">{briefing_html}</div>
+      <div class="table-map-grid" aria-label="DBML table readiness map">{table_cards}</div>
+      <div class="fix-lane-grid" aria-label="Default and LLM fix verify lanes">{fix_lane}</div>
+    """
+
+
+def _package_missingness_groups(profile_summary: dict[str, Any], *, limit: int = 6) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for table_name, table in (profile_summary.get("tables") or {}).items():
+        columns = []
+        for column_name, column in (table.get("columns") or {}).items():
+            null_count = int(column.get("null_count") or 0)
+            if null_count > 0:
+                columns.append({"column": str(column_name), "null_count": null_count})
+        if columns:
+            groups.append(
+                {
+                    "table": str(table_name),
+                    "null_count": sum(column["null_count"] for column in columns),
+                    "columns": sorted(columns, key=lambda column: (-column["null_count"], column["column"])),
+                }
+            )
+    return sorted(groups, key=lambda group: (-group["null_count"], group["table"]))[:limit]
+
+
+def _package_first_plan_item(plan: dict[str, Any], key: str) -> str:
+    values = plan.get(key) if isinstance(plan, dict) else None
+    if not isinstance(values, list):
+        return ""
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _package_issue_field(issue: dict[str, Any]) -> str:
+    table = str(issue.get("table") or "dataset")
+    columns = issue.get("columns")
+    if isinstance(columns, list) and columns:
+        return f"{table}.{', '.join(str(column) for column in columns)}"
+    return table
+
+
+def _package_llm_success_count(artifact: dict[str, Any]) -> int:
+    enrichments = artifact.get("enrichments") if artifact else []
+    if not isinstance(enrichments, list):
+        return 0
+    return sum(1 for entry in enrichments if isinstance(entry, dict) and entry.get("status") == "succeeded")
+
+
+def _package_llm_bullets(artifact: dict[str, Any], top_issue_id: str) -> list[str]:
+    if not artifact:
+        return [
+            "No issue_llm_enrichments.json was included in this package.",
+            "Use deterministic fix/verify guidance by default.",
+            "Run OpenAI issue guidance for selected issues when advisory context is needed.",
+        ]
+    enrichments = artifact.get("enrichments") if artifact else []
+    if not isinstance(enrichments, list):
+        return [
+            "No issue_llm_enrichments.json was included in this package.",
+            "Use deterministic fix/verify guidance by default.",
+            "Run OpenAI issue guidance for selected issues when advisory context is needed.",
+        ]
+    succeeded = [entry for entry in enrichments if isinstance(entry, dict) and entry.get("status") == "succeeded"]
+    if not succeeded:
+        return [
+            f"{len(enrichments)} LLM enrichment attempts were recorded.",
+            "No succeeded OpenAI guidance is available.",
+            "Human review is required before applying failed or unavailable LLM output.",
+        ]
+    selected = next((entry for entry in succeeded if entry.get("issue_id") == top_issue_id), succeeded[0])
+    response = selected.get("structured_response") or {}
+    return [
+        _package_first_text(response.get("why_this_was_flagged")) or f"OpenAI guidance is available for {selected.get('issue_id', top_issue_id)}.",
+        _package_first_text(response.get("extra_fix_suggestion")) or "No extra fix suggestion was included.",
+        _package_first_text(response.get("extra_verification")) or "No extra verification suggestion was included.",
+        "OpenAI guidance is advisory and requires human review.",
+    ]
+
+
+def _package_first_text(values: Any) -> str:
+    if not isinstance(values, list):
+        return ""
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _package_top_table_assessments(table_assessments: dict[str, Any], *, limit: int = 6) -> list[dict[str, Any]]:
+    assessments = [row for row in table_assessments.get("assessments", []) if isinstance(row, dict)]
+    return sorted(
+        assessments,
+        key=lambda row: (
+            {"NOT_READY": 0, "WARN": 1, "READY": 2}.get(str(row.get("readiness") or ""), 3),
+            int(row.get("health_score") or 0),
+            str(row.get("table") or ""),
+        ),
+    )[:limit]
+
+
+def _package_table_map_card(row: dict[str, Any]) -> str:
+    counts = row.get("issue_counts_by_severity") or {}
+    issue_total = sum(int(value or 0) for value in counts.values())
+    affected_columns = ", ".join(str(column) for column in (row.get("affected_columns") or [])[:4]) or "no affected columns"
+    return f"""
+      <article class="table-map-card">
+        <header><code>{_h(row.get('table', ''))}</code><span class="pill {_h(row.get('readiness', 'unknown'))}">{_h(row.get('readiness', 'unknown'))}</span></header>
+        <div class="table-map-meta">
+          <span>{_h(row.get('role', 'unknown'))}</span>
+          <span>health {_h(row.get('health_score', 0))}</span>
+          <span>{_h(issue_total)} issues</span>
+        </div>
+        <div class="severity-strip">
+          <span>P0 <b>{_h(counts.get('P0', 0))}</b></span>
+          <span>P1 <b>{_h(counts.get('P1', 0))}</b></span>
+          <span>P2 <b>{_h(counts.get('P2', 0))}</b></span>
+          <span>P3 <b>{_h(counts.get('P3', 0))}</b></span>
+        </div>
+        <p class="meta">{_h(affected_columns)}</p>
+      </article>
+    """
+
+
+def _package_fix_lane_card(
+    issue: dict[str, Any],
+    plan: dict[str, Any],
+    issue_llm_enrichments: dict[str, Any],
+) -> str:
+    issue_id = str(issue.get("issue_id") or plan.get("issue_id") or "top issue")
+    severity = str(issue.get("severity") or "P?")
+    issue_type = str(issue.get("issue_type") or plan.get("issue_type") or "Issue")
+    llm_bullets = _package_llm_bullets(issue_llm_enrichments, issue_id)
+    default_fix = _package_first_plan_item(plan, "fix_data_checklist") or "Inspect bounded sample rows, then fix upstream data or DBML contract."
+    default_verify = _package_first_plan_item(plan, "verify_after_fix_checklist") or f"Rerun and confirm {issue_id} no longer appears."
+    return f"""
+      <article class="fix-lane-card">
+        <header><code>{_h(issue_id)}</code><span class="pill {_h(severity)}">{_h(severity)}</span></header>
+        <strong>{_h(issue_type.replace('_', ' ').title())}</strong>
+        <div class="fix-lane-meta">
+          <span>{_h(_package_issue_field(issue))}</span>
+          <span>{_h(issue.get('bad_count', 0))}/{_h(issue.get('total_count', 0))} rows</span>
+        </div>
+        <div class="lane-action-grid">
+          <div class="lane-action"><span>Default fix</span><p>{_h(default_fix)}</p></div>
+          <div class="lane-action"><span>Default verify</span><p>{_h(default_verify)}</p></div>
+          <div class="lane-action"><span>OpenAI add-on</span><p>{_h(llm_bullets[1] if len(llm_bullets) > 1 else llm_bullets[0])}</p></div>
+        </div>
+      </article>
+    """
 
 
 def package_column_issue_blocks(

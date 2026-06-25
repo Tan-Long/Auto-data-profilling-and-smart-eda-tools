@@ -340,6 +340,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".table-column-evidence-table",
         ".table-column-evidence-row",
         ".issue-visual-summary",
+        ".review-briefing",
+        ".review-briefing-card",
+        ".review-data-map",
+        ".review-table-map-card",
+        ".review-fix-lane",
         ".issue-visual-chart",
         ".issue-visual-row.selected",
         ".severity-priority-panel",
@@ -680,6 +685,11 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Issue table" in js
     assert "Charts and issue table" in js
     assert "renderIssueVisualSummary" in js
+    assert "renderStage4ReviewBriefing" in js
+    assert "Review briefing" in js
+    assert "Default fix" in js
+    assert "Default verify" in js
+    assert "OpenAI add-on" in js
     assert "renderIssueFocusMap" in js
     assert "selectedRunTimeline" in js
     assert 'return stage?.name === "influence_analysis";' in js

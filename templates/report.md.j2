@@ -14,7 +14,25 @@ Visual CSV+DBML readiness report generated from deterministic local artifacts.
 
 Run status: {{ fixed_report.run_summary.status }}. Runtime seconds: {{ fixed_report.run_summary.duration_seconds or "unknown" }}. Preflight: {{ fixed_report.run_summary.preflight_status }}.
 
-## Visual Overview
+## Review Briefing
+
+{% for card in visual_report.briefing_cards -%}
+### {{ card.title }}
+{% for bullet in card.bullets -%}
+- {{ bullet }}
+{% endfor %}
+
+{% endfor -%}
+
+## Visual Evidence Map
+
+### DBML table map
+
+| Table | Role | Readiness | Health | P0 | P1 | P2 | P3 | Missing/outlier focus |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+{% for row in visual_report.table_hotspots -%}
+| {{ row.table }} | {{ row.role }} | {{ row.readiness }} | {{ row.health_score }} | {{ row.severity_counts.P0 }} | {{ row.severity_counts.P1 }} | {{ row.severity_counts.P2 }} | {{ row.severity_counts.P3 }} | {{ row.affected_columns_text }} |
+{% endfor %}
 
 ### Issue severity
 
@@ -53,14 +71,16 @@ Missing values by table:
 - No IQR outlier columns were detected for this run.
 {% endif %}
 
-## What Should Be Fixed First?
+## Fix / Verify Lanes
 
-Sample row preview: the HTML report expands bounded sample rows inline. Sample paths below identify the generated evidence artifact without requiring a CSV download.
+- Default route is deterministic and comes from `issue_action_plans.json`.
+- OpenAI add-ons appear only when `issue_llm_enrichments.json` exists and passed structured validation.
+- Sample row preview: HTML expands bounded sample rows inline; generated CSV sample paths identify the evidence artifact without direct CSV download.
 
-| Priority | Where | Problem | Affected | First fix | Sample |
-| --- | --- | --- | ---: | --- | --- |
+| Priority | Where | Problem | Affected | Default fix | Default verify | OpenAI add-on |
+| --- | --- | --- | ---: | --- | --- | --- |
 {% for card in visual_report.top_fix_cards -%}
-| {{ card.severity }} {{ card.issue_id }} | {{ card.field }} | {{ card.issue_label }} | {{ card.bad_count }}/{{ card.total_count }} ({{ card.bad_rate_text }}) | {{ card.fix }} | {{ card.sample_bad_rows_path or "not available" }} |
+| {{ card.severity }} {{ card.issue_id }} | {{ card.field }} | {{ card.issue_label }} | {{ card.bad_count }}/{{ card.total_count }} ({{ card.bad_rate_text }}) | {{ card.fix }} | {{ card.verify }} | {% if card.llm.available %}{{ card.llm.fix or card.llm.why }}{% else %}Not generated for this issue.{% endif %} |
 {% endfor %}
 
 ## Quality Gates

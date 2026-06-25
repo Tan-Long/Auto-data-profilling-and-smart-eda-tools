@@ -168,6 +168,7 @@ def _build_context(
         fixed_report=fixed_report,
         chart_context=chart_context,
         action_plans=action_plans_context,
+        issue_enrichments=issue_enrichments_context,
     )
     return {
         "summary": {
@@ -400,6 +401,10 @@ def _table_overview_context(
         assessment = assessments.get(table_name, {})
         affected_columns = assessment.get("affected_columns") or []
         relationship_risks = assessment.get("relationship_risks") or []
+        severity_counts = {
+            severity: int((assessment.get("issue_counts_by_severity") or {}).get(severity) or 0)
+            for severity in SEVERITIES
+        }
         rows.append(
             {
                 "table": table_name,
@@ -408,9 +413,9 @@ def _table_overview_context(
                 "readiness": assessment.get("readiness", "unknown"),
                 "role": assessment.get("role", "unknown"),
                 "health_score": assessment.get("health_score", "unknown"),
-                "issue_total": sum((assessment.get("issue_counts_by_severity") or {}).values())
-                if assessment
-                else 0,
+                "issue_total": sum(severity_counts.values()) if assessment else 0,
+                "severity_counts": severity_counts,
+                "severity_counts_text": _format_counts(severity_counts),
                 "affected_columns_text": ", ".join(affected_columns) if affected_columns else "none",
                 "relationship_risk_count": len(relationship_risks),
                 "next_step": (assessment.get("recommended_next_actions") or ["No deterministic next step."])[0],
@@ -748,11 +753,16 @@ def _issue_llm_enrichments_context(artifact: dict[str, Any] | None) -> dict[str,
             "available": False,
             "path": "",
             "summary": {},
+            "enrichments": [],
+            "succeeded_count": 0,
         }
+    enrichments = [entry for entry in artifact.get("enrichments", []) if isinstance(entry, dict)]
     return {
         "available": True,
         "path": "issue_llm_enrichments.json",
         "summary": artifact.get("summary") or {},
+        "enrichments": enrichments,
+        "succeeded_count": sum(1 for entry in enrichments if entry.get("status") == "succeeded"),
     }
 
 
@@ -876,6 +886,7 @@ def _visual_report_context(
     fixed_report: dict[str, Any],
     chart_context: dict[str, Any],
     action_plans: dict[str, Any],
+    issue_enrichments: dict[str, Any],
 ) -> dict[str, Any]:
     run_summary = fixed_report.get("run_summary") or {}
     table_overview = fixed_report.get("table_overview") or {}
@@ -885,9 +896,15 @@ def _visual_report_context(
         for plan in action_plans.get("plans", [])
         if isinstance(plan, dict)
     }
+    llm_by_issue = _issue_llm_by_issue(issue_enrichments)
     severity_counts = Counter(normalize_severity(issue.severity) for issue in issues)
     top_fix_cards = [
-        _visual_issue_card(out_dir=out_dir, issue=issue, plan=plan_by_issue.get(issue.issue_id, {}))
+        _visual_issue_card(
+            out_dir=out_dir,
+            issue=issue,
+            plan=plan_by_issue.get(issue.issue_id, {}),
+            llm_entry=llm_by_issue.get(issue.issue_id),
+        )
         for issue in issues[:5]
     ]
     table_hotspots = []
@@ -900,6 +917,12 @@ def _visual_report_context(
                 "bar_width_pct": min(100, max(issue_total * 12, relationship_risks * 16, 4)),
             }
         )
+    missingness_groups = _missingness_table_groups_for_report(
+        (chart_context.get("missingness_columns") or {}).get("data", []),
+        table_limit=6,
+        column_limit=8,
+    )
+    outlier_chart = (chart_context.get("outlier_columns") or {}).get("data", [])[:6]
     return {
         "verdict": run_summary.get("readiness", "unknown"),
         "risk_score": run_summary.get("risk_score", "unknown"),
@@ -918,15 +941,19 @@ def _visual_report_context(
             row for row in (chart_context.get("missingness_columns") or {}).get("data", [])
             if _numeric(row.get("null_count")) > 0
         ][:6],
-        "missingness_table_groups": _missingness_table_groups_for_report(
-            (chart_context.get("missingness_columns") or {}).get("data", []),
-            table_limit=6,
-            column_limit=8,
-        ),
-        "outlier_chart": (chart_context.get("outlier_columns") or {}).get("data", [])[:6],
+        "missingness_table_groups": missingness_groups,
+        "outlier_chart": outlier_chart,
         "table_hotspots": table_hotspots,
         "column_issue_rows": (column_matrix.get("rows") or [])[:16],
         "top_fix_cards": top_fix_cards,
+        "briefing_cards": _report_briefing_cards(
+            run_summary=run_summary,
+            top_fix_cards=top_fix_cards,
+            table_hotspots=table_hotspots,
+            missingness_groups=missingness_groups,
+            outlier_chart=outlier_chart,
+            issue_enrichments=issue_enrichments,
+        ),
         "can_run_analysis": run_summary.get("can_run_analysis", {}),
         "can_trust_joins": run_summary.get("can_trust_joins", {}),
     }
@@ -976,13 +1003,20 @@ def _missingness_table_groups_for_report(
     return sorted(result, key=lambda item: (-int(item["null_count"]), str(item["table"])))[:table_limit]
 
 
-def _visual_issue_card(*, out_dir: Path, issue: Issue, plan: dict[str, Any]) -> dict[str, Any]:
+def _visual_issue_card(
+    *,
+    out_dir: Path,
+    issue: Issue,
+    plan: dict[str, Any],
+    llm_entry: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     columns = issue.columns or []
     sample_preview = _sample_rows_preview(
         out_dir,
         issue.sample_bad_rows_path,
         highlighted_columns=columns,
     )
+    llm = _issue_llm_card_context(llm_entry)
     return {
         "issue_id": issue.issue_id,
         "issue_type": issue.issue_type,
@@ -1007,7 +1041,144 @@ def _visual_issue_card(*, out_dir: Path, issue: Issue, plan: dict[str, Any]) -> 
             (plan.get("verify_after_fix_checklist") or [None])[0]
             or f"Rerun and confirm {issue.issue_id} no longer appears."
         ),
+        "llm": llm,
         "why_it_matters": _analysis_consequence(issue),
+    }
+
+
+def _report_briefing_cards(
+    *,
+    run_summary: dict[str, Any],
+    top_fix_cards: list[dict[str, Any]],
+    table_hotspots: list[dict[str, Any]],
+    missingness_groups: list[dict[str, Any]],
+    outlier_chart: list[dict[str, Any]],
+    issue_enrichments: dict[str, Any],
+) -> list[dict[str, Any]]:
+    first_issue = top_fix_cards[0] if top_fix_cards else {}
+    first_table = table_hotspots[0] if table_hotspots else {}
+    missing_total = sum(int(group.get("null_count") or 0) for group in missingness_groups)
+    outlier_total = sum(int(row.get("outlier_count") or 0) for row in outlier_chart)
+    llm_bullets = _report_llm_bullets(issue_enrichments)
+    return [
+        {
+            "title": "Overall readout",
+            "tone": "danger" if str(run_summary.get("readiness", "")).upper() == "NOT_READY" else "info",
+            "bullets": [
+                f"{run_summary.get('readiness', 'unknown')} with risk {run_summary.get('risk_score', 'unknown')}/100.",
+                f"{run_summary.get('p0_p1_count', 0)} P0/P1 blockers should be fixed before analysis.",
+                f"{run_summary.get('table_count', 0)} DBML tables, {run_summary.get('column_count', 0)} columns, {run_summary.get('row_count', 0)} rows checked.",
+            ],
+        },
+        {
+            "title": "Data signals",
+            "tone": "warning" if missing_total or outlier_total else "success",
+            "bullets": [
+                f"{missing_total} missing values across {len(missingness_groups)} table groups.",
+                f"{outlier_total} IQR outliers across {len(outlier_chart)} numeric columns.",
+                f"Highest-risk table: {first_table.get('table', 'none')} ({first_table.get('readiness', 'n/a')}, health {first_table.get('health_score', 'n/a')}).",
+            ],
+        },
+        {
+            "title": "Default fix route",
+            "tone": "danger",
+            "bullets": [
+                f"Start with {first_issue.get('issue_id', 'the top issue')} on {first_issue.get('field', 'the affected field')}.",
+                str(first_issue.get("fix") or "Inspect bounded sample rows, then fix source extract, pipeline, or DBML contract."),
+                "Do not edit generated artifacts; apply the correction upstream.",
+            ],
+        },
+        {
+            "title": "Verify route",
+            "tone": "info",
+            "bullets": [
+                str(first_issue.get("verify") or "Rerun the profiler on corrected CSV + DBML inputs."),
+                "Confirm the fixed issue no longer appears in issues.json.",
+                "Confirm affected rows are 0 for the same table and column.",
+            ],
+        },
+        {
+            "title": "OpenAI add-on",
+            "tone": "info" if issue_enrichments.get("succeeded_count") else "warning",
+            "bullets": llm_bullets,
+        },
+    ]
+
+
+def _report_llm_bullets(issue_enrichments: dict[str, Any]) -> list[str]:
+    if not issue_enrichments.get("available"):
+        return [
+            "No issue_llm_enrichments.json was generated for this run.",
+            "Use the deterministic fix/verify route by default.",
+            "Run OpenAI guidance on selected issues when more context is needed.",
+        ]
+    succeeded = [
+        entry for entry in issue_enrichments.get("enrichments", [])
+        if isinstance(entry, dict) and entry.get("status") == "succeeded"
+    ]
+    if not succeeded:
+        return [
+            f"{issue_enrichments.get('summary', {}).get('enrichment_count', 0)} LLM enrichment attempts recorded.",
+            "No succeeded OpenAI guidance is available in this report.",
+            "Human review is required before using failed or unavailable LLM output.",
+        ]
+    bullets: list[str] = []
+    for entry in succeeded[:2]:
+        response = entry.get("structured_response") or {}
+        issue_id = str(entry.get("issue_id") or "issue")
+        why = _first_text(response.get("why_this_was_flagged"))
+        fix = _first_text(response.get("extra_fix_suggestion"))
+        if why:
+            bullets.append(f"{issue_id}: {why}")
+        if fix:
+            bullets.append(f"{issue_id} add-on: {fix}")
+    bullets.append("OpenAI guidance is advisory; human review is still required.")
+    return bullets[:4]
+
+
+def _first_text(values: Any) -> str:
+    if not isinstance(values, list):
+        return ""
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _issue_llm_by_issue(issue_enrichments: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    by_issue: dict[str, dict[str, Any]] = {}
+    for entry in issue_enrichments.get("enrichments", []):
+        if not isinstance(entry, dict):
+            continue
+        issue_id = str(entry.get("issue_id") or "")
+        if not issue_id:
+            continue
+        if issue_id not in by_issue or entry.get("status") == "succeeded":
+            by_issue[issue_id] = entry
+    return by_issue
+
+
+def _issue_llm_card_context(entry: dict[str, Any] | None) -> dict[str, Any]:
+    if not entry:
+        return {
+            "available": False,
+            "status": "not_generated",
+            "why": "",
+            "fix": "",
+            "verify": "",
+            "review_reason": "Run OpenAI guidance for this issue if deterministic evidence needs more context.",
+        }
+    response = entry.get("structured_response") or {}
+    review = response.get("human_review_needed") or {}
+    return {
+        "available": entry.get("status") == "succeeded",
+        "status": str(entry.get("status") or "unknown"),
+        "provider": str(entry.get("provider") or "unknown"),
+        "why": _first_text(response.get("why_this_was_flagged")),
+        "fix": _first_text(response.get("extra_fix_suggestion")),
+        "verify": _first_text(response.get("extra_verification")),
+        "review_reason": str(review.get("reason") or "Human review is required before applying LLM guidance."),
     }
 
 

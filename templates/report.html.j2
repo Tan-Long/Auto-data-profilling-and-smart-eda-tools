@@ -106,6 +106,137 @@
       border-radius: 8px;
       background: var(--surface-overlay);
     }
+    .briefing-grid,
+    .table-map-grid,
+    .fix-lane-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .briefing-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    .briefing-card,
+    .table-map-card,
+    .fix-lane-card {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--surface-overlay);
+    }
+    .briefing-card[data-tone="danger"] { border-color: rgba(178, 59, 50, 0.28); background: rgba(178, 59, 50, 0.05); }
+    .briefing-card[data-tone="warning"] { border-color: rgba(154, 95, 0, 0.28); background: rgba(154, 95, 0, 0.05); }
+    .briefing-card[data-tone="success"] { border-color: rgba(35, 118, 77, 0.25); background: rgba(35, 118, 77, 0.05); }
+    .briefing-card strong,
+    .table-map-card strong,
+    .fix-lane-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .briefing-card ul,
+    .fix-lane-card ul {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding-left: 18px;
+      color: var(--foreground-secondary);
+      font-size: 13px;
+    }
+    .table-map-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 14px;
+    }
+    .table-map-card header,
+    .fix-lane-card header {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 8px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .table-map-card header code,
+    .fix-lane-card header code {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 900;
+    }
+    .table-map-meta,
+    .fix-lane-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .table-map-meta span,
+    .fix-lane-meta span {
+      display: inline-flex;
+      min-height: 22px;
+      align-items: center;
+      padding: 2px 7px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      background: var(--surface-panel);
+      color: var(--foreground-secondary);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .severity-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 4px;
+      margin: 8px 0;
+    }
+    .severity-strip span {
+      display: inline-flex;
+      justify-content: space-between;
+      gap: 4px;
+      padding: 3px 6px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      background: var(--surface-panel);
+      color: var(--foreground-secondary);
+      font: 900 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .fix-lane-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-bottom: 14px;
+    }
+    .fix-lane-card {
+      background: var(--surface-panel);
+    }
+    .lane-action-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .lane-action {
+      min-width: 0;
+      padding: 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--surface-overlay);
+    }
+    .lane-action span {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--foreground-tertiary);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .lane-action p {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font-size: 13px;
+      line-height: 1.36;
+    }
     .visual-column { min-width: 0; }
     .bar-list { display: grid; gap: 7px; }
     .bar-row { display: grid; grid-template-columns: minmax(142px, 0.7fr) minmax(120px, 1fr) minmax(54px, auto); gap: 10px; align-items: center; }
@@ -329,7 +460,15 @@
     @media (max-width: 900px) {
       main { width: min(100% - 20px, 1120px); padding-top: 12px; }
       .report-header-line { display: grid; }
-      .summary-strip, .visual-panel, .todo-summary-cards, .todo-stack, .artifact-grid { grid-template-columns: 1fr; }
+      .summary-strip,
+      .visual-panel,
+      .todo-summary-cards,
+      .todo-stack,
+      .artifact-grid,
+      .briefing-grid,
+      .table-map-grid,
+      .fix-lane-grid,
+      .lane-action-grid { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: minmax(0, 1fr); }
       .bar-value { text-align: left; }
     }
@@ -369,8 +508,44 @@
       </div>
     </section>
 
+    <section id="review-briefing">
+      <h2>Review briefing</h2>
+      <div class="briefing-grid" aria-label="Guided review briefing">
+        {% for card in visual_report.briefing_cards %}
+        <article class="briefing-card" data-tone="{{ card.tone }}">
+          <strong>{{ card.title }}</strong>
+          <ul>
+            {% for bullet in card.bullets %}
+            <li>{{ bullet }}</li>
+            {% endfor %}
+          </ul>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+
     <section id="visual-overview">
       <h2>Where are the problems?</h2>
+      <p class="eyebrow">DBML table map</p>
+      <div class="table-map-grid" aria-label="DBML table readiness map">
+        {% for row in visual_report.table_hotspots %}
+        <article class="table-map-card">
+          <header><code>{{ row.table }}</code><span class="pill {{ row.readiness }}">{{ row.readiness }}</span></header>
+          <div class="table-map-meta">
+            <span>{{ row.role }}</span>
+            <span>health {{ row.health_score }}</span>
+            <span>{{ row.issue_total }} issues</span>
+          </div>
+          <div class="severity-strip" aria-label="{{ row.table }} issue severity counts">
+            <span>P0 <b>{{ row.severity_counts.P0 }}</b></span>
+            <span>P1 <b>{{ row.severity_counts.P1 }}</b></span>
+            <span>P2 <b>{{ row.severity_counts.P2 }}</b></span>
+            <span>P3 <b>{{ row.severity_counts.P3 }}</b></span>
+          </div>
+          <p class="muted">{{ row.affected_columns_text }}</p>
+        </article>
+        {% endfor %}
+      </div>
       <div class="visual-panel">
         <div class="visual-column">
           <span>Issue severity</span>
@@ -423,7 +598,28 @@
     </section>
 
     <section id="fix-first">
-      <h2>What should be fixed first?</h2>
+      <h2>Fix / Verify lanes</h2>
+      <div class="fix-lane-grid" aria-label="Issue fix and verify lanes">
+        {% for card in visual_report.top_fix_cards %}
+        <article class="fix-lane-card">
+          <header>
+            <code>{{ card.issue_id }}</code>
+            <span class="pill {{ card.severity }}">{{ card.severity }}</span>
+          </header>
+          <strong>{{ card.issue_label }}</strong>
+          <div class="fix-lane-meta">
+            <span>{{ card.field }}</span>
+            <span>{{ card.bad_count }}/{{ card.total_count }} rows</span>
+            <span>{{ card.bad_rate_text }}</span>
+          </div>
+          <div class="lane-action-grid">
+            <div class="lane-action"><span>Default fix</span><p>{{ card.fix }}</p></div>
+            <div class="lane-action"><span>Default verify</span><p>{{ card.verify }}</p></div>
+            <div class="lane-action"><span>OpenAI add-on</span><p>{% if card.llm.available %}{{ card.llm.fix or card.llm.why }}{% else %}Not generated for this issue.{% endif %}</p></div>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
       <div class="table-wrap">
         <table class="fix-table">
           <thead><tr><th>Priority</th><th>Where</th><th>Problem</th><th>Affected</th><th>First fix</th><th>Evidence</th></tr></thead>

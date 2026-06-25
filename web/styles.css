@@ -2095,6 +2095,244 @@ h3 {
   background: var(--surface-overlay);
 }
 
+.review-briefing {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-panel);
+}
+
+.review-briefing-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-briefing-heading h4 {
+  margin: 0;
+  color: var(--foreground-primary);
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.review-briefing-heading > span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.review-briefing-grid,
+.review-data-map,
+.review-table-map-grid,
+.review-fix-lane-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.review-briefing-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.review-data-map {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.review-table-map-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.review-briefing-card,
+.review-data-card,
+.review-fix-lane {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+}
+
+.review-briefing-card.danger {
+  border-color: rgba(178, 59, 50, 0.28);
+  background: rgba(178, 59, 50, 0.05);
+}
+
+.review-briefing-card.warning {
+  border-color: rgba(154, 95, 0, 0.28);
+  background: rgba(154, 95, 0, 0.05);
+}
+
+.review-briefing-card.success {
+  border-color: rgba(35, 118, 77, 0.25);
+  background: rgba(35, 118, 77, 0.05);
+}
+
+.review-briefing-card strong,
+.review-data-card-heading strong,
+.review-fix-lane strong {
+  color: var(--foreground-primary);
+  font-size: 13px;
+}
+
+.review-briefing-card ul {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding-left: 17px;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.review-data-card.wide {
+  grid-column: span 1;
+}
+
+.review-data-card-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.review-data-card-heading span {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.review-table-map-card,
+.review-signal-row {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--foreground-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.review-table-map-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.review-table-map-card:hover,
+.review-table-map-card:focus-visible,
+.review-signal-row:hover,
+.review-signal-row:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.review-table-map-card > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.review-table-map-card code {
+  font-weight: 900;
+}
+
+.review-table-map-card small,
+.review-fix-lane header span,
+.review-signal-row small {
+  color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.review-table-health {
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.review-signal-list {
+  display: grid;
+  gap: 6px;
+}
+
+.review-signal-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 8px;
+}
+
+.review-signal-row span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-signal-row code {
+  color: var(--foreground-primary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.review-fix-lane {
+  background: var(--surface-overlay);
+}
+
+.review-fix-lane header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.review-fix-lane header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.review-fix-lane-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.review-fix-lane-grid > div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.review-fix-lane-grid span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--foreground-tertiary);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.review-fix-lane-grid p {
+  margin: 0;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .issue-visual-heading {
   display: flex;
   align-items: flex-start;
@@ -7300,6 +7538,10 @@ details.runtime-stage-item.active .stage-dot {
   .upload-grid,
   .status-strip,
   .dashboard-summary-strip,
+  .review-briefing-grid,
+  .review-data-map,
+  .review-table-map-grid,
+  .review-fix-lane-grid,
   .todo-visual-summary,
   .todo-issue-work-card,
   .dashboard-layout,

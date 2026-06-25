@@ -203,10 +203,12 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         assert section in report_html
     assert "Evaluation Summary" not in report_md
     assert "Evaluation Summary" not in report_html
-    assert "Visual Overview" in report_md
-    assert "What Should Be Fixed First?" in report_md
+    assert "Review Briefing" in report_md
+    assert "Visual Evidence Map" in report_md
+    assert "Fix / Verify Lanes" in report_md
+    assert "Review briefing" in report_html
     assert "Where are the problems?" in report_html
-    assert "What should be fixed first?" in report_html
+    assert "Fix / Verify lanes" in report_html
     for answer in [
         "Can this dataset run analysis?",
         "Can joins be trusted?",
@@ -221,10 +223,14 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     for visual_report_text in [
         "Issue severity",
         "Issue types",
+        "DBML table map",
         "Missing values",
         "Missing values by table",
         "Outliers",
         "Sample row preview",
+        "Default fix",
+        "Default verify",
+        "OpenAI add-on",
         "Fix data",
         "Verify after fix",
     ]:
@@ -232,13 +238,13 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         assert visual_report_text in report_html
     assert "missing-table-group" in report_html
     assert "Missing values by column" not in report_html
-    assert report_md.count("Sample row preview:") >= 1
+    assert "generated CSV sample paths identify the evidence artifact" in report_md
     assert report_html.count("sample-table") >= 1
     assert "sample-preview-row" in report_html
     assert "Highlighted:" in report_html
     assert 'class="highlighted"' in report_html
     assert 'href="samples/' not in report_html
-    assert "HTML report expands bounded sample rows inline" in report_md
+    assert "HTML expands bounded sample rows inline" in report_md
     assert "issue_action_plans.json" in report_md
     assert "Full deterministic action-plan evidence remains" in report_html
     assert "issue_action_plans.json" in report_html

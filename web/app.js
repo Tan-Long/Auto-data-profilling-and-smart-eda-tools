@@ -4001,6 +4001,7 @@ function renderDashboard() {
 
   els.dashboardPanelGrid.innerHTML = `
     ${renderIssueVisualSummary(issues, filteredIssues)}
+    ${renderStage4ReviewBriefing(issues, filteredIssues)}
     ${renderIssueInbox(filteredIssues, issues)}
   `;
   renderDashboardDrilldown();
@@ -5438,6 +5439,224 @@ function renderIssueVisualSummary(allIssues, filteredIssues) {
       </div>
     </section>
   `;
+}
+
+function renderStage4ReviewBriefing(allIssues, filteredIssues) {
+  const issues = sortIssuesForReview(allIssues || []);
+  const focusedIssues = Array.isArray(filteredIssues) ? filteredIssues : issues;
+  const topIssue = issues[0] || null;
+  const topPlan = topIssue ? getIssueActionPlan(topIssue) : null;
+  const topLlm = topIssue ? getIssueLlmEnrichment(topIssue, "openai") : null;
+  const missingRows = dashboardChartRows(dashboardChartPaths.missingColumns)
+    .filter((row) => Number(row.null_count || 0) > 0);
+  const outlierRows = dashboardChartRows(dashboardChartPaths.outliers)
+    .filter((row) => Number(row.outlier_count || 0) > 0);
+  const tableRows = getDashboardTableAssessments()
+    .slice()
+    .sort((a, b) => (
+      readinessOrder(a.readiness) - readinessOrder(b.readiness) ||
+      Number(a.health_score || 0) - Number(b.health_score || 0) ||
+      String(a.table || "").localeCompare(String(b.table || ""))
+    ))
+    .slice(0, 6);
+  return `
+    <section class="review-briefing" aria-label="Stage 4 review briefing">
+      <div class="review-briefing-heading">
+        <div>
+          <p class="eyebrow">Review briefing</p>
+          <h4>What to fix, verify, and escalate</h4>
+        </div>
+        <span>${integerText(focusedIssues.length)}/${integerText(issues.length)} issues in current view</span>
+      </div>
+      <div class="review-briefing-grid">
+        ${stage4BriefingCards({ issues, topIssue, missingRows, outlierRows, topLlm }).map(renderStage4BriefingCard).join("")}
+      </div>
+      <div class="review-data-map" aria-label="DBML table, missingness, outlier, and issue evidence map">
+        ${renderStage4TableMap(tableRows)}
+        ${renderStage4DataSignals(missingRows, outlierRows)}
+      </div>
+      ${renderStage4FixVerifyLane(topIssue, topPlan, topLlm)}
+    </section>
+  `;
+}
+
+function stage4BriefingCards({ issues, topIssue, missingRows, outlierRows, topLlm }) {
+  const p0p1 = issues.filter((issue) => ["P0", "P1"].includes(todoPriorityToken(issue.severity))).length;
+  const missingTotal = missingRows.reduce((sum, row) => sum + Number(row.null_count || 0), 0);
+  const outlierTotal = outlierRows.reduce((sum, row) => sum + Number(row.outlier_count || 0), 0);
+  const llmStatus = topLlm?.status || "not generated";
+  return [
+    {
+      title: "Overall",
+      tone: p0p1 ? "danger" : "success",
+      bullets: [
+        `${integerText(issues.length)} issues detected.`,
+        `${integerText(p0p1)} P0/P1 blockers before analysis.`,
+        topIssue ? `${issueGuid(topIssue)} is first by severity and bad rows.` : "No issue selected.",
+      ],
+    },
+    {
+      title: "Data signals",
+      tone: missingTotal || outlierTotal ? "warning" : "success",
+      bullets: [
+        `${integerText(missingTotal)} missing values across ${integerText(missingRows.length)} columns.`,
+        `${integerText(outlierTotal)} outliers across ${integerText(outlierRows.length)} numeric columns.`,
+        "Use the maps below before opening individual details.",
+      ],
+    },
+    {
+      title: "Default route",
+      tone: "info",
+      bullets: [
+        "Inspect highlighted sample rows.",
+        "Fix source extract, pipeline, or DBML contract.",
+        "Do not edit generated artifacts.",
+      ],
+    },
+    {
+      title: "OpenAI add-on",
+      tone: topLlm?.status === "succeeded" ? "info" : "warning",
+      bullets: [
+        `Top issue guidance: ${llmStatus}.`,
+        topLlm?.status === "succeeded" ? "Add-on bullets merge into Fix / Todo." : "Run OpenAI guidance on selected issue if needed.",
+        "Human review required before applying AI advice.",
+      ],
+    },
+  ];
+}
+
+function renderStage4BriefingCard(card) {
+  return `
+    <article class="review-briefing-card ${escapeHtml(card.tone)}">
+      <strong>${escapeHtml(card.title)}</strong>
+      <ul>
+        ${card.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
+      </ul>
+    </article>
+  `;
+}
+
+function renderStage4TableMap(tables) {
+  if (!tables.length) {
+    return `<article class="review-data-card"><strong>DBML table map</strong><p class="muted">table_assessments.json is unavailable.</p></article>`;
+  }
+  return `
+    <article class="review-data-card wide">
+      <div class="review-data-card-heading">
+        <strong>DBML table map</strong>
+        <span>${integerText(tables.length)} highest-risk tables</span>
+      </div>
+      <div class="review-table-map-grid">
+        ${tables.map((table) => {
+          const counts = tableSeverityCounts(table);
+          const affected = Array.isArray(table.affected_columns) ? table.affected_columns : [];
+          return `
+            <button class="review-table-map-card" type="button" data-dashboard-kind="table_assessment" data-dashboard-value="${escapeHtml(table.table)}" data-dashboard-label="${escapeHtml(table.table)}" data-dashboard-scroll="drilldown">
+              <span><code>${escapeHtml(table.table)}</code><small>${escapeHtml(table.role || "unknown")}</small></span>
+              <span class="pill-status ${readinessPillClass(table.readiness)}">${escapeHtml(table.readiness || "unknown")}</span>
+              <span class="review-table-health">${integerText(table.health_score)} health</span>
+              ${renderTableSeverityStrip(counts)}
+              <small>${escapeHtml(affected.slice(0, 3).join(", ") || "No affected columns")}</small>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderStage4DataSignals(missingRows, outlierRows) {
+  return `
+    <article class="review-data-card">
+      <div class="review-data-card-heading">
+        <strong>Missing values</strong>
+        <span>${integerText(missingRows.length)} columns</span>
+      </div>
+      ${renderStage4SignalRows(
+        missingRows.slice(0, 5).map((row) => ({
+          label: row.field || `${row.table}.${row.column}`,
+          value: integerText(row.null_count),
+          detail: percentText(row.null_rate),
+          kind: "missing_table",
+          rawValue: row.table,
+        })),
+        "No missing-value columns.",
+      )}
+    </article>
+    <article class="review-data-card">
+      <div class="review-data-card-heading">
+        <strong>Outliers</strong>
+        <span>${integerText(outlierRows.length)} columns</span>
+      </div>
+      ${renderStage4SignalRows(
+        outlierRows.slice(0, 5).map((row) => ({
+          label: row.field || `${row.table}.${row.column}`,
+          value: integerText(row.outlier_count),
+          detail: percentText(row.outlier_rate),
+          kind: "numeric_outlier",
+          rawValue: row.field || `${row.table}.${row.column}`,
+        })),
+        "No IQR outlier columns.",
+      )}
+    </article>
+  `;
+}
+
+function renderStage4SignalRows(rows, emptyText) {
+  if (!rows.length) {
+    return `<p class="muted">${escapeHtml(emptyText)}</p>`;
+  }
+  return `
+    <div class="review-signal-list">
+      ${rows.map((row) => `
+        <button class="review-signal-row" type="button" data-dashboard-kind="${escapeHtml(row.kind)}" data-dashboard-value="${escapeHtml(row.rawValue)}" data-dashboard-label="${escapeHtml(row.label)}" data-dashboard-scroll="drilldown">
+          <span>${escapeHtml(row.label)}</span>
+          <code>${escapeHtml(row.value)}</code>
+          <small>${escapeHtml(row.detail)}</small>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderStage4FixVerifyLane(issue, plan, llmEntry) {
+  if (!issue) {
+    return "";
+  }
+  const defaultFix = firstActionPlanText(plan, "fix_data_checklist") || "Inspect bounded sample rows, then fix source extract, pipeline, or DBML contract.";
+  const defaultVerify = firstActionPlanText(plan, "verify_after_fix_checklist") || `Rerun and confirm ${issueGuid(issue)} no longer appears.`;
+  const response = llmEntry?.structured_response || {};
+  const llmFix = firstArrayText(response.extra_fix_suggestion);
+  const llmVerify = firstArrayText(response.extra_verification);
+  return `
+    <article class="review-fix-lane">
+      <header>
+        <div>
+          <strong>${escapeHtml(issueGuid(issue))} · ${escapeHtml(issueTypeLabel(issue))}</strong>
+          <span>${escapeHtml(issue.table || "dataset")}.${escapeHtml(issuePrimaryColumn(issue))} · ${integerText(issue.bad_count)} bad rows</span>
+        </div>
+        <span class="issue-severity-token ${dashboardTone(issue.severity)}">${escapeHtml(todoPriorityToken(issue.severity))}</span>
+      </header>
+      <div class="review-fix-lane-grid">
+        <div><span>Default fix</span><p>${escapeHtml(defaultFix)}</p></div>
+        <div><span>Default verify</span><p>${escapeHtml(defaultVerify)}</p></div>
+        <div><span>OpenAI add-on</span><p>${escapeHtml(llmFix || llmVerify || "Not generated for this issue.")}</p></div>
+      </div>
+    </article>
+  `;
+}
+
+function firstActionPlanText(plan, key) {
+  const values = Array.isArray(plan?.[key]) ? plan[key] : [];
+  return firstArrayText(values);
+}
+
+function firstArrayText(values) {
+  if (!Array.isArray(values)) {
+    return "";
+  }
+  const value = values.find((item) => String(item || "").trim());
+  return value ? String(value).trim() : "";
 }
 
 function severityPriorityRows(issues) {

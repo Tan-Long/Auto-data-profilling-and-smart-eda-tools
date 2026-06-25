@@ -95,6 +95,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert 'href="favicon.svg"' not in index_html
     assert 'href="favicon.svg"' not in packaged_report_html
     for section in [
+        "Review briefing",
         "Run Summary",
         "Report / Export",
         "Quality Gates",
@@ -115,6 +116,10 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
         "Verify after fix checklist",
         "Evidence coverage",
         "Actionability",
+        "Default fix",
+        "Default verify",
+        "OpenAI add-on",
+        "DBML table",
     ]:
         assert report_copy in index_html
     assert "No evaluation artifact was included" not in index_html
