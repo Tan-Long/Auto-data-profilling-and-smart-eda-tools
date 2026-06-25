@@ -287,7 +287,7 @@ summary::-webkit-details-marker{display:none}
 </div>
 
 {% set verdict = dataset_verdict %}
-{% set v_color = '#ef4444' if verdict.verdict == 'FAIL' else ('#d97706' if verdict.verdict == 'WARN' else '#22c55e') %}
+{% set v_color = '#ef4444' if verdict.verdict == 'NOT_READY' else ('#d97706' if verdict.verdict == 'WARN' else '#22c55e') %}
 <div class="verdict-section">
   <div class="verdict-row">
     <div class="verdict-main" style="border-left-color:{{ v_color }}">
