@@ -511,6 +511,9 @@ function handleDashboardSelectionClick(event) {
   if (changedFilter) {
     renderDashboard();
   } else {
+    if (nextKind === "table_assessment") {
+      renderTableImpactSection();
+    }
     renderDashboardDrilldown();
   }
   if (target.dataset.dashboardScroll === "drilldown") {
@@ -539,7 +542,7 @@ function applyDashboardSelectionFilter(kind, value) {
   } else if (kind === "issue_type") {
     resetDashboardFilters();
     state.dashboardFilters.issueType = value || "all";
-  } else if (kind === "table" || kind === "table_assessment") {
+  } else if (kind === "table") {
     resetDashboardFilters();
     state.dashboardFilters.table = value || "all";
   } else {
@@ -4341,8 +4344,17 @@ function renderTableImpactSection() {
     const columns = Array.isArray(assessment.affected_columns) ? assessment.affected_columns : [];
     const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
     const readiness = assessment.readiness || "unknown";
+    const selected = state.dashboardSelection?.kind === "table_assessment" && state.dashboardSelection.value === assessment.table;
     return `
-      <button class="table-impact-card" type="button" data-dashboard-kind="table_assessment" data-dashboard-value="${escapeHtml(assessment.table)}" data-dashboard-label="${escapeHtml(assessment.table)}">
+      <button
+        class="table-impact-card ${selected ? "selected" : ""}"
+        type="button"
+        data-dashboard-kind="table_assessment"
+        data-dashboard-value="${escapeHtml(assessment.table)}"
+        data-dashboard-label="${escapeHtml(assessment.table)}"
+        data-dashboard-scroll="drilldown"
+        aria-pressed="${selected ? "true" : "false"}"
+      >
         <span>
           <code>${escapeHtml(assessment.table)}</code>
           <small>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</small>
@@ -6523,9 +6535,12 @@ function renderTableAssessmentDetails(selection) {
   const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
   return `
     <div class="table-assessment-detail">
-      <div>
-        <strong><code>${escapeHtml(assessment.table)}</code></strong>
-        <p>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</p>
+      <div class="table-assessment-detail-heading">
+        <div>
+          <strong><code>${escapeHtml(assessment.table)}</code></strong>
+          <p>${escapeHtml(assessment.role || "unknown")} · ${escapeHtml(impact.label || "General analytics")}</p>
+        </div>
+        <button class="button secondary compact" type="button" data-dashboard-reset-filters>Show full review</button>
       </div>
       <span class="pill-status ${readinessPillClass(assessment.readiness)}">${escapeHtml(assessment.readiness || "unknown")}</span>
       <dl class="graph-metadata">

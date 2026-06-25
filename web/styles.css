@@ -3189,6 +3189,13 @@ h3 {
   outline: none;
 }
 
+.table-impact-card.selected,
+.table-impact-card[aria-pressed="true"] {
+  border-color: rgba(15, 118, 100, 0.58);
+  background: rgba(15, 118, 100, 0.07);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .table-impact-card code {
   overflow-wrap: anywhere;
   font-size: 13px;
@@ -3518,6 +3525,14 @@ h3 {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
+}
+
+.table-assessment-detail-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
 .table-assessment-detail p {

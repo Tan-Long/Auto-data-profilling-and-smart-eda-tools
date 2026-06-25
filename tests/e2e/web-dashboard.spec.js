@@ -812,6 +812,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
     "tables from table_assessments.json",
   );
   await expect(page.locator("#tableImpactGrid")).toContainText("order_reviews");
+  await expect(page.locator("#tableImpactGrid .table-impact-card")).toHaveCount(7);
 
   await page
     .locator('#tableImpactGrid [data-dashboard-kind="table_assessment"][data-dashboard-value="order_reviews"]')
@@ -819,6 +820,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("order_reviews");
   await expect(page.locator("#dashboardDrilldown")).toContainText("feedback_signal_quality");
   await expect(page.locator("#dashboardDrilldown")).toContainText("affected_columns");
+  await expect(page.locator("#tableImpactGrid .table-impact-card")).toHaveCount(7);
+  await expect(page.locator('#tableImpactGrid [data-dashboard-value="order_reviews"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toHaveCount(0);
 
   await expect(page.locator("#graphs")).toHaveCount(0);
   await expect(page.locator("#dashboardGraphSvg")).toHaveCount(0);
@@ -829,9 +833,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(page.locator("#dashboard")).not.toContainText("Graph drilldown");
   await expect(page.locator("#dashboard")).not.toContainText("Developer artifact sources");
 
-  await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("table order_reviews");
-  await page.locator("#dashboardPanelGrid [data-dashboard-reset-filters]").click();
+  await page.locator("#dashboardDrilldown [data-dashboard-reset-filters]").click();
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
+  await expect(page.locator("#tableImpactGrid .table-impact-card")).toHaveCount(7);
+  await expect(page.locator("#tableImpactGrid .table-impact-card.selected")).toHaveCount(0);
   await expect(page.locator("#dashboardPanelGrid")).toContainText("Blocked");
   await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"]').first().click();
   await expect(page.locator("#dashboardDrilldown")).toContainText("Row evidence");
