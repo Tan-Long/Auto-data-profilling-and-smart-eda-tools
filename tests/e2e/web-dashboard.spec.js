@@ -654,10 +654,13 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportExport.locator('a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
   const reportLlmAction = reportExport.locator('button.report-export-action-card[data-dashboard-open-llm="true"]');
   await expect(reportLlmAction).toContainText("Open OpenAI issue guidance");
-  await expect(reportExport).toContainText("Report preview");
-  await expect(reportExport).toContainText("Issue types");
-  await expect(reportExport).toContainText("Missing values by table");
-  await expect(reportExport.locator(".report-preview-table-group").first()).toBeVisible();
+  await expect(reportExport).not.toContainText("Report preview");
+  await expect(reportExport).not.toContainText("Summary before opening the report");
+  await expect(reportExport).not.toContainText("Issue types");
+  await expect(reportExport).not.toContainText("Missing values by table");
+  await expect(reportExport).not.toContainText("Inspect first");
+  await expect(reportExport.locator(".report-preview-table-group")).toHaveCount(0);
+  await expect(reportExport.locator(".report-fix-row")).toHaveCount(0);
   await expect(reportExport.locator('[data-dashboard-kind="issue"]').first()).toBeVisible();
   await reportExport.scrollIntoViewIfNeeded();
   await reportExport.screenshot({

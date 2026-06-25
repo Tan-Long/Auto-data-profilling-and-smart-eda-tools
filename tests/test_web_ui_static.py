@@ -325,7 +325,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".todo-queue-open-label",
         ".todo-more-groups",
         ".todo-compact-row",
-        ".report-preview-table-group",
         ".quality-gates-section",
         ".quality-gate-card",
         ".quality-gate-evidence-value",
@@ -434,9 +433,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderGeneratedReportLinks",
         "renderReportExportSection",
         "renderReportExportLinks",
-        "missingTableGroupsForPreview",
-        "renderReportMissingTables",
-        "Missing values by table",
         "renderReportIssueLlmAction",
         "reportIssueForLlmAction",
         "data-dashboard-open-llm",
@@ -636,6 +632,7 @@ def test_web_review_surfaces_use_single_flow_layouts():
 
 def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     root = Path(__file__).resolve().parents[1] / "web"
+    css = (root / "styles.css").read_text()
     js = "\n".join(
         [
             (root / "app.js").read_text(),
@@ -701,6 +698,12 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderTableImpactSection" in js
     assert "renderTodosSection" in js
     assert "renderReportExportSection" in js
+    assert "renderReportVisualPreview" not in js
+    assert "Report preview" not in js
+    assert "Summary before opening the report" not in js
+    assert "Missing values by table" not in js
+    assert "report-preview" not in css
+    assert "report-fix-row" not in css
     assert "issueForTodoOccurrence" in js
     assert "Open optional selected-issue enrichment evidence." not in js
     assert "data-dashboard-scroll=\"drilldown\"" in js
