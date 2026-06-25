@@ -861,13 +861,19 @@ test("local path run renders the interactive dashboard from generated artifacts"
   );
   await expect(page.locator("#tableImpactGrid")).toContainText("order_reviews");
   await expect(page.locator("#tableImpactGrid .table-impact-card")).toHaveCount(7);
+  await expect(page.locator("#tableImpactGrid .table-severity-strip").first()).toContainText("P0");
+  await expect(page.locator("#tableImpactGrid .table-column-evidence-summary").first()).toContainText(/missing columns|outlier columns/);
+  await expect(page.locator("#tableImpactGrid .table-score-formula").first()).toContainText(/100 - \d+ = \d+/);
 
   await page
     .locator('#tableImpactGrid [data-dashboard-kind="table_assessment"][data-dashboard-value="order_reviews"]')
     .click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText("order_reviews");
   await expect(page.locator("#dashboardDrilldown")).toContainText("feedback_signal_quality");
-  await expect(page.locator("#dashboardDrilldown")).toContainText("affected_columns");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Score calculation");
+  await expect(page.locator("#dashboardDrilldown")).toContainText("Column readiness evidence");
+  await expect(page.locator("#dashboardDrilldown .table-column-evidence-row").filter({ hasText: "order_id" })).toBeVisible();
+  await expect(page.locator("#dashboardDrilldown .table-column-severity-cells").first()).toContainText("P1");
   await expect(page.locator("#tableImpactGrid .table-impact-card")).toHaveCount(7);
   await expect(page.locator('#tableImpactGrid [data-dashboard-value="order_reviews"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toHaveCount(0);

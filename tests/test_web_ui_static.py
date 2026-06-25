@@ -333,6 +333,12 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".issue-active-lens",
         ".table-impact-card.selected",
         ".table-assessment-detail-heading",
+        ".table-severity-strip",
+        ".table-column-evidence-summary",
+        ".table-score-formula",
+        ".table-score-breakdown",
+        ".table-column-evidence-table",
+        ".table-column-evidence-row",
         ".issue-visual-summary",
         ".issue-visual-chart",
         ".issue-visual-row.selected",
@@ -704,6 +710,13 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "getQualityGatesArtifact" in js
     assert "quality_gates.json was not available" in js
     assert "renderTableImpactSection" in js
+    assert "tableReadinessEvidence" in js
+    assert "tableColumnEvidenceRows" in js
+    assert "tableScoreBreakdown" in js
+    assert "tableIssueScoreWeights" in js
+    assert "tableRelationshipScoreWeights" in js
+    assert "Score calculation" in js
+    assert "Column readiness evidence" in js
     assert "renderTodosSection" in js
     assert "renderReportExportSection" in js
     assert "renderReportVisualPreview" not in js

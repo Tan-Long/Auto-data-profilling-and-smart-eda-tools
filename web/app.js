@@ -67,6 +67,8 @@ const DIAGRAM_TABLE_PILL_Y = 56;
 const DIAGRAM_TABLE_PILL_TEXT_Y = 68;
 const DIAGRAM_COLUMN_START_Y = 90;
 const DIAGRAM_COLUMN_ROW_HEIGHT = 21;
+const tableIssueScoreWeights = { P0: 30, P1: 18, P2: 7, P3: 2 };
+const tableRelationshipScoreWeights = { invalid: 12, warning: 6, skipped: 3 };
 
 const els = {
   workflowNav: document.querySelector("#workflowNav"),
@@ -4441,6 +4443,7 @@ function renderTableImpactSection() {
     const columns = Array.isArray(assessment.affected_columns) ? assessment.affected_columns : [];
     const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
     const readiness = assessment.readiness || "unknown";
+    const evidence = tableReadinessEvidence(assessment);
     const selected = state.dashboardSelection?.kind === "table_assessment" && state.dashboardSelection.value === assessment.table;
     return `
       <button
@@ -4458,6 +4461,9 @@ function renderTableImpactSection() {
         </span>
         <span class="table-impact-score">${integerText(assessment.health_score)}<small>health</small></span>
         <span class="pill-status ${readinessPillClass(readiness)}">${escapeHtml(readiness)}</span>
+        ${renderTableSeverityStrip(evidence.severityCounts)}
+        ${renderTableColumnEvidenceSummary(evidence)}
+        ${renderTableScoreFormula(evidence)}
         <span class="table-impact-meta">
           <span>${escapeHtml(impact.category || "general_analytics")}</span>
           <span>${integerText(columns.length)} columns</span>
@@ -4466,6 +4472,180 @@ function renderTableImpactSection() {
       </button>
     `;
   }).join("");
+}
+
+function tableReadinessEvidence(assessment) {
+  const table = assessment?.table || "";
+  const severityCounts = tableSeverityCounts(assessment);
+  const issues = getDashboardIssues().filter((issue) => issue.table === table);
+  const relationshipRisks = Array.isArray(assessment?.relationship_risks) ? assessment.relationship_risks : [];
+  const affectedColumns = Array.isArray(assessment?.affected_columns) ? assessment.affected_columns : [];
+  const missingRows = dashboardChartRows(dashboardChartPaths.missingColumns)
+    .filter((row) => row.table === table && Number(row.null_count || 0) > 0);
+  const outlierRows = dashboardChartRows(dashboardChartPaths.outliers)
+    .filter((row) => row.table === table && Number(row.outlier_count || 0) > 0);
+  const columnRows = tableColumnEvidenceRows(table, issues, missingRows, outlierRows, affectedColumns);
+  const score = tableScoreBreakdown(severityCounts, relationshipRisks, assessment?.health_score);
+  return { severityCounts, issues, relationshipRisks, missingRows, outlierRows, columnRows, score };
+}
+
+function dashboardChartRows(path) {
+  const data = state.dashboardArtifacts[path]?.data;
+  return Array.isArray(data) ? data : [];
+}
+
+function tableSeverityCounts(assessment) {
+  const counts = assessment?.issue_counts_by_severity || {};
+  return Object.fromEntries(severityOrder.map((severity) => [severity, Number(counts[severity] || 0)]));
+}
+
+function tableScoreBreakdown(severityCounts, relationshipRisks, healthScore) {
+  const severityPenalty = severityOrder.reduce((sum, severity) => (
+    sum + Number(severityCounts[severity] || 0) * tableIssueScoreWeights[severity]
+  ), 0);
+  const relationshipCounts = {};
+  const relationshipPenalty = (Array.isArray(relationshipRisks) ? relationshipRisks : []).reduce((sum, risk) => {
+    const status = risk.status || "unknown";
+    relationshipCounts[status] = (relationshipCounts[status] || 0) + 1;
+    return sum + (tableRelationshipScoreWeights[status] || 0);
+  }, 0);
+  const totalPenalty = severityPenalty + relationshipPenalty;
+  const calculatedHealth = Math.max(0, Math.min(100, 100 - totalPenalty));
+  return {
+    healthScore: Number(healthScore ?? calculatedHealth),
+    calculatedHealth,
+    severityPenalty,
+    relationshipPenalty,
+    totalPenalty,
+    relationshipCounts,
+  };
+}
+
+function tableColumnEvidenceRows(table, issues, missingRows, outlierRows, affectedColumns = []) {
+  const rows = new Map();
+  const ensure = (column) => {
+    const key = column || "table-level";
+    if (!rows.has(key)) {
+      rows.set(key, {
+        table,
+        column: key,
+        issueCounts: Object.fromEntries(severityOrder.map((severity) => [severity, 0])),
+        issueTotal: 0,
+        badRows: 0,
+        missingCount: 0,
+        missingRate: 0,
+        outlierCount: 0,
+        outlierRate: 0,
+      });
+    }
+    return rows.get(key);
+  };
+  issues.forEach((issue) => {
+    const columns = Array.isArray(issue.columns) && issue.columns.length ? issue.columns : ["table-level"];
+    columns.forEach((column) => {
+      const row = ensure(column);
+      const severity = todoPriorityToken(issue.severity);
+      row.issueCounts[severity] = (row.issueCounts[severity] || 0) + 1;
+      row.issueTotal += 1;
+      row.badRows += Number(issue.bad_count || 0);
+    });
+  });
+  missingRows.forEach((item) => {
+    const row = ensure(item.column || String(item.field || "").split(".").pop() || "column");
+    row.missingCount += Number(item.null_count || 0);
+    row.missingRate = Math.max(row.missingRate, Number(item.null_rate || 0));
+  });
+  outlierRows.forEach((item) => {
+    const row = ensure(item.column || String(item.field || "").split(".").pop() || "column");
+    row.outlierCount += Number(item.outlier_count || 0);
+    row.outlierRate = Math.max(row.outlierRate, Number(item.outlier_rate || 0));
+  });
+  affectedColumns.forEach((column) => {
+    ensure(column);
+  });
+  return [...rows.values()].sort((a, b) => (
+    severityCountWeight(b.issueCounts) - severityCountWeight(a.issueCounts) ||
+    b.missingCount - a.missingCount ||
+    b.outlierCount - a.outlierCount ||
+    b.badRows - a.badRows ||
+    a.column.localeCompare(b.column)
+  ));
+}
+
+function severityCountWeight(counts) {
+  return severityOrder.reduce((sum, severity, index) => (
+    sum + Number(counts[severity] || 0) * (100 - index * 20)
+  ), 0);
+}
+
+function renderTableSeverityStrip(severityCounts) {
+  return `
+    <span class="table-severity-strip" aria-label="Issue counts by severity">
+      ${severityOrder.map((severity) => `
+        <span class="table-severity-chip ${todoPriorityClass(severity)}">
+          <span>${escapeHtml(severity)}</span>
+          <b>${integerText(severityCounts[severity] || 0)}</b>
+        </span>
+      `).join("")}
+    </span>
+  `;
+}
+
+function renderTableColumnEvidenceSummary(evidence) {
+  const affectedColumns = evidence.columnRows.filter((row) => row.issueTotal || row.missingCount || row.outlierCount);
+  const previewRows = affectedColumns.slice(0, 3);
+  return `
+    <span class="table-column-evidence-summary">
+      <span><strong>${integerText(evidence.missingRows.length)}</strong> missing columns</span>
+      <span><strong>${integerText(evidence.outlierRows.length)}</strong> outlier columns</span>
+      <span><strong>${integerText(affectedColumns.length)}</strong> affected columns</span>
+      ${previewRows.length ? `
+        <span class="table-column-preview">
+          ${previewRows.map((row) => `
+            <span><code>${escapeHtml(row.column)}</code>${tableColumnEvidenceText(row)}</span>
+          `).join("")}
+        </span>
+      ` : `<span class="muted">No column-level evidence.</span>`}
+    </span>
+  `;
+}
+
+function tableColumnEvidenceText(row) {
+  const parts = [];
+  const issueParts = severityOrder
+    .filter((severity) => Number(row.issueCounts[severity] || 0) > 0)
+    .map((severity) => `${severity} ${integerText(row.issueCounts[severity])}`);
+  if (issueParts.length) {
+    parts.push(issueParts.join(" · "));
+  }
+  if (row.missingCount) {
+    parts.push(`${integerText(row.missingCount)} missing`);
+  }
+  if (row.outlierCount) {
+    parts.push(`${integerText(row.outlierCount)} outliers`);
+  }
+  return parts.length ? ` · ${escapeHtml(parts.join(" · "))}` : "";
+}
+
+function renderTableScoreFormula(evidence) {
+  const parts = tableScoreFormulaParts(evidence.score, evidence.severityCounts);
+  return `
+    <span class="table-score-formula">
+      <strong>Score</strong>
+      <span>100 - ${integerText(evidence.score.totalPenalty)} = ${integerText(evidence.score.healthScore)}</span>
+      <small>${escapeHtml(parts.length ? parts.join(" · ") : "No penalties")}</small>
+    </span>
+  `;
+}
+
+function tableScoreFormulaParts(score, severityCounts) {
+  const severityParts = severityOrder
+    .filter((severity) => Number(severityCounts[severity] || 0) > 0)
+    .map((severity) => `${severity} ${integerText(severityCounts[severity])}x${tableIssueScoreWeights[severity]}`);
+  const relationshipParts = Object.entries(score.relationshipCounts || {})
+    .filter(([, count]) => Number(count) > 0)
+    .map(([status, count]) => `${status} relationship ${integerText(count)}x${tableRelationshipScoreWeights[status] || 0}`);
+  return [...severityParts, ...relationshipParts];
 }
 
 function renderTodosSection() {
@@ -6776,8 +6956,8 @@ function renderTableAssessmentDetails(selection) {
     return "";
   }
   const impact = assessment.business_impact || {};
-  const columns = Array.isArray(assessment.affected_columns) ? assessment.affected_columns : [];
   const risks = Array.isArray(assessment.relationship_risks) ? assessment.relationship_risks : [];
+  const evidence = tableReadinessEvidence(assessment);
   return `
     <div class="table-assessment-detail">
       <div class="table-assessment-detail-heading">
@@ -6788,14 +6968,66 @@ function renderTableAssessmentDetails(selection) {
         <button class="button secondary compact" type="button" data-dashboard-reset-filters>Show full review</button>
       </div>
       <span class="pill-status ${readinessPillClass(assessment.readiness)}">${escapeHtml(assessment.readiness || "unknown")}</span>
-      <dl class="graph-metadata">
-        <div><dt>health_score</dt><dd>${integerText(assessment.health_score)}/100</dd></div>
-        <div><dt>analysis_impact</dt><dd>${escapeHtml(impact.category || "general_analytics")}</dd></div>
-        <div><dt>impact_evidence</dt><dd>${escapeHtml(impact.rationale || "")}</dd></div>
-        <div><dt>affected_columns</dt><dd>${escapeHtml(columns.length ? columns.join(", ") : "none")}</dd></div>
-        <div><dt>relationship_risks</dt><dd>${integerText(risks.length)}</dd></div>
+      ${renderTableScoreBreakdown(evidence, assessment)}
+      ${renderTableColumnEvidenceTable(evidence)}
+      <dl class="graph-metadata table-impact-context">
+        <div><dt>analysis impact</dt><dd>${escapeHtml(impact.category || "general_analytics")}</dd></div>
+        <div><dt>impact evidence</dt><dd>${escapeHtml(impact.rationale || "")}</dd></div>
+        <div><dt>relationship risks</dt><dd>${integerText(risks.length)}</dd></div>
       </dl>
     </div>
+  `;
+}
+
+function renderTableScoreBreakdown(evidence, assessment) {
+  const parts = tableScoreFormulaParts(evidence.score, evidence.severityCounts);
+  return `
+    <section class="table-score-breakdown" aria-label="Table health score calculation">
+      <div>
+        <span>Score calculation</span>
+        <strong>100 - ${integerText(evidence.score.totalPenalty)} = ${integerText(evidence.score.healthScore)}/100</strong>
+        <small>${escapeHtml(parts.length ? parts.join(" · ") : "No penalties")}</small>
+      </div>
+      ${renderTableSeverityStrip(evidence.severityCounts)}
+      <p>Health score comes from table_assessments.json: P0=${tableIssueScoreWeights.P0}, P1=${tableIssueScoreWeights.P1}, P2=${tableIssueScoreWeights.P2}, P3=${tableIssueScoreWeights.P3}; invalid relationship=${tableRelationshipScoreWeights.invalid}, warning=${tableRelationshipScoreWeights.warning}, skipped=${tableRelationshipScoreWeights.skipped}.</p>
+      ${evidence.score.calculatedHealth !== Number(assessment.health_score) ? `
+        <p class="muted">Displayed score follows artifact value ${integerText(assessment.health_score)}; calculated preview is ${integerText(evidence.score.calculatedHealth)}.</p>
+      ` : ""}
+    </section>
+  `;
+}
+
+function renderTableColumnEvidenceTable(evidence) {
+  const rows = evidence.columnRows.filter((row) => row.issueTotal || row.missingCount || row.outlierCount);
+  return `
+    <section class="table-column-evidence-table" aria-label="Column readiness evidence">
+      <div class="table-column-evidence-heading">
+        <strong>Column readiness evidence</strong>
+        <span>${integerText(rows.length)} affected columns</span>
+      </div>
+      ${rows.length ? `
+        <div class="table-column-evidence-header" role="row">
+          <span role="columnheader">Column</span>
+          <span role="columnheader">Issue levels</span>
+          <span role="columnheader">Missing</span>
+          <span role="columnheader">Outlier</span>
+          <span role="columnheader">Bad rows</span>
+        </div>
+        ${rows.map((row) => `
+          <button class="table-column-evidence-row" type="button" data-dashboard-kind="${row.outlierCount ? "numeric_outlier" : "table_assessment"}" data-dashboard-value="${escapeHtml(row.outlierCount ? `${row.table}.${row.column}` : row.table)}" data-dashboard-label="${escapeHtml(`${row.table}.${row.column}`)}" data-dashboard-scroll="drilldown" role="row">
+            <span role="cell"><code>${escapeHtml(row.column)}</code></span>
+            <span class="table-column-severity-cells" role="cell">
+              ${severityOrder.map((severity) => `
+                <span class="${todoPriorityClass(severity)}"><b>${escapeHtml(severity)}</b>${integerText(row.issueCounts[severity] || 0)}</span>
+              `).join("")}
+            </span>
+            <span role="cell">${integerText(row.missingCount)}<small>${row.missingCount ? percentText(row.missingRate) : "clean"}</small></span>
+            <span role="cell">${integerText(row.outlierCount)}<small>${row.outlierCount ? percentText(row.outlierRate) : "none"}</small></span>
+            <span role="cell">${integerText(row.badRows)}</span>
+          </button>
+        `).join("")}
+      ` : `<p class="muted">No per-column missing, outlier, or issue evidence for this table.</p>`}
+    </section>
   `;
 }
 
