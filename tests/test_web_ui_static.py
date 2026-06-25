@@ -308,6 +308,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".runtime-stage-item",
         ".stage-info-icon",
         ".stage-info-tooltip",
+        ".runtime-stage-item.active",
+        ".llm-toggle-button.locked",
         ".stage-dropdown",
         ".stage-detail-grid",
         ".generated-result-info",
@@ -420,6 +422,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "preflight_review",
         "llmRunOptions",
         "appendLlmFormFields",
+        "jobIsRunning",
+        "OpenAI issue guidance is locked while the pipeline is running.",
+        "Locked for this run.",
         "use_llm",
         "use_issue_llm",
         "llm_provider",
@@ -652,6 +657,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderRuntimeStage" in js
     assert "renderRuntimeStageDropdown" in js
     assert "insertInferredRuntimeStages" in js
+    assert "activeRuntimeStageName" in js
+    assert "followActiveRuntimeStage" in js
+    assert "runtimeAutoFollowStageName" in js
     assert "Waiting for provider response and guardrail validation." in js
     assert "runtimeStageStatusClass" in js
     assert "renderRunHistory" in js

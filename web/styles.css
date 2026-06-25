@@ -5567,6 +5567,20 @@ button.report-export-card {
   color: var(--accent-strong);
 }
 
+.llm-toggle-button.locked,
+.llm-toggle-button:disabled {
+  border-color: rgba(49, 101, 150, 0.32);
+  background: var(--surface-inset);
+  color: var(--foreground-secondary);
+  cursor: not-allowed;
+}
+
+.llm-toggle-button.locked:hover,
+.llm-toggle-button:disabled:hover {
+  border-color: rgba(49, 101, 150, 0.32);
+  background: var(--surface-inset);
+}
+
 .llm-toggle-copy {
   display: grid;
   min-width: 0;
@@ -6152,6 +6166,19 @@ details.runtime-stage-item {
 details.runtime-stage-item:hover,
 details.runtime-stage-item:focus-within {
   z-index: 30;
+}
+
+details.runtime-stage-item.active {
+  border-color: rgba(49, 101, 150, 0.46);
+  background: rgba(49, 101, 150, 0.08);
+}
+
+details.runtime-stage-item.active .stage-summary {
+  box-shadow: inset 4px 0 0 var(--info);
+}
+
+details.runtime-stage-item.active .stage-dot {
+  background: var(--info);
 }
 
 .stage-summary {

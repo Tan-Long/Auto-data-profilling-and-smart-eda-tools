@@ -398,10 +398,20 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await goToProfileStep(page, "run");
   await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
   await page.locator("#runPathProfilerButton").click();
+  await expect(page.locator("#llmModeToggle")).toBeDisabled();
+  await expect(page.locator("#llmModeToggle")).toHaveClass(/locked/);
+  await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#llmModeStatus")).toContainText("On");
+  await expect(page.locator("#stageList .runtime-stage-item.active")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.locator("#stageList .runtime-stage-item.active").first()).toHaveAttribute("open", "");
 
   await expect(page.locator("#runnerMessage")).toContainText("Run complete", {
     timeout: 60_000,
   });
+  await expect(page.locator("#llmModeToggle")).toBeEnabled();
+  await expect(page.locator("#llmModeToggle")).not.toHaveClass(/locked/);
   await expect(page.locator("#dashboardStatusBadge")).toContainText(
     "succeeded dashboard",
   );

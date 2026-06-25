@@ -22,6 +22,7 @@ const state = {
   runnerHost: "",
   currentJob: null,
   runEvents: [],
+  runtimeAutoFollowStageName: "",
   runHistory: [],
   runHistoryLoading: false,
   runHistoryError: "",
@@ -384,6 +385,11 @@ els.runnerModePath.addEventListener("click", () => {
 });
 
 els.llmModeToggle.addEventListener("click", () => {
+  if (jobIsRunning()) {
+    renderRunnerMessage("OpenAI issue guidance is locked while the pipeline is running.", "pending");
+    renderControls();
+    return;
+  }
   setLlmMode(state.llmMode === "openai" ? "off" : "openai");
 });
 
@@ -880,9 +886,11 @@ async function startProfilerRun() {
   appendLlmFormFields(form);
 
   state.runEvents = [];
+  state.runtimeAutoFollowStageName = "";
   state.currentJob = { status: "queued", artifacts: [] };
   resetDashboardState();
   renderJob();
+  renderControls();
   renderRunnerMessage(`Uploading files to local runner${llmRunSuffix()}...`, "pending");
   els.runProfilerButton.disabled = true;
 
@@ -896,7 +904,9 @@ async function startProfilerRun() {
     renderRunnerMessage("Pipeline started. Runtime events are streaming from run_events.jsonl.", "pending");
     connectEventStream(payload.events_url);
   } catch (error) {
-    renderRunnerMessage(error.message || "Unable to start local run.", "error");
+    const message = error.message || "Unable to start local run.";
+    state.currentJob = { status: "failed", error: message, artifacts: [] };
+    renderRunnerMessage(message, "error");
   } finally {
     renderAll();
   }
@@ -934,9 +944,11 @@ async function startPathRun() {
   Object.assign(payload, llmRunOptions());
 
   state.runEvents = [];
+  state.runtimeAutoFollowStageName = "";
   state.currentJob = { status: "queued", input_mode: "path", artifacts: [] };
   resetDashboardState();
   renderJob();
+  renderControls();
   renderRunnerMessage(`Starting local profiler job on ${runnerHostLabel()}${llmRunSuffix()}...`, "pending");
   els.runPathProfilerButton.disabled = true;
 
@@ -954,7 +966,9 @@ async function startPathRun() {
     renderRunnerMessage("Pipeline started. Runtime events are streaming from run_events.jsonl.", "pending");
     connectEventStream(responsePayload.events_url);
   } catch (error) {
-    renderRunnerMessage(error.message || "Unable to start local profiler run.", "error");
+    const message = error.message || "Unable to start local profiler run.";
+    state.currentJob = { status: "failed", error: message, artifacts: [] };
+    renderRunnerMessage(message, "error");
   } finally {
     renderAll();
   }
@@ -1047,6 +1061,11 @@ function moveProfileStep(direction) {
 }
 
 function setLlmMode(mode) {
+  if (jobIsRunning()) {
+    renderRunnerMessage("OpenAI issue guidance is locked while the pipeline is running.", "pending");
+    renderControls();
+    return;
+  }
   state.llmMode = mode === "openai" ? "openai" : "off";
   renderControls();
 }
@@ -2035,6 +2054,10 @@ function evaluationJobRunning() {
   return ["queued", "running"].includes(state.evaluationJob?.status);
 }
 
+function jobIsRunning(job = state.currentJob) {
+  return ["queued", "running"].includes(job?.status);
+}
+
 function evaluationArtifactUrl(path, artifacts = state.evaluationJob?.artifacts || []) {
   const artifact = artifacts.find((item) => item.path === path);
   return artifact?.url || "";
@@ -2712,7 +2735,7 @@ function renderControls() {
   const hasUploadedDbml = Boolean(state.dbmlFile);
   const hasUploadedCsvs = state.csvFiles.some((file) => file.sourceFile);
   const hasPathInputs = Boolean(els.dbmlPathInput.value.trim() && els.csvDirPathInput.value.trim());
-  const jobRunning = ["queued", "running"].includes(state.currentJob?.status);
+  const jobRunning = jobIsRunning();
   const evaluationRunning = evaluationJobRunning();
   const preflightReview = buildPreflightReview();
   const preflightAllowsRun = preflightReview.runAllowed;
@@ -2766,13 +2789,28 @@ function pathBasename(path) {
 
 function renderLlmModeControls() {
   const enabled = state.llmMode === "openai";
+  const locked = jobIsRunning();
+  const subtext = els.llmModeToggle.querySelector(".llm-toggle-subtext");
   els.llmModeStatus.textContent = enabled ? "On" : "Off";
   els.llmModeToggle.classList.toggle("active", enabled);
+  els.llmModeToggle.classList.toggle("locked", locked);
+  els.llmModeToggle.disabled = locked;
+  els.llmModeToggle.setAttribute("aria-disabled", locked ? "true" : "false");
   els.llmModeToggle.setAttribute("aria-checked", enabled ? "true" : "false");
   els.llmModeToggle.setAttribute(
     "aria-label",
-    enabled ? "Disable OpenAI issue guidance" : "Enable OpenAI issue guidance",
+    locked
+      ? `OpenAI issue guidance is locked ${enabled ? "on" : "off"} while the pipeline is running`
+      : enabled ? "Disable OpenAI issue guidance" : "Enable OpenAI issue guidance",
   );
+  els.llmModeToggle.title = locked
+    ? "This setting is fixed for the current pipeline run."
+    : "";
+  if (subtext) {
+    subtext.textContent = locked
+      ? "Locked for this run. Wait for the pipeline to finish before changing it."
+      : "After deterministic checks, adds bounded issue-level guidance before Review.";
+  }
 }
 
 function renderRunner() {
@@ -2835,13 +2873,28 @@ function renderStages(job) {
   insertInferredRuntimeStages(stageMap, job);
   els.stageList.innerHTML = "";
   const visibleStages = visibleRuntimeStages([...stageMap.values()]);
+  const activeStageName = activeRuntimeStageName(visibleStages, job);
   if (!visibleStages.length) {
     els.stageList.innerHTML = `<p class="muted">Run events from <code>run_events.jsonl</code> will appear here.</p>`;
     return;
   }
   visibleStages.forEach((stage) => {
-    els.stageList.insertAdjacentHTML("beforeend", renderRuntimeStage(stage));
+    els.stageList.insertAdjacentHTML(
+      "beforeend",
+      renderRuntimeStage(stage, { active: stage.name === activeStageName }),
+    );
   });
+  followActiveRuntimeStage(activeStageName, job);
+}
+
+function activeRuntimeStageName(stages, job) {
+  if (!jobIsRunning(job)) {
+    return "";
+  }
+  const visibleStages = Array.isArray(stages) ? stages : [];
+  const activeStages = visibleStages.filter((stage) => ["queued", "running"].includes(stage.status || "running"));
+  const activeStage = activeStages[activeStages.length - 1] || visibleStages[visibleStages.length - 1];
+  return activeStage?.name || "";
 }
 
 function insertInferredRuntimeStages(stageMap, job) {
@@ -2876,14 +2929,15 @@ function insertInferredRuntimeStages(stageMap, job) {
   });
 }
 
-function renderRuntimeStage(stage) {
+function renderRuntimeStage(stage, options = {}) {
   const status = stage.status || "running";
   const purpose = stagePurpose(stage);
+  const active = Boolean(options.active && ["queued", "running"].includes(status));
   const duration = stage.duration === null || stage.duration === undefined
     ? ""
     : ` · ${Number(stage.duration).toFixed(3)}s`;
   return `
-    <details class="stage-item runtime-stage-item ${escapeHtml(status)}">
+    <details class="stage-item runtime-stage-item ${escapeHtml(status)} ${active ? "active" : ""}" data-stage-name="${escapeHtml(stage.name || "stage")}" data-stage-status="${escapeHtml(status)}" ${active ? 'open aria-current="step"' : ""}>
       <summary class="stage-summary">
         <span class="stage-dot" aria-hidden="true"></span>
         <span class="stage-main">
@@ -2900,6 +2954,28 @@ function renderRuntimeStage(stage) {
       ${renderRuntimeStageDropdown(stage, purpose)}
     </details>
   `;
+}
+
+function followActiveRuntimeStage(stageName, job) {
+  if (!stageName || !jobIsRunning(job) || state.flowMode !== "profile" || state.profileStep !== "run") {
+    return;
+  }
+  if (state.runtimeAutoFollowStageName === stageName) {
+    return;
+  }
+  state.runtimeAutoFollowStageName = stageName;
+  window.requestAnimationFrame(() => {
+    const stageElement = [...els.stageList.querySelectorAll(".runtime-stage-item")]
+      .find((candidate) => candidate.dataset.stageName === stageName);
+    if (!stageElement) {
+      return;
+    }
+    ensureRuntimeStageDetailVisible(stageElement);
+    stageElement.scrollIntoView({
+      block: "center",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  });
 }
 
 function runtimeStageStatusClass(status) {
