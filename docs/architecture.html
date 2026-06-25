@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSF Data Profiler — System Architecture</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ===== THEME VARIABLES ===== */
+[data-theme="dark"] {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #21262d; --bg4: #30363d;
+  --border: #30363d; --border2: #21262d;
+  --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+  --accent: #58a6ff; --accent2: #1f6feb;
+  --green: #3fb950; --red: #f85149; --purple: #bc8cff;
+  --orange: #d29922; --shadow: rgba(0,0,0,0.5);
+  --header-bg: linear-gradient(135deg,#0d1117 0%,#161b22 50%,#0d1117 100%);
+  --nav-bg: #161b22;
+  --mermaid-theme: dark;
+}
+[data-theme="light"] {
+  --bg: #f6f8fa; --bg2: #ffffff; --bg3: #f0f3f6; --bg4: #e1e4e8;
+  --border: #d0d7de; --border2: #e1e4e8;
+  --text: #1f2328; --text2: #656d76; --text3: #9198a1;
+  --accent: #0969da; --accent2: #0550ae;
+  --green: #1a7f37; --red: #cf222e; --purple: #8250df;
+  --orange: #9a6700; --shadow: rgba(0,0,0,0.12);
+  --header-bg: linear-gradient(135deg,#f6f8fa 0%,#eef2f6 50%,#f6f8fa 100%);
+  --nav-bg: #ffffff;
+  --mermaid-theme: default;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; transition: background 0.3s, color 0.3s; }
+
+/* ===== HEADER ===== */
+header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 28px 48px;
+  position: relative; overflow: hidden;
+}
+header::before {
+  content:''; position:absolute; top:-40%; left:-10%;
+  width:500px; height:500px;
+  background:radial-gradient(circle,rgba(88,166,255,0.07) 0%,transparent 70%);
+  pointer-events:none;
+}
+.header-inner { max-width:1400px; margin:0 auto; position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.header-left {}
+.badge {
+  display:inline-flex; align-items:center; gap:6px;
+  background:rgba(88,166,255,0.1); border:1px solid rgba(88,166,255,0.3);
+  color:var(--accent); font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  padding:4px 10px; border-radius:20px; margin-bottom:12px;
+}
+h1 {
+  font-size:30px; font-weight:800; letter-spacing:-0.5px;
+  background:linear-gradient(135deg,var(--text) 0%,var(--accent) 60%,var(--green) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  margin-bottom:6px;
+}
+.subtitle { color:var(--text2); font-size:13px; max-width:580px; line-height:1.6; }
+
+/* THEME TOGGLE */
+.theme-btn {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--text2); font-size:12px; font-weight:600;
+  padding:8px 16px; border-radius:8px; cursor:pointer;
+  transition:all 0.2s; white-space:nowrap; flex-shrink:0;
+}
+.theme-btn:hover { background:var(--bg4); color:var(--text); border-color:var(--accent); }
+.theme-icon { font-size:16px; }
+
+/* ===== NAV ===== */
+nav {
+  background:var(--nav-bg); border-bottom:1px solid var(--border);
+  padding:0 48px; position:sticky; top:0; z-index:100;
+  box-shadow:0 2px 8px var(--shadow);
+}
+nav ul { display:flex; list-style:none; max-width:1400px; margin:0 auto; overflow-x:auto; }
+nav ul li a {
+  display:block; padding:13px 18px;
+  color:var(--text2); text-decoration:none; font-size:13px; font-weight:500;
+  border-bottom:2px solid transparent; transition:all 0.2s; white-space:nowrap;
+}
+nav ul li a:hover, nav ul li a.active { color:var(--text); border-bottom-color:var(--accent); }
+
+/* ===== MAIN ===== */
+main { max-width:1400px; margin:0 auto; padding:40px 48px 80px; }
+section { display:none; }
+section.active { display:block; }
+.section-title { font-size:20px; font-weight:700; margin-bottom:6px; }
+.section-desc { color:var(--text2); font-size:14px; margin-bottom:28px; line-height:1.6; }
+
+/* ===== MERMAID DIAGRAM ===== */
+.mermaid-wrap {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:32px; overflow-x:auto;
+  margin-bottom:32px;
+}
+.mermaid-title {
+  font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--text3); margin-bottom:20px; display:flex; align-items:center; gap:8px;
+}
+.mermaid-title::after {
+  content:''; flex:1; height:1px; background:var(--border);
+}
+.mermaid { display:flex; justify-content:center; }
+.mermaid svg { max-width:100%; height:auto; }
+
+/* ===== PIPELINE ===== */
+.pipeline-wrapper { display:flex; flex-direction:column; gap:0; }
+.pipeline-connector { display:flex; justify-content:center; align-items:center; height:36px; position:relative; }
+.pipeline-connector::before {
+  content:''; position:absolute; left:50%; top:0; bottom:0; width:2px;
+  background:linear-gradient(to bottom,var(--border),var(--border));
+}
+.pipeline-arrow {
+  width:22px; height:22px; background:var(--bg3); border:2px solid var(--border);
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:11px; z-index:1; color:var(--text2);
+}
+.stage {
+  border:1px solid var(--border); border-radius:12px; background:var(--bg2);
+  overflow:hidden; transition:all 0.25s; cursor:pointer;
+}
+.stage:hover { border-color:var(--accent); box-shadow:0 0 0 1px rgba(88,166,255,0.15),0 6px 24px var(--shadow); }
+.stage.expanded .stage-detail { display:block; }
+.stage-header { display:grid; grid-template-columns:48px 1fr auto; align-items:center; gap:14px; padding:14px 18px; }
+.stage-icon { width:38px; height:38px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; }
+.stage-name { font-size:14px; font-weight:600; margin-bottom:2px; }
+.stage-sub { font-size:11px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
+.stage-meta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.stage-tag { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
+.stage-expand { font-size:11px; color:var(--text3); }
+.stage-detail { display:none; border-top:1px solid var(--border); padding:18px; background:var(--bg); }
+.detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:14px; }
+.detail-card { background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:10px 14px; }
+.detail-card-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--text3); margin-bottom:6px; }
+.detail-card-value { font-size:12px; font-family:'JetBrains Mono',monospace; color:var(--text); }
+.artifact-list { display:flex; flex-wrap:wrap; gap:6px; }
+.artifact-pill {
+  font-size:11px; font-family:'JetBrains Mono',monospace;
+  background:var(--bg3); border:1px solid var(--border);
+  padding:3px 9px; border-radius:4px; color:var(--accent);
+}
+
+/* Stage colors */
+.s-input .stage-icon { background:rgba(88,166,255,0.15); }
+.s-ingest .stage-icon { background:rgba(56,139,253,0.15); }
+.s-profile .stage-icon { background:rgba(63,185,80,0.15); }
+.s-artifact .stage-icon { background:rgba(210,153,34,0.15); }
+.s-llm .stage-icon { background:rgba(188,140,255,0.15); }
+.s-report .stage-icon { background:rgba(88,166,255,0.12); }
+.s-web .stage-icon { background:rgba(248,81,73,0.15); }
+.t-input { background:rgba(88,166,255,0.15); color:#79c0ff; }
+.t-ingest { background:rgba(56,139,253,0.15); color:#58a6ff; }
+.t-profile { background:rgba(63,185,80,0.15); color:#3fb950; }
+.t-artifact { background:rgba(210,153,34,0.15); color:#d29922; }
+.t-llm { background:rgba(188,140,255,0.15); color:#bc8cff; }
+.t-report { background:rgba(88,166,255,0.12); color:#79c0ff; }
+.t-web { background:rgba(248,81,73,0.15); color:#ff7b72; }
+.t-compat { background:rgba(110,118,129,0.15); color:#8b949e; }
+
+/* ===== MODULES ===== */
+.modules-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+.module-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:18px; transition:all 0.2s; }
+.module-card:hover { border-color:var(--accent2); box-shadow:0 4px 16px var(--shadow); transform:translateY(-2px); }
+.module-card-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.module-icon { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:17px; }
+.module-name { font-size:13px; font-weight:700; }
+.module-path { font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--text3); }
+.module-files { display:flex; flex-direction:column; gap:5px; }
+.module-file { display:flex; align-items:center; justify-content:space-between; padding:5px 9px; background:var(--bg3); border-radius:5px; font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--text2); transition:background 0.2s; }
+.module-file:hover { background:var(--bg4); color:var(--text); }
+.file-size { font-size:10px; color:var(--text3); }
+
+/* ===== ARTIFACTS ===== */
+.artifacts-intro { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.artifact-group { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.artifact-group-header { padding:12px 18px; border-bottom:1px solid var(--border); font-size:12px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.artifact-group-body { padding:14px 18px; display:flex; flex-direction:column; gap:6px; }
+.artifact-row { padding:7px 10px; border-radius:5px; background:var(--bg3); transition:background 0.2s; }
+.artifact-row:hover { background:var(--bg4); }
+.artifact-filename { font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--accent); }
+.artifact-desc { font-size:11px; color:var(--text3); margin-top:2px; }
+
+/* ===== ADRs ===== */
+.adr-list { display:flex; flex-direction:column; gap:14px; }
+.adr-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.adr-header { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:14px; padding:14px 18px; cursor:pointer; transition:background 0.2s; }
+.adr-header:hover { background:var(--bg3); }
+.adr-num { font-size:10px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--text3); background:var(--bg3); padding:3px 8px; border-radius:4px; }
+.adr-title { font-size:13px; font-weight:600; }
+.adr-status { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
+.adr-status.accepted { background:rgba(63,185,80,0.2); color:#3fb950; }
+.adr-body { display:none; border-top:1px solid var(--border); }
+.adr-body.open { display:grid; grid-template-columns:1fr 1fr; }
+.adr-section { padding:16px 18px; border-right:1px solid var(--border); }
+.adr-section:last-child { border-right:none; }
+.adr-section h4 { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--text3); margin-bottom:8px; }
+.adr-section p { font-size:13px; color:var(--text2); line-height:1.7; }
+
+/* ===== ANTI-PATTERNS ===== */
+.antipattern-list { display:flex; flex-direction:column; gap:14px; }
+.antipattern-card { background:var(--bg2); border:1px solid var(--border); border-left:4px solid var(--red); border-radius:12px; padding:18px 22px; }
+.antipattern-title { font-size:13px; font-weight:700; color:var(--red); margin-bottom:7px; }
+.antipattern-desc { font-size:13px; color:var(--text2); line-height:1.7; margin-bottom:9px; }
+.antipattern-why { font-size:12px; background:rgba(248,81,73,0.06); border:1px solid rgba(248,81,73,0.2); border-radius:6px; padding:10px 13px; color:var(--text2); line-height:1.6; }
+.antipattern-why strong { color:var(--red); }
+
+code { font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--bg3); padding:2px 6px; border-radius:4px; color:var(--accent); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--bg4); border-radius:3px; }
+
+/* RESPONSIVE */
+@media (max-width:768px) {
+  header { padding:20px; }
+  nav { padding:0 16px; }
+  main { padding:20px 16px 60px; }
+  h1 { font-size:22px; }
+  .header-inner { flex-direction:column; align-items:flex-start; gap:12px; }
+  .artifacts-intro,.adr-body.open { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="badge"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span> Live Architectural Snapshot</div>
+      <h1>VSF Data Profiler</h1>
+      <p class="subtitle">Kiến trúc hệ thống được trích xuất <strong>trực tiếp từ source code</strong> — không phải đặc tả, mà là snapshot chính xác 100% từ codebase hiện tại.</p>
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">
+      <span class="theme-icon" id="themeIcon">☀️</span>
+      <span id="themeLabel">Light Mode</span>
+    </button>
+  </div>
+</header>
+
+<nav>
+  <ul>
+    <li><a href="#diagram" class="active" onclick="switchTab('diagram',this)">🔀 Luồng hoạt động</a></li>
+    <li><a href="#pipeline" onclick="switchTab('pipeline',this)">⚙️ Pipeline</a></li>
+    <li><a href="#modules" onclick="switchTab('modules',this)">📦 Modules</a></li>
+    <li><a href="#artifacts" onclick="switchTab('artifacts',this)">💾 Artifacts</a></li>
+    <li><a href="#decisions" onclick="switchTab('decisions',this)">📋 ADRs</a></li>
+    <li><a href="#antipatterns" onclick="switchTab('antipatterns',this)">❌ Anti-Patterns</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<!-- ============================== MERMAID DIAGRAM ============================== -->
+<section id="diagram" class="active">
+  <div class="section-title">Luồng hoạt động hệ thống (End-to-End Flow)</div>
+  <p class="section-desc">
+    Sơ đồ bên dưới mô tả chính xác từng bước trong hàm <code>run_pipeline()</code> — từ dữ liệu đầu vào đến báo cáo cuối cùng.
+  </p>
+
+  <div class="mermaid-wrap">
+    <div class="mermaid-title">🗺️ Main Pipeline — cli.py → run_pipeline()</div>
+    <div class="mermaid" id="main-flow">
+flowchart TD
+    subgraph INPUT["📥 INPUT SOURCES"]
+        CSV["CSV Files\n+ DBML Schema"]
+        DB["Postgres /\nMySQL DB"]
+        MAP["Mapping Override\nYAML/JSON (optional)"]
+    end
+
+    subgraph INGEST["🔍 INGESTION LAYER"]
+        S1["Stage 1\nParse DBML Schema\ndbml_parser.py"]
+        S2["Stage 2\nCatalog CSV & Mappings\ncsv_catalog.py"]
+    end
+
+    subgraph PROFILING["📊 PROFILING ENGINE (DuckDB)"]
+        S3["Stage 3\nProfile Tables & Columns\nprofiler.py"]
+        S4["Stage 4\nData Quality Checks\nquality_rules.py\nP0→P3 issues"]
+        S5["Stage 5\nRelationship Checks\nrelationship_checker.py\nFK/PK violations"]
+        S6["Stage 6\nInfluence Analysis\ninfluence_analyzer.py\n(only if --target set)"]
+    end
+
+    subgraph ARTIFACTS["💾 MACHINE ARTIFACTS (Stage 7)"]
+        direction LR
+        A1["profile_summary.json\nschema_diagram.json\nschema_evaluation.json"]
+        A2["issues.json\nrelationship_graph.json\ndataset_verdict.json"]
+        A3["table_assessments.json\nissue_action_plans.json\nissue_todos.json\nquality_gates.json\ncharts/*.json"]
+    end
+
+    subgraph LLM["🤖 LLM LAYER"]
+        direction LR
+        L1["Stage 8a\nLLM Narrative\nnarratives.py\nl4_report.md\nguardrail_report.json\n(requires --use-llm)"]
+        L2["Stage 8b\nUI Insights\nAlways runs\nDual-track overview\nPer-table insights"]
+    end
+
+    subgraph REPORT["📄 REPORT RENDERING (Stage 9)"]
+        R1["report_generator.py\nJinja2 templates\nMermaid ER Diagram\nChart.js inline"]
+        R2["report.html\nreport.md"]
+        R3["lineage_graph.json\ncompat artifact"]
+    end
+
+    subgraph WEB["🌐 WEB RUNNER (Independent Surface)"]
+        W1["web_runner.py\n127.0.0.1:8765\nHTTP API"]
+        W2["web/app.js\nDashboard UI\nReads JSON via API\nNever re-runs profiler"]
+    end
+
+    CSV --> S1
+    DB --> S1
+    MAP --> S2
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6
+    S6 --> A1
+    S6 --> A2
+    S6 --> A3
+    A2 --> L1
+    A1 --> L1
+    A2 --> L2
+    A1 --> L2
+    L1 --> R1
+    L2 --> R1
+    A3 --> R1
+    R1 --> R2
+    R1 --> R3
+    W1 -->|"calls run_pipeline()"| S1
+    R2 -->|"artifacts written"| W1
+    W1 --> W2
+
+    classDef inputStyle fill:#1a3a6e,stroke:#58a6ff,color:#c9d1d9
+    classDef ingestStyle fill:#1a4a3a,stroke:#3fb950,color:#c9d1d9
+    classDef profileStyle fill:#2d5a1a,stroke:#3fb950,color:#c9d1d9
+    classDef artifactStyle fill:#5a3a00,stroke:#d29922,color:#c9d1d9
+    classDef llmStyle fill:#3a1a5a,stroke:#bc8cff,color:#c9d1d9
+    classDef reportStyle fill:#1a3a5a,stroke:#58a6ff,color:#c9d1d9
+    classDef webStyle fill:#5a1a1a,stroke:#f85149,color:#c9d1d9
+
+    class CSV,DB,MAP inputStyle
+    class S1,S2 ingestStyle
+    class S3,S4,S5,S6 profileStyle
+    class A1,A2,A3 artifactStyle
+    class L1,L2 llmStyle
+    class R1,R2,R3 reportStyle
+    class W1,W2 webStyle
+    </div>
+  </div>
+
+  <div class="mermaid-wrap">
+    <div class="mermaid-title">🤖 Dual-Track LLM Architecture — llm/narrative.py</div>
+    <div class="mermaid" id="llm-flow">
+flowchart LR
+    subgraph IN["Machine Artifacts (Input)"]
+        I1["issues.json\nP0-P3 issues"]
+        I2["dataset_verdict.json\nrisk_score"]
+        I3["profile_summary.json\nnull_rate, min, max"]
+        I4["Schema DBML\ntable names, FK/PK"]
+    end
+
+    DISP{"Dispatcher\nSlices data\nby table"}
+
+    subgraph T1["Track 1 — Objective Technical"]
+        direction TB
+        TA["Per-table Analyst Agents\ngenerate_per_table_insights()\nNeutral, no role-playing"]
+        ED["Dual-track Editor\ngenerate_dual_track_overview()\nTechnical executive summary"]
+    end
+
+    subgraph T2["Track 2 — Auto-Persona Business"]
+        direction TB
+        PG["Persona Guesser\nReads schema structure\nGuesses domain: Healthcare / E-com..."]
+        DE["Domain Expert Agent\nPlays the domain role\nBusiness risk framing"]
+    end
+
+    subgraph OUT["UI Output (embedded in report)"]
+        O1["per_table_llm\nPer-issue commentary\nin Issue cards"]
+        O2["dual_track_llm\nExecutive summary\nin Overview tab"]
+        O3["l4_report.md\n(optional, --use-llm)"]
+    end
+
+    I1 & I2 & I3 & I4 --> DISP
+    DISP -->|"slice by table"| TA
+    DISP -->|"top issues"| DE
+    I4 --> PG
+    TA --> ED
+    PG --> DE
+    ED --> O1
+    ED --> O2
+    DE --> O2
+    ED --> O3
+
+    classDef inputStyle fill:#1a3a6e,stroke:#58a6ff,color:#c9d1d9
+    classDef track1Style fill:#1a4a1a,stroke:#3fb950,color:#c9d1d9
+    classDef track2Style fill:#3a1a5a,stroke:#bc8cff,color:#c9d1d9
+    classDef outStyle fill:#5a3a00,stroke:#d29922,color:#c9d1d9
+    classDef dispStyle fill:#2a2a2a,stroke:#8b949e,color:#c9d1d9
+
+    class I1,I2,I3,I4 inputStyle
+    class TA,ED track1Style
+    class PG,DE track2Style
+    class O1,O2,O3 outStyle
+    class DISP dispStyle
+    </div>
+  </div>
+
+  <div class="mermaid-wrap">
+    <div class="mermaid-title">🌐 Web Runner Architecture — web_runner.py</div>
+    <div class="mermaid" id="web-flow">
+flowchart TD
+    subgraph BROWSER["Browser (web/index.html + app.js)"]
+        UI1["Upload DBML + CSV\n(upload mode)"]
+        UI2["Enter local path\n(path mode)"]
+        UI3["DB connection URL\n(connector mode)"]
+        DASH["Dashboard\nReads artifacts via API\nChart.js + Mermaid ER"]
+    end
+
+    subgraph SERVER["web_runner.py — 127.0.0.1:8765"]
+        API1["POST /api/run-upload\nSaves files to temp dir"]
+        API2["POST /api/run-local-path\nValidates path on server"]
+        API3["POST /api/run-db\nIntrospects DB tables"]
+        PIPE["run_pipeline()\nExact same function as CLI"]
+        API4["GET /api/jobs/{id}/artifacts/*\nServes artifact JSON files"]
+        API5["POST /api/enrich-issue\nOn-demand LLM enrichment"]
+    end
+
+    subgraph FS["File System — outputs/web_runs/"]
+        RUN["run_YYYYMMDD_HHMMSS_HASH/\n  artifacts/\n    issues.json\n    profile_summary.json\n    report.html\n    charts/*.json\n    ..."]
+    end
+
+    UI1 -->|"multipart/form-data"| API1
+    UI2 -->|"JSON {dbml_path, csv_dir}"| API2
+    UI3 -->|"JSON {db_url, tables}"| API3
+    API1 & API2 & API3 --> PIPE
+    PIPE --> RUN
+    RUN --> API4
+    API4 --> DASH
+    UI1 -.->|"trigger enrichment"| API5
+    API5 -.->|"LLM call"| PIPE
+
+    classDef browserStyle fill:#1a3a6e,stroke:#58a6ff,color:#c9d1d9
+    classDef serverStyle fill:#2d5a1a,stroke:#3fb950,color:#c9d1d9
+    classDef fsStyle fill:#5a3a00,stroke:#d29922,color:#c9d1d9
+
+    class UI1,UI2,UI3,DASH browserStyle
+    class API1,API2,API3,PIPE,API4,API5 serverStyle
+    class RUN fsStyle
+    </div>
+  </div>
+
+</section>
+
+<!-- ============================== PIPELINE ============================== -->
+<section id="pipeline">
+  <div class="section-title">Execution Pipeline — Từng stage chi tiết</div>
+  <p class="section-desc">
+    Hàm <code>run_pipeline()</code> trong <code>cli.py</code> điều phối tuần tự tất cả các stages. Click để xem chi tiết từng stage.
+  </p>
+
+  <div class="pipeline-wrapper">
+
+    <div class="stage s-input" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">📥</div>
+        <div><div class="stage-name">Input Sources</div><div class="stage-sub">CSV+DBML · Postgres · MySQL/MariaDB</div></div>
+        <div class="stage-meta"><span class="stage-tag t-input">Entry Point</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Primary Mode</div><div class="detail-card-value">CSV + DBML Schema</div></div>
+          <div class="detail-card"><div class="detail-card-label">Connector Modes</div><div class="detail-card-value">Postgres, MySQL/MariaDB</div></div>
+          <div class="detail-card"><div class="detail-card-label">Optional</div><div class="detail-card-value">Mapping YAML/JSON override</div></div>
+        </div>
+        <div class="artifact-list">
+          <span class="artifact-pill">ingestion/connectors.py</span>
+          <span class="artifact-pill">ingestion/csv_catalog.py</span>
+          <span class="artifact-pill">ingestion/dbml_parser.py</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-ingest" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">🔍</div>
+        <div><div class="stage-name">Stage 1 — Parse DBML Schema</div><div class="stage-sub">parse_dbml_schema · ingestion/dbml_parser.py</div></div>
+        <div class="stage-meta"><span class="stage-tag t-ingest">Ingestion</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Function</div><div class="detail-card-value">parse_dbml_with_report(dbml_path)</div></div>
+          <div class="detail-card"><div class="detail-card-label">Output</div><div class="detail-card-value">Schema + parse_report dict</div></div>
+          <div class="detail-card"><div class="detail-card-label">Tracks</div><div class="detail-card-value">table_count, relationships, diagnostics</div></div>
+        </div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px">Trích xuất bảng, cột, PK, FK, kiểu dữ liệu từ file DBML. Connector mode gọi <code>source_connector.prepare_schema()</code>.</p>
+        <div class="artifact-list"><span class="artifact-pill">→ schema_parse_report.json</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-ingest" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">🗂️</div>
+        <div><div class="stage-name">Stage 2 — Catalog CSV & Mappings</div><div class="stage-sub">catalog_csv_files · ingestion/csv_catalog.py</div></div>
+        <div class="stage-meta"><span class="stage-tag t-ingest">Ingestion</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Strategy</div><div class="detail-card-value">Exact stem → header inference → manual override</div></div>
+          <div class="detail-card"><div class="detail-card-label">Tracks</div><div class="detail-card-value">mapped_tables, missing_tables, extra_csvs</div></div>
+        </div>
+        <div class="artifact-list"><span class="artifact-pill">connector_metadata.json (DB mode only)</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-profile" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">📊</div>
+        <div><div class="stage-name">Stage 3 — Profile Tables & Columns</div><div class="stage-sub">profile_csv_tables · profiling/profiler.py · DuckDB</div></div>
+        <div class="stage-meta"><span class="stage-tag t-profile">Core Profiling</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Engine</div><div class="detail-card-value">DuckDB — không load CSV vào pandas</div></div>
+          <div class="detail-card"><div class="detail-card-label">Metrics</div><div class="detail-card-value">null_rate, min, max, percentiles, IQR, cardinality</div></div>
+        </div>
+        <div class="artifact-list"><span class="artifact-pill">→ profile_summary.json</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-profile" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">✅</div>
+        <div><div class="stage-name">Stage 4 — Data Quality Checks</div><div class="stage-sub">data_quality_checks · profiling/quality_rules.py</div></div>
+        <div class="stage-meta"><span class="stage-tag t-profile">Core Profiling</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">P0 Critical</div><div class="detail-card-value">PK null, PK duplicate</div></div>
+          <div class="detail-card"><div class="detail-card-label">P1 High</div><div class="detail-card-value">NOT NULL violation, type mismatch</div></div>
+          <div class="detail-card"><div class="detail-card-label">P2/P3</div><div class="detail-card-value">Outliers (IQR), suspicious values</div></div>
+        </div>
+        <div class="artifact-list"><span class="artifact-pill">→ issues.json</span><span class="artifact-pill">→ samples/ISSUE-*.csv</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-profile" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">🔗</div>
+        <div><div class="stage-name">Stage 5 — Relationship Checks</div><div class="stage-sub">relationship_checks · profiling/relationship_checker.py</div></div>
+        <div class="stage-meta"><span class="stage-tag t-profile">Core Profiling</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Checks</div><div class="detail-card-value">Orphan FK, composite FK, junction-table cardinality</div></div>
+        </div>
+        <div class="artifact-list"><span class="artifact-pill">→ relationship_graph.json (contributes)</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-profile" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">📈</div>
+        <div><div class="stage-name">Stage 6 — Influence Analysis</div><div class="stage-sub">influence_analysis · influence_analyzer.py · Optional</div></div>
+        <div class="stage-meta"><span class="stage-tag t-compat">Optional</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Trigger</div><div class="detail-card-value">Chỉ chạy khi --target được cung cấp</div></div>
+        </div>
+        <div class="artifact-list"><span class="artifact-pill">→ influence.json</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-artifact" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">💾</div>
+        <div><div class="stage-name">Stage 7 — Write Machine Artifacts</div><div class="stage-sub">write_machine_artifacts · artifacts/ · 12+ files</div></div>
+        <div class="stage-meta"><span class="stage-tag t-artifact">Artifacts</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px">Tất cả artifacts deterministic được ghi ra trong một stage duy nhất. Đây là nguồn sự thật cho Dashboard và reports.</p>
+        <div class="artifact-list">
+          <span class="artifact-pill">profile_summary.json</span><span class="artifact-pill">issues.json</span>
+          <span class="artifact-pill">schema_parse_report.json</span><span class="artifact-pill">schema_diagram.json</span>
+          <span class="artifact-pill">schema_evaluation.json</span><span class="artifact-pill">relationship_graph.json</span>
+          <span class="artifact-pill">dataset_verdict.json</span><span class="artifact-pill">table_assessments.json</span>
+          <span class="artifact-pill">issue_action_plans.json</span><span class="artifact-pill">issue_todos.json</span>
+          <span class="artifact-pill">quality_gates.json</span><span class="artifact-pill">charts/*.json (8 specs)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-llm" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">🤖</div>
+        <div><div class="stage-name">Stage 8a — LLM Narrative (Optional)</div><div class="stage-sub">llm_narrative · llm/narrative.py · --use-llm required</div></div>
+        <div class="stage-meta"><span class="stage-tag t-llm">Optional LLM</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Providers</div><div class="detail-card-value">fake (local), openai (API)</div></div>
+        </div>
+        <div class="artifact-list"><span class="artifact-pill">→ l4_report.md</span><span class="artifact-pill">→ guardrail_report.json</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-llm" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">💡</div>
+        <div><div class="stage-name">Stage 8b — UI Insights (Always runs)</div><div class="stage-sub">generate_ui_insights · per-table + dual-track LLM</div></div>
+        <div class="stage-meta"><span class="stage-tag t-llm">LLM Layer</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">per_table_llm</div><div class="detail-card-value">generate_per_table_insights() — commentary per table</div></div>
+          <div class="detail-card"><div class="detail-card-label">dual_track_llm</div><div class="detail-card-value">generate_dual_track_overview() — Executive summary kép</div></div>
+        </div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px">Stage này <strong>luôn luôn chạy</strong>, kể cả khi không có <code>--use-llm</code>. Không có LLM provider thì sinh fallback text deterministic. Kết quả được nhúng thẳng vào context của report template — KHÔNG ghi thành file JSON riêng.</p>
+        <div class="artifact-list"><span class="artifact-pill">→ embedded in report.html context</span><span class="artifact-pill">→ issue_llm_enrichments.json (on-demand)</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline-connector"><div class="pipeline-arrow">↓</div></div>
+
+    <div class="stage s-report" onclick="toggleStage(this)">
+      <div class="stage-header">
+        <div class="stage-icon">📄</div>
+        <div><div class="stage-name">Stage 9 — Render Reports</div><div class="stage-sub">render_reports · reporting/report_generator.py · Jinja2</div></div>
+        <div class="stage-meta"><span class="stage-tag t-report">Output</span><span class="stage-expand">▾</span></div>
+      </div>
+      <div class="stage-detail">
+        <div class="detail-grid">
+          <div class="detail-card"><div class="detail-card-label">Templates</div><div class="detail-card-value">templates/report.html.j2, report.md.j2</div></div>
+          <div class="detail-card"><div class="detail-card-label">ER Diagram</div><div class="detail-card-value">MermaidJS (types sanitized với re.sub)</div></div>
+        </div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px">Report được generate 2 lần: lần 1 trước lineage graph (preview nhanh), lần 2 sau khi có đầy đủ lineage context.</p>
+        <div class="artifact-list"><span class="artifact-pill">→ report.html</span><span class="artifact-pill">→ report.md</span><span class="artifact-pill">→ lineage_graph.json</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================== MODULES ============================== -->
+<section id="modules">
+  <div class="section-title">Cấu trúc Module</div>
+  <p class="section-desc">Source code tổ chức theo module có trách nhiệm đơn, phụ thuộc chéo tối thiểu dưới <code>src/vsf_profiler/</code>.</p>
+  <div class="modules-grid">
+    <div class="module-card">
+      <div class="module-card-header"><div class="module-icon" style="background:rgba(88,166,255,0.15)">📥</div><div><div class="module-name">ingestion/</div><div class="module-path">src/vsf_profiler/ingestion/</div></div></div>
+      <div class="module-files">
+        <div class="module-file"><span>dbml_parser.py</span><span class="file-size">40 KB</span></div>
+        <div class="module-file"><span>csv_catalog.py</span><span class="file-size">14 KB</span></div>
+        <div class="module-file"><span>connectors.py</span><span class="file-size">43 KB</span></div>
+        <div class="module-file"><span>duckdb_utils.py</span><span class="file-size">3.5 KB</span></div>
+        <div class="module-file"><span>schema_evaluation.py</span><span class="file-size">8.8 KB</span></div>
+        <div class="module-file"><span>relationship_metadata.py</span><span class="file-size">3 KB</span></div>
+      </div>
+    </div>
+    <div class="module-card">
+      <div class="module-card-header"><div class="module-icon" style="background:rgba(63,185,80,0.15)">🔬</div><div><div class="module-name">profiling/</div><div class="module-path">src/vsf_profiler/profiling/</div></div></div>
+      <div class="module-files">
+        <div class="module-file"><span>profiler.py</span><span class="file-size">8.7 KB</span></div>
+        <div class="module-file"><span>issue_catalog.py</span><span class="file-size">8.1 KB</span></div>
+        <div class="module-file"><span>quality_rules.py</span><span class="file-size">11 KB</span></div>
+        <div class="module-file"><span>quality_gates.py</span><span class="file-size">24 KB</span></div>
+        <div class="module-file"><span>relationship_checker.py</span><span class="file-size">8.6 KB</span></div>
+        <div class="module-file"><span>relationship_graph.py</span><span class="file-size">11 KB</span></div>
+      </div>
+    </div>
+    <div class="module-card">
+      <div class="module-card-header"><div class="module-icon" style="background:rgba(210,153,34,0.15)">📦</div><div><div class="module-name">artifacts/</div><div class="module-path">src/vsf_profiler/artifacts/</div></div></div>
+      <div class="module-files">
+        <div class="module-file"><span>action_plans.py</span><span class="file-size">19 KB</span></div>
+        <div class="module-file"><span>chart_specs.py</span><span class="file-size">14 KB</span></div>
+        <div class="module-file"><span>dataset_verdict.py</span><span class="file-size">12 KB</span></div>
+        <div class="module-file"><span>table_assessments.py</span><span class="file-size">16 KB</span></div>
+        <div class="module-file"><span>lineage_graph.py</span><span class="file-size">26 KB</span></div>
+        <div class="module-file"><span>runtime.py</span><span class="file-size">16 KB</span></div>
+        <div class="module-file"><span>todos.py</span><span class="file-size">6.3 KB</span></div>
+      </div>
+    </div>
+    <div class="module-card">
+      <div class="module-card-header"><div class="module-icon" style="background:rgba(188,140,255,0.15)">🤖</div><div><div class="module-name">llm/</div><div class="module-path">src/vsf_profiler/llm/</div></div></div>
+      <div class="module-files">
+        <div class="module-file"><span>narrative.py</span><span class="file-size">62 KB — Main LLM orchestrator</span></div>
+        <div class="module-file"><span>issue_enrichment.py</span><span class="file-size">44 KB — Per-issue on-demand</span></div>
+      </div>
+    </div>
+    <div class="module-card">
+      <div class="module-card-header"><div class="module-icon" style="background:rgba(88,166,255,0.12)">📄</div><div><div class="module-name">reporting/</div><div class="module-path">src/vsf_profiler/reporting/</div></div></div>
+      <div class="module-files">
+        <div class="module-file"><span>report_generator.py</span><span class="file-size">75 KB</span></div>
+        <div class="module-file"><span>schema_diagram.py</span><span class="file-size">6.8 KB — Mermaid ER</span></div>
+        <div class="module-file"><span>export_package.py</span><span class="file-size">67 KB</span></div>
+        <div class="module-file"><span>pdf_export.py</span><span class="file-size">5.3 KB</span></div>
+        <div class="module-file"><span>artifact_audit.py</span><span class="file-size">16 KB</span></div>
+      </div>
+    </div>
+    <div class="module-card">
+      <div class="module-card-header"><div class="module-icon" style="background:rgba(248,81,73,0.15)">🌐</div><div><div class="module-name">Root files</div><div class="module-path">src/vsf_profiler/</div></div></div>
+      <div class="module-files">
+        <div class="module-file"><span>cli.py</span><span class="file-size">38 KB — Pipeline orchestrator</span></div>
+        <div class="module-file"><span>web_runner.py</span><span class="file-size">72 KB — HTTP server + API</span></div>
+        <div class="module-file"><span>models.py</span><span class="file-size">6.9 KB — Pydantic models</span></div>
+        <div class="module-file"><span>influence_analyzer.py</span><span class="file-size">14 KB</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ARTIFACTS ============================== -->
+<section id="artifacts">
+  <div class="section-title">Output Artifacts</div>
+  <p class="section-desc">Tất cả artifacts được ghi vào thư mục output. Dashboard đọc các file này qua API — không bao giờ chạy lại profiler.</p>
+  <div class="artifacts-intro">
+    <div class="artifact-group">
+      <div class="artifact-group-header" style="background:rgba(63,185,80,0.08);color:var(--green)">✅ Core Artifacts (Luôn được ghi)</div>
+      <div class="artifact-group-body">
+        <div class="artifact-row"><div class="artifact-filename">profile_summary.json</div><div class="artifact-desc">Thống kê per-table/column: nulls, min, max, IQR</div></div>
+        <div class="artifact-row"><div class="artifact-filename">issues.json</div><div class="artifact-desc">Danh sách lỗi với severity P0-P3, evidence SQL, bad_count</div></div>
+        <div class="artifact-row"><div class="artifact-filename">schema_parse_report.json</div><div class="artifact-desc">Kết quả parse DBML, diagnostics, unsupported constructs</div></div>
+        <div class="artifact-row"><div class="artifact-filename">schema_diagram.json</div><div class="artifact-desc">Dữ liệu ER diagram + Mermaid syntax</div></div>
+        <div class="artifact-row"><div class="artifact-filename">schema_evaluation.json</div><div class="artifact-desc">Đánh giá coverage và chất lượng schema contract</div></div>
+        <div class="artifact-row"><div class="artifact-filename">relationship_graph.json</div><div class="artifact-desc">FK/PK cardinality, orphan ratios, relationship health</div></div>
+        <div class="artifact-row"><div class="artifact-filename">dataset_verdict.json</div><div class="artifact-desc">Verdict tổng thể về data readiness, risk score</div></div>
+        <div class="artifact-row"><div class="artifact-filename">table_assessments.json</div><div class="artifact-desc">Điểm readiness và blockers theo từng bảng</div></div>
+        <div class="artifact-row"><div class="artifact-filename">issue_action_plans.json</div><div class="artifact-desc">Kế hoạch xử lý deterministic cho từng issue</div></div>
+        <div class="artifact-row"><div class="artifact-filename">issue_todos.json</div><div class="artifact-desc">TODO items gom nhóm cho data engineering team</div></div>
+        <div class="artifact-row"><div class="artifact-filename">quality_gates.json</div><div class="artifact-desc">Pass/fail quality gate summary với blocker count</div></div>
+        <div class="artifact-row"><div class="artifact-filename">charts/*.json (8 files)</div><div class="artifact-desc">Spec Chart.js: severity, missingness, outliers, FK health...</div></div>
+        <div class="artifact-row"><div class="artifact-filename">samples/ISSUE-XXXX.csv</div><div class="artifact-desc">Sample rows giới hạn cho từng issue phát hiện</div></div>
+        <div class="artifact-row"><div class="artifact-filename">report.html / report.md</div><div class="artifact-desc">Báo cáo human-readable với charts và LLM insights</div></div>
+        <div class="artifact-row"><div class="artifact-filename">run_summary.json / run_events.jsonl</div><div class="artifact-desc">Runtime metadata và stage-level events log</div></div>
+      </div>
+    </div>
+    <div class="artifact-group">
+      <div class="artifact-group-header" style="background:rgba(188,140,255,0.08);color:var(--purple)">🤖 Optional / Compat Artifacts</div>
+      <div class="artifact-group-body">
+        <div class="artifact-row"><div class="artifact-filename">l4_report.md</div><div class="artifact-desc">Báo cáo narrative do LLM sinh (cần --use-llm)</div></div>
+        <div class="artifact-row"><div class="artifact-filename">guardrail_report.json</div><div class="artifact-desc">LLM provider status, model, fallback reason</div></div>
+        <div class="artifact-row"><div class="artifact-filename">issue_llm_enrichments.json</div><div class="artifact-desc">On-demand per-issue LLM enrichment (từ Web UI)</div></div>
+        <div class="artifact-row"><div class="artifact-filename">influence.json</div><div class="artifact-desc">Feature importance (cần --target column)</div></div>
+        <div class="artifact-row"><div class="artifact-filename">lineage_graph.json</div><div class="artifact-desc">Full lineage graph liên kết tất cả artifacts</div></div>
+        <div class="artifact-row"><div class="artifact-filename">connector_metadata.json</div><div class="artifact-desc">DB connector source info (Postgres/MySQL mode)</div></div>
+        <div class="artifact-row"><div class="artifact-filename">schema_diagram.dbml</div><div class="artifact-desc">DBML text được reconstruct từ parsed schema</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== DECISIONS ============================== -->
+<section id="decisions">
+  <div class="section-title">Architectural Decision Records</div>
+  <p class="section-desc">Các quyết định kiến trúc quan trọng cùng lý do. Click để xem chi tiết.</p>
+  <div class="adr-list">
+    <div class="adr-card">
+      <div class="adr-header" onclick="toggleAdr(this)">
+        <span class="adr-num">ADR-001</span>
+        <span class="adr-title">DuckDB là scan engine chính — không load CSV vào pandas</span>
+        <span class="adr-status accepted">Accepted</span>
+      </div>
+      <div class="adr-body">
+        <div class="adr-section"><h4>Context</h4><p>Prototype đầu dùng pandas để load CSV. File lớn gây OOM trên laptop 8GB RAM.</p></div>
+        <div class="adr-section"><h4>Decision</h4><p>Tất cả profiling và quality checks chạy qua DuckDB SQL. DuckDB đọc thẳng từ CSV mà không load toàn bộ vào Python memory. Trade-off: phải viết SQL thay vì pandas, nhưng được: memory không giới hạn, quét nhanh hơn, evidence SQL có thể hiển thị cho người dùng.</p></div>
+      </div>
+    </div>
+    <div class="adr-card">
+      <div class="adr-header" onclick="toggleAdr(this)">
+        <span class="adr-num">ADR-002</span>
+        <span class="adr-title">Dual-Track LLM — cô lập Track kỹ thuật và Track nghiệp vụ</span>
+        <span class="adr-status accepted">Accepted</span>
+      </div>
+      <div class="adr-body">
+        <div class="adr-section"><h4>Context</h4><p>LLM đóng vai "chuyên gia kinh doanh" bị cognitive bias: bỏ qua lỗi kỹ thuật nghiêm trọng để đi tìm insight doanh thu.</p></div>
+        <div class="adr-section"><h4>Decision</h4><p>Hai luồng LLM độc lập hoàn toàn: Track 1 (per_table_insights) phân tích kỹ thuật trung lập. Track 2 (dual_track_overview) đoán domain từ schema rồi mới nhập vai chuyên gia. Hai output không bao giờ trộn lẫn nhau.</p></div>
+      </div>
+    </div>
+    <div class="adr-card">
+      <div class="adr-header" onclick="toggleAdr(this)">
+        <span class="adr-num">ADR-003</span>
+        <span class="adr-title">Web Runner là HTTP wrapper mỏng — không reimplementing pipeline</span>
+        <span class="adr-status accepted">Accepted</span>
+      </div>
+      <div class="adr-body">
+        <div class="adr-section"><h4>Context</h4><p>Nguy cơ tạo hai code path song song: một cho CLI, một cho Web, dần diverge và khó bảo trì.</p></div>
+        <div class="adr-section"><h4>Decision</h4><p>web_runner.py chỉ đơn giản gọi đúng hàm <code>run_pipeline()</code> từ cli.py. Web server xử lý file upload, lưu vào temp dir, truyền path cho pipeline. Frontend đọc artifact JSON qua API. Pipeline không biết gì về HTTP, web runner không có logic profiling.</p></div>
+      </div>
+    </div>
+    <div class="adr-card">
+      <div class="adr-header" onclick="toggleAdr(this)">
+        <span class="adr-num">ADR-004</span>
+        <span class="adr-title">Mermaid ER diagram với type sanitization bằng regex</span>
+        <span class="adr-status accepted">Accepted</span>
+      </div>
+      <div class="adr-body">
+        <div class="adr-section"><h4>Context</h4><p>MermaidJS 11 từ chối attribute type chứa dấu phẩy (ví dụ: <code>decimal(10,2)</code>). Gây lỗi render silent trên database có decimal columns.</p></div>
+        <div class="adr-section"><h4>Decision</h4><p>schema_diagram.py dùng <code>re.sub(r'[^a-zA-Z0-9_]', '_', column.type)</code> để loại bỏ mọi ký tự không phải identifier. <code>decimal(10,2)</code> → <code>decimal_10_2</code>. Trade-off readable vs luôn render được — chọn luôn render được.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ANTI-PATTERNS ============================== -->
+<section id="antipatterns">
+  <div class="section-title">Anti-Patterns — Tuyệt đối không implement lại</div>
+  <p class="section-desc">Những pattern đã được đánh giá và loại bỏ có chủ đích. Dev mới vào dự án PHẢI đọc phần này trước khi code.</p>
+  <div class="antipattern-list">
+    <div class="antipattern-card">
+      <div class="antipattern-title">❌ YAML Business Rules (cờ --rules)</div>
+      <p class="antipattern-desc">Cờ <code>--rules rules.yaml</code> đã bị xóa. Người dùng phải tự viết YAML định nghĩa custom logic (ví dụ: <code>date_shipped > date_ordered</code>).</p>
+      <div class="antipattern-why"><strong>Tại sao bị loại bỏ:</strong> "Garbage in, garbage out." Bắt người dùng viết YAML là UX thất bại. Hệ thống đã có deterministic checks P0/P1 từ DBML schema (PK nulls, FK orphans, NOT NULL violations) mà không cần cấu hình. Thêm user-defined business rules trùng lặp những gì schema đã thể hiện và tạo gánh nặng bảo trì.</div>
+    </div>
+    <div class="antipattern-card">
+      <div class="antipattern-title">❌ LLM đơn luồng với role assignment sớm</div>
+      <p class="antipattern-desc">Viết prompt bắt đầu bằng "Bạn là chuyên gia kinh doanh, hãy phân tích dữ liệu này..." trước khi trình bày lỗi.</p>
+      <div class="antipattern-why"><strong>Tại sao bị loại bỏ:</strong> Gây cognitive bias hallucination. LLM đóng vai "business expert" bỏ qua lỗi y tế để tìm doanh thu. Dual-Track Pattern (ADR-002) được implement để giải quyết vấn đề này. Role assignment chỉ xảy ra ở Track 2 sau khi Track 1 phân tích xong.</div>
+    </div>
+    <div class="antipattern-card">
+      <div class="antipattern-title">❌ pandas.read_csv() để profiling</div>
+      <p class="antipattern-desc">Dùng <code>pandas.read_csv()</code> làm cách chính để scan CSV cho quality checks và thống kê.</p>
+      <div class="antipattern-why"><strong>Tại sao bị loại bỏ:</strong> Memory không giới hạn. File 500MB load vào pandas trên laptop 8GB RAM sẽ OOM. DuckDB đọc lazy từ disk với memory tối thiểu. Codebase có source scan guardrail trong benchmark report để phát hiện bất kỳ <code>pandas.read_csv</code> hay <code>.fetchdf()</code> không được guard.</div>
+    </div>
+    <div class="antipattern-card">
+      <div class="antipattern-title">❌ Python sinh HTML trực tiếp (html_merger pattern)</div>
+      <p class="antipattern-desc">Build HTML bằng string concatenation hoặc thư viện Python thay vì Jinja2 templates.</p>
+      <div class="antipattern-why"><strong>Tại sao bị loại bỏ:</strong> Phá vỡ frontend/backend separation. Kiến trúc đúng là: Python sinh machine JSON → Jinja2 templates render HTML từ JSON đó. Web Dashboard đọc cùng JSON qua API. Trộn HTML generation vào Python business logic tạo monolith không testable.</div>
+    </div>
+    <div class="antipattern-card">
+      <div class="antipattern-title">❌ Probabilistic severity calibration</div>
+      <p class="antipattern-desc">Dùng ML-based calibrator để "đoán" mức độ nghiêm trọng của null field.</p>
+      <div class="antipattern-why"><strong>Tại sao bị loại bỏ:</strong> DBML schema đã cho biết deterministic column nào là PK, FK, NOT NULL. Null ở PK luôn là P0, không có gì phải đoán. Thêm probabilistic ML lên trên knowledge deterministic này chỉ tạo nhiễu và unpredictability.</div>
+    </div>
+    <div class="antipattern-card">
+      <div class="antipattern-title">❌ Hosted/remote Python job runner</div>
+      <p class="antipattern-desc">Deploy profiler như cloud service, người dùng upload data lên server từ xa.</p>
+      <div class="antipattern-why"><strong>Tại sao bị loại bỏ:</strong> Đây là explicit non-goal. Tool là local-first theo thiết kế — data không bao giờ rời khỏi máy người dùng. Web runner bind tới <code>127.0.0.1</code> only. Đây là security requirement, không phải technical limitation.</div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  // ===== THEME =====
+  function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    const newTheme = isDark ? 'light' : 'dark';
+    html.setAttribute('data-theme', newTheme);
+    document.getElementById('themeIcon').textContent = isDark ? '🌙' : '☀️';
+    document.getElementById('themeLabel').textContent = isDark ? 'Dark Mode' : 'Light Mode';
+    localStorage.setItem('vsf-arch-theme', newTheme);
+    // Re-render mermaid with correct theme
+    renderMermaid(newTheme);
+  }
+
+  // ===== TABS =====
+  function switchTab(id, el) {
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    el.classList.add('active');
+  }
+
+  // ===== STAGE EXPAND =====
+  function toggleStage(el) {
+    el.classList.toggle('expanded');
+    const exp = el.querySelector('.stage-expand');
+    if (exp) exp.textContent = el.classList.contains('expanded') ? '▴' : '▾';
+  }
+
+  // ===== ADR EXPAND =====
+  function toggleAdr(header) {
+    header.nextElementSibling.classList.toggle('open');
+  }
+
+  // ===== MERMAID =====
+  function renderMermaid(theme) {
+    const mermaidTheme = theme === 'dark' ? 'dark' : 'default';
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: mermaidTheme,
+      flowchart: { curve: 'basis', padding: 20 },
+      themeVariables: theme === 'dark' ? {
+        primaryColor: '#1f2937',
+        primaryTextColor: '#e6edf3',
+        primaryBorderColor: '#30363d',
+        lineColor: '#58a6ff',
+        secondaryColor: '#161b22',
+        tertiaryColor: '#21262d',
+        background: '#0d1117',
+        nodeBorder: '#30363d',
+        clusterBkg: '#161b22',
+        titleColor: '#e6edf3',
+        edgeLabelBackground: '#21262d',
+      } : {
+        primaryColor: '#dbeafe',
+        primaryTextColor: '#1e3a5f',
+        primaryBorderColor: '#93c5fd',
+        lineColor: '#2563eb',
+        secondaryColor: '#f0f9ff',
+        tertiaryColor: '#e0f2fe',
+        background: '#ffffff',
+      }
+    });
+
+    // Re-render all mermaid divs
+    document.querySelectorAll('.mermaid').forEach(async (el) => {
+      const code = el.getAttribute('data-original') || el.textContent.trim();
+      if (!el.getAttribute('data-original')) {
+        el.setAttribute('data-original', code);
+      }
+      try {
+        const id = 'mermaid-' + Math.random().toString(36).substr(2,9);
+        const { svg } = await mermaid.render(id, code);
+        el.innerHTML = svg;
+      } catch(e) {
+        console.error('Mermaid render error:', e);
+      }
+    });
+  }
+
+  // ===== INIT =====
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Restore saved theme
+    const saved = localStorage.getItem('vsf-arch-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    if (saved === 'light') {
+      document.getElementById('themeIcon').textContent = '🌙';
+      document.getElementById('themeLabel').textContent = 'Dark Mode';
+    }
+
+    // Expand first stage
+    const first = document.querySelector('.stage');
+    if (first) toggleStage(first);
+
+    // Render mermaid
+    await renderMermaid(saved);
+  });
+</script>
+
+</body>
+</html>
