@@ -306,9 +306,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".todo-visual-summary",
         ".todo-summary-card",
         ".todo-signal-card",
-        ".todo-card-grid",
-        ".todo-visual-card",
-        ".todo-issue-chip",
+        ".todo-issue-queue",
+        ".todo-issue-work-card",
         ".todo-more-groups",
         ".todo-compact-row",
         ".quality-gates-section",
@@ -581,9 +580,9 @@ def test_web_review_surfaces_use_single_flow_layouts():
     assert ".dashboard-risk-meter[open] .dashboard-risk-breakdown" in css
     assert ".dashboard-risk-meter:hover .dashboard-risk-breakdown" in css
     assert ".todo-visual-summary" in css
-    assert ".todo-card-grid" in css
-    assert ".todo-visual-card" in css
-    assert ".todo-issue-chip" in css
+    assert ".todo-issue-queue" in css
+    assert ".todo-issue-work-card" in css
+    assert ".todo-work-counts" in css
     assert ".todo-more-groups" in css
     assert ".todo-distribution-row" in css
     assert ".todo-summary-strip" not in css
@@ -661,15 +660,14 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderReportExportSection" in js
     assert "issueForTodoOccurrence" in js
     assert "Open optional selected-issue enrichment evidence." not in js
-    assert "todoOccurrenceEvidenceText" in js
     assert "data-dashboard-scroll=\"drilldown\"" in js
-    assert "todo-issue-chip" in js
-    assert "Linked issues" in js
+    assert "todoIssueWorkItems" in js
+    assert "Open issue for checklist" in js
     assert "open issue detail" not in js
     assert "Copy Fix data Markdown" not in js
     assert "Copy Verify after fix Markdown" not in js
     assert "data-todo-export" not in js
-    assert "Reports and todo exports are ready for review." in js
+    assert "Reports and issue todo summaries are ready for review." in js
     assert "Developer artifacts below" not in js
     assert "getIssueTodosArtifact" in js
     assert "No todos generated" in js

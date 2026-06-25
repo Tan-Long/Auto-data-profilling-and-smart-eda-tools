@@ -535,7 +535,7 @@
       <p class="muted">Plans: {{ fixed_report.issue_action_plans.summary.plan_count }} · human review: {{ fixed_report.issue_action_plans.summary.human_review_count }} · average actionability: {{ fixed_report.issue_action_plans.summary.average_actionability_score }}/100.</p>
       <p class="muted">Main report expands the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans as visual fix cards above. Full deterministic action-plan evidence remains in <code>{{ fixed_report.issue_action_plans.path }}</code>.</p>
       {% if fixed_report.issue_action_plans.remaining_count > 0 %}
-      <p class="muted">{{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in <code>{{ fixed_report.issue_action_plans.path }}</code> and the todo exports.</p>
+      <p class="muted">{{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in <code>{{ fixed_report.issue_action_plans.path }}</code> and the issue todo summary.</p>
       {% endif %}
       <details class="report-details">
         <summary>Action plan table</summary>
@@ -558,47 +558,25 @@
     <section id="todos">
       <h2>Todos</h2>
       {% if fixed_report.todos.available %}
-      <p class="muted">Compact todo snapshot. Full grouped todos remain in <code>{{ fixed_report.todos.path }}</code>.</p>
+      <p class="muted">Issue-first todo queue. Full fix/verify checklist detail belongs in the issue detail drawer and <code>{{ fixed_report.todos.path }}</code>.</p>
       <div class="todo-summary-cards" aria-label="Todo summary">
-        <div><strong>{{ fixed_report.todos.fix_group_count }}</strong><span>Fix data groups</span><p>{{ fixed_report.todos.fix_occurrence_count }} occurrences from deterministic action plans.</p></div>
-        <div><strong>{{ fixed_report.todos.verify_group_count }}</strong><span>Verify groups</span><p>{{ fixed_report.todos.verify_occurrence_count }} occurrences to check after rerun.</p></div>
+        <div><strong>{{ fixed_report.todos.issue_count }}</strong><span>Issues</span><p>Grouped by selected issue, not by repeated todo text.</p></div>
+        <div><strong>{{ fixed_report.todos.fix_occurrence_count }}/{{ fixed_report.todos.verify_occurrence_count }}</strong><span>Fix data / Verify after fix</span><p>Action counts from deterministic issue plans.</p></div>
       </div>
-      <div class="todo-stack">
-        <article class="todo-block">
-          <h3>Fix data snapshot</h3>
-          <div class="todo-card-list">
-            {% for group in fixed_report.todos.fix_display_groups %}
-            <article class="todo-card">
-              <header><code>{{ group.todo_id }}</code><span>{{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}</span></header>
-              <p>{{ group.short_text }}</p>
-              <div class="todo-card-meta"><span>{{ group.tables_text }}</span><span>{{ group.priorities_text }}</span></div>
-            </article>
-            {% else %}
-            <p class="muted">No issue-specific Fix data todos were generated.</p>
-            {% endfor %}
-          </div>
-            {% if fixed_report.todos.fix_remaining_count > 0 %}
-            <p class="todo-more">{{ fixed_report.todos.fix_remaining_count }} additional Fix data groups, including routine repeated steps, remain in <code>{{ fixed_report.todos.path }}</code>.</p>
-            {% endif %}
+      <div class="todo-card-list issue-first">
+        {% for row in fixed_report.todos.issue_rows %}
+        <article class="todo-card issue-first-card">
+          <header><code>{{ row.issue_id }}</code><span class="pill {{ row.severity }}">{{ row.severity }}</span></header>
+          <p><strong>{{ row.field }}</strong> · {{ row.issue_type }}</p>
+          <div class="todo-card-meta"><span>{{ row.fix_count }} fix data</span><span>{{ row.verify_count }} verify after fix</span></div>
         </article>
-        <article class="todo-block">
-          <h3>Verify after fix snapshot</h3>
-          <div class="todo-card-list">
-            {% for group in fixed_report.todos.verify_display_groups %}
-            <article class="todo-card">
-              <header><code>{{ group.todo_id }}</code><span>{{ group.occurrence_count }} occurrence{{ "" if group.occurrence_count == 1 else "s" }}</span></header>
-              <p>{{ group.short_text }}</p>
-              <div class="todo-card-meta"><span>{{ group.tables_text }}</span><span>{{ group.priorities_text }}</span></div>
-            </article>
-            {% else %}
-            <p class="muted">No issue-specific Verify after fix todos were generated.</p>
-            {% endfor %}
-          </div>
-            {% if fixed_report.todos.verify_remaining_count > 0 %}
-            <p class="todo-more">{{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups, including routine repeated checks, remain in <code>{{ fixed_report.todos.path }}</code>.</p>
-            {% endif %}
-        </article>
+        {% else %}
+        <p class="muted">No issue-specific todos were generated.</p>
+        {% endfor %}
       </div>
+      {% if fixed_report.todos.remaining_issue_count > 0 %}
+      <p class="todo-more">{{ fixed_report.todos.remaining_issue_count }} additional issues have todo detail in <code>{{ fixed_report.todos.path }}</code>.</p>
+      {% endif %}
       {% else %}
       <p>{{ fixed_report.todos.message }}</p>
       {% endif %}

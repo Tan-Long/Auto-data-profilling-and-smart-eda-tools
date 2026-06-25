@@ -22,7 +22,7 @@ FIXED_ZIP_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
 PACKAGE_ACTION_PLAN_LIMIT = 5
 PACKAGE_ACTION_PLAN_SUMMARY_LIMIT = 30
 PACKAGE_EVIDENCE_VALUE_LIMIT = 6
-PACKAGE_TODO_GROUP_LIMIT = 3
+PACKAGE_TODO_ISSUE_LIMIT = 6
 REQUIRED_ARTIFACTS = [
     "profile_summary.json",
     "issues.json",
@@ -1025,7 +1025,7 @@ def package_action_plans_html(issue_action_plans: dict[str, Any]) -> str:
     remaining_count = max(0, len(valid_plans) - min(len(valid_plans), PACKAGE_ACTION_PLAN_LIMIT))
     remaining_html = (
         f'<p class="meta">{remaining_count} additional plans are available in '
-        '<code>issue_action_plans.json</code> and the todo exports.</p>'
+        '<code>issue_action_plans.json</code> and the issue todo summary.</p>'
         if remaining_count
         else ""
     )
@@ -1078,20 +1078,13 @@ def package_todos_html(issue_todos: dict[str, Any]) -> str:
     verify_groups = [
         group for group in groups if isinstance(group, dict) and group.get("todo_type") == "verify_after_fix"
     ]
-    fix_display_groups = _package_todo_report_groups(fix_groups, PACKAGE_TODO_GROUP_LIMIT)
-    verify_display_groups = _package_todo_report_groups(verify_groups, PACKAGE_TODO_GROUP_LIMIT)
-    fix_remaining_count = max(0, len(fix_groups) - len(fix_display_groups))
-    verify_remaining_count = max(0, len(verify_groups) - len(verify_display_groups))
-    fix_remaining_html = (
-        f'<p class="todo-more">{fix_remaining_count} additional Fix data groups, including routine repeated steps, remain in '
+    issue_rows = _package_todo_issue_rows(groups, PACKAGE_TODO_ISSUE_LIMIT)
+    issue_count = _package_todo_issue_count(groups)
+    remaining_issue_count = max(0, issue_count - len(issue_rows))
+    remaining_html = (
+        f'<p class="todo-more">{remaining_issue_count} additional issues have todo detail in '
         '<code>issue_todos.json</code>.</p>'
-        if fix_remaining_count
-        else ""
-    )
-    verify_remaining_html = (
-        f'<p class="todo-more">{verify_remaining_count} additional Verify after fix groups, including routine repeated checks, remain in '
-        '<code>issue_todos.json</code>.</p>'
-        if verify_remaining_count
+        if remaining_issue_count
         else ""
     )
     fix_occurrence_count = summary.get("fix_data_occurrence_count", _package_todo_occurrence_total(fix_groups))
@@ -1100,23 +1093,14 @@ def package_todos_html(issue_todos: dict[str, Any]) -> str:
         _package_todo_occurrence_total(verify_groups),
     )
     return f"""
-      <p class="meta">Compact todo snapshot. Full grouped todos remain in <code>issue_todos.json</code>.</p>
+      <p class="meta">Issue-first todo queue. Full fix/verify checklist detail belongs in the issue detail drawer and <code>issue_todos.json</code>.</p>
       <div class="todo-summary-cards" aria-label="Todo summary">
-        <div><strong>{_h(summary.get('fix_data_group_count', len(fix_groups)))}</strong><span>Fix data groups</span><p>{_h(fix_occurrence_count)} occurrences from deterministic action plans.</p></div>
-        <div><strong>{_h(summary.get('verify_after_fix_group_count', len(verify_groups)))}</strong><span>Verify groups</span><p>{_h(verify_occurrence_count)} occurrences to check after rerun.</p></div>
+        <div><strong>{_h(issue_count)}</strong><span>Issues</span><p>Grouped by selected issue, not by repeated todo text.</p></div>
+        <div><strong>{_h(fix_occurrence_count)}/{_h(verify_occurrence_count)}</strong><span>Fix data / Verify after fix</span><p>Action counts from deterministic issue plans.</p></div>
       </div>
-      <div class="stack">
-        <article class="panel">
-          <h3>Fix data snapshot</h3>
-          {_package_todo_group_list_html(fix_display_groups, 'No issue-specific Fix data todos were generated.')}
-          {fix_remaining_html}
-        </article>
-        <article class="panel">
-          <h3>Verify after fix snapshot</h3>
-          {_package_todo_group_list_html(verify_display_groups, 'No issue-specific Verify after fix todos were generated.')}
-          {verify_remaining_html}
-        </article>
-      </div>
+      <h3>Issue todo queue</h3>
+      {_package_todo_issue_list_html(issue_rows)}
+      {remaining_html}
     """
 
 
@@ -1235,17 +1219,70 @@ def _package_list_html(items: Any, empty_text: str) -> str:
     return "<ul>" + "".join(f"<li>{_h(item)}</li>" for item in values) + "</ul>"
 
 
-def _package_todo_group_list_html(groups: list[dict[str, Any]], empty_text: str) -> str:
-    if not groups:
-        return f"<p class=\"meta\">{_h(empty_text)}</p>"
-    items = []
+def _package_todo_issue_count(groups: list[dict[str, Any]]) -> int:
+    issue_ids: set[str] = set()
     for group in groups:
+        occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+        for occurrence in occurrences:
+            if isinstance(occurrence, dict):
+                issue_ids.add(str(occurrence.get("issue_id") or "UNKNOWN"))
+    return len(issue_ids)
+
+
+def _package_todo_issue_rows(groups: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    by_issue: dict[str, dict[str, Any]] = {}
+    for group in groups:
+        occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+        todo_type = str(group.get("todo_type") or "fix_data")
+        for occurrence in occurrences:
+            if not isinstance(occurrence, dict):
+                continue
+            issue_id = str(occurrence.get("issue_id") or "UNKNOWN")
+            item = by_issue.setdefault(
+                issue_id,
+                {
+                    "issue_id": issue_id,
+                    "severity": str(occurrence.get("severity") or "P?"),
+                    "field": _package_todo_occurrence_field(occurrence),
+                    "issue_type": str(occurrence.get("issue_type") or "UNKNOWN").replace("_", " ").title(),
+                    "fix_count": 0,
+                    "verify_count": 0,
+                },
+            )
+            if todo_type == "verify_after_fix":
+                item["verify_count"] += 1
+            else:
+                item["fix_count"] += 1
+    rows = list(by_issue.values())
+    rows.sort(
+        key=lambda row: (
+            _package_priority_rank(str(row.get("severity") or "")),
+            -(int(row.get("fix_count") or 0) + int(row.get("verify_count") or 0)),
+            str(row.get("issue_id") or ""),
+        )
+    )
+    return rows[:limit]
+
+
+def _package_todo_occurrence_field(occurrence: dict[str, Any]) -> str:
+    table = str(occurrence.get("table") or "unknown")
+    columns = occurrence.get("columns")
+    if isinstance(columns, list) and columns:
+        return f"{table}.{', '.join(str(column) for column in columns if str(column).strip())}"
+    return f"{table}.table"
+
+
+def _package_todo_issue_list_html(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return '<p class="meta">No issue-specific todos were generated.</p>'
+    items = []
+    for row in rows:
         items.append(
             f"""
-            <article class="todo-card">
-              <header><code>{_h(group.get('todo_id', 'TODO'))}</code><span>{_h(group.get('occurrence_count', 0))} occurrence{'' if group.get('occurrence_count') == 1 else 's'}</span></header>
-              <p>{_h(group.get('short_text') or group.get('text', 'Todo needs review.'))}</p>
-              <div class="todo-card-meta"><span>{_h(group.get('tables_text', 'table context'))}</span><span>{_h(group.get('priorities_text', 'priority n/a'))}</span></div>
+            <article class="todo-card issue-first-card">
+              <header><code>{_h(row.get('issue_id', 'ISSUE'))}</code><span class="pill {_h(row.get('severity', 'P?'))}">{_h(row.get('severity', 'P?'))}</span></header>
+              <p><strong>{_h(row.get('field', 'table.column'))}</strong> · {_h(row.get('issue_type', 'Issue'))}</p>
+              <div class="todo-card-meta"><span>{_h(row.get('fix_count', 0))} fix data</span><span>{_h(row.get('verify_count', 0))} verify after fix</span></div>
             </article>
             """
         )

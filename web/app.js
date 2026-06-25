@@ -4398,7 +4398,8 @@ function renderTodosSection() {
   }
 
   const summary = artifact.summary || {};
-  els.todosStatus.textContent = `${integerText(summary.todo_group_count)} grouped todos · ${integerText(summary.todo_occurrence_count)} occurrences · source=deterministic`;
+  const issueActionCount = todoIssueWorkItems(allGroups).length;
+  els.todosStatus.textContent = `${integerText(issueActionCount)} issue actions · ${integerText(summary.todo_occurrence_count)} occurrences · source=deterministic`;
   if (!allGroups.length) {
     els.todosGrid.innerHTML = `
       <section class="todo-empty">
@@ -4413,24 +4414,15 @@ function renderTodosSection() {
       ${renderTodoVisualSummary(groups, allGroups, summary)}
       <section class="todo-empty">
         <strong>No ${escapeHtml(todoTypeLabel(state.todoFilter).toLowerCase())} todos match this run.</strong>
-        <p>Switch back to All to review the other todo groups generated for this profile.</p>
+        <p>Switch back to All to review the other issue actions generated for this profile.</p>
       </section>
     `;
     return;
   }
 
-  const todoSections = state.todoFilter === "fix_data"
-    ? [["Fix data", groups]]
-    : state.todoFilter === "verify_after_fix"
-      ? [["Verify after fix", groups]]
-      : [
-          ["Fix data", groups.filter((group) => group.todo_type === "fix_data")],
-          ["Verify after fix", groups.filter((group) => group.todo_type === "verify_after_fix")],
-        ];
-
   els.todosGrid.innerHTML = `
     ${renderTodoVisualSummary(groups, allGroups, summary)}
-    ${todoSections.map(([title, sectionGroups]) => renderTodoGroupSection(title, sectionGroups)).join("")}
+    ${renderTodoIssueQueue(groups)}
   `;
 }
 
@@ -4440,9 +4432,9 @@ function renderReportExportSection() {
     els.reportExportStatus.textContent = state.dashboardLoadingJobId
       ? "Fetching reports"
       : "Waiting for reports";
-    els.reportExportGrid.innerHTML = `<p class="muted">Run a job to open generated reports and copy todo exports.</p>`;
-    els.reportExportTodos.innerHTML = `<p class="muted">Todo exports load after deterministic todos are generated.</p>`;
-    els.reportExportMessage.textContent = "Reports and todo exports are ready after a completed run.";
+    els.reportExportGrid.innerHTML = `<p class="muted">Run a job to open generated reports and review issue todo summaries.</p>`;
+    els.reportExportTodos.innerHTML = `<p class="muted">Issue todo summary loads after deterministic todos are generated.</p>`;
+    els.reportExportMessage.textContent = "Reports and issue todo summaries are ready after a completed run.";
     els.reportExportMessage.dataset.status = "";
     return;
   }
@@ -4461,11 +4453,11 @@ function renderReportExportSection() {
   if (!todoArtifact) {
     els.reportExportTodos.innerHTML = `
       <section class="report-export-empty">
-        <strong>Todo exports unavailable.</strong>
+        <strong>Issue todo summary unavailable.</strong>
         <p>Fix data and Verify after fix exports load when deterministic todos are generated.</p>
       </section>
     `;
-    els.reportExportMessage.textContent = "Todo exports need issue_todos.json from a completed run.";
+    els.reportExportMessage.textContent = "Issue todo summary needs issue_todos.json from a completed run.";
     els.reportExportMessage.dataset.status = "";
     return;
   }
@@ -4473,17 +4465,18 @@ function renderReportExportSection() {
   const groups = Array.isArray(todoArtifact.groups) ? todoArtifact.groups : [];
   const fixGroups = groups.filter((group) => group.todo_type === "fix_data");
   const verifyGroups = groups.filter((group) => group.todo_type === "verify_after_fix");
+  const issueCount = todoIssueWorkItems(groups).length;
   els.reportExportTodos.innerHTML = `
     <div class="runtime-heading compact">
-      <strong>Todo exports</strong>
-      <span>${integerText(groups.length)} groups</span>
+      <strong>Issue todo summary</strong>
+      <span>${integerText(issueCount)} issues</span>
     </div>
     <div class="report-export-todo-split" aria-label="Todo export summary">
       ${renderReportExportTodoSummary("Fix data", fixGroups)}
       ${renderReportExportTodoSummary("Verify after fix", verifyGroups)}
     </div>
   `;
-  els.reportExportMessage.textContent = "Reports and todo exports are ready for review.";
+  els.reportExportMessage.textContent = "Reports and issue todo summaries are ready for review.";
   els.reportExportMessage.dataset.status = "";
 }
 
@@ -4656,10 +4649,11 @@ function renderReportFixPreviewCard(issue) {
 
 function renderReportExportTodoSummary(title, groups) {
   const occurrenceCount = groups.reduce((sum, group) => sum + Number(group.occurrence_count || 0), 0);
+  const issueCount = todoIssueWorkItems(groups).length;
   return `
     <article class="report-export-todo-card">
       <strong>${escapeHtml(title)}</strong>
-      <p>${integerText(groups.length)} groups · ${integerText(occurrenceCount)} occurrences</p>
+      <p>${integerText(issueCount)} issues · ${integerText(occurrenceCount)} actions</p>
     </article>
   `;
 }
@@ -4694,35 +4688,40 @@ function getTodoGroupsForFilter() {
   return groups;
 }
 
-function renderTodoGroupSection(title, groups) {
-  if (!groups.length && state.todoFilter !== "all") {
+function renderTodoIssueQueue(groups) {
+  const items = todoIssueWorkItems(groups);
+  const title = state.todoFilter === "fix_data"
+    ? "Fix data issue queue"
+    : state.todoFilter === "verify_after_fix"
+      ? "Verify after fix issue queue"
+      : "Issue work queue";
+  if (!items.length && state.todoFilter !== "all") {
     return `
       <section class="todo-type-section">
         <h4>${escapeHtml(title)}</h4>
-        <p class="muted">No ${escapeHtml(title.toLowerCase())} todos match this run.</p>
+        <p class="muted">No ${escapeHtml(todoTypeLabel(state.todoFilter).toLowerCase())} issue actions match this run.</p>
       </section>
     `;
   }
-  if (!groups.length) {
+  if (!items.length) {
     return "";
   }
-  const orderedGroups = todoGroupsForVisualDisplay(groups);
-  const visibleGroups = orderedGroups.slice(0, 4);
-  const remainingGroups = orderedGroups.slice(visibleGroups.length);
-  const maxOccurrences = Math.max(...visibleGroups.map((group) => Number(group.occurrence_count || 0)), 1);
+  const visibleItems = items.slice(0, 8);
+  const remainingItems = items.slice(visibleItems.length);
+  const occurrenceCount = items.reduce((total, item) => total + item.totalCount, 0);
   return `
     <section class="todo-type-section visual">
       <div class="todo-type-heading">
         <div>
-          <h4>${escapeHtml(title)} focus</h4>
-          <p>${integerText(groups.length)} groups · ${integerText(todoOccurrenceTotal(groups))} occurrences</p>
+          <h4>${escapeHtml(title)}</h4>
+          <p>${integerText(items.length)} issues · ${integerText(occurrenceCount)} todo occurrences</p>
         </div>
-        <span>${escapeHtml(title)}</span>
+        <span>Open issue for checklist</span>
       </div>
-      <div class="todo-card-grid">
-        ${visibleGroups.map((group) => renderTodoVisualCard(group, maxOccurrences)).join("")}
+      <div class="todo-issue-queue">
+        ${visibleItems.map(renderTodoIssueWorkCard).join("")}
       </div>
-      ${remainingGroups.length ? renderTodoRemainingGroups(remainingGroups) : ""}
+      ${remainingItems.length ? renderTodoRemainingIssues(remainingItems) : ""}
     </section>
   `;
 }
@@ -4784,107 +4783,120 @@ function renderTodoDistributionCard(title, rows, emptyText) {
   `;
 }
 
-function renderTodoVisualCard(group, maxOccurrences) {
-  const occurrenceCount = Number(group.occurrence_count || 0);
-  const occurrences = Array.isArray(group.occurrences) ? group.occurrences : [];
-  const width = Math.max(5, Math.round(occurrenceCount / Math.max(maxOccurrences, 1) * 100));
-  const priorityTags = todoPriorityTags(group);
-  const tableTags = todoTableTags(group);
+function todoIssueWorkItems(groups) {
+  const byIssue = new Map();
+  groups.forEach((group) => {
+    const occurrences = Array.isArray(group.occurrences) ? group.occurrences : [];
+    occurrences.forEach((occurrence) => {
+      const issueId = occurrence.issue_id || "UNKNOWN";
+      const issue = issueForTodoOccurrence(occurrence);
+      if (!byIssue.has(issueId)) {
+        byIssue.set(issueId, {
+          issueId,
+          issue,
+          occurrence,
+          severity: occurrence.severity || issue?.severity || "P?",
+          table: occurrence.table || issue?.table || "unknown",
+          columns: Array.isArray(occurrence.columns) && occurrence.columns.length
+            ? occurrence.columns
+            : (Array.isArray(issue?.columns) ? issue.columns : []),
+          issueType: occurrence.issue_type || issue?.issue_type || "UNKNOWN",
+          findingSummary: occurrence.finding_summary || todoFindingFromIssue(issue),
+          fixTexts: [],
+          verifyTexts: [],
+          fixCount: 0,
+          verifyCount: 0,
+          totalCount: 0,
+        });
+      }
+      const item = byIssue.get(issueId);
+      const text = todoShortText(group.text || "Todo needs review.", 118);
+      if (group.todo_type === "verify_after_fix") {
+        item.verifyCount += 1;
+        addUniqueTodoText(item.verifyTexts, text);
+      } else {
+        item.fixCount += 1;
+        addUniqueTodoText(item.fixTexts, text);
+      }
+      item.totalCount += 1;
+    });
+  });
+  return [...byIssue.values()].sort((a, b) => (
+    severityRank(a.severity) - severityRank(b.severity) ||
+    b.totalCount - a.totalCount ||
+    a.issueId.localeCompare(b.issueId)
+  ));
+}
+
+function addUniqueTodoText(target, text) {
+  if (!text || target.includes(text)) {
+    return;
+  }
+  target.push(text);
+}
+
+function renderTodoIssueWorkCard(item) {
+  const field = todoIssueField(item);
+  const status = issueStatus(item.issue || item.occurrence);
+  const preview = todoIssuePreviewText(item);
   return `
-    <article class="todo-visual-card">
-      <div class="todo-card-head">
-        <code>${escapeHtml(group.todo_id || "TODO")}</code>
-        <span>${integerText(occurrenceCount)} occurrence${occurrenceCount === 1 ? "" : "s"}</span>
-      </div>
-      <strong>${escapeHtml(todoShortText(group.text || "Todo needs human review.", 116))}</strong>
-      <div class="todo-card-meter" aria-label="${integerText(occurrenceCount)} occurrences">
-        <span style="width: ${width}%"></span>
-      </div>
-      <div class="todo-card-tags">
-        ${tableTags.map((table) => `<span>${escapeHtml(table)}</span>`).join("")}
-        ${priorityTags.map((priority) => `<span>${escapeHtml(priority)}</span>`).join("")}
-      </div>
-      ${renderTodoLinkedIssues(occurrences)}
-    </article>
+    <button class="todo-issue-work-card" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(item.issueId)}" data-dashboard-label="${escapeHtml(item.issueId)}" data-dashboard-scroll="drilldown">
+      <span class="issue-pill ${issueStatusClass(status)}">${escapeHtml(item.severity)}</span>
+      <span class="todo-work-main">
+        <code>${escapeHtml(item.issueId)}</code>
+        <strong>${escapeHtml(field)}</strong>
+        <small>${escapeHtml(todoIssueTypeLabel(item.issueType))}</small>
+      </span>
+      <span class="todo-work-counts" aria-label="Todo counts">
+        <span>${integerText(item.fixCount)} fix</span>
+        <span>${integerText(item.verifyCount)} verify</span>
+      </span>
+      <span class="todo-work-preview">${escapeHtml(preview)}</span>
+    </button>
   `;
 }
 
-function renderTodoRemainingGroups(groups) {
+function todoIssueField(item) {
+  const columns = item.columns.length ? item.columns.join(", ") : "table";
+  return `${item.table}.${columns}`;
+}
+
+function todoIssuePreviewText(item) {
+  const firstFix = item.fixTexts.find((text) => !isRoutineTodoText(text)) || item.fixTexts[0];
+  const firstVerify = item.verifyTexts.find((text) => !isRoutineTodoText(text)) || item.verifyTexts[0];
+  if (state.todoFilter === "verify_after_fix") {
+    return firstVerify || "Open issue detail to review verification checklist.";
+  }
+  if (state.todoFilter === "fix_data") {
+    return firstFix || "Open issue detail to review fix checklist.";
+  }
+  if (firstFix && firstVerify) {
+    return `Fix: ${firstFix} Verify: ${firstVerify}`;
+  }
+  return firstFix || firstVerify || item.findingSummary || "Open issue detail to review fix and verify checklist.";
+}
+
+function renderTodoRemainingIssues(items) {
   return `
     <details class="todo-more-groups">
-      <summary>Show ${integerText(groups.length)} more todo group${groups.length === 1 ? "" : "s"}</summary>
+      <summary>Show ${integerText(items.length)} more issue${items.length === 1 ? "" : "s"}</summary>
       <div class="todo-compact-list">
-        ${groups.map(renderTodoCompactGroup).join("")}
+        ${items.map(renderTodoCompactIssue).join("")}
       </div>
     </details>
   `;
 }
 
-function renderTodoCompactGroup(group) {
-  const occurrenceCount = Number(group.occurrence_count || 0);
+function renderTodoCompactIssue(item) {
+  const status = issueStatus(item.issue || item.occurrence);
   return `
-    <article class="todo-compact-row">
-      <code>${escapeHtml(group.todo_id || "TODO")}</code>
-      <strong>${escapeHtml(todoShortText(group.text || "Todo needs human review.", 88))}</strong>
-      <span>${integerText(occurrenceCount)}</span>
-      <div class="todo-compact-issues">
-        ${renderTodoLinkedIssues(Array.isArray(group.occurrences) ? group.occurrences.slice(0, 3) : [], { compact: true })}
-      </div>
-    </article>
-  `;
-}
-
-function renderTodoLinkedIssues(occurrences, options = {}) {
-  const limit = options.compact ? 3 : 4;
-  const visibleOccurrences = (Array.isArray(occurrences) ? occurrences : [])
-    .slice()
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || String(a.issue_id || "").localeCompare(String(b.issue_id || "")))
-    .slice(0, limit);
-  if (!visibleOccurrences.length) {
-    return "";
-  }
-  const remaining = Math.max(0, occurrences.length - visibleOccurrences.length);
-  return `
-    <div class="${options.compact ? "todo-linked-issues compact" : "todo-linked-issues"}" aria-label="Linked issues">
-      ${visibleOccurrences.map(renderTodoIssueChip).join("")}
-      ${remaining ? `<span class="todo-issue-more">+${integerText(remaining)}</span>` : ""}
-    </div>
-  `;
-}
-
-function renderTodoIssueChip(occurrence) {
-  const issue = issueForTodoOccurrence(occurrence);
-  const issueId = occurrence.issue_id || "UNKNOWN";
-  const table = occurrence.table || issue?.table || "unknown";
-  const columns = Array.isArray(occurrence.columns) && occurrence.columns.length
-    ? occurrence.columns.join(", ")
-    : "table";
-  const severity = occurrence.severity || issue?.severity || "P?";
-  const evidence = todoOccurrenceEvidenceText(occurrence, issue);
-  return `
-    <button class="todo-issue-chip" type="button" title="${escapeHtml(evidence)}" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(issueId)}" data-dashboard-label="${escapeHtml(issueId)}" data-dashboard-scroll="drilldown">
-      <span class="issue-pill ${issueStatusClass(issueStatus(issue || occurrence))}">${escapeHtml(severity)}</span>
-      <code>${escapeHtml(issueId)}</code>
-      <span>${escapeHtml(table)}.${escapeHtml(columns)}</span>
+    <button class="todo-compact-row" type="button" data-dashboard-kind="issue" data-dashboard-value="${escapeHtml(item.issueId)}" data-dashboard-label="${escapeHtml(item.issueId)}" data-dashboard-scroll="drilldown">
+      <code>${escapeHtml(item.issueId)}</code>
+      <strong>${escapeHtml(todoIssueField(item))}</strong>
+      <span class="issue-pill ${issueStatusClass(status)}">${escapeHtml(item.severity)}</span>
+      <small>${integerText(item.fixCount)} fix · ${integerText(item.verifyCount)} verify</small>
     </button>
   `;
-}
-
-function todoGroupsForVisualDisplay(groups) {
-  const sorted = groups.slice().sort(todoGroupVisualSort);
-  const nonRoutine = sorted.filter((group) => !isRoutineTodoGroup(group));
-  return nonRoutine.length ? [...nonRoutine, ...sorted.filter((group) => isRoutineTodoGroup(group))] : sorted;
-}
-
-function todoGroupVisualSort(a, b) {
-  return todoGroupPriorityRank(a) - todoGroupPriorityRank(b) ||
-    Number(b.occurrence_count || 0) - Number(a.occurrence_count || 0) ||
-    String(a.todo_id || a.text || "").localeCompare(String(b.todo_id || b.text || ""));
-}
-
-function todoGroupPriorityRank(group) {
-  const priorities = todoPriorityTags(group);
-  return Math.min(...priorities.map(severityRank), severityOrder.length);
 }
 
 function todoPriorityRows(groups, limit) {
@@ -4963,7 +4975,11 @@ function todoShortText(value, maxLength) {
 }
 
 function isRoutineTodoGroup(group) {
-  const text = String(group.text || "").toLowerCase();
+  return isRoutineTodoText(group.text);
+}
+
+function isRoutineTodoText(value) {
+  const text = String(value || "").toLowerCase();
   return text.includes("do not edit generated artifacts") ||
     text.includes("rerun the profiler on the corrected csv + dbml inputs");
 }
@@ -4993,34 +5009,6 @@ function todoIssueTypeLabel(value) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ") || "Unknown";
-}
-
-function todoOccurrenceEvidenceText(occurrence, issue) {
-  const parts = [];
-  if (issue?.bad_count !== undefined && issue?.total_count !== undefined) {
-    parts.push(`${integerText(issue.bad_count)}/${integerText(issue.total_count)} rows`);
-  }
-  const sampleKeys = Array.isArray(issue?.sample_keys) ? issue.sample_keys.filter(Boolean) : [];
-  if (sampleKeys.length) {
-    parts.push(`sample key ${sampleKeys.slice(0, 3).join(", ")}`);
-  }
-  if (issue?.sample_bad_rows_path) {
-    parts.push(`sample rows ${issue.sample_bad_rows_path}`);
-  }
-  const parentTable = occurrence.parent_table || issue?.parent_table;
-  const parentColumns = Array.isArray(occurrence.parent_columns) && occurrence.parent_columns.length
-    ? occurrence.parent_columns
-    : (Array.isArray(issue?.parent_columns) ? issue.parent_columns : []);
-  if (parentTable) {
-    parts.push(`parent ${parentTable}.${parentColumns.length ? parentColumns.join(", ") : "key"}`);
-  }
-  const cause = Array.isArray(issue?.probable_causes) ? issue.probable_causes.find(Boolean) : "";
-  if (cause) {
-    parts.push(cause);
-  }
-  return parts.length
-    ? `Evidence: ${parts.join(" · ")}`
-    : "Evidence: open the issue detail drawer for generated sample rows and query context.";
 }
 
 function objectOrEmpty(value) {

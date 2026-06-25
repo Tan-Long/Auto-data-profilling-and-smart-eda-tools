@@ -605,7 +605,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await expect(reportExport).toContainText("report.html");
   await expect(reportExport).not.toContainText("Markdown report");
   await expect(reportExport).not.toContainText("report.md");
-  await expect(reportExport).toContainText("Todo exports");
+  await expect(reportExport).toContainText("Issue todo summary");
   await expect(reportExport).toContainText("Fix data");
   await expect(reportExport).toContainText("Verify after fix");
   await expect(reportExport).not.toContainText("Copy Fix data Markdown");
@@ -654,7 +654,7 @@ test("local path run renders the interactive dashboard from generated artifacts"
   });
   await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
   await expect(page.locator("#qualityGatesStatus")).toContainText("source=deterministic");
-  await expect(page.locator("#todosStatus")).toContainText("grouped todos");
+  await expect(page.locator("#todosStatus")).toContainText("issue actions");
   fs.mkdirSync("outputs/us073_goal4", { recursive: true });
   await page.locator("#dashboardPanelGrid").scrollIntoViewIfNeeded();
   await page.locator("#dashboardPanelGrid").screenshot({
@@ -791,17 +791,18 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator('#workflowNav .nav-subitem[data-workflow-nav-target="todos"]').click();
   await expect(page.locator('#workflowNav .nav-subitem[data-workflow-nav-target="todos"]')).toHaveAttribute("aria-current", "step");
   await expect(page.locator("#todos .todo-visual-summary")).toBeVisible();
-  await expect(page.locator("#todos .todo-visual-card").first()).toBeVisible();
-  const linkedTodoIssue = page.locator("#todos .todo-issue-chip").first();
+  await expect(page.locator("#todos .todo-issue-work-card").first()).toBeVisible();
+  await expect(page.locator("#todos")).toContainText("Issue work queue");
+  const linkedTodoIssue = page.locator("#todos .todo-issue-work-card").first();
   await expect(linkedTodoIssue).toBeVisible();
   await linkedTodoIssue.click();
   await expect(page.locator("#dashboardDrilldownMeta")).toContainText(/ISSUE-/);
   await expect(page.locator("#dashboardDrilldown")).toContainText("Evidence facts");
   await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todosFilterVerify").click();
-  await expect(page.locator("#todos")).toContainText("Verify after fix focus");
-  await expect(page.locator("#todos .todo-visual-card").first()).toBeVisible();
-  await expect(page.locator("#todos .todo-issue-chip").first()).toBeVisible();
+  await expect(page.locator("#todos")).toContainText("Verify after fix issue queue");
+  await expect(page.locator("#todos .todo-issue-work-card").first()).toBeVisible();
+  await expect(page.locator("#todos")).toContainText("Open issue for checklist");
   await page.locator("#todos").scrollIntoViewIfNeeded();
   await page.locator("#todos").screenshot({
     path: "outputs/us073_goal6/global-todos-tab.png",

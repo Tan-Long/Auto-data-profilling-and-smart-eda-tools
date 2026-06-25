@@ -263,7 +263,7 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     await goToProfileStep(page, "review");
     await expect(page.locator("#qualityGates")).toContainText("Quality Gates");
     await expect(page.locator("#dashboard")).toContainText("Review Issues");
-    await expect(page.locator("#todosStatus")).toContainText("grouped todos");
+    await expect(page.locator("#todosStatus")).toContainText("issue actions");
     await expect(page.locator("#reportExportStatus")).toContainText("Reports ready");
     await expect(page.locator("#tableImpactStatus")).toContainText("tables from table_assessments.json");
     await expect(page.locator("#graphs")).toHaveCount(0);
@@ -314,12 +314,12 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     );
 
     await page.locator("#todosFilterVerify").click();
-    await expect(page.locator("#todos")).toContainText("Verify after fix focus");
+    await expect(page.locator("#todos")).toContainText("Verify after fix issue queue");
     await expect(page.locator("#todos .todo-visual-summary")).toBeVisible();
-    await expect(page.locator("#todos .todo-visual-card").first()).toBeVisible();
-    await expect(page.locator("#todos .todo-issue-chip").first()).toBeVisible();
+    await expect(page.locator("#todos .todo-issue-work-card").first()).toBeVisible();
+    await expect(page.locator("#todos")).toContainText("Open issue for checklist");
     await expect(page.locator("#reportExport")).toContainText("Report preview");
-    await expect(page.locator("#reportExport")).toContainText("Todo exports");
+    await expect(page.locator("#reportExport")).toContainText("Issue todo summary");
     await expect(page.locator("#reportExport [data-todo-export]")).toHaveCount(0);
     await expect(page.locator('#reportExport a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
     await expect(page.locator('#reportExport button[data-dashboard-open-llm="true"]')).toContainText("Open issue LLM add-on");
@@ -339,8 +339,8 @@ test("demo user can complete upload, demo, evaluate, report, and post-run review
     record(
       matrix,
       "Todos and report export",
-      "Todo filters and report export copy buttons work, and report.html opens with fixed sections.",
-      "Verify filter showed expected todos, both copy buttons reported success, and report.html opened.",
+      "Todo filters show an issue queue, and report.html opens with fixed sections.",
+      "Verify filter showed issue-first todos and report.html opened.",
       await screenshot(page.locator("#reportExport"), "11-report-export-copy.png"),
     );
 

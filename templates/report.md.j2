@@ -106,7 +106,7 @@ Plans: {{ fixed_report.issue_action_plans.summary.plan_count }}. Human review re
 Main report shows the first {{ fixed_report.issue_action_plans.display_limit }} highest-priority plans as visual fix cards above. Full deterministic action-plan evidence remains in `{{ fixed_report.issue_action_plans.path }}`.
 
 {% if fixed_report.issue_action_plans.remaining_count > 0 -%}
-{{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in `{{ fixed_report.issue_action_plans.path }}` and the todo exports.
+{{ fixed_report.issue_action_plans.remaining_count }} additional plans are available in `{{ fixed_report.issue_action_plans.path }}` and the issue todo summary.
 {% endif %}
 {% else -%}
 {{ fixed_report.issue_action_plans.message }}
@@ -115,34 +115,19 @@ Main report shows the first {{ fixed_report.issue_action_plans.display_limit }} 
 ## Todos
 
 {% if fixed_report.todos.available -%}
-Todo snapshot: {{ fixed_report.todos.fix_group_count }} Fix data groups ({{ fixed_report.todos.fix_occurrence_count }} occurrences) and {{ fixed_report.todos.verify_group_count }} Verify after fix groups ({{ fixed_report.todos.verify_occurrence_count }} occurrences).
+Issue-first todo queue: {{ fixed_report.todos.issue_count }} issues with {{ fixed_report.todos.fix_occurrence_count }} Fix data actions and {{ fixed_report.todos.verify_occurrence_count }} Verify after fix checks.
 
-This report shows up to {{ fixed_report.todos.display_limit }} highest-priority non-routine groups per type. Full grouped todos remain in `{{ fixed_report.todos.path }}`.
+This report shows up to {{ fixed_report.todos.display_limit }} highest-priority issues. Full fix/verify checklist detail belongs in the issue detail drawer and `{{ fixed_report.todos.path }}`.
 
-### Fix data snapshot
-
-| Todo | Action | Where | Count |
-| --- | --- | --- | ---: |
-{% for group in fixed_report.todos.fix_display_groups -%}
-| {{ group.todo_id }} | {{ group.short_text }} | {{ group.tables_text }} · {{ group.priorities_text }} | {{ group.occurrence_count }} |
+| Issue | Where | Problem | Fix data | Verify after fix |
+| --- | --- | --- | ---: | ---: |
+{% for row in fixed_report.todos.issue_rows -%}
+| {{ row.severity }} {{ row.issue_id }} | {{ row.field }} | {{ row.issue_type }} | {{ row.fix_count }} | {{ row.verify_count }} |
 {% else -%}
-| - | No issue-specific Fix data todos were generated. | - | 0 |
+| - | No issue-specific todos were generated. | - | 0 | 0 |
 {% endfor %}
-{% if fixed_report.todos.fix_remaining_count > 0 -%}
-{{ fixed_report.todos.fix_remaining_count }} additional Fix data groups, including routine repeated steps, remain in `{{ fixed_report.todos.path }}`.
-{% endif %}
-
-### Verify after fix snapshot
-
-| Todo | Check | Where | Count |
-| --- | --- | --- | ---: |
-{% for group in fixed_report.todos.verify_display_groups -%}
-| {{ group.todo_id }} | {{ group.short_text }} | {{ group.tables_text }} · {{ group.priorities_text }} | {{ group.occurrence_count }} |
-{% else -%}
-| - | No issue-specific Verify after fix todos were generated. | - | 0 |
-{% endfor %}
-{% if fixed_report.todos.verify_remaining_count > 0 -%}
-{{ fixed_report.todos.verify_remaining_count }} additional Verify after fix groups, including routine repeated checks, remain in `{{ fixed_report.todos.path }}`.
+{% if fixed_report.todos.remaining_issue_count > 0 -%}
+{{ fixed_report.todos.remaining_issue_count }} additional issues have todo detail in `{{ fixed_report.todos.path }}`.
 {% endif %}
 {% else -%}
 {{ fixed_report.todos.message }}

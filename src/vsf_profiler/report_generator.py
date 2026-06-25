@@ -20,7 +20,7 @@ RELATIONSHIP_ISSUES = {
 }
 MAIN_REPORT_ACTION_PLAN_LIMIT = 5
 MAIN_REPORT_EVIDENCE_VALUE_LIMIT = 6
-MAIN_REPORT_TODO_GROUP_LIMIT = 3
+MAIN_REPORT_TODO_ISSUE_LIMIT = 6
 DEVELOPER_ARTIFACT_LABELS = {
     "connector_metadata.json": "Connector Metadata",
     "lineage_graph.json": "Developer Runtime Context",
@@ -561,9 +561,10 @@ def _issue_todos_context(artifact: dict[str, Any] | None) -> dict[str, Any]:
             "summary": {},
             "fix_groups": [],
             "verify_groups": [],
-            "fix_display_groups": [],
-            "verify_display_groups": [],
-            "display_limit": MAIN_REPORT_TODO_GROUP_LIMIT,
+            "issue_rows": [],
+            "display_limit": MAIN_REPORT_TODO_ISSUE_LIMIT,
+            "issue_count": 0,
+            "remaining_issue_count": 0,
             "fix_remaining_count": 0,
             "verify_remaining_count": 0,
             "message": "issue_todos.json was not available, so fix and verification todos are partial.",
@@ -571,8 +572,8 @@ def _issue_todos_context(artifact: dict[str, Any] | None) -> dict[str, Any]:
     groups = [dict(group) for group in artifact.get("groups", []) if isinstance(group, dict)]
     fix_groups = [group for group in groups if group.get("todo_type") == "fix_data"]
     verify_groups = [group for group in groups if group.get("todo_type") == "verify_after_fix"]
-    fix_display_groups = _todo_report_groups(fix_groups, MAIN_REPORT_TODO_GROUP_LIMIT)
-    verify_display_groups = _todo_report_groups(verify_groups, MAIN_REPORT_TODO_GROUP_LIMIT)
+    issue_rows = _todo_issue_report_rows(groups, MAIN_REPORT_TODO_ISSUE_LIMIT)
+    issue_count = _todo_issue_count(groups)
     summary = artifact.get("summary") or {}
     return {
         "available": True,
@@ -580,17 +581,79 @@ def _issue_todos_context(artifact: dict[str, Any] | None) -> dict[str, Any]:
         "summary": summary,
         "fix_groups": fix_groups[:30],
         "verify_groups": verify_groups[:30],
-        "fix_display_groups": fix_display_groups,
-        "verify_display_groups": verify_display_groups,
-        "display_limit": MAIN_REPORT_TODO_GROUP_LIMIT,
+        "issue_rows": issue_rows,
+        "display_limit": MAIN_REPORT_TODO_ISSUE_LIMIT,
+        "issue_count": issue_count,
         "fix_group_count": int(summary.get("fix_data_group_count") or len(fix_groups)),
         "verify_group_count": int(summary.get("verify_after_fix_group_count") or len(verify_groups)),
         "fix_occurrence_count": int(summary.get("fix_data_occurrence_count") or _todo_occurrence_total(fix_groups)),
         "verify_occurrence_count": int(summary.get("verify_after_fix_occurrence_count") or _todo_occurrence_total(verify_groups)),
-        "fix_remaining_count": max(0, len(fix_groups) - len(fix_display_groups)),
-        "verify_remaining_count": max(0, len(verify_groups) - len(verify_display_groups)),
-        "message": "Report shows a compact todo snapshot. Full grouped todos remain in issue_todos.json.",
+        "remaining_issue_count": max(0, issue_count - len(issue_rows)),
+        "fix_remaining_count": max(0, len(fix_groups)),
+        "verify_remaining_count": max(0, len(verify_groups)),
+        "message": "Report shows an issue-first todo queue. Full checklist detail remains in issue action plans and issue_todos.json.",
     }
+
+
+def _todo_issue_count(groups: list[dict[str, Any]]) -> int:
+    issue_ids: set[str] = set()
+    for group in groups:
+        occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+        for occurrence in occurrences:
+            if isinstance(occurrence, dict):
+                issue_ids.add(str(occurrence.get("issue_id") or "UNKNOWN"))
+    return len(issue_ids)
+
+
+def _todo_issue_report_rows(groups: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    by_issue: dict[str, dict[str, Any]] = {}
+    for group in groups:
+        occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+        todo_type = str(group.get("todo_type") or "fix_data")
+        text = _report_short_text(str(group.get("text") or "Todo needs review."), 94)
+        for occurrence in occurrences:
+            if not isinstance(occurrence, dict):
+                continue
+            issue_id = str(occurrence.get("issue_id") or "UNKNOWN")
+            item = by_issue.setdefault(
+                issue_id,
+                {
+                    "issue_id": issue_id,
+                    "severity": str(occurrence.get("severity") or "P?"),
+                    "field": _todo_occurrence_field(occurrence),
+                    "issue_type": str(occurrence.get("issue_type") or "UNKNOWN").replace("_", " ").title(),
+                    "finding_summary": str(occurrence.get("finding_summary") or ""),
+                    "fix_count": 0,
+                    "verify_count": 0,
+                    "fix_preview": "",
+                    "verify_preview": "",
+                },
+            )
+            if todo_type == "verify_after_fix":
+                item["verify_count"] += 1
+                if not item["verify_preview"] or _is_routine_report_todo_text(item["verify_preview"]):
+                    item["verify_preview"] = text
+            else:
+                item["fix_count"] += 1
+                if not item["fix_preview"] or _is_routine_report_todo_text(item["fix_preview"]):
+                    item["fix_preview"] = text
+    rows = list(by_issue.values())
+    rows.sort(
+        key=lambda row: (
+            _priority_rank(str(row.get("severity") or "")),
+            -(int(row.get("fix_count") or 0) + int(row.get("verify_count") or 0)),
+            str(row.get("issue_id") or ""),
+        )
+    )
+    return rows[:limit]
+
+
+def _todo_occurrence_field(occurrence: dict[str, Any]) -> str:
+    table = str(occurrence.get("table") or "unknown")
+    columns = occurrence.get("columns")
+    if isinstance(columns, list) and columns:
+        return f"{table}.{', '.join(str(column) for column in columns if str(column).strip())}"
+    return f"{table}.table"
 
 
 def _todo_report_groups(groups: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -628,7 +691,11 @@ def _todo_occurrence_total(groups: list[dict[str, Any]]) -> int:
 
 
 def _is_routine_report_todo(group: dict[str, Any]) -> bool:
-    text = " ".join(str(group.get("text") or "").lower().split())
+    return _is_routine_report_todo_text(str(group.get("text") or ""))
+
+
+def _is_routine_report_todo_text(value: str) -> bool:
+    text = " ".join(str(value or "").lower().split())
     routine_fragments = [
         "do not edit generated artifacts",
         "rerun the profiler on the corrected csv + dbml inputs",

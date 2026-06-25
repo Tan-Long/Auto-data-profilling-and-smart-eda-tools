@@ -4704,7 +4704,6 @@ button.report-export-card {
 .todo-summary-card,
 .todo-signal-card,
 .todo-empty,
-.todo-visual-card,
 .todo-compact-row {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -4835,124 +4834,88 @@ button.report-export-card {
   color: var(--foreground-primary);
 }
 
-.todo-card-grid {
+.todo-issue-queue {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
-.todo-visual-card {
+.todo-issue-work-card {
   display: grid;
-  align-content: start;
+  grid-template-columns: auto minmax(150px, 0.9fr) max-content minmax(220px, 1.25fr);
   gap: 10px;
-  min-width: 0;
-  padding: 12px;
-}
-
-.todo-card-head {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 66px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  color: var(--foreground-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.todo-issue-work-card:hover,
+.todo-issue-work-card:focus-visible {
+  border-color: var(--accent);
+  background: #f6fbf8;
+  outline: none;
+}
+
+.todo-issue-work-card:focus-visible {
+  box-shadow: 0 0 0 3px rgba(15, 118, 100, 0.16);
+}
+
+.todo-work-main {
+  display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
-.todo-card-head code {
+.todo-work-main code {
   color: var(--accent-strong);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.todo-card-head span,
-.todo-issue-more {
-  color: var(--foreground-tertiary);
   font-size: 11px;
   font-weight: 900;
-  text-transform: uppercase;
 }
 
-.todo-visual-card > strong {
+.todo-work-main strong,
+.todo-work-preview {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-work-main strong {
   color: var(--foreground-primary);
   font-size: 13px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
-.todo-card-meter {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--surface-inset);
+.todo-work-main small,
+.todo-work-preview {
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.3;
 }
 
-.todo-card-meter span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-}
-
-.todo-card-tags,
-.todo-linked-issues {
+.todo-work-counts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
+  justify-content: flex-end;
+  gap: 5px;
 }
 
-.todo-card-tags span {
+.todo-work-counts span {
   padding: 3px 7px;
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   background: var(--surface-overlay);
   color: var(--foreground-secondary);
   font-size: 11px;
-  font-weight: 800;
-}
-
-.todo-linked-issues {
-  padding-top: 2px;
-}
-
-.todo-issue-chip {
-  display: inline-grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: center;
-  gap: 5px;
-  max-width: 100%;
-  min-height: 28px;
-  padding: 3px 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--surface-panel);
-  color: var(--foreground-primary);
-  cursor: pointer;
-}
-
-.todo-issue-chip:hover,
-.todo-issue-chip:focus-visible {
-  border-color: var(--accent);
-  background: #f6fbf8;
-  outline: none;
-}
-
-.todo-issue-chip:focus-visible {
-  box-shadow: 0 0 0 3px rgba(15, 118, 100, 0.16);
-}
-
-.todo-issue-chip code {
-  color: var(--foreground-primary);
-  font-size: 11px;
-}
-
-.todo-issue-chip > span:last-child {
-  min-width: 0;
-  color: var(--foreground-secondary);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .todo-more-groups {
@@ -4983,10 +4946,14 @@ button.report-export-card {
 
 .todo-compact-row {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
   gap: 8px;
   align-items: center;
+  width: 100%;
   padding: 8px;
+  color: var(--foreground-primary);
+  text-align: left;
+  cursor: pointer;
 }
 
 .todo-compact-row > code {
@@ -5005,6 +4972,13 @@ button.report-export-card {
 
 .todo-compact-row > span {
   color: var(--foreground-tertiary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.todo-compact-row > small {
+  color: var(--foreground-secondary);
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
@@ -6695,7 +6669,7 @@ details.runtime-stage-item:focus-within {
   .status-strip,
   .dashboard-summary-strip,
   .todo-visual-summary,
-  .todo-card-grid,
+  .todo-issue-work-card,
   .dashboard-layout,
   .dashboard-panel-grid,
   .generated-result-grid,
@@ -6731,7 +6705,6 @@ details.runtime-stage-item:focus-within {
   .quality-gate-context-groups,
   .issue-inbox-row,
   .todo-compact-row,
-  .todo-issue-chip,
   .evidence-value {
     grid-template-columns: 1fr;
   }
