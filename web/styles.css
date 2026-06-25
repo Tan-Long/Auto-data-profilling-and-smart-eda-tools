@@ -3613,30 +3613,40 @@ h3 {
 
 .drilldown-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .drilldown-summary div {
-  padding: 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  min-width: 118px;
+  padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-panel);
 }
 
 .drilldown-summary span {
-  display: block;
+  display: inline;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 900;
+  line-height: 1;
 }
 
 .drilldown-summary p {
-  margin: 2px 0 0;
+  margin: 0;
   color: var(--foreground-secondary);
   font-size: 11px;
   font-weight: 800;
+  line-height: 1.1;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .drilldown-artifacts {
@@ -7006,8 +7016,7 @@ details.runtime-stage-item:focus-within {
   .dashboard-issue-row,
   .stage-summary,
   .issue-visual-grid,
-  .issue-focus-map,
-  .drilldown-summary {
+  .issue-focus-map {
     grid-template-columns: 1fr;
   }
 

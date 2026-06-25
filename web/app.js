@@ -5589,12 +5589,14 @@ function renderDashboardDrilldown() {
     }
   }
   const issues = dashboardIssuesForSelection(selection);
+  const tableCount = uniqueSorted(issues.map((issue) => issue.table).filter(Boolean)).length;
+  const badRowCount = sum(issues.map((issue) => Number(issue.bad_count || 0)));
   els.dashboardDrilldownMeta.textContent = selection.label || "Review Issues";
   els.dashboardDrilldown.innerHTML = `
     <div class="drilldown-summary">
-      <div><span>${issues.length}</span><p>matching issues</p></div>
-      <div><span>${uniqueSorted(issues.map((issue) => issue.table).filter(Boolean)).length}</span><p>tables</p></div>
-      <div><span>${integerText(sum(issues.map((issue) => Number(issue.bad_count || 0))))}</span><p>bad rows</p></div>
+      <div><span>${integerText(issues.length)}</span><p>matching issue${issues.length === 1 ? "" : "s"}</p></div>
+      <div><span>${integerText(tableCount)}</span><p>table${tableCount === 1 ? "" : "s"}</p></div>
+      <div><span>${integerText(badRowCount)}</span><p>bad row${badRowCount === 1 ? "" : "s"}</p></div>
     </div>
     <p class="muted">Select an issue row to open its detail drawer.</p>
     ${renderL4GuardrailDetails(selection)}

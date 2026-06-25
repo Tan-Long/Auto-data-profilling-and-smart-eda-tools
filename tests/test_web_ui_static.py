@@ -569,7 +569,6 @@ def test_web_review_surfaces_use_single_flow_layouts():
         ".dashboard-detail-grid",
         ".table-assessment-detail",
         ".dashboard-issue-row",
-        ".drilldown-summary",
         ".issue-detail-grid div",
         ".evidence-value",
         ".action-plan-metrics",
@@ -584,6 +583,7 @@ def test_web_review_surfaces_use_single_flow_layouts():
 
     assert "max-height:" in _css_block(css, ".issue-review-body")
     assert "overflow: auto;" in _css_block(css, ".issue-review-body")
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in _css_block(css, ".drilldown-summary")
     assert "grid-template-columns:" in _css_block(css, ".issue-inbox-row")
     assert "position: absolute;" in _css_block(css, ".dashboard-risk-breakdown")
     assert ".dashboard-risk-meter[open] .dashboard-risk-breakdown" in css

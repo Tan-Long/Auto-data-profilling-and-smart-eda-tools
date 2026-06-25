@@ -511,6 +511,10 @@ test("local path run renders the interactive dashboard from generated artifacts"
   await page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="table"][data-dashboard-value="orders"]').click();
   await expect(page.locator("#dashboardPanelGrid .issue-active-lens")).toContainText("table orders");
   await expect(page.locator("#dashboardIssueCount")).toContainText("6/12 issues");
+  await expect(page.locator("#dashboardDrilldown .drilldown-summary > div")).toHaveCount(3);
+  await expect(page.locator("#dashboardDrilldown .drilldown-summary > div").nth(0)).toContainText(/6\s*matching issues/);
+  await expect(page.locator("#dashboardDrilldown .drilldown-summary > div").nth(1)).toContainText(/1\s*table$/);
+  await expect(page.locator("#dashboardDrilldown .drilldown-summary > div").nth(2)).toContainText(/10\s*bad rows/);
   await expect(page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="table"][data-dashboard-value="orders"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('#dashboardPanelGrid .issue-visual-row[data-dashboard-kind="table"][data-dashboard-value="customers"]')).toBeVisible();
   await expect(page.locator("#dashboardPanelGrid .severity-priority-card[data-dashboard-value=\"P0\"]")).toBeVisible();
