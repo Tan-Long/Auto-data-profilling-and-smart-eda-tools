@@ -2,7 +2,7 @@ from vsf_profiler.models import Issue, ProfileSummary, TableProfile
 from vsf_profiler.table_assessments import build_table_assessments
 
 
-def test_table_assessments_score_roles_and_business_impact():
+def test_table_assessments_score_roles_and_analysis_impact():
     artifact = build_table_assessments(
         profile=ProfileSummary(
             tables={
@@ -51,36 +51,29 @@ def test_table_assessments_score_roles_and_business_impact():
 
     assert artifact["artifact"] == "table_assessments"
     assert artifact["summary"]["table_count"] == 3
-    assert artifact["summary"]["score_model"]["label"] == "Table review score"
-    assert "P0*30" in artifact["summary"]["score_model"]["formula"]
     by_table = {row["table"]: row for row in artifact["assessments"]}
 
     assert by_table["customers"]["readiness"] == "READY"
     assert by_table["customers"]["role"] == "dimension"
-    assert by_table["customers"]["business_impact"]["category"] == "customer_experience"
+    assert by_table["customers"]["business_impact"]["category"] == "entity_identity_quality"
 
     payments = by_table["order_payments"]
     assert payments["role"] == "fact"
     assert payments["readiness"] == "NOT_READY"
     assert payments["health_score"] < 100
-    assert payments["review_score"] == payments["health_score"]
-    assert payments["score_penalty_breakdown"]["issue_penalties"]["P1"] == 18
-    assert payments["score_penalty_breakdown"]["relationship_penalties"]["invalid"] == 12
-    assert payments["score_penalty_breakdown"]["total_penalty"] == 30
     assert payments["issue_counts_by_severity"]["P1"] == 1
-    assert payments["business_impact"]["category"] == "revenue_and_payment_operations"
+    assert payments["business_impact"]["category"] == "numeric_measure_integrity"
     assert payments["relationship_risks"][0]["relationship_id"] == (
         "order_payments.order_id->orders.order_id"
     )
     assert payments["relationship_risks"][0]["status"] == "invalid"
     assert any(ref["artifact"] == "table_assessments.json" for ref in payments["evidence_artifacts"])
-    assert "Fix FK data-quality issues" in payments["recommended_next_actions"][1]
 
     reviews = by_table["order_reviews"]
     assert reviews["role"] == "event"
     assert reviews["readiness"] == "WARN"
     assert reviews["affected_columns"] == ["review_score"]
-    assert reviews["business_impact"]["category"] == "customer_feedback"
+    assert reviews["business_impact"]["category"] == "feedback_signal_quality"
 
 
 def test_bridge_role_uses_existing_junction_detection_metadata():
@@ -96,7 +89,7 @@ def test_bridge_role_uses_existing_junction_detection_metadata():
     assessment = artifact["assessments"][0]
     assert assessment["role"] == "bridge"
     assert assessment["readiness"] == "READY"
-    assert assessment["business_impact"]["category"] == "product_catalog"
+    assert assessment["business_impact"]["category"] == "catalog_attribute_quality"
 
 
 def _table(name: str) -> TableProfile:

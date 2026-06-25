@@ -19,8 +19,9 @@ def test_dataset_verdict_ready_for_clean_artifacts():
 
     assert verdict["verdict"] == "READY"
     assert verdict["risk_score"] == 0
-    assert verdict["risk_score_model"]["label"] == "Dataset review risk score"
-    assert "P0*30" in verdict["risk_score_model"]["formula"]
+    assert verdict["risk_breakdown"]["score"] == 0
+    assert verdict["risk_breakdown"]["raw_score"] == 0
+    assert verdict["risk_breakdown"]["active_components"] == []
     assert verdict["issue_counts"]["total"] == 0
     assert verdict["issue_counts"]["by_severity"] == {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
     assert verdict["top_blockers"] == []
@@ -48,6 +49,11 @@ def test_dataset_verdict_warns_for_low_severity_findings():
     assert normalize_severity("low") == "P3"
     assert verdict["verdict"] == "WARN"
     assert verdict["risk_score"] == 5
+    assert verdict["risk_breakdown"]["raw_score"] == 5
+    assert verdict["risk_breakdown"]["capped"] is False
+    active = {row["component_id"]: row for row in verdict["risk_breakdown"]["active_components"]}
+    assert active["issue_severity_p3"]["points"] == 1
+    assert active["relationship_warning"]["points"] == 4
     assert verdict["issue_counts"]["by_severity"]["P3"] == 1
     assert verdict["relationship_status_counts"] == {"warning": 1}
     assert verdict["top_blockers"][0]["severity"] == "P3"
@@ -94,6 +100,13 @@ def test_dataset_verdict_not_ready_for_blockers_and_invalid_relationships():
     assert normalize_severity("WARN") == "P2"
     assert verdict["verdict"] == "NOT_READY"
     assert verdict["risk_score"] == 70
+    assert verdict["risk_breakdown"]["score"] == 70
+    assert verdict["risk_breakdown"]["raw_score"] == 70
+    active = {row["component_id"]: row for row in verdict["risk_breakdown"]["active_components"]}
+    assert active["issue_severity_p0"]["points"] == 30
+    assert active["issue_severity_p2"]["points"] == 5
+    assert active["relationship_invalid"]["points"] == 10
+    assert active["schema_missing_table_count"]["points"] == 25
     assert verdict["issue_counts"]["by_severity"] == {"P0": 1, "P1": 0, "P2": 1, "P3": 0}
     assert verdict["issue_counts"]["by_type"] == {
         "DUPLICATE_PRIMARY_KEY": 1,
@@ -104,8 +117,7 @@ def test_dataset_verdict_not_ready_for_blockers_and_invalid_relationships():
     assert verdict["affected_tables"][0]["table"] == "orders"
     assert verdict["affected_tables"][0]["max_severity"] == "P0"
     assert verdict["recommended_next_actions"][0].startswith("Resolve P0/P1")
-    assert "Fix foreign-key data-quality issues" in verdict["recommended_next_actions"][2]
-    assert "FK data-quality issue(s)" in verdict["verdict_rationale"]
+    assert "Fix invalid foreign-key relationships" in verdict["recommended_next_actions"][2]
 
 
 def _issue(

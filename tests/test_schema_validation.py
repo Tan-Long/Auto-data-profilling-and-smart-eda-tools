@@ -113,9 +113,9 @@ def test_report_generated_without_target(tmp_path):
     report_md = (out_dir / "report.md").read_text()
     assert influence["top_features"] == []
     assert influence["notes"] == ["No target column was provided."]
-    assert summary["skipped_stages"][0]["name"] == "influence_analysis"
-    assert summary["skipped_stages"][0]["details"]["skip_reason"] == "No target column was provided."
-    assert "Execution Flow" in report_md
+    assert summary["skipped_stages"] == []
+    assert "influence_analysis" not in [stage["name"] for stage in summary["stage_timings"]]
+    assert "Run Summary" in report_md
 
 
 def _write_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:

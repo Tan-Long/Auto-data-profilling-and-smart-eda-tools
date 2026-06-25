@@ -30,22 +30,6 @@ SEVERITY_ALIASES = {
 ISSUE_RISK_WEIGHTS = {"P0": 30, "P1": 15, "P2": 5, "P3": 1}
 RELATIONSHIP_RISK_WEIGHTS = {"invalid": 10, "warning": 4, "skipped": 2}
 SCHEMA_RISK_WEIGHTS = {"missing_table_count": 25, "extra_csv_count": 2}
-RISK_SCORE_MODEL = {
-    "label": "Dataset review risk score",
-    "description": (
-        "Deterministic review heuristic for prioritizing EDA follow-up. "
-        "It is not a statistical health model."
-    ),
-    "formula": (
-        "min(100, P0*30 + P1*15 + P2*5 + P3*1 + invalid_fk*10 + "
-        "warning_fk*4 + skipped_fk*2 + missing_table*25 + extra_csv*2)"
-    ),
-    "issue_weights": ISSUE_RISK_WEIGHTS,
-    "relationship_weights": RELATIONSHIP_RISK_WEIGHTS,
-    "schema_weights": SCHEMA_RISK_WEIGHTS,
-    "score_range": {"min": 0, "max": 100},
-    "interpretation": "Higher means more review risk; P3 findings are low-weight review signals.",
-}
 
 
 def build_dataset_verdict(
@@ -58,7 +42,8 @@ def build_dataset_verdict(
     issue_counts = _issue_counts(issue_rows)
     schema_summary = _schema_summary(schema_evaluation)
     relationship_status_counts = _relationship_status_counts(relationship_graph)
-    risk_score = _risk_score(issue_counts, schema_summary, relationship_status_counts)
+    risk_breakdown = _risk_breakdown(issue_counts, schema_summary, relationship_status_counts)
+    risk_score = risk_breakdown["score"]
     verdict = _verdict(issue_counts, schema_summary, relationship_status_counts)
 
     return {
@@ -66,7 +51,7 @@ def build_dataset_verdict(
         "version": 1,
         "verdict": verdict,
         "risk_score": risk_score,
-        "risk_score_model": RISK_SCORE_MODEL,
+        "risk_breakdown": risk_breakdown,
         "verdict_rationale": _verdict_rationale(
             verdict,
             issue_counts,
@@ -155,20 +140,93 @@ def _risk_score(
     schema_summary: dict[str, int],
     relationship_status_counts: dict[str, int],
 ) -> int:
+    return int(_risk_breakdown(issue_counts, schema_summary, relationship_status_counts)["score"])
+
+
+def _risk_breakdown(
+    issue_counts: dict[str, Any],
+    schema_summary: dict[str, int],
+    relationship_status_counts: dict[str, int],
+) -> dict[str, Any]:
     severity_counts = issue_counts["by_severity"]
-    score = sum(
-        severity_counts[severity] * ISSUE_RISK_WEIGHTS[severity]
-        for severity in SEVERITIES
-    )
-    score += sum(
-        relationship_status_counts.get(status, 0) * weight
-        for status, weight in RELATIONSHIP_RISK_WEIGHTS.items()
-    )
-    score += sum(
-        schema_summary.get(name, 0) * weight
-        for name, weight in SCHEMA_RISK_WEIGHTS.items()
-    )
-    return min(100, int(score))
+    components: list[dict[str, Any]] = []
+    for severity in SEVERITIES:
+        count = int(severity_counts.get(severity, 0))
+        weight = ISSUE_RISK_WEIGHTS[severity]
+        components.append(
+            _risk_component(
+                component_id=f"issue_severity_{severity.lower()}",
+                label=f"{severity} issue findings",
+                count=count,
+                weight=weight,
+                artifact="issues.json",
+                explanation=f"{severity} findings add {weight} risk point(s) each.",
+            )
+        )
+    for status, weight in RELATIONSHIP_RISK_WEIGHTS.items():
+        count = int(relationship_status_counts.get(status, 0))
+        components.append(
+            _risk_component(
+                component_id=f"relationship_{status}",
+                label=f"{status.title()} relationship checks",
+                count=count,
+                weight=weight,
+                artifact="relationship_graph.json",
+                explanation=f"{status.title()} relationship checks add {weight} risk point(s) each.",
+            )
+        )
+    schema_labels = {
+        "missing_table_count": "Missing DBML table CSVs",
+        "extra_csv_count": "Extra CSV files",
+    }
+    for name, weight in SCHEMA_RISK_WEIGHTS.items():
+        count = int(schema_summary.get(name, 0))
+        components.append(
+            _risk_component(
+                component_id=f"schema_{name}",
+                label=schema_labels.get(name, name.replace("_", " ").title()),
+                count=count,
+                weight=weight,
+                artifact="schema_evaluation.json",
+                explanation=f"{schema_labels.get(name, name)} add {weight} risk point(s) each.",
+            )
+        )
+    raw_score = sum(int(component["points"]) for component in components)
+    score = min(100, int(raw_score))
+    active = [component for component in components if int(component["points"]) > 0]
+    return {
+        "score": score,
+        "raw_score": raw_score,
+        "capped": raw_score > score,
+        "scale": "0 means no deterministic risk; 100 is the displayed maximum risk.",
+        "components": components,
+        "active_components": active,
+        "explanation": (
+            f"Raw risk is {raw_score}; displayed risk is capped at 100."
+            if raw_score > score
+            else f"Risk is {score} from deterministic issue, relationship, and schema evidence."
+        ),
+    }
+
+
+def _risk_component(
+    *,
+    component_id: str,
+    label: str,
+    count: int,
+    weight: int,
+    artifact: str,
+    explanation: str,
+) -> dict[str, Any]:
+    return {
+        "component_id": component_id,
+        "label": label,
+        "count": count,
+        "weight": weight,
+        "points": count * weight,
+        "artifact": artifact,
+        "explanation": explanation,
+    }
 
 
 def _verdict(
@@ -208,7 +266,7 @@ def _verdict_rationale(
         if blocker_count:
             parts.append(f"{blocker_count} P0/P1 blocker issue(s)")
         if relationship_status_counts.get("invalid", 0):
-            parts.append(f"{relationship_status_counts['invalid']} FK data-quality issue(s)")
+            parts.append(f"{relationship_status_counts['invalid']} invalid relationship edge(s)")
         if schema_summary.get("missing_table_count", 0):
             parts.append(f"{schema_summary['missing_table_count']} missing DBML table CSV(s)")
         return "; ".join(parts) + " make the dataset not ready for use."
@@ -327,7 +385,7 @@ def _recommended_next_actions(
     if schema_summary.get("missing_table_count", 0):
         _add_action(actions, seen, "Regenerate the extract so every DBML table has a CSV file.")
     if relationship_status_counts.get("invalid", 0):
-        _add_action(actions, seen, "Fix foreign-key data-quality issues before cross-table use.")
+        _add_action(actions, seen, "Fix invalid foreign-key relationships before cross-table use.")
 
     for row in sorted(
         issue_rows,

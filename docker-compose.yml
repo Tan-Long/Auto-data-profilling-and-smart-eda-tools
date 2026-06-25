@@ -1,0 +1,12 @@
+services:
+  vsf-profiler:
+    build: .
+    image: vsf-profiler-local
+    ports:
+      - "${VSF_PROFILER_PORT:-8765}:8765"
+    environment:
+      PORT: "8765"
+      VSF_PROFILER_OUTPUT_DIR: /app/outputs/web_runs
+    volumes:
+      - ./outputs:/app/outputs
+      - ./data:/app/data

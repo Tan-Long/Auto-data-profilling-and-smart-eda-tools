@@ -1,121 +1,147 @@
-# VSF Data Profiler Demo Package
+# VSF Data Profiler Demo
 
-This is the concise v0.2 local release-candidate demo path. It uses the
-bundled Olist-shaped demo dataset and does not require internet access.
+This is the current live-demo path for the guided CSV+DBML data-quality
+profiler. It runs locally, uses built-in sample data, keeps raw artifacts behind
+developer links, and does not require internet access or OpenAI credentials.
+Install the `evaluation` extra to show a real Great Expectations comparison.
 
 ## 5-10 Minute Demo Script
 
-1. Setup and orient: VSF Data Profiler is a local CLI for profiling CSV files
-   against a DBML schema. It uses DuckDB for large-file-friendly scans and
-   writes static Markdown/HTML plus machine-readable artifacts.
-2. Run the release demo:
-   `PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-full`
-3. Open `outputs/olist_demo/report.html`. Point out schema mapping,
-   relationship checks, issue counts, visual summaries, dataset verdict, and
-   execution flow.
-4. Show the artifact directory:
-   `find outputs/olist_demo -maxdepth 2 -type f | sort`
-5. Run the fake LLM path to show deterministic guardrails without an API call.
-6. Open `outputs/olist_demo_l4/report.html`, then show `l4_report.md` and
-   `guardrail_report.json`.
-7. Run the OpenAI smoke path only when `.env` has `OPENAI_API_KEY`. Explain
-   that OpenAI may produce unsupported claims; if so, guardrails reject the
-   candidate and write deterministic fallback with `fallback_used`.
-8. In the local web runner, show that completed upload/path jobs populate the
-   interactive dashboard from generated artifact URLs. Contrast it with the
-   static report Visual Summary, which remains deterministic and non-interactive.
-9. Close with the v0.2 local RC boundary: local CLI, static Vercel preflight
-   only, full browser jobs through `127.0.0.1`, deterministic artifacts,
-   optional guarded L4 narrative, optional Postgres/MySQL smokes, optional PDF
-   package export, and no hosted Python/DuckDB backend runner.
+1. Start on the first screen and point out the two intended flows:
+   **Profile my data** for a user CSV+DBML run, and **Evaluate tool** for a
+   built-in faulty dataset comparison.
+2. Choose **Profile my data**. In Connect, select **Local CSV path** and keep
+   the **Small CSV demo** preset. Show that Preflight Review gates the run:
+   blockers stop execution, warnings require review, and the accepted review is
+   persisted with the run.
+3. Run the Profile job. On completion, start with **Quality Gates** and
+   **Review Issues**. Show the table-first issue inbox, then open issue
+   `ISSUE-0009` to show Where, What happened, Evidence, Why it matters, How to
+   fix, deterministic Action plan, sample rows, and issue-level copy controls.
+4. Show **Todos** and **Report / Export**. The report links and todo copy
+   actions are the primary user path; JSON/runtime files remain available below
+   as Developer artifact evidence.
+5. Switch to **Evaluate tool**. Choose a curated faulty dataset and run the
+   local comparison. Show VSF caught/missed/extra findings, actionability and
+   evidence metrics, and the Great Expectations baseline state. If GE is not
+   installed, the baseline rows should read as unavailable or not covered
+   rather than failing the demo.
+6. Return to the selected issue drawer and run **Fake** issue LLM enrichment.
+   Show the short structured add-on sections: Why this was flagged, Extra fix
+   suggestion, Extra verification, and Human review needed. Emphasize that the
+   deterministic action plan remains the source of truth.
+7. Switch the same drawer control to **OpenAI** and run it with no local
+   `OPENAI_API_KEY`. The expected default demo state is explicit
+   `unavailable` with human review required, not a silent fake-provider
+   fallback.
 
 ## Command Checklist
 
-Default deterministic demo:
+Install and prepare the local environment:
 
 ```bash
-PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-small
-open outputs/olist_demo/report.html
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev,evaluation]"
 ```
 
-Release-candidate demo:
+Regenerate the deterministic CLI demo report:
 
 ```bash
-PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler doctor
-PATH="/Users/jin/repository-harness/.venv/bin:$PATH" make demo-full
-open outputs/olist_demo_package/index.html
+PATH="$PWD/.venv/bin:$PATH" make demo-small
+open outputs/demo_small/report.html
 ```
 
-Fake LLM demo:
+Start the local web runner for the guided browser demo:
 
 ```bash
-PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
-  --dbml data/demo_olist/schema.dbml \
-  --csv-dir data/demo_olist/csv \
-  --rules data/demo_olist/rules.yaml \
-  --target olist_order_reviews_dataset.review_score \
-  --out outputs/olist_demo_l4 \
-  --use-llm \
-  --llm-provider fake
-open outputs/olist_demo_l4/report.html
+PATH="$PWD/.venv/bin:$PATH" vsf-profiler web --port 8765
+open http://127.0.0.1:8765
 ```
 
-OpenAI smoke demo:
+The default runner binds to `127.0.0.1`. For a trusted container or local
+self-host smoke, use an explicit host and keep public auth/reverse proxying out
+of this demo:
 
 ```bash
-cp .env.example .env
-# edit .env and set OPENAI_API_KEY; do not commit .env
-PATH="/Users/jin/repository-harness/.venv/bin:$PATH" vsf-profiler run \
-  --dbml data/demo_olist/schema.dbml \
-  --csv-dir data/demo_olist/csv \
-  --rules data/demo_olist/rules.yaml \
-  --target olist_order_reviews_dataset.review_score \
-  --out outputs/olist_demo_l4_openai_smoke \
-  --use-llm \
-  --llm-provider openai
-.venv/bin/python scripts/verify_openai_smoke.py
-open outputs/olist_demo_l4_openai_smoke/report.html
+PATH="$PWD/.venv/bin:$PATH" vsf-profiler web --host 0.0.0.0 --port 8765
 ```
+
+Docker runs the same web runner and writes artifacts to host `outputs/`:
+
+```bash
+docker compose up --build
+curl http://127.0.0.1:8765/api/health
+open http://127.0.0.1:8765
+```
+
+Export the report package after `make demo-small`:
+
+```bash
+PATH="$PWD/.venv/bin:$PATH" vsf-profiler package \
+  --input outputs/demo_small \
+  --output outputs/demo_small_package \
+  --zip \
+  --pdf \
+  --force
+open outputs/demo_small_package/index.html
+```
+
+Run the browser proof path and refresh the Goal 12 screenshots:
+
+```bash
+VSF_E2E_PORT=8779 npm run test:e2e:dashboard
+```
+
+## Screenshot Checklist
+
+The final demo-readiness proof should include these fresh screenshots:
+
+| Screenshot | What it proves |
+| --- | --- |
+| `outputs/us073_goal12/first-screen-two-flow-choice.png` | The first screen clearly separates Profile my data from Evaluate tool. |
+| `outputs/us073_goal12/profile-post-run-review-surface.png` | A completed Profile run opens into the review surface with gates, issues, readiness, todos, and reports. |
+| `outputs/us073_goal12/evaluate-comparison-summary.png` | Evaluate renders a real built-in comparison summary. |
+| `outputs/us073_goal12/issue-drawer-after-fake-llm-enrichment.png` | Fake selected-issue LLM enrichment is structured and secondary to the deterministic action plan. |
+| `outputs/us073_goal12/issue-drawer-openai-unavailable.png` | OpenAI missing-key/provider failure is visible and requires human review. |
+| `outputs/us073_goal12/report-export-surface.png` | Report / Export keeps human-facing outputs before Developer artifacts. |
 
 ## Artifact Tour
 
 | Artifact | Demo talking point |
 | --- | --- |
-| `profile_summary.json` | Table and column profiling from CSV scans, including row counts, nulls, distinct values, and type-oriented summaries. |
-| `issues.json` | Normalized quality findings with severity, table/column refs, counts, evidence SQL, sample paths, probable causes, and suggested fixes. |
-| `connector_metadata.json` | Optional for connector runs. Records source type, tables scanned, row estimates, extraction status, warnings, and redaction status. |
+| `profile_summary.json` | Table and column profiling from CSV scans, including row counts, nulls, distinct values, numeric percentiles, IQR outlier evidence, and type-oriented summaries. |
+| `issues.json` | Normalized quality findings with severity, table/column refs, counts, evidence SQL, sample paths, evidence notes, and data-quality next steps. |
 | `schema_parse_report.json` | DBML parsed object counts, warnings, unsupported constructs, and parser diagnostics. |
-| `schema_evaluation.json` | DBML-vs-CSV conformance summary, including missing/extra table or column evidence and schema issue references. |
-| `relationship_graph.json` | Graph of tables and DBML relationships with observed FK status, cardinality, junction-table detection, and relationship issue links. |
-| `dataset_verdict.json` | Deterministic readiness verdict, review-risk score, scoring formula, top blockers, affected tables, and recommended next actions. |
-| `table_assessments.json` | One deterministic assessment per profiled table with role, review score, scoring formula, readiness, relationship risks, name-token business impact, evidence refs, and next actions. |
-| `charts/*.json` | Deterministic chart specs for issue counts, missingness, relationship FK status, risk, and influence top features. |
-| `l4_report.md` | Optional Senior Data Scientist narrative generated only when `--use-llm` runs; may be provider output or deterministic fallback. |
-| `guardrail_report.json` | Audit record for L4 validation: status, provider, fallback reason, checked numbers, checked refs, violations, and raw-data flags. |
+| `schema_evaluation.json` | DBML-vs-CSV conformance summary, including mapping confidence, missing/ambiguous/extra table or column evidence, and schema issue references. |
+| `relationship_graph.json` | Table relationships with observed FK health, cardinality, junction-table detection, and relationship issue links. |
+| `quality_gates.json` | Deterministic gates for analysis readiness, join trust, cleanup before sharing, and outlier review. |
+| `table_assessments.json` | One deterministic readiness assessment per profiled table, including role, health score, relationship risk, and next steps. |
+| `issue_action_plans.json` | The deterministic source of truth for issue remediation guidance. |
+| `issue_todos.json` | Grouped Fix data and Verify after fix todos derived from deterministic action plans. |
+| `issue_llm_enrichments.json` | Optional selected-issue enrichment attempts, including fake/OpenAI status, guardrail result, sanitized request summary, and human-review state. |
+| `evaluation_summary.json` | Built-in benchmark comparison summary for VSF correctness, usefulness, and baseline status. |
+| `ground_truth_issues.json` | Seeded expected findings for the selected built-in evaluation dataset. |
+| `baseline_comparison.json` | Great Expectations baseline comparison rows, including unavailable and not-covered states. |
+| `data/evaluation_public/*` | Local public CSV snapshots for Evaluate demos, including Plotly diabetes and manufacturing defect datasets with MIT attribution. |
+| `report.html` / `report.md` | Compact fixed-section reports for the normal user review path. |
+| `samples/*.csv` | Bounded bad-row samples for evidence preview. Full source CSV files stay outside the package and artifact API. |
 
-The static `report.html` renders a deterministic Visual Summary from these
-chart specs. The local web runner adds the interactive dashboard: filters,
-chart-item drilldown, issue rows, and artifact/sample links all come from the
-same generated artifacts and protected web-runner URLs.
+Compatibility artifacts such as `influence.json`, `lineage_graph.json`, and
+legacy guarded LLM report files can still appear in developer runs, but they
+are not the primary Goal 12 demo path.
 
 ## Demo Caveats
 
-- The default run is fully deterministic and should not write `l4_report.md` or
-  `guardrail_report.json`.
-- `--llm-provider fake` is for local validation and should produce a passed
-  guardrail report without calling a real API.
-- `--llm-provider openai` is opt-in and uses local `.env` configuration. Do not
-  commit `.env` or print API keys.
-- OpenAI may return prose with unsupported numbers or references. That is not a
-  demo failure if `guardrail_report.json` records `fallback_used` with a clear
-  reason such as `guardrail_failed`.
-- L4 prompts use structured artifacts only. Raw CSV rows and unbounded samples
-  are not sent through the narrative path.
-
-## v0.2 Local RC Summary
-
-v0.2 local RC is ready after doctor, default demo, package/PDF export, artifact
-audit, benchmark smoke, optional Postgres/MySQL smokes, fake LLM validation,
-OpenAI smoke verification when configured, and local web-runner
-upload/path/dashboard flows pass. The hosted Vercel surface remains static
-preflight only; full jobs run through the local `127.0.0.1` runner.
+- The default Profile demo is deterministic and does not require OpenAI.
+- Evaluate uses built-in datasets only; it does not accept arbitrary uploads.
+- Great Expectations is optional for the app to run, but the recommended demo
+  install includes it through `.[dev,evaluation]` so Evaluate can compare VSF
+  against GE-native checks. Missing GE still renders as an explicit unavailable
+  baseline state.
+- Selected-issue LLM enrichment is advisory. It never changes deterministic
+  action plans, todos, quality gates, severity, readiness, or evaluation scores.
+- OpenAI mode must be opt-in and may show `unavailable` when no key is
+  configured. Do not commit `.env` or print API keys.
+- LLM context is built from generated artifacts and bounded samples only; raw
+  source CSV files and unbounded rows are not sent to providers.

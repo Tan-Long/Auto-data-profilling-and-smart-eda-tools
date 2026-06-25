@@ -1,25 +1,103 @@
-# VSF Data Profiler v0.2 Local Release Candidate
+# VSF Data Profiler
 
-`vsf-profiler` is a local-first CLI and `127.0.0.1` web runner that profiles
-CSV datasets against a DBML schema, detects common data quality and
-relationship issues, runs association-based influence analysis, and writes
-Markdown/HTML reports plus machine-readable artifacts.
+`vsf-profiler` is a local-first guided data-quality profiler for related CSV
+files described by a DBML/schema contract. The supported product workflow is:
+provide CSV plus DBML inputs, review mapping/schema evidence, run local
+profiling, inspect table/column issues, and open deterministic reports with
+data-quality next steps.
+
+The repository still contains older advanced code paths for rules, target-based
+association artifacts, database connectors, lineage artifacts, package export,
+Olist samples, and optional LLM summaries. They are compatibility and developer
+surfaces for now; they are not the main product workflow.
+
+DuckDB is the internal scan engine. Users do not need to manage DuckDB directly
+for the default CSV plus DBML workflow.
 
 This repository still carries Harness docs under `docs/` for agent workflow.
 The product implemented here is `VSF Data Profiler`.
 
-## Setup
+## Clone and Run Locally
+
+Clone the repository and install the Python package in a virtual environment:
 
 ```bash
+git clone https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools.git
+cd Auto-data-profilling-and-smart-eda-tools
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,evaluation]"
 ```
 
 Use `python -m venv .venv` instead if your system provides `python` as Python
 3.11 or newer.
 
-## Local Release Demo
+Start the full local Python/DuckDB web runner:
+
+```bash
+vsf-profiler demo create-small --out data/demo_small
+vsf-profiler web --port 8765
+open http://127.0.0.1:8765
+```
+
+The default web runner binds to `127.0.0.1` for local-only use. For a trusted
+container or LAN self-host smoke, pass an explicit host:
+
+```bash
+vsf-profiler web --host 0.0.0.0 --port 8765
+```
+
+Do not expose that process directly to the public internet. Public hosting
+needs an authentication layer, TLS, and a reverse proxy or gateway; this
+repository does not implement public auth.
+
+In the browser, choose **Profile my data**, keep the **Small demo** local path
+preset, and run the profile. Then choose **Evaluate tool** and run a built-in
+faulty dataset comparison. Profile and Evaluate artifacts are written under
+`outputs/web_runs/<job_id>/artifacts` by default, or under the directory set by
+`--run-root` / `VSF_PROFILER_OUTPUT_DIR`.
+
+Great Expectations is included above through the `evaluation` extra so the
+Evaluate tool can run a real baseline comparison. Optional OpenAI, Postgres,
+MySQL/MariaDB, Kaggle, Node, and Playwright paths are not required for the
+default local demo. They either stay hidden, show explicit unavailable states,
+or skip in release checks when their dependencies or credentials are missing.
+
+## Docker Local Runner
+
+Docker runs the same Python web runner with the evaluation extra installed
+inside a container and publishes it on the host at `http://127.0.0.1:8765`.
+The container creates the small demo data on startup so the Profile preset
+works immediately.
+
+```bash
+docker build -t vsf-profiler-local .
+docker run --rm \
+  -p 8765:8765 \
+  -v "$PWD/outputs:/app/outputs" \
+  -v "$PWD/data:/app/data" \
+  --env-file .env.example \
+  vsf-profiler-local
+curl http://127.0.0.1:8765/api/health
+open http://127.0.0.1:8765
+```
+
+Docker Compose uses the same image and host port convention:
+
+```bash
+docker compose up --build
+```
+
+Use `.env.example` as a starting point for optional local settings. Do not
+commit `.env`, generated `data/`, generated `outputs/`, `.venv`, or
+`node_modules`.
+
+Vercel configuration in this repo is a static preview only. It can serve the
+browser-side DBML/CSV mapping UI from `web/`, but it does not start the
+Python/DuckDB backend, run Profile jobs, run Evaluate jobs, or write artifacts
+unless a separate backend host is configured outside this repo.
+
+## Guided CSV + DBML Demo
 
 No internet or Kaggle account is required.
 
@@ -28,19 +106,22 @@ make demo-small
 open outputs/demo_small/report.html
 ```
 
-For a 5-10 minute guided walkthrough, command checklist, artifact tour, and L4
-guardrail caveats, use [docs/demo/vsf-data-profiler.md](docs/demo/vsf-data-profiler.md).
-For the v0.2 release-candidate path, run:
+For a 5-10 minute guided walkthrough, command checklist, and artifact tour, use
+[docs/demo/vsf-data-profiler.md](docs/demo/vsf-data-profiler.md).
+
+The larger release-candidate validation path exercises compatibility and
+developer validation surfaces such as package export, artifact audit, and
+dashboard E2E when local tooling is installed:
 
 ```bash
 vsf-profiler doctor
 make demo-full
 ```
 
-The full demo runs the synthetic demo, exports
-`outputs/demo_small_package/`, writes `analysis_report.pdf` and
-`outputs/demo_small_package.zip`, audits the canonical artifacts, and runs the
-Playwright dashboard E2E when local
+The full demo still starts from the same synthetic CSV plus DBML dataset. It
+also exports `outputs/demo_small_package/`, writes the optional
+`analysis_report.pdf` and `outputs/demo_small_package.zip`, audits the
+canonical artifacts, and runs the optional Playwright dashboard E2E when local
 Node/Playwright tooling is installed. See
 [docs/releases/v0.2-rc.md](docs/releases/v0.2-rc.md).
 
@@ -48,18 +129,19 @@ Latest public prerelease:
 [VSF Data Profiler v0.2.0-rc2](https://github.com/Tan-Long/Auto-data-profilling-and-smart-eda-tools/releases/tag/vsf-profiler-v0.2.0-rc2),
 with release notes in [docs/releases/v0.2.0-rc2.md](docs/releases/v0.2.0-rc2.md).
 
-Expected artifacts:
+Primary generated evidence:
 
 ```text
 outputs/demo_small/profile_summary.json
 outputs/demo_small/issues.json
-outputs/demo_small/influence.json
 outputs/demo_small/schema_parse_report.json
-outputs/demo_small/lineage_graph.json
 outputs/demo_small/schema_evaluation.json
 outputs/demo_small/relationship_graph.json
 outputs/demo_small/dataset_verdict.json
 outputs/demo_small/table_assessments.json
+outputs/demo_small/issue_action_plans.json
+outputs/demo_small/issue_todos.json
+outputs/demo_small/quality_gates.json
 outputs/demo_small/schema_diagram.json
 outputs/demo_small/schema_diagram.dbml
 outputs/demo_small/run.log
@@ -71,16 +153,29 @@ outputs/demo_small/report.html
 outputs/demo_small/samples/
 ```
 
+The current pipeline also writes compatibility/developer artifacts such as
+`influence.json` and `lineage_graph.json`. They remain available for existing
+tests and debugging, but they are no longer positioned as required user
+workflow outputs.
+
+Numeric column profiles include percentiles and IQR outlier evidence in
+`profile_summary.json`; `issues.json` records `NUMERIC_OUTLIER` findings only
+when profiled values exceed the generic IQR fence, and
+`charts/outliers_top_columns.json` feeds report, package, and dashboard
+summaries.
+
 On Windows, open the report with:
 
 ```bash
 start outputs/demo_small/report.html
 ```
 
-## Olist Demo
+## Legacy Olist Relational CSV Sample
 
-The Olist demo requires Kaggle CLI authentication. The synthetic demo does not
-require internet access.
+Olist remains as a legacy relational CSV sample for maintainers who need a
+larger compatibility dataset. It is not the product identity or the default
+demo path. The Olist demo requires Kaggle CLI authentication; the synthetic
+CSV+DBML demo does not require internet access.
 
 ```bash
 python -m pip install kaggle
@@ -93,7 +188,7 @@ open outputs/olist_demo/report.html
 If `kaggle auth login` is unavailable in your Kaggle CLI version, configure
 `~/.kaggle/kaggle.json` or the Kaggle credential environment variables.
 
-## CLI
+## Core CLI
 
 ```bash
 vsf-profiler doctor
@@ -101,10 +196,28 @@ vsf-profiler doctor
 vsf-profiler run \
   --dbml data/demo_small/schema.dbml \
   --csv-dir data/demo_small/csv \
-  --rules data/demo_small/rules.yaml \
-  --target order_reviews.review_score \
   --out outputs/demo_small
 
+# Optional: force table-to-CSV choices when source filenames are not table names.
+# YAML and JSON are supported, for example: mappings: {customers: crm_export.csv}
+vsf-profiler run \
+  --dbml data/demo_small/schema.dbml \
+  --csv-dir data/demo_small/csv \
+  --mapping mapping.yaml \
+  --out outputs/manual_mapping
+
+vsf-profiler demo create-small --out data/demo_small
+vsf-profiler demo download-olist --out data/olist
+vsf-profiler demo run-olist --csv-dir data/olist --out outputs/olist_demo
+```
+
+## Compatibility and Developer CLI
+
+These commands remain implemented for compatibility, release validation, and
+developer debugging. They are not required for the guided CSV+DBML
+data-quality workflow.
+
+```bash
 vsf-profiler package \
   --input outputs/demo_small \
   --output outputs/demo_small_package \
@@ -119,7 +232,7 @@ python scripts/benchmark_large_dataset.py \
   --max-feature-columns 4 \
   --force
 
-# Postgres mode reads selected local database tables through a chunked connector.
+# Legacy Postgres connector mode reads selected local database tables through a chunked connector.
 # Prefer the environment variable path so credentials are not stored in shell history.
 export VSF_PROFILER_POSTGRES_URL='postgresql://user:password@127.0.0.1:5432/app'
 vsf-profiler run \
@@ -129,7 +242,7 @@ vsf-profiler run \
   --target orders.order_total \
   --out outputs/postgres_profile
 
-# MySQL/MariaDB mode uses the same connector boundary and temporary chunked extracts.
+# Legacy MySQL/MariaDB connector mode uses the same connector boundary and temporary chunked extracts.
 export VSF_PROFILER_MYSQL_URL='mysql://user:password@127.0.0.1:3306/app'
 vsf-profiler run \
   --mysql-url-env VSF_PROFILER_MYSQL_URL \
@@ -158,12 +271,9 @@ vsf-profiler run \
   --use-llm \
   --llm-provider openai
 
-vsf-profiler demo create-small --out data/demo_small
-vsf-profiler demo download-olist --out data/olist
-vsf-profiler demo run-olist --csv-dir data/olist --out outputs/olist_demo
 ```
 
-## Real Postgres Smoke
+## Optional Real Postgres Smoke
 
 The real connector smoke is optional and local-only. It creates a disposable
 schema in the configured database, runs the connector in introspection and DBML
@@ -195,7 +305,7 @@ When `VSF_POSTGRES_TEST_URL` is not set, the smoke skips explicitly. Docker is
 not required for the normal test suite unless a local Harness/tooling setup
 chooses to provide it.
 
-## Real MySQL/MariaDB Smoke
+## Optional Real MySQL/MariaDB Smoke
 
 The MySQL/MariaDB connector smoke is optional and local-only. It creates
 disposable tables in the configured database, runs connector introspection,
@@ -213,7 +323,7 @@ When `VSF_MYSQL_TEST_URL` is not set, the smoke skips explicitly. The connector
 also accepts `mariadb://` URLs and uses the same `connector_metadata.json`
 contract as Postgres.
 
-## Large Dataset Benchmark
+## Optional Large Dataset Benchmark
 
 The benchmark generates deterministic relational CSV data, runs the existing
 Python/DuckDB pipeline, creates an export package, audits the artifacts, and
@@ -241,24 +351,30 @@ artifact audit status, and the source scan proving no production
 
 ## Web UI and Local Runner
 
-The web workspace has two distinct surfaces:
+The web workspace is the current browser surface over the same local artifact
+contracts. The first screen separates the two supported demo flows:
 
-- the hosted/static preflight UI for DBML and small CSV header mapping; and
-- the local web runner for full Python/DuckDB profiling jobs on
-  `127.0.0.1`.
+- **Profile my data** for CSV+DBML profiling through upload mode or local path
+  mode, with mandatory preflight review before a run.
+- **Evaluate tool** for built-in faulty dataset comparisons against seeded
+  ground truth and the available Great Expectations baseline state.
+  Evaluate includes synthetic retail/support datasets plus local public
+  snapshots derived from Plotly `diabetes.csv` and
+  `cost_output_defective.csv` under `data/evaluation_public/` so demos do not
+  need network access.
 
-The static preflight UI lets a user upload a DBML file and related CSV files in
-the browser, auto-link CSV file stems to DBML tables, inspect PK/FK
-relationships, and inspect a local schema diagram without depending on an
-external iframe. A generated dbdiagram.io link remains available as a secondary
-action. It does not run the Python/DuckDB profiler, database connectors, local
-path jobs, LLM narratives, package/PDF export, or backend dashboard jobs.
+After a Profile run, the local runner opens the review surface with Quality
+Gates, Review Issues, deterministic action plans, grouped todos, Report /
+Export, and table readiness. Selected issues can run optional fake/OpenAI
+enrichment as a short structured add-on; the deterministic action plan remains
+the source of truth.
 
-Static preflight deployment:
+Treat Olist preset paths, optional LLM report artifacts, graph artifacts, and
+raw artifact links as developer/demo support surfaces.
 
-```text
-https://smart-eda.vercel.app
-```
+Historical hosted previews are retained only as compatibility previews for
+browser-side DBML/CSV mapping. They are not the product-facing workflow and do
+not run Python/DuckDB jobs.
 
 For full profiling from the browser, start the local runner:
 
@@ -267,84 +383,85 @@ make web-runner
 open http://127.0.0.1:8765
 ```
 
-The local runner binds only to `127.0.0.1`. It preserves CLI artifact
-contracts and can run upload-mode jobs for demo/small-medium files or local
-path mode jobs where browser-entered DBML, CSV directory, and optional rules
-paths are validated locally without uploading CSV bytes through the browser.
-After a run completes, the local runner shows an interactive dashboard from
+The runner binds to `127.0.0.1` by default. Use `vsf-profiler web --host
+0.0.0.0 --port 8765` only for a trusted container or local self-host smoke, and
+put your own authentication/reverse proxy in front before any public exposure.
+The runner preserves CLI artifact contracts and can run upload-mode jobs for
+demo/small-medium CSV+DBML inputs or local path mode jobs where browser-entered
+DBML and CSV directory paths are validated locally without uploading CSV bytes
+through the browser. The Profile input surface exposes only DBML plus CSV
+sources; legacy rule config, association-field, and database-source controls are
+not shown in the browser workflow.
+After a run completes, the local runner can show an interactive dashboard from
 generated artifact URLs such as
 `charts/*.json`, `issues.json`, `profile_summary.json`,
 `relationship_graph.json`, `dataset_verdict.json`,
-`table_assessments.json`, `schema_parse_report.json`, `lineage_graph.json`,
-`schema_evaluation.json`, `schema_diagram.json`, `influence.json`, and
-`run_summary.json`. The DBML diagram panel switches from browser preflight
+`table_assessments.json`, `schema_parse_report.json`,
+`schema_evaluation.json`, `schema_diagram.json`, and `run_summary.json`.
+Compatibility artifacts such as `lineage_graph.json` and `influence.json` may
+also be generated for artifact compatibility, but they are not shown as a
+primary dashboard pane. The DBML diagram panel switches from browser preview
 state to generated `schema_diagram.json`, `relationship_graph.json`, and
 `schema_parse_report.json` artifacts after a run. Its local ERD renderer uses
 deterministic table layers, compact PK/FK-focused cards, orthogonal
 relationship edges, fit/expanded/non-key controls, and table or relationship
-drilldown backed by existing artifact evidence. The Generated results panel
-previews verdict, issue counts, table impact, runtime summary, and report links
-from those artifacts while keeping raw artifact links available.
+drilldown backed by existing artifact evidence. The post-run snapshot previews
+data-quality readiness, issue counts, table readiness, runtime summary, and
+report links from those artifacts without exposing a separate developer
+artifact-source pane.
 
-- Upload mode sends browser-selected DBML/CSV/rules files to the local backend
-  and is intended for demos and small-to-medium local files.
+- Upload mode sends browser-selected DBML/CSV files to the local backend and is
+  intended for demos and small-to-medium local files.
 - Local path mode sends only local path strings to the backend, then runs the
   existing Python/DuckDB pipeline directly against those paths. Use it for
   larger local datasets when the CSV directory is visible to the server process.
 
-The static `report.html` keeps its deterministic Visual Summary. The web
-runner dashboard is the interactive browser view with filters and drilldown; it
-also renders table assessments, lineage, and relationship graphs from
-generated artifact JSON. It does not fetch raw CSV files or rerun the profiler.
+The static `report.html` keeps its deterministic issue summary. The web-runner
+review surface is an interactive browser view with filters and drilldown; it
+also renders table readiness and schema/relationship context from generated
+artifact JSON. It does not fetch raw CSV files or rerun the profiler.
 
 ## Scope
 
-v0.2 local release-candidate scope:
+Core MVP workflow:
 
-- DBML subset parsing with explicit `schema_parse_report.json` diagnostics.
-- CSV cataloging by file stem.
-- Optional Postgres and MySQL/MariaDB connector modes for selected tables,
-  writing additive `connector_metadata.json` without preserving raw connector
-  extracts.
+- DBML/schema parsing with explicit `schema_parse_report.json` diagnostics.
+- CSV cataloging by exact file stem first, then conservative schema/header
+  inference or explicit manual mapping override.
 - DuckDB-backed profiling without full pandas CSV loads.
 - DBML-derived quality checks.
-- YAML business rules.
 - FK relationship checks with cardinality, composite FK, and junction-table support.
-- Issue catalog with evidence SQL and sample bad rows.
-- DBML diagram artifacts with a dbdiagram.io embed link and CSV-to-table mapping.
-- Local web-runner ERD-style DBML diagram preview for deterministic table
-  layers, compact PK/FK cards, orthogonal relationship edges, fit controls,
-  CSV mapping status, relationship drilldown, and parser diagnostics.
-- Additive lineage graph artifact connecting input sources, schema entities,
-  relationships, profiler stages, and generated artifacts.
-- Deterministic severity aggregation and dataset verdict artifact.
-- Deterministic chart-spec artifacts rendered as report visual summaries.
-- Static web UI and Vercel preflight deployment for browser-side DBML/CSV
-  mapping and visualization preview only.
-- Local-only web runner with separate upload mode and local path mode, both
-  backed by the existing Python pipeline, plus an interactive artifact
-  dashboard rendered from generated JSON artifacts, including lineage and
-  relationship graph views.
-- Exportable self-contained analysis package command for offline review,
-  writing `index.html`, `export_manifest.json`, copied generated artifacts,
-  bounded sample evidence, an optional deterministic zip archive, and optional
-  `analysis_report.pdf` without raw source CSV files.
-- Generated Markdown, HTML, package index, and package PDF reports use a
-  Senior Data Scientist review layout: executive scorecard, visual summaries,
-  table impact, issue evidence, relationship/schema/lineage summaries, and
-  explicit L4 guardrail state from existing artifacts only.
-- Release-candidate hardening with `vsf-profiler doctor`, `make demo-full`,
-  and `scripts/verify_vsf_artifacts.py` for final artifact/package audits.
+- Issue catalog with evidence SQL, bounded sample bad rows, and data-quality
+  next steps.
+- Schema evaluation, relationship graph, deterministic data-quality
+  readiness artifact (`dataset_verdict.json`), per-table assessment artifact
+  (`table_assessments.json`), and chart specs rendered in reports.
+- Deterministic quality gates, issue action plans, grouped todos, and
+  selected-issue enrichment evidence when requested.
+- Built-in evaluation datasets with ground truth, comparison summary, and
+  explicit Great Expectations unavailable/not-covered states.
+- Deterministic Markdown and HTML data-quality reports.
+
+Compatibility and developer surfaces:
+
+- Local-only web runner and historical static preview for browser-assisted mapping,
+  local path runs, and artifact dashboard review.
+- Postgres and MySQL/MariaDB connector modes for selected local database
+  tables, writing additive `connector_metadata.json` without preserving raw
+  connector extracts.
+- Additive `lineage_graph.json` and `influence.json` artifacts.
+- Exportable self-contained analysis package command with optional zip and
+  optional `analysis_report.pdf`.
+- Release-candidate hardening commands: `vsf-profiler doctor`,
+  `make demo-full`, and `scripts/verify_vsf_artifacts.py`.
 - Large dataset benchmark guardrails with `make benchmark-small`,
   `make benchmark-large`, and `performance_guard_report.json`.
-- Deterministic Markdown and HTML reports.
-- Optional guarded Senior Data Scientist narrative from structured artifacts
-  only, writing `l4_report.md` and `guardrail_report.json` when enabled.
-  The built-in providers are `fake` for local validation and `openai` for
-  opt-in API usage with `.env` configuration. OpenAI-compatible model config is
-  validated before dispatch, and reports/dashboard views surface L4 guardrail
-  status, provider, fallback reason, and artifact links when L4 artifacts exist.
-- Olist-specific influence preset for `review_score`.
+- Optional compatibility LLM report artifacts from structured artifacts only,
+  writing `l4_report.md` and `guardrail_report.json` when enabled. Selected
+  issue enrichment writes `issue_llm_enrichments.json` only after a concrete
+  issue is chosen. The built-in providers are `fake` for local validation and
+  `openai` for opt-in API usage with `.env` configuration.
+- Legacy Olist preset paths for relational CSV compatibility data.
 
 Non-goals:
 

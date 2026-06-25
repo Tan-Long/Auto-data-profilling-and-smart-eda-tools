@@ -1,6 +1,6 @@
 {
-  "name": "auto-data-profilling-and-smart-eda-tools",
-  "version": "0.2.0-rc5",
+  "name": "repository-harness",
+  "version": "1.0.0",
   "description": "Playwright E2E checks for the VSF Data Profiler web runner.",
   "private": true,
   "scripts": {

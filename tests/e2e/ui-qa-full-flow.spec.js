@@ -1,0 +1,471 @@
+const { expect, test } = require("@playwright/test");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const qaDir = path.join("outputs", "ui_qa_full_flow");
+
+test("demo user can complete upload, demo, evaluate, report, and post-run review flows", async ({
+  context,
+  page,
+}) => {
+  test.setTimeout(240_000);
+  fs.mkdirSync(qaDir, { recursive: true });
+  const matrix = [];
+  const artifactRequests = [];
+  page.on("request", (request) => {
+    const url = request.url();
+    if (url.includes("/api/jobs/") && url.includes("/artifacts/")) {
+      artifactRequests.push(url);
+    }
+  });
+
+  try {
+    await page.goto("/");
+
+    await expect(page.locator("#flowChooser")).toBeVisible();
+    await expect(page.locator("#profileFlowButton")).toContainText("Profile my data");
+    await expect(page.locator("#evaluateFlowButton")).toContainText("Evaluate tool");
+    record(
+      matrix,
+      "First screen",
+      "Profile and Evaluate choices are visible before any run.",
+      "Both flow buttons are visible and inactive until selected.",
+      await screenshot(page.locator("#flowChooser"), "01-first-screen.png"),
+    );
+
+    await page.locator("#evaluateFlowButton").click();
+    await expect(page.locator("#evaluateFlow")).toBeVisible();
+    await expect(page.locator("#evaluateFlow input[type='file']")).toHaveCount(0);
+    await expect(page.locator("#evaluationCatalogCount")).toContainText("4 datasets", {
+      timeout: 10_000,
+    });
+    await expect(page.locator("#evaluationDatasetList")).toContainText("Retail orders seeded faults");
+    await expect(page.locator("#evaluationDatasetList")).toContainText("Support tickets seeded faults");
+    await expect(page.locator("#evaluationDatasetList")).toContainText("Public diabetes seeded faults");
+    await expect(page.locator("#evaluationDatasetList")).toContainText("Public manufacturing defects seeded faults");
+    await expect(page.locator("#evaluationDatasetList")).toContainText("MIT source");
+    record(
+      matrix,
+      "Evaluate catalog",
+      "Evaluate exposes only built-in datasets and no file upload controls.",
+      "Four curated datasets are listed, including public local snapshots; no DBML/CSV file inputs exist in Evaluate.",
+      await screenshot(page.locator("#evaluateFlow"), "02-evaluate-catalog.png"),
+    );
+
+    await page.locator('[data-evaluation-dataset-id="public_manufacturing_defects_seeded_faults"]').click();
+    await expect(page.locator('[data-evaluation-dataset-id="public_manufacturing_defects_seeded_faults"]')).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await page.locator("#startEvaluationButton").click();
+    await expect(page.locator("#evaluateMessage")).toContainText("Evaluation complete", {
+      timeout: 60_000,
+    });
+    await expect(page.locator("#evaluationExpectedList")).toContainText("VSF profiler");
+    await expect(page.locator("#evaluationExpectedList")).toContainText("Great Expectations");
+    await expect(page.locator("#evaluationExpectedList")).toContainText("caught");
+    await expect(page.locator("#evaluationUsefulnessList")).toContainText("Actionability");
+    await expect(page.locator("#evaluationExpectedList")).toContainText("Not covered by baseline");
+    await expect(page.locator("#evaluationComparison")).not.toContainText("GE not installed");
+    await expect(page.locator("#evaluationComparison")).not.toContainText("ModuleNotFoundError");
+    await expect(page.locator("#evaluationArtifactLinks")).toContainText("evaluation_summary.json");
+    await expect(page.locator("#evaluationArtifactLinks")).toContainText("ground_truth_issues.json");
+    await expect(page.locator("#evaluationArtifactLinks")).toContainText("baseline_comparison.json");
+    record(
+      matrix,
+      "Evaluate run",
+      "A selected built-in dataset runs and shows correctness, usefulness, baseline, and artifact links.",
+      "Public manufacturing evaluation completed with expected rows and artifact links.",
+      await screenshot(page.locator("#evaluationComparison"), "03-evaluate-run.png"),
+    );
+
+    await page.locator("#profileFlowButton").click();
+    await expect(page.locator("#profileFlow")).toBeVisible();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "connect");
+    await expect(page.locator("#sourceStateTitle")).toContainText("Source status");
+    await expect(page.locator("#inputSetup")).toContainText("Connect DBML + CSV");
+    await expect(page.locator("#upload")).toBeVisible();
+    await expect(page.locator("#dbmlDropzone")).toBeVisible();
+    await expect(page.locator("#csvDropzone")).toBeVisible();
+    await expect(page.locator("#issues")).toBeHidden();
+    await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+    await expect(page.locator("#csvList")).not.toContainText("customers.csv");
+    await expect(page.locator("#diagramEmpty")).toContainText("Upload DBML to preview schema");
+    record(
+      matrix,
+      "Upload initial state",
+      "Upload mode starts clean, with no demo inventory visible.",
+      "Source badge says No upload, CSV list has no demo CSVs, and diagram is empty.",
+      await screenshot(page.locator("#sourceState"), "04-upload-empty-source.png"),
+    );
+
+    await page.locator("#quickDemoButton").click();
+    await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
+    await expect(page.locator("#sourceStateSummary")).toContainText("DBML + CSV demo is loaded");
+    await expect(page.locator("#upload")).toBeHidden();
+    await expect(page.locator("#dbmlDropzone")).toBeHidden();
+    await expect(page.locator("#csvDropzone")).toBeHidden();
+    await expect(page.locator("#runnerMessage")).toContainText("DBML + CSV demo is loaded");
+    await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
+    await expect(page.locator("#csvList")).toContainText("customers.csv");
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
+    await expect(page.locator("#runPathProfilerButton")).toBeDisabled();
+    record(
+      matrix,
+      "Quick demo source",
+      "A visible Connect-step button loads sample DBML and CSV inventory for demo runs.",
+      "The sample demo switched to local path mode, filled mapping 7/7, and enabled Next while keeping Run gated.",
+      await screenshot(page.locator("#sourceState"), "05-quick-demo-source.png"),
+    );
+
+    await page.locator("#clearUploadButton").click();
+    await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+    await expect(page.locator("#csvList")).not.toContainText("customers.csv");
+
+    const uploadFixtureDir = path.join(qaDir, "fixtures");
+    fs.mkdirSync(uploadFixtureDir, { recursive: true });
+    const accountsDbml = path.join(uploadFixtureDir, "accounts.dbml");
+    const accountsCsv = path.join(uploadFixtureDir, "accounts.csv");
+    const invoicesDbml = path.join(uploadFixtureDir, "invoices.dbml");
+    const invoicesCsv = path.join(uploadFixtureDir, "invoices.csv");
+    fs.writeFileSync(
+      accountsDbml,
+      ["Table accounts {", "  account_id varchar [pk, not null]", "  account_name varchar", "}", ""].join(
+        "\n",
+      ),
+    );
+    fs.writeFileSync(accountsCsv, "account_id,account_name\nA-1,Example account\n");
+    fs.writeFileSync(
+      invoicesDbml,
+      [
+        "Table invoices {",
+        "  invoice_id varchar [pk, not null]",
+        "  account_id varchar",
+        "  amount float",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    fs.writeFileSync(invoicesCsv, "invoice_id,account_id,amount\nINV-1,A-1,42.50\n");
+
+    await page.locator("#dbmlInput").setInputFiles(accountsDbml);
+    await page.locator("#csvInput").setInputFiles(accountsCsv);
+    await expect(page.locator("#sourceStateBadge")).toContainText("Custom upload");
+    await expect(page.locator("#csvList")).toContainText("accounts.csv");
+    await expect(page.locator("#csvList")).not.toContainText("customers.csv");
+    await expect(page.locator("#mappingStatus")).toContainText("1/1 tables mapped");
+    await expect(page.locator("#preflightGateBadge")).toContainText("Run enabled");
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
+    await expect(page.locator("#runProfilerButton")).toBeDisabled();
+    record(
+      matrix,
+      "Custom upload mapping",
+      "Custom DBML/CSV replaces demo inventory and enables the run button.",
+      "accounts.csv is visible, demo CSVs are absent, mapping is 1/1, and preflight enables Run.",
+      await screenshot(page.locator("#profileFlow"), "05-custom-upload-mapped.png"),
+    );
+
+    await page.locator("#clearUploadButton").click();
+    await expect(page.locator("#sourceStateBadge")).toContainText("No upload");
+    await expect(page.locator("#csvList")).not.toContainText("accounts.csv");
+    await page.locator("#dbmlInput").setInputFiles(invoicesDbml);
+    await page.locator("#csvInput").setInputFiles(invoicesCsv);
+    await expect(page.locator("#csvList")).toContainText("invoices.csv");
+    await expect(page.locator("#csvList")).not.toContainText("accounts.csv");
+    await expect(page.locator("#mappingStatus")).toContainText("1/1 tables mapped");
+    record(
+      matrix,
+      "Clear and re-upload",
+      "Clear source removes old uploads, and a new upload inventory replaces it.",
+      "accounts.csv disappeared, invoices.csv is the only uploaded CSV, and mapping stayed valid.",
+      await screenshot(page.locator("#profileFlow"), "06-reupload-source-state.png"),
+    );
+
+    await goToProfileStep(page, "preflight");
+    await goToProfileStep(page, "run");
+    await expect(page.locator("#runProfilerButton")).toBeEnabled();
+    await page.locator("#runProfilerButton").click();
+    await expect(page.locator("#runnerMessage")).toContainText("Run complete", {
+      timeout: 60_000,
+    });
+    await goToProfileStep(page, "run");
+    await expect(page.locator("#artifactList")).toContainText("Issue counts");
+    record(
+      matrix,
+      "Upload run",
+      "The custom upload can run through the real backend and produce artifacts.",
+      "Upload job completed and generated result previews.",
+      await screenshot(page.locator("#artifactList"), "07-upload-run-results.png"),
+    );
+
+    await expect(page.locator("#runnerModeUpload")).toBeHidden();
+    await expect(page.locator("#runnerModePath")).toBeHidden();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+    await expect(page.locator("#demoPresetOlist")).toHaveCount(0);
+    await expect(page.locator("#demoPresetStatus")).toHaveCount(0);
+    await page.locator("#loadDemoButton").click();
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+    await expect(page.locator("#pathRunnerForm")).toBeVisible();
+    await expect(page.locator("#sourceStateBadge")).toContainText("Sample data");
+    await expect(page.locator("#mappingStatus")).toContainText("7/7 tables mapped");
+    await expect(page.locator("#llmModeStatus")).toContainText("On");
+    await expect(page.locator("#profileDeveloperOptions")).toBeVisible();
+    await expect(page.locator("#llmModeToggle .llm-switch-track")).toBeVisible();
+    await expect(page.locator("#llmModeToggle .llm-switch-thumb")).toBeVisible();
+    await expect(page.locator("#llmModeFake")).toHaveCount(0);
+    await page.locator("#llmModeToggle").click();
+    await expect(page.locator("#llmModeStatus")).toContainText("Off");
+    await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "false");
+    await page.locator("#llmModeToggle").click();
+    await expect(page.locator("#llmModeStatus")).toContainText("On");
+    await expect(page.locator("#llmModeToggle")).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator("#llmModeToggle")).toHaveClass(/active/);
+    await expect(page.locator("#runnerModeDatabase")).toHaveCount(0);
+    await expect(page.locator("#databaseRunnerForm")).toHaveCount(0);
+    await expect(page.locator("#rulesPathInput")).toHaveCount(0);
+    await expect(page.locator("#pathTargetInput")).toHaveCount(0);
+    await expect(page.locator("#runner")).toContainText("Selected source");
+    await expect(page.locator("#runner")).toContainText("demo_schema.dbml");
+    await expect(page.locator("#runSourceCsvCount")).toContainText("7 CSV files");
+    await expect(page.locator("#runSourceCsvList")).toContainText("orders.csv");
+    await expect(page.locator("#runSourceCsvList")).toContainText("order_payments.csv");
+    await expect(page.locator("#runner")).not.toContainText("data/demo_small");
+    await expect(page.locator("#dbmlPathInput")).toHaveValue("data/demo_small/schema.dbml");
+    await expect(page.locator("#dbmlPathInput")).toHaveAttribute("type", "hidden");
+    await expect(page.locator("#csvDirPathInput")).toHaveValue("data/demo_small/csv");
+    await expect(page.locator("#csvDirPathInput")).toHaveAttribute("type", "hidden");
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+    await expect(page.locator("#profileStepNext")).toBeDisabled();
+    await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
+    record(
+      matrix,
+      "Input contract",
+      "The Profile input surface accepts only DBML plus CSV sources while keeping optional LLM mode available.",
+      "Developer DB, rule config, and association target controls are absent; DBML path and CSV directory remain runnable after preflight.",
+      await screenshot(page.locator("#runner"), "08-input-contract.png"),
+    );
+
+    await goToProfileStep(page, "preflight");
+    await goToProfileStep(page, "run");
+    await expect(page.locator("#runPathProfilerButton")).toBeEnabled();
+    await page.locator("#runPathProfilerButton").click();
+    await expect(page.locator("#runnerMessage")).toContainText("Run complete", {
+      timeout: 60_000,
+    });
+    await expect(page.locator("#dashboardStatusBadge")).toContainText("succeeded dashboard", {
+      timeout: 20_000,
+    });
+    await expect(page.locator("#dashboardIssueCount")).toContainText("12/12 issues");
+    await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", "run");
+    await expect(page.locator("#profileStepNext")).toBeEnabled();
+    await expect(page.locator("#stageList")).toContainText("Render Markdown and HTML reports");
+    await expect(page.locator("#artifactList")).toContainText("Data-quality readiness");
+    await goToProfileStep(page, "review");
+    await expect(page.locator("#qualityGates")).toContainText("Quality Gates");
+    await expect(page.locator("#dashboard")).toContainText("Review Issues");
+    await expect(page.locator("#todosStatus")).toContainText("issue actions");
+    await expect(page.locator("#reportExportStatus")).toContainText("Reports ready");
+    await expect(page.locator("#tableImpactStatus")).toContainText("tables from table_assessments.json");
+    await expect(page.locator("#graphs")).toHaveCount(0);
+    await expect(page.locator("#dashboardGraphDrilldown")).toHaveCount(0);
+    await expect(page.locator("#artifacts")).toHaveCount(0);
+    record(
+      matrix,
+      "Small demo run",
+      "Local path Small demo completes and populates the user-facing review/report surfaces.",
+      "Run completed with stages, gates, issues, todos, report/export, and table readiness; developer graph/artifact source panes stayed absent.",
+      await screenshot(page.locator("#dashboard"), "09-small-demo-review.png"),
+    );
+
+    await page.locator('#dashboardPanelGrid [data-dashboard-kind="issue"][data-dashboard-value="ISSUE-0009"]').click();
+    await expect(page.locator("#dashboardDrilldownMeta")).toContainText("ISSUE-0009");
+    await expect(page.locator("#dashboardDrilldown")).toContainText("Row evidence");
+    await expect(page.locator("#dashboardDrilldown .issue-row-evidence")).toContainText("Previewing sample");
+    await expect(page.locator("#dashboardDrilldown .issue-row-evidence")).not.toContainText("Open CSV");
+    await expect(page.locator("#dashboardDrilldown .issue-sample-table td.highlighted").first()).toBeVisible();
+    await expect(page.locator("#dashboardDrilldown")).toContainText("Fix / Todo");
+    await page.locator('[data-action-plan-export="markdown"]').click();
+    await expect(page.locator(".issue-export-status")).toContainText("Copied Markdown for ISSUE-0009.");
+    await page.locator('[data-action-plan-export="csv"]').click();
+    await expect(page.locator(".issue-export-status")).toContainText("Copied CSV row for ISSUE-0009.");
+    await page.locator('[data-action-plan-export="json"]').click();
+    await expect(page.locator(".issue-export-status")).toContainText("Copied JSON for ISSUE-0009.");
+    await expect(page.locator("#dashboardDrilldown .issue-llm-priority-panel")).toBeVisible();
+    await expect(page.locator("#dashboardDrilldown")).toContainText("OpenAI issue guidance");
+    await expect(page.locator('[data-issue-llm-provider]')).toHaveCount(0);
+    await page.locator("[data-issue-llm-run]").click();
+    await expect(page.locator(".issue-llm-message")).toContainText(/OPENAI_API_KEY|OpenAI/i, {
+      timeout: 20_000,
+    });
+    await expect(page.locator("#dashboardDrilldown")).toContainText(/unavailable|succeeded/i);
+    record(
+      matrix,
+      "Issue drawer interactions",
+      "Issue copy buttons and fake/OpenAI selected-issue enrichment show clear visible states.",
+      "Markdown/CSV/JSON copy statuses appeared, fake enrichment succeeded, and OpenAI showed a visible provider state.",
+      await screenshot(page.locator("#dashboardDrilldown"), "10-issue-drawer-llm-copy.png"),
+    );
+
+    await page.locator("#todosFilterVerify").click();
+    await expect(page.locator("#todos")).toContainText("Verify after fix issue queue");
+    await expect(page.locator("#todos .todo-visual-summary")).toBeVisible();
+    await expect(page.locator("#todos .todo-issue-work-card").first()).toBeVisible();
+    await expect(page.locator("#todos")).toContainText("Open issue for checklist");
+    await expect(page.locator("#reportExport")).toContainText("Issue todo summary");
+    await expect(page.locator("#reportExport [data-todo-export]")).toHaveCount(0);
+    await expect(page.locator('#reportExport a[href*="issue_llm_enrichments.json"]')).toHaveCount(0);
+    await expect(page.locator('#reportExport button[data-dashboard-open-llm="true"]')).toContainText("Open OpenAI issue guidance");
+    await expect(page.locator("#reportExport")).not.toContainText("Report preview");
+    await expect(page.locator("#reportExport")).not.toContainText("Summary before opening the report");
+    await expect(page.locator("#reportExport")).not.toContainText("Issue types");
+    await expect(page.locator("#reportExport")).not.toContainText("Missing values by table");
+    await expect(page.locator("#reportExport .report-preview-table-group")).toHaveCount(0);
+    const reportHref = await page.locator('#reportExport a[href*="report.html"]').first().getAttribute("href");
+    const reportPage = await context.newPage();
+    await reportPage.goto(new URL(reportHref, page.url()).toString());
+    await expect(reportPage.locator("h2", { hasText: "Where are the problems?" })).toBeVisible();
+    await expect(reportPage.getByText("Missing values by table")).toBeVisible();
+    await expect(reportPage.locator(".missing-table-group").first()).toBeVisible();
+    await expect(reportPage.locator("h2", { hasText: "What should be fixed first?" })).toBeVisible();
+    await expect(reportPage.getByText("Sample row preview").first()).toBeVisible();
+    await expect(reportPage.locator(".sample-preview-row").first()).toBeVisible();
+    await expect(reportPage.locator(".sample-table td.highlighted").first()).toBeVisible();
+    await expect(reportPage.locator("h2", { hasText: "Quality Gates" })).toBeVisible();
+    await expect(reportPage.locator("h2", { hasText: "Issue Action Plans" })).toBeVisible();
+    await reportPage.close();
+    record(
+      matrix,
+      "Todos and report export",
+      "Todo filters show an issue queue, and report.html opens with fixed sections.",
+      "Verify filter showed issue-first todos and report.html opened.",
+      await screenshot(page.locator("#reportExport"), "11-report-export-copy.png"),
+    );
+
+    await expect(page.locator("#dashboard")).not.toContainText("Developer Schema Context");
+    await expect(page.locator("#dashboard")).not.toContainText("Graph drilldown");
+    await expect(page.locator("#dashboard")).not.toContainText("Developer artifact sources");
+    record(
+      matrix,
+      "Developer surfaces removed",
+      "Dashboard review does not expose developer schema graph, graph drilldown, or developer artifact source panes.",
+      "The post-run dashboard omitted the removed developer panels while issue, todo, and report controls remained usable.",
+      await screenshot(page.locator("#dashboard"), "12-dashboard-without-developer-surfaces.png"),
+    );
+
+    await expect(page.locator("#runHistory")).toBeHidden();
+    await expect(page.locator("#workflowNav")).not.toContainText("Run History");
+    await expect(page.locator("#workflowNav")).not.toContainText("Previous runs");
+    record(
+      matrix,
+      "Run history removed from demo",
+      "The post-run review surface does not expose Previous runs during demos.",
+      "Run history stayed hidden while quality gates, issues, todos, and reports remained usable.",
+      await screenshot(page.locator("#dashboard"), "13-run-history-hidden.png"),
+    );
+
+    const rawCsvArtifactRequests = artifactRequests.filter(
+      (url) => url.endsWith(".csv") && !url.includes("/samples/"),
+    );
+    expect(rawCsvArtifactRequests).toEqual([]);
+    record(
+      matrix,
+      "Raw CSV privacy",
+      "Dashboard artifact fetches do not request raw source CSV files outside bounded samples.",
+      "No raw non-sample CSV artifact URLs were requested during QA run.",
+      "",
+    );
+  } catch (error) {
+    const failureShot = await screenshot(page, "failure.png", { fullPage: true }).catch(() => "");
+    matrix.push({
+      flow: "QA run failure",
+      expected: "All required scenarios pass.",
+      actual: error.message,
+      screenshot_path: failureShot,
+      result: "fail",
+    });
+    throw error;
+  } finally {
+    writeMatrix(matrix);
+  }
+});
+
+async function screenshot(target, filename, options = {}) {
+  const screenshotPath = path.join(qaDir, filename);
+  await target.screenshot({ path: screenshotPath, ...options });
+  return screenshotPath;
+}
+
+async function goToProfileStep(page, targetStep) {
+  const order = ["connect", "preflight", "run", "review"];
+  const targetIndex = order.indexOf(targetStep);
+  if (targetIndex === -1) {
+    throw new Error(`Unknown profile step: ${targetStep}`);
+  }
+  for (let attempt = 0; attempt < order.length + 2; attempt += 1) {
+    const currentStep = await page.locator("#profileFlow").getAttribute("data-profile-step");
+    if (currentStep === targetStep) {
+      await expect(page.locator("#profileFlow")).toHaveAttribute("data-profile-step", targetStep);
+      return;
+    }
+    const currentIndex = order.indexOf(currentStep);
+    if (currentIndex === -1) {
+      throw new Error(`Unknown current profile step: ${currentStep}`);
+    }
+    if (currentIndex < targetIndex) {
+      await expect(page.locator("#profileStepNext")).toBeEnabled();
+      await page.locator("#profileStepNext").click();
+    } else {
+      await expect(page.locator("#profileStepBack")).toBeEnabled();
+      await page.locator("#profileStepBack").click();
+    }
+  }
+  throw new Error(`Unable to navigate to profile step: ${targetStep}`);
+}
+
+async function openDetails(page, selector) {
+  const details = page.locator(selector);
+  if (!(await details.evaluate((element) => element.open))) {
+    await details.locator("summary").click();
+  }
+}
+
+function record(matrix, flow, expected, actual, screenshotPath) {
+  matrix.push({
+    flow,
+    expected,
+    actual,
+    screenshot_path: screenshotPath,
+    result: "pass",
+  });
+}
+
+function writeMatrix(matrix) {
+  fs.mkdirSync(qaDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(qaDir, "qa-matrix.json"),
+    JSON.stringify({ generated_at: new Date().toISOString(), matrix }, null, 2),
+  );
+  const lines = [
+    "# VSF Data Profiler UI QA Matrix",
+    "",
+    "| Flow | Expected result | Actual result | Screenshot | Result |",
+    "| --- | --- | --- | --- | --- |",
+    ...matrix.map((row) =>
+      [
+        row.flow,
+        row.expected,
+        row.actual,
+        row.screenshot_path ? `\`${row.screenshot_path}\`` : "",
+        row.result,
+      ]
+        .map(markdownCell)
+        .join(" | "),
+    ).map((row) => `| ${row} |`),
+    "",
+  ];
+  fs.writeFileSync(path.join(qaDir, "qa-matrix.md"), lines.join("\n"));
+}
+
+function markdownCell(value) {
+  return String(value || "").replace(/\|/g, "\\|").replace(/\n/g, "<br>");
+}

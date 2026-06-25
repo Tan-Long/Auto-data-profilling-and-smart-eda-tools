@@ -26,13 +26,14 @@ CAUSES = {
     "CHILD_RELATIONSHIP_DUPLICATE": [
         "Child foreign-key values are not unique for a declared one-to-one relationship."
     ],
-    "VALUE_OUT_OF_RANGE": ["A business rule range constraint was violated."],
-    "NEGATIVE_VALUE_NOT_ALLOWED": ["A non-negative amount rule was violated."],
-    "DATE_ORDER_INVALID": ["Timestamp ordering violates the expected business process."],
+    "VALUE_OUT_OF_RANGE": ["A configured range constraint was violated."],
+    "NEGATIVE_VALUE_NOT_ALLOWED": ["A configured non-negative numeric rule was violated."],
+    "DATE_ORDER_INVALID": ["Timestamp ordering violates the configured chronological rule."],
     "ACCEPTED_VALUE_VIOLATION": ["A categorical column contains undeclared values."],
     "REGEX_MISMATCH": ["A text value does not match the expected pattern."],
     "EMPTY_STRING": ["Text fields contain blank strings that may behave differently from null."],
     "INVALID_PLACEHOLDER_TOKEN": ["Placeholder tokens are present instead of normalized nulls."],
+    "NUMERIC_OUTLIER": ["Numeric values fall outside the profiled IQR fence for this column."],
 }
 
 FIXES = {
@@ -53,13 +54,16 @@ FIXES = {
     "CHILD_RELATIONSHIP_DUPLICATE": [
         "Deduplicate child foreign-key values or change the DBML relationship cardinality."
     ],
-    "VALUE_OUT_OF_RANGE": ["Clamp, reject, or correct values outside the accepted business range."],
-    "NEGATIVE_VALUE_NOT_ALLOWED": ["Reject negative amount rows or correct sign handling upstream."],
+    "VALUE_OUT_OF_RANGE": ["Clamp, reject, or correct values outside the accepted configured range."],
+    "NEGATIVE_VALUE_NOT_ALLOWED": ["Reject negative numeric values or correct sign handling upstream."],
     "DATE_ORDER_INVALID": ["Fix timestamp derivation and add ordering validation in the pipeline."],
     "ACCEPTED_VALUE_VIOLATION": ["Update the allowed set or normalize unexpected category values."],
     "REGEX_MISMATCH": ["Normalize the text field or update the regex if the contract changed."],
     "EMPTY_STRING": ["Convert blank strings to null or enforce non-empty text rules."],
     "INVALID_PLACEHOLDER_TOKEN": ["Normalize placeholder tokens to null at ingestion."],
+    "NUMERIC_OUTLIER": [
+        "Review bounded sample rows and decide whether to correct, cap, transform, or keep the values."
+    ],
 }
 
 

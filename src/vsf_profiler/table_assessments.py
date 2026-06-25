@@ -12,24 +12,6 @@ ROLE_VALUES = ("fact", "dimension", "bridge", "event", "reference", "unknown")
 READINESS_VALUES = ("READY", "WARN", "NOT_READY")
 ISSUE_SCORE_WEIGHTS = {"P0": 30, "P1": 18, "P2": 7, "P3": 2}
 RELATIONSHIP_SCORE_WEIGHTS = {"invalid": 12, "warning": 6, "skipped": 3}
-TABLE_REVIEW_SCORE_MODEL = {
-    "label": "Table review score",
-    "description": (
-        "Deterministic EDA prioritization heuristic. "
-        "It is not a statistical health model."
-    ),
-    "formula": (
-        "max(0, min(100, 100 - (P0*30 + P1*18 + P2*7 + P3*2 + "
-        "invalid_fk*12 + warning_fk*6 + skipped_fk*3)))"
-    ),
-    "issue_penalty_weights": ISSUE_SCORE_WEIGHTS,
-    "relationship_penalty_weights": RELATIONSHIP_SCORE_WEIGHTS,
-    "score_range": {"min": 0, "max": 100},
-    "interpretation": (
-        "Higher is cleaner for review. P3 findings, including generic outliers, "
-        "are low-weight review signals."
-    ),
-}
 
 ROLE_TOKEN_RULES: tuple[tuple[str, set[str]], ...] = (
     ("bridge", {"bridge", "junction", "xref", "crosswalk", "link", "links", "map", "mapping"}),
@@ -41,33 +23,33 @@ ROLE_TOKEN_RULES: tuple[tuple[str, set[str]], ...] = (
 
 BUSINESS_IMPACT_RULES: tuple[dict[str, Any], ...] = (
     {
-        "category": "revenue_and_payment_operations",
-        "label": "Revenue and payment operations",
+        "category": "numeric_measure_integrity",
+        "label": "Numeric measure integrity",
         "tokens": {"payment", "payments", "invoice", "invoices", "transaction", "transactions", "revenue", "price", "prices", "refund", "refunds", "billing"},
     },
     {
-        "category": "customer_feedback",
-        "label": "Customer feedback",
+        "category": "feedback_signal_quality",
+        "label": "Feedback signal quality",
         "tokens": {"review", "reviews", "rating", "ratings", "feedback", "survey", "surveys"},
     },
     {
-        "category": "product_catalog",
-        "label": "Product catalog",
+        "category": "catalog_attribute_quality",
+        "label": "Catalog attribute quality",
         "tokens": {"product", "products", "catalog", "inventory", "sku", "category", "categories"},
     },
     {
-        "category": "customer_experience",
-        "label": "Customer experience",
+        "category": "entity_identity_quality",
+        "label": "Entity identity quality",
         "tokens": {"customer", "customers", "user", "users", "account", "accounts", "buyer", "buyers", "client", "clients", "consumer", "consumers"},
     },
     {
-        "category": "marketplace_operations",
-        "label": "Marketplace operations",
+        "category": "partner_entity_quality",
+        "label": "Partner entity quality",
         "tokens": {"seller", "sellers", "vendor", "vendors", "merchant", "merchants"},
     },
     {
-        "category": "order_fulfillment",
-        "label": "Order fulfillment",
+        "category": "transaction_event_quality",
+        "label": "Transaction event quality",
         "tokens": {"order", "orders", "shipment", "shipments", "delivery", "deliveries", "item", "items"},
     },
     {
@@ -137,8 +119,6 @@ def build_table_assessments(
         "summary": {
             "table_count": len(assessments),
             "average_health_score": average_score,
-            "average_review_score": average_score,
-            "score_model": TABLE_REVIEW_SCORE_MODEL,
             "readiness_counts": {value: readiness_counts.get(value, 0) for value in READINESS_VALUES},
             "role_counts": {value: role_counts.get(value, 0) for value in ROLE_VALUES},
             "business_impact_counts": dict(sorted(impact_counts.items())),
@@ -159,10 +139,7 @@ def _table_assessment(
     issue_counts_by_type = _issue_counts_by_type(issues)
     relationship_risks = _relationship_risks(table_name, graph_edges)
     readiness = _readiness(issue_counts_by_severity, relationship_risks)
-    health_score, penalty_breakdown = _health_score_with_breakdown(
-        issue_counts_by_severity,
-        relationship_risks,
-    )
+    health_score = _health_score(issue_counts_by_severity, relationship_risks)
     affected_columns = sorted(
         {
             column
@@ -179,8 +156,6 @@ def _table_assessment(
         "table": table_name,
         "role": role,
         "health_score": health_score,
-        "review_score": health_score,
-        "score_penalty_breakdown": penalty_breakdown,
         "readiness": readiness,
         "row_count": _to_int(table_profile.get("row_count")),
         "column_count": _to_int(table_profile.get("column_count")),
@@ -266,27 +241,16 @@ def _readiness(issue_counts_by_severity: dict[str, int], relationship_risks: lis
     return "READY"
 
 
-def _health_score_with_breakdown(
-    issue_counts_by_severity: dict[str, int],
-    relationship_risks: list[dict[str, Any]],
-) -> tuple[int, dict[str, Any]]:
-    issue_penalties = {
-        severity: issue_counts_by_severity[severity] * ISSUE_SCORE_WEIGHTS[severity]
+def _health_score(issue_counts_by_severity: dict[str, int], relationship_risks: list[dict[str, Any]]) -> int:
+    penalty = sum(
+        issue_counts_by_severity[severity] * ISSUE_SCORE_WEIGHTS[severity]
         for severity in SEVERITIES
-    }
-    relationship_counts = Counter(risk["status"] for risk in relationship_risks)
-    relationship_penalties = {
-        status: relationship_counts.get(status, 0) * weight
-        for status, weight in RELATIONSHIP_SCORE_WEIGHTS.items()
-    }
-    penalty = sum(issue_penalties.values()) + sum(relationship_penalties.values())
-    score = max(0, min(100, 100 - penalty))
-    return score, {
-        "issue_penalties": issue_penalties,
-        "relationship_penalties": relationship_penalties,
-        "total_penalty": penalty,
-        "formula": TABLE_REVIEW_SCORE_MODEL["formula"],
-    }
+    )
+    penalty += sum(
+        RELATIONSHIP_SCORE_WEIGHTS.get(risk["status"], 0)
+        for risk in relationship_risks
+    )
+    return max(0, min(100, 100 - penalty))
 
 
 def _infer_role(
@@ -325,7 +289,7 @@ def _business_impact(table_name: str) -> dict[str, Any]:
         "category": DEFAULT_BUSINESS_IMPACT["category"],
         "label": DEFAULT_BUSINESS_IMPACT["label"],
         "matched_tokens": [],
-        "rationale": "No safe business-impact token matched the table name.",
+        "rationale": "No safe analysis-impact token matched the table name.",
     }
 
 
@@ -377,7 +341,7 @@ def _recommended_next_actions(
     if readiness == "NOT_READY":
         _add_action(actions, seen, f"Resolve blocker issues for `{table_name}` before cross-table analytics.")
     if any(risk["status"] == "invalid" for risk in relationship_risks):
-        _add_action(actions, seen, f"Fix FK data-quality issues involving `{table_name}`.")
+        _add_action(actions, seen, f"Fix invalid relationship checks involving `{table_name}`.")
     if affected_columns:
         _add_action(
             actions,

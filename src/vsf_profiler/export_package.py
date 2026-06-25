@@ -19,6 +19,10 @@ MANIFEST_NAME = "export_manifest.json"
 INDEX_NAME = "index.html"
 PDF_REPORT_NAME = "analysis_report.pdf"
 FIXED_ZIP_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
+PACKAGE_ACTION_PLAN_LIMIT = 5
+PACKAGE_ACTION_PLAN_SUMMARY_LIMIT = 30
+PACKAGE_EVIDENCE_VALUE_LIMIT = 6
+PACKAGE_TODO_ISSUE_LIMIT = 6
 REQUIRED_ARTIFACTS = [
     "profile_summary.json",
     "issues.json",
@@ -39,6 +43,14 @@ REQUIRED_ARTIFACTS = [
 ]
 OPTIONAL_ARTIFACTS = [
     "connector_metadata.json",
+    "preflight_review.json",
+    "issue_action_plans.json",
+    "issue_llm_enrichments.json",
+    "issue_todos.json",
+    "quality_gates.json",
+    "ground_truth_issues.json",
+    "baseline_comparison.json",
+    "evaluation_summary.json",
     "l4_report.md",
     "guardrail_report.json",
 ]
@@ -349,14 +361,13 @@ def _render_index_html(
     connector_metadata = _read_json(source_root / "connector_metadata.json")
     profile_summary = _read_json(source_root / "profile_summary.json")
     issues = _read_json_list(source_root / "issues.json")
-    guardrail_report = _read_json(source_root / "guardrail_report.json")
+    quality_gates = _read_json(source_root / "quality_gates.json")
+    issue_action_plans = _read_json(source_root / "issue_action_plans.json")
+    issue_todos = _read_json(source_root / "issue_todos.json")
+    evaluation_summary = _read_json(source_root / "evaluation_summary.json")
+    issue_llm_enrichments = _read_json(source_root / "issue_llm_enrichments.json")
     chart_paths = sorted(path for path in artifact_index if path.startswith("charts/"))
     sample_paths = sorted(path for path in artifact_index if path.startswith("samples/"))
-    optional_paths = [
-        path
-        for path in ["connector_metadata.json", "l4_report.md", "guardrail_report.json"]
-        if path in artifact_index
-    ]
     run_id = source_run.get("run_id", "unknown") if source_run else "unknown"
     run_status = source_run.get("status", "unknown") if source_run else "unknown"
     verdict_issue_counts = verdict.get("issue_counts") or {}
@@ -373,30 +384,76 @@ def _render_index_html(
     profile_tables = profile_summary.get("tables") or {}
     row_count = sum(int(table.get("row_count") or 0) for table in profile_tables.values())
     column_count = sum(int(table.get("column_count") or 0) for table in profile_tables.values())
+    all_outlier_rows = top_numeric_outlier_rows(profile_summary, limit=10_000)
+    outlier_rows = all_outlier_rows[:10]
+    outlier_count = sum(int(row.get("outlier_count") or 0) for row in all_outlier_rows)
+    column_usability_rows = package_column_usability_rows(profile_summary, issues)
+    blocked_column_count = sum(1 for row in column_usability_rows if row["status"] == "blocked")
+    preparation_column_count = sum(
+        1 for row in column_usability_rows if row["status"] == "needs_preparation"
+    )
+    column_issue_blocks = package_column_issue_blocks(issues)
     relationship_status_counts = relationship_summary.get("status_counts") or {}
     invalid_fk_count = int(relationship_status_counts.get("invalid", 0) or 0)
-    table_score_model = table_assessment_summary.get("score_model") or {}
-    l4_status = guardrail_report.get("status", "not_enabled") if guardrail_report else "not_enabled"
-    l4_provider = guardrail_report.get("provider", "none") if guardrail_report else "none"
     cards = [
-        ("Verdict", verdict_label, f"Risk score {risk_score}"),
+        ("Readiness", verdict_label, f"Risk score {risk_score}"),
         ("Issues", str(issue_total), f"{blocker_count} P0/P1 blockers"),
         ("Tables", str(len(profile_tables) or eval_summary.get("mapped_table_count", "0")), f"{row_count} rows, {column_count} columns"),
-        ("FK Status", f"{invalid_fk_count}/{relationship_summary.get('edge_count', 0)}", "Invalid relationship edges"),
+        ("FK Health", f"{invalid_fk_count}/{relationship_summary.get('edge_count', 0)}", "Invalid relationship edges"),
         (
             "Table assessments",
             str(table_assessment_summary.get("table_count", "0")),
             "Readiness rows",
         ),
-        ("L4", l4_status, f"{l4_provider} provider"),
+        ("Column usability", str(blocked_column_count), f"{preparation_column_count} need preparation"),
+        ("Numeric outliers", str(outlier_count), f"{len(all_outlier_rows)} profiled columns"),
         ("Artifacts", str(len(artifact_index)), "Package files"),
     ]
+    run_summary_html = package_run_summary_html(
+        source_run=source_run,
+        verdict=verdict,
+        quality_gates=quality_gates,
+        issue_total=issue_total,
+        blocker_count=blocker_count,
+        table_count=len(profile_tables) or eval_summary.get("mapped_table_count", 0),
+        column_count=column_count,
+        row_count=row_count,
+    )
+    quality_gates_html = package_quality_gates_html(quality_gates)
+    table_overview_html = package_table_overview_html(table_assessments)
+    column_issue_matrix_html = package_column_issue_matrix_html(column_issue_blocks)
+    action_plans_html = package_action_plans_html(issue_action_plans)
+    todos_html = package_todos_html(issue_todos)
+    review_briefing_html = package_review_briefing_html(
+        verdict=verdict,
+        table_assessments=table_assessments,
+        issues=issues,
+        issue_action_plans=issue_action_plans,
+        issue_llm_enrichments=issue_llm_enrichments,
+        profile_summary=profile_summary,
+        outlier_rows=all_outlier_rows,
+    )
+    developer_artifact_links_html = package_developer_artifact_links_html(
+        artifact_index,
+        chart_paths=chart_paths,
+        sample_paths=sample_paths,
+    )
+    evaluation_summary_section_html = (
+        f"""
+    <section class="section panel">
+      <h2>Evaluation Summary</h2>
+      {package_evaluation_summary_html(evaluation_summary)}
+    </section>"""
+        if evaluation_summary
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VSF Senior Data Scientist Review Package</title>
+  <title>VSF Data Quality Package</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230f7664'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='Arial,sans-serif' font-size='11' font-weight='700' fill='%23ffffff'%3EVSF%3C/text%3E%3C/svg%3E">
   <style>
     :root {{
       --foreground-primary: #121817;
@@ -453,8 +510,65 @@ def _render_index_html(
       border-radius: 12px;
       background: var(--surface-overlay);
     }}
+    details.panel summary {{ cursor: pointer; font-weight: 800; color: var(--foreground-primary); }}
+    details.panel summary:focus-visible {{
+      outline: 3px solid rgba(15, 118, 100, 0.28);
+      outline-offset: 3px;
+    }}
     .metric strong {{ display: block; font-size: 24px; line-height: 1; }}
     .metric span {{ color: var(--foreground-secondary); font-size: 12px; font-weight: 800; text-transform: uppercase; }}
+    .stack {{ display: grid; gap: 10px; }}
+    .briefing-grid,
+    .table-map-grid,
+    .fix-lane-grid {{
+      display: grid;
+      gap: 10px;
+    }}
+    .briefing-grid {{ grid-template-columns: repeat(5, minmax(0, 1fr)); }}
+    .table-map-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }}
+    .fix-lane-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }}
+    .briefing-card,
+    .table-map-card,
+    .fix-lane-card,
+    .lane-action {{
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: var(--surface-panel);
+    }}
+    .briefing-card[data-tone="danger"] {{ border-color: rgba(178, 59, 50, 0.28); background: rgba(178, 59, 50, 0.05); }}
+    .briefing-card[data-tone="warning"] {{ border-color: rgba(154, 95, 0, 0.28); background: rgba(154, 95, 0, 0.05); }}
+    .briefing-card[data-tone="success"] {{ border-color: rgba(35, 118, 77, 0.25); background: rgba(35, 118, 77, 0.05); }}
+    .briefing-card strong,
+    .table-map-card strong,
+    .fix-lane-card strong {{ display: block; margin-bottom: 7px; font-size: 14px; }}
+    .briefing-card ul {{ display: grid; gap: 5px; margin: 0; padding-left: 18px; color: var(--foreground-secondary); font-size: 13px; }}
+    .table-map-card header,
+    .fix-lane-card header {{ display: flex; justify-content: space-between; gap: 8px; margin: 0 0 8px; padding: 0; border: 0; border-radius: 0; background: transparent; }}
+    .table-map-meta,
+    .fix-lane-meta {{ display: flex; flex-wrap: wrap; gap: 6px; }}
+    .table-map-meta span,
+    .fix-lane-meta span {{ display: inline-flex; min-height: 22px; align-items: center; padding: 2px 7px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface-overlay); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; }}
+    .severity-strip {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 8px 0; }}
+    .severity-strip span {{ display: inline-flex; justify-content: space-between; gap: 4px; padding: 3px 6px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--surface-overlay); color: var(--foreground-secondary); font: 900 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
+    .lane-action-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }}
+    .lane-action span {{ display: block; margin-bottom: 5px; color: var(--foreground-tertiary); font-size: 10px; font-weight: 900; text-transform: uppercase; }}
+    .lane-action p {{ margin: 0; color: var(--foreground-secondary); font-size: 13px; line-height: 1.36; }}
+    .todo-summary-cards {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }}
+    .todo-summary-cards div,
+    .todo-card {{ min-width: 0; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--surface-panel); }}
+    .todo-summary-cards strong {{ display: block; font-size: 22px; line-height: 1; }}
+    .todo-summary-cards span,
+    .todo-card span {{ color: var(--foreground-tertiary); font-size: 11px; font-weight: 800; text-transform: uppercase; }}
+    .todo-summary-cards p,
+    .todo-card p {{ margin: 4px 0 0; color: var(--foreground-secondary); font-size: 13px; line-height: 1.38; }}
+    .todo-card-list {{ display: grid; gap: 8px; }}
+    .todo-card header {{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px; padding: 0; border: 0; border-radius: 0; background: transparent; }}
+    .todo-card code {{ color: var(--accent); font-weight: 800; }}
+    .todo-card-meta {{ display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }}
+    .todo-card-meta span {{ padding: 3px 7px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface-overlay); color: var(--foreground-secondary); font-size: 11px; text-transform: none; }}
+    .todo-more {{ margin: 8px 0 0; padding: 8px 10px; border: 1px dashed var(--border-default); border-radius: 8px; background: var(--surface-panel); color: var(--foreground-secondary); font-size: 13px; }}
     table {{ width: 100%; border-collapse: collapse; background: var(--surface-panel); }}
     th, td {{ padding: 8px 9px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }}
     th {{ background: var(--surface-inset); color: var(--foreground-secondary); font-size: 11px; font-weight: 800; text-transform: uppercase; }}
@@ -486,7 +600,7 @@ def _render_index_html(
       background: white;
     }}
     @media (max-width: 820px) {{
-      .grid, .links {{ grid-template-columns: 1fr; }}
+      .grid, .links, .todo-summary-cards, .briefing-grid, .table-map-grid, .fix-lane-grid, .lane-action-grid {{ grid-template-columns: 1fr; }}
       main {{ width: min(100% - 20px, 1180px); padding-top: 16px; }}
     }}
   </style>
@@ -495,118 +609,62 @@ def _render_index_html(
   <main>
     <header>
       <p class="eyebrow">VSF Data Profiler</p>
-      <h1>Senior Data Scientist Review Package</h1>
+      <h1>Data Quality Package</h1>
       <p class="meta">Run <code>{_h(run_id)}</code> finished with status <strong>{_h(run_status)}</strong>. This offline package contains generated artifacts only, plus bounded sample evidence when available. Raw source CSV files are excluded.</p>
     </header>
     <section class="grid" aria-label="Package summary">
       {''.join(_metric_card(label, value, detail) for label, value, detail in cards)}
     </section>
     <section class="section panel">
-      <h2>Executive scorecard</h2>
-      <p class="meta">{_h(verdict.get("verdict_rationale", "No verdict rationale was included."))}</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Signal</th><th>Value</th><th>Evidence</th></tr></thead>
-          <tbody>
-            {''.join(_scorecard_row(label, value, detail) for label, value, detail in cards)}
-          </tbody>
-        </table>
-      </div>
+      <h2>Review briefing</h2>
+      {review_briefing_html}
     </section>
     <section class="section panel">
-      <h2>L4 Senior Data Scientist Narrative</h2>
-      {l4_summary_html(guardrail_report, artifact_index)}
+      <h2>Run Summary</h2>
+      <p class="meta">Deterministic summary from run, verdict, profile, and gate artifacts.</p>
+      {run_summary_html}
     </section>
     <section class="section panel">
-      <h2>Table Impact</h2>
-      <p class="meta">Powered by <code>table_assessments.json</code>. Readiness, review score, relationship risk, and business-impact labels are deterministic artifact evidence.</p>
-      <p class="meta">{_h(table_score_model.get("description", "Review score is a deterministic EDA prioritization heuristic."))} Formula: <code>{_h(table_score_model.get("formula", "100 - weighted issue and relationship penalties"))}</code></p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Review score</th><th>Penalty</th><th>Issues</th><th>Relationship risks</th><th>Business impact</th><th>First action</th></tr></thead>
-          <tbody>
-            {table_impact_rows_html(table_assessments)}
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section class="section panel">
-      <h2>Issue Evidence</h2>
-      <p class="meta">Top findings from <code>issues.json</code>, including bounded sample links when included in the package.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Issue</th><th>Severity</th><th>Type</th><th>Table</th><th>Columns</th><th>Bad rows</th><th>Bad rate</th><th>Sample</th><th>Suggested fix</th></tr></thead>
-          <tbody>
-            {issue_rows_html(issues, artifact_index)}
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section class="grid">
-      <article class="panel">
-        <h2>Schema</h2>
-        <ul class="summary-list">
-          <li><span>Tables parsed</span><strong>{_h(parse_counts.get("tables", 0))}</strong></li>
-          <li><span>Columns parsed</span><strong>{_h(parse_counts.get("columns", 0))}</strong></li>
-          <li><span>Diagnostics</span><strong>{_h(len(schema_parse.get("diagnostics") or []))}</strong></li>
-        </ul>
-      </article>
-      <article class="panel">
-        <h2>Runtime</h2>
-        <ul class="summary-list">
-          <li><span>Stages</span><strong>{_h(len(source_run.get("stage_timings") or []))}</strong></li>
-          <li><span>Failed stages</span><strong>{_h(len(source_run.get("failed_stages") or []))}</strong></li>
-          <li><span>Duration seconds</span><strong>{_h(source_run.get("duration_seconds", "n/a"))}</strong></li>
-        </ul>
-      </article>
-      <article class="panel">
-        <h2>Connector</h2>
-        {connector_summary_html(connector_metadata)}
-      </article>
-    </section>
-    <section class="section panel">
-      <h2>Relationship, Schema, and Lineage Summary</h2>
-      <ul class="summary-list">
-        <li><span>Schema parse diagnostics</span><strong>{_h(len(schema_parse.get("diagnostics") or []))}</strong></li>
-        <li><span>Mapped tables</span><strong>{_h(eval_summary.get("mapped_table_count", 0))}</strong></li>
-        <li><span>Missing tables</span><strong>{_h(eval_summary.get("missing_table_count", 0))}</strong></li>
-        <li><span>Relationship edges</span><strong>{_h(relationship_summary.get("edge_count", 0))}</strong></li>
-        <li><span>Relationship status counts</span><strong>{_h(_counts_text(relationship_status_counts))}</strong></li>
-        <li><span>Lineage artifacts</span><strong>{_h(lineage_summary.get("artifact_count", 0))}</strong></li>
-        <li><span>Lineage dependency edges</span><strong>{_h(lineage_summary.get("edge_count", 0))}</strong></li>
-      </ul>
-    </section>
-    <section class="section panel">
-      <h2>Primary reports</h2>
+      <h2>Report / Export</h2>
+      <p class="meta">Open the fixed-section report first. Developer artifacts are kept below for debugging and compatibility.</p>
       <div class="links">
-        {_artifact_link("Open PDF report", PDF_REPORT_NAME, artifact_index)}
         {_artifact_link("Open HTML report", "report.html", artifact_index)}
         {_artifact_link("Open Markdown report", "report.md", artifact_index)}
+        {_artifact_link("Open PDF report", PDF_REPORT_NAME, artifact_index)}
         {_artifact_link("Open manifest", MANIFEST_NAME, {MANIFEST_NAME: {"path": MANIFEST_NAME}})}
       </div>
     </section>
     <section class="section panel">
-      <h2>Machine artifacts</h2>
-      <div class="links">
-        {''.join(_artifact_link(label, path, artifact_index) for label, path in _artifact_links())}
-        {''.join(_artifact_link(Path(path).name, path, artifact_index) for path in optional_paths)}
-      </div>
+      <h2>Quality Gates</h2>
+      {quality_gates_html}
     </section>
     <section class="section panel">
-      <h2>Visual Summary Chart Specs</h2>
-      <div class="links">
-        {''.join(_artifact_link(Path(path).name, path, artifact_index) for path in chart_paths) or '<p class="meta">No chart specs were included.</p>'}
-      </div>
+      <h2>Table Overview</h2>
+      {table_overview_html}
     </section>
     <section class="section panel">
-      <h2>Sample evidence</h2>
+      <h2>Column Issue Matrix</h2>
+      {column_issue_matrix_html}
+    </section>
+    <section class="section panel">
+      <h2>Issue Action Plans</h2>
+      {action_plans_html}
+    </section>
+    <section class="section panel">
+      <h2>Todos</h2>
+      {todos_html}
+    </section>
+    <section class="section panel">
+      <h2>Developer Artifacts</h2>
+      <p class="meta">Raw JSON, runtime logs, chart specs, and bounded sample files are listed here. Normal report reading should use the sections above.</p>
       <div class="links">
-        {''.join(_artifact_link(Path(path).name, path, artifact_index) for path in sample_paths[:20]) or '<p class="meta">No sample CSV artifacts were included.</p>'}
+        {developer_artifact_links_html}
       </div>
     </section>
+    {evaluation_summary_section_html}
     <section class="section">
       <h2>Embedded report</h2>
-      <iframe src="report.html" title="VSF deterministic HTML report"></iframe>
+      <iframe src="report.html" title="VSF deterministic data-quality report"></iframe>
     </section>
   </main>
 </body>
@@ -630,14 +688,16 @@ def l4_summary_html(guardrail_report: dict[str, Any], artifact_index: dict[str, 
     if not guardrail_report:
         return (
             '<p><span class="pill not_enabled">not_enabled</span> '
-            "L4 narrative was not enabled for this deterministic run.</p>"
+            "LLM summary artifact was not generated for this deterministic run.</p>"
         )
     status = guardrail_report.get("status", "unknown")
+    status_text = _l4_display_status(str(status))
     provider = guardrail_report.get("provider", "unknown")
     model = guardrail_report.get("model", "")
     fallback_reason = guardrail_report.get("fallback_reason", "")
     details = [
-        f'<span class="pill {_h(status)}">{_h(status)}</span>',
+        f'<span class="pill {_h(status)}">{_h(status_text)}</span>',
+        "validates LLM text only, not data readiness",
         f"provider=<strong>{_h(provider)}</strong>",
     ]
     if model:
@@ -647,8 +707,8 @@ def l4_summary_html(guardrail_report: dict[str, Any], artifact_index: dict[str, 
     return f"""
       <p>{' · '.join(details)}</p>
       <div class="links">
-        {_artifact_link("Open L4 report", "l4_report.md", artifact_index)}
-        {_artifact_link("Open guardrail report", "guardrail_report.json", artifact_index)}
+        {_artifact_link("Open compatibility LLM report", "l4_report.md", artifact_index)}
+        {_artifact_link("Open LLM output validation report", "guardrail_report.json", artifact_index)}
       </div>
     """
 
@@ -664,8 +724,7 @@ def table_impact_rows_html(table_assessments: dict[str, Any]) -> str:
             f"<td><code>{_h(row.get('table', ''))}</code></td>"
             f"<td>{_h(row.get('role', ''))}</td>"
             f"<td><span class=\"pill {_h(row.get('readiness', 'unknown'))}\">{_h(row.get('readiness', 'unknown'))}</span></td>"
-            f"<td>{_h(row.get('review_score', row.get('health_score', 0)))}</td>"
-            f"<td>{_h((row.get('score_penalty_breakdown') or {}).get('total_penalty', 0))}</td>"
+            f"<td>{_h(row.get('health_score', 0))}</td>"
             f"<td>{_h(issue_total)}</td>"
             f"<td>{_h(len(row.get('relationship_risks') or []))}</td>"
             f"<td>{_h(impact.get('label', ''))}<br><span class=\"meta\">{_h(impact.get('category', ''))}</span></td>"
@@ -673,7 +732,7 @@ def table_impact_rows_html(table_assessments: dict[str, Any]) -> str:
             "</tr>"
         )
     if not rows:
-        return '<tr><td colspan="9">No table assessment rows were included.</td></tr>'
+        return '<tr><td colspan="8">No table assessment rows were included.</td></tr>'
     return "".join(rows)
 
 
@@ -681,7 +740,11 @@ def issue_rows_html(issues: list[dict[str, Any]], artifact_index: dict[str, dict
     rows = []
     for issue in issues[:25]:
         sample_path = issue.get("sample_bad_rows_path") or ""
-        sample_html = _artifact_link(sample_path, sample_path, artifact_index) if sample_path else "none"
+        sample_html = (
+            f'<code>{_h(sample_path)}</code><br><span class="meta">preview in report.html</span>'
+            if sample_path
+            else "none"
+        )
         fixes = issue.get("suggested_fix") or []
         rows.append(
             "<tr>"
@@ -701,21 +764,1091 @@ def issue_rows_html(issues: list[dict[str, Any]], artifact_index: dict[str, dict
     return "".join(rows)
 
 
+def package_column_usability_rows(
+    profile_summary: dict[str, Any],
+    issues: list[dict[str, Any]],
+    *,
+    limit: int = 30,
+) -> list[dict[str, Any]]:
+    issue_map: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for issue in issues:
+        table = str(issue.get("table") or "")
+        for column in issue.get("columns") or [""]:
+            issue_map.setdefault((table, str(column)), []).append(issue)
+
+    rows = []
+    for table_name, table in sorted((profile_summary.get("tables") or {}).items()):
+        for column_name, column in sorted((table.get("columns") or {}).items()):
+            column_issues = issue_map.get((table_name, column_name), [])
+            severity = _worst_issue_severity(column_issues)
+            outliers = column.get("outliers") or {}
+            outlier_count = int(outliers.get("outlier_count") or 0)
+            status = _column_usability_status(
+                severity=severity,
+                null_rate=float(column.get("null_rate") or 0),
+                invalid_cast_count=int(column.get("invalid_cast_count") or 0),
+                outlier_count=outlier_count,
+            )
+            rows.append(
+                {
+                    "field": f"{table_name}.{column_name}",
+                    "status": status,
+                    "status_label": _column_usability_label(status),
+                    "severity": severity or "none",
+                    "issue_types": ", ".join(sorted({issue.get("issue_type", "") for issue in column_issues}))
+                    or "none",
+                    "evidence": _package_column_evidence(column, column_issues, outlier_count),
+                    "advisory_next_step": _package_column_next_step(column, column_issues, outlier_count),
+                    "issue_count": len(column_issues),
+                }
+            )
+    rows.sort(
+        key=lambda row: (
+            {"blocked": 0, "needs_preparation": 1, "ready": 2}.get(row["status"], 3),
+            _severity_rank(row["severity"]),
+            -int(row["issue_count"]),
+            row["field"],
+        )
+    )
+    return rows[:limit]
+
+
+def package_column_usability_rows_html(rows: list[dict[str, Any]]) -> str:
+    html_rows = []
+    for row in rows:
+        html_rows.append(
+            "<tr>"
+            f"<td><code>{_h(row.get('field', ''))}</code></td>"
+            f"<td>{_h(row.get('status_label', ''))}</td>"
+            f"<td><span class=\"pill {_h(row.get('severity', 'none'))}\">{_h(row.get('severity', 'none'))}</span></td>"
+            f"<td>{_h(row.get('issue_types', 'none'))}</td>"
+            f"<td>{_h(row.get('evidence', ''))}</td>"
+            f"<td>{_h(row.get('advisory_next_step', ''))}</td>"
+            "</tr>"
+        )
+    if not html_rows:
+        return '<tr><td colspan="6">No column usability rows were generated.</td></tr>'
+    return "".join(html_rows)
+
+
+def package_review_briefing_html(
+    *,
+    verdict: dict[str, Any],
+    table_assessments: dict[str, Any],
+    issues: list[dict[str, Any]],
+    issue_action_plans: dict[str, Any],
+    issue_llm_enrichments: dict[str, Any],
+    profile_summary: dict[str, Any],
+    outlier_rows: list[dict[str, Any]],
+) -> str:
+    sorted_issues = sorted(
+        issues,
+        key=lambda issue: (
+            _severity_rank(str(issue.get("severity") or "")),
+            -int(issue.get("bad_count") or 0),
+            str(issue.get("issue_id") or ""),
+        ),
+    )
+    top_issue = sorted_issues[0] if sorted_issues else {}
+    top_issue_id = str(top_issue.get("issue_id") or "top issue")
+    plans_by_issue = {
+        str(plan.get("issue_id") or ""): plan
+        for plan in issue_action_plans.get("plans", [])
+        if isinstance(plan, dict)
+    }
+    top_plan = plans_by_issue.get(str(top_issue.get("issue_id") or ""), {})
+    missing_groups = _package_missingness_groups(profile_summary)
+    missing_total = sum(group["null_count"] for group in missing_groups)
+    outlier_total = sum(int(row.get("outlier_count") or 0) for row in outlier_rows)
+    blockers = sum(1 for issue in sorted_issues if str(issue.get("severity") or "") in {"P0", "P1"})
+    cards = [
+        (
+            "Overall readout",
+            "danger" if str(verdict.get("verdict", "")).upper() == "NOT_READY" else "info",
+            [
+                f"{verdict.get('verdict', 'unknown')} with risk {verdict.get('risk_score', 'n/a')}/100.",
+                f"{blockers} P0/P1 blockers should be fixed before analysis.",
+                f"{len(profile_summary.get('tables') or {})} DBML tables were profiled.",
+            ],
+        ),
+        (
+            "Data signals",
+            "warning" if missing_total or outlier_total else "success",
+            [
+                f"{missing_total} missing values across {len(missing_groups)} table groups.",
+                f"{outlier_total} IQR outliers across {len(outlier_rows)} numeric columns.",
+                f"Top issue: {top_issue_id} on {_package_issue_field(top_issue)}.",
+            ],
+        ),
+        (
+            "Default fix route",
+            "danger",
+            [
+                _package_first_plan_item(top_plan, "fix_data_checklist")
+                or "Inspect bounded sample rows, then fix source extract, pipeline, or DBML contract.",
+                "Do not edit generated artifacts.",
+                "Apply the correction upstream and keep DBML aligned with the CSV contract.",
+            ],
+        ),
+        (
+            "Verify route",
+            "info",
+            [
+                _package_first_plan_item(top_plan, "verify_after_fix_checklist")
+                or f"Rerun and confirm {top_issue_id} no longer appears.",
+                "Confirm affected rows are 0 for the same table and column.",
+                "Recheck Quality Gates before using the data for analysis.",
+            ],
+        ),
+        (
+            "OpenAI add-on",
+            "info" if _package_llm_success_count(issue_llm_enrichments) else "warning",
+            _package_llm_bullets(issue_llm_enrichments, top_issue_id),
+        ),
+    ]
+    briefing_html = "".join(
+        f"""
+        <article class="briefing-card" data-tone="{_h(tone)}">
+          <strong>{_h(title)}</strong>
+          <ul>{''.join(f'<li>{_h(item)}</li>' for item in bullets)}</ul>
+        </article>
+        """
+        for title, tone, bullets in cards
+    )
+    table_cards = "".join(_package_table_map_card(row) for row in _package_top_table_assessments(table_assessments))
+    fix_lane = _package_fix_lane_card(top_issue, top_plan, issue_llm_enrichments)
+    return f"""
+      <div class="briefing-grid" aria-label="Package review briefing">{briefing_html}</div>
+      <div class="table-map-grid" aria-label="DBML table readiness map">{table_cards}</div>
+      <div class="fix-lane-grid" aria-label="Default and LLM fix verify lanes">{fix_lane}</div>
+    """
+
+
+def _package_missingness_groups(profile_summary: dict[str, Any], *, limit: int = 6) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for table_name, table in (profile_summary.get("tables") or {}).items():
+        columns = []
+        for column_name, column in (table.get("columns") or {}).items():
+            null_count = int(column.get("null_count") or 0)
+            if null_count > 0:
+                columns.append({"column": str(column_name), "null_count": null_count})
+        if columns:
+            groups.append(
+                {
+                    "table": str(table_name),
+                    "null_count": sum(column["null_count"] for column in columns),
+                    "columns": sorted(columns, key=lambda column: (-column["null_count"], column["column"])),
+                }
+            )
+    return sorted(groups, key=lambda group: (-group["null_count"], group["table"]))[:limit]
+
+
+def _package_first_plan_item(plan: dict[str, Any], key: str) -> str:
+    values = plan.get(key) if isinstance(plan, dict) else None
+    if not isinstance(values, list):
+        return ""
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _package_issue_field(issue: dict[str, Any]) -> str:
+    table = str(issue.get("table") or "dataset")
+    columns = issue.get("columns")
+    if isinstance(columns, list) and columns:
+        return f"{table}.{', '.join(str(column) for column in columns)}"
+    return table
+
+
+def _package_llm_success_count(artifact: dict[str, Any]) -> int:
+    enrichments = artifact.get("enrichments") if artifact else []
+    if not isinstance(enrichments, list):
+        return 0
+    return sum(1 for entry in enrichments if isinstance(entry, dict) and entry.get("status") == "succeeded")
+
+
+def _package_llm_bullets(artifact: dict[str, Any], top_issue_id: str) -> list[str]:
+    if not artifact:
+        return [
+            "No issue_llm_enrichments.json was included in this package.",
+            "Use deterministic fix/verify guidance by default.",
+            "Run OpenAI issue guidance for selected issues when advisory context is needed.",
+        ]
+    enrichments = artifact.get("enrichments") if artifact else []
+    if not isinstance(enrichments, list):
+        return [
+            "No issue_llm_enrichments.json was included in this package.",
+            "Use deterministic fix/verify guidance by default.",
+            "Run OpenAI issue guidance for selected issues when advisory context is needed.",
+        ]
+    succeeded = [entry for entry in enrichments if isinstance(entry, dict) and entry.get("status") == "succeeded"]
+    if not succeeded:
+        return [
+            f"{len(enrichments)} LLM enrichment attempts were recorded.",
+            "No succeeded OpenAI guidance is available.",
+            "Human review is required before applying failed or unavailable LLM output.",
+        ]
+    selected = next((entry for entry in succeeded if entry.get("issue_id") == top_issue_id), succeeded[0])
+    response = selected.get("structured_response") or {}
+    return [
+        _package_first_text(response.get("why_this_was_flagged")) or f"OpenAI guidance is available for {selected.get('issue_id', top_issue_id)}.",
+        _package_first_text(response.get("extra_fix_suggestion")) or "No extra fix suggestion was included.",
+        _package_first_text(response.get("extra_verification")) or "No extra verification suggestion was included.",
+        "OpenAI guidance is advisory and requires human review.",
+    ]
+
+
+def _package_first_text(values: Any) -> str:
+    if not isinstance(values, list):
+        return ""
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _package_top_table_assessments(table_assessments: dict[str, Any], *, limit: int = 6) -> list[dict[str, Any]]:
+    assessments = [row for row in table_assessments.get("assessments", []) if isinstance(row, dict)]
+    return sorted(
+        assessments,
+        key=lambda row: (
+            {"NOT_READY": 0, "WARN": 1, "READY": 2}.get(str(row.get("readiness") or ""), 3),
+            int(row.get("health_score") or 0),
+            str(row.get("table") or ""),
+        ),
+    )[:limit]
+
+
+def _package_table_map_card(row: dict[str, Any]) -> str:
+    counts = row.get("issue_counts_by_severity") or {}
+    issue_total = sum(int(value or 0) for value in counts.values())
+    affected_columns = ", ".join(str(column) for column in (row.get("affected_columns") or [])[:4]) or "no affected columns"
+    return f"""
+      <article class="table-map-card">
+        <header><code>{_h(row.get('table', ''))}</code><span class="pill {_h(row.get('readiness', 'unknown'))}">{_h(row.get('readiness', 'unknown'))}</span></header>
+        <div class="table-map-meta">
+          <span>{_h(row.get('role', 'unknown'))}</span>
+          <span>health {_h(row.get('health_score', 0))}</span>
+          <span>{_h(issue_total)} issues</span>
+        </div>
+        <div class="severity-strip">
+          <span>P0 <b>{_h(counts.get('P0', 0))}</b></span>
+          <span>P1 <b>{_h(counts.get('P1', 0))}</b></span>
+          <span>P2 <b>{_h(counts.get('P2', 0))}</b></span>
+          <span>P3 <b>{_h(counts.get('P3', 0))}</b></span>
+        </div>
+        <p class="meta">{_h(affected_columns)}</p>
+      </article>
+    """
+
+
+def _package_fix_lane_card(
+    issue: dict[str, Any],
+    plan: dict[str, Any],
+    issue_llm_enrichments: dict[str, Any],
+) -> str:
+    issue_id = str(issue.get("issue_id") or plan.get("issue_id") or "top issue")
+    severity = str(issue.get("severity") or "P?")
+    issue_type = str(issue.get("issue_type") or plan.get("issue_type") or "Issue")
+    llm_bullets = _package_llm_bullets(issue_llm_enrichments, issue_id)
+    default_fix = _package_first_plan_item(plan, "fix_data_checklist") or "Inspect bounded sample rows, then fix upstream data or DBML contract."
+    default_verify = _package_first_plan_item(plan, "verify_after_fix_checklist") or f"Rerun and confirm {issue_id} no longer appears."
+    return f"""
+      <article class="fix-lane-card">
+        <header><code>{_h(issue_id)}</code><span class="pill {_h(severity)}">{_h(severity)}</span></header>
+        <strong>{_h(issue_type.replace('_', ' ').title())}</strong>
+        <div class="fix-lane-meta">
+          <span>{_h(_package_issue_field(issue))}</span>
+          <span>{_h(issue.get('bad_count', 0))}/{_h(issue.get('total_count', 0))} rows</span>
+        </div>
+        <div class="lane-action-grid">
+          <div class="lane-action"><span>Default fix</span><p>{_h(default_fix)}</p></div>
+          <div class="lane-action"><span>Default verify</span><p>{_h(default_verify)}</p></div>
+          <div class="lane-action"><span>OpenAI add-on</span><p>{_h(llm_bullets[1] if len(llm_bullets) > 1 else llm_bullets[0])}</p></div>
+        </div>
+      </article>
+    """
+
+
+def package_column_issue_blocks(
+    issues: list[dict[str, Any]],
+    *,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    blocks = []
+    for issue in issues:
+        for column in issue.get("columns") or ["table_level"]:
+            table = str(issue.get("table") or "")
+            field = table if column == "table_level" else f"{table}.{column}"
+            fixes = issue.get("suggested_fix") or []
+            blocks.append(
+                {
+                    "field": field,
+                    "issue_id": issue.get("issue_id") or "",
+                    "issue_type": issue.get("issue_type") or "",
+                    "severity": issue.get("severity") or "",
+                    "evidence": (
+                        f"{issue.get('bad_count', 0)}/{issue.get('total_count', 0)} rows; "
+                        f"bad rate {_format_percent(issue.get('bad_rate', 0))}"
+                    ),
+                    "analysis_consequence": _analysis_consequence(str(issue.get("issue_type") or "")),
+                    "advisory_next_step": fixes[0] if fixes else "Review generated evidence.",
+                }
+            )
+    blocks.sort(
+        key=lambda row: (
+            _severity_rank(str(row["severity"])),
+            str(row["field"]),
+            str(row["issue_id"]),
+        )
+    )
+    return blocks[:limit]
+
+
+def package_column_issue_blocks_html(rows: list[dict[str, Any]]) -> str:
+    html_rows = []
+    for row in rows:
+        html_rows.append(
+            "<tr>"
+            f"<td><code>{_h(row.get('field', ''))}</code></td>"
+            f"<td><code>{_h(row.get('issue_id', ''))}</code> {_h(row.get('issue_type', ''))}</td>"
+            f"<td><span class=\"pill {_h(row.get('severity', 'unknown'))}\">{_h(row.get('severity', 'unknown'))}</span></td>"
+            f"<td>{_h(row.get('evidence', ''))}</td>"
+            f"<td>{_h(row.get('analysis_consequence', ''))}</td>"
+            f"<td>{_h(row.get('advisory_next_step', ''))}</td>"
+            "</tr>"
+        )
+    if not html_rows:
+        return '<tr><td colspan="6">No column issue blocks were generated.</td></tr>'
+    return "".join(html_rows)
+
+
+def package_run_summary_html(
+    *,
+    source_run: dict[str, Any],
+    verdict: dict[str, Any],
+    quality_gates: dict[str, Any],
+    issue_total: Any,
+    blocker_count: int,
+    table_count: Any,
+    column_count: int,
+    row_count: int,
+) -> str:
+    answers = _package_gate_answers(quality_gates)
+    run_id = source_run.get("run_id", "unknown") if source_run else "unknown"
+    run_status = source_run.get("status", "unknown") if source_run else "unknown"
+    duration = source_run.get("duration_seconds", "unknown") if source_run else "unknown"
+    readiness = verdict.get("verdict", "unknown") if verdict else "unknown"
+    risk_score = verdict.get("risk_score", "n/a") if verdict else "n/a"
+    return f"""
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Run ID</th><th>Status</th><th>Readiness</th><th>Risk</th><th>Issues</th><th>P0/P1 blockers</th><th>Tables</th><th>Columns</th><th>Rows</th><th>Duration seconds</th></tr></thead>
+          <tbody>
+            <tr><td><code>{_h(run_id)}</code></td><td>{_h(run_status)}</td><td>{_h(readiness)}</td><td>{_h(risk_score)}</td><td>{_h(issue_total)}</td><td>{_h(blocker_count)}</td><td>{_h(table_count)}</td><td>{_h(column_count)}</td><td>{_h(row_count)}</td><td>{_h(duration)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Question</th><th>Answer</th><th>Evidence</th></tr></thead>
+          <tbody>
+            <tr><td>Can this dataset run analysis?</td><td>{_h(answers.get("Can run analysis", {}).get("answer", "Gate evidence missing."))}</td><td>{_h(answers.get("Can run analysis", {}).get("evidence", ""))}</td></tr>
+            <tr><td>Can joins be trusted?</td><td>{_h(answers.get("Can trust joins", {}).get("answer", "Gate evidence missing."))}</td><td>{_h(answers.get("Can trust joins", {}).get("evidence", ""))}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    """
+
+
+def package_quality_gates_html(quality_gates: dict[str, Any]) -> str:
+    gates = quality_gates.get("gates") if quality_gates else None
+    if not isinstance(gates, list):
+        return '<p class="meta">Quality gates were not included in this package.</p>'
+    summary = quality_gates.get("summary") or {}
+    rows = []
+    for gate in gates:
+        if not isinstance(gate, dict):
+            continue
+        action = gate.get("recommended_next_action") or {}
+        rows.append(
+            "<tr>"
+            f"<td>{_h(gate.get('label', 'Gate'))}</td>"
+            f"<td><span class=\"pill {_h(gate.get('status', 'unknown'))}\">{_h(gate.get('status', 'unknown'))}</span></td>"
+            f"<td>{_h(_package_gate_answer(gate).get('answer', 'Needs review.'))}</td>"
+            f"<td>{_h(gate.get('explanation', ''))}</td>"
+            f"<td>{_h(action.get('label', 'Review evidence'))}</td>"
+            "</tr>"
+        )
+    if not rows:
+        rows.append('<tr><td colspan="5">No quality gate rows were included.</td></tr>')
+    return f"""
+      <p class="meta">Source: deterministic. Blocked gates: {_h(summary.get('blocked_count', 0))} of {_h(summary.get('gate_count', len(gates)))}.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gate</th><th>Status</th><th>Answer</th><th>Explanation</th><th>Next action</th></tr></thead>
+          <tbody>{''.join(rows)}</tbody>
+        </table>
+      </div>
+    """
+
+
+def package_table_overview_html(table_assessments: dict[str, Any]) -> str:
+    assessments = table_assessments.get("assessments") if table_assessments else None
+    if not isinstance(assessments, list):
+        return '<p class="meta">Table overview is unavailable because table assessment evidence was not included.</p>'
+    rows = []
+    for row in assessments:
+        if not isinstance(row, dict):
+            continue
+        issue_total = sum(int(value or 0) for value in (row.get("issue_counts_by_severity") or {}).values())
+        actions = row.get("recommended_next_actions") or []
+        affected_columns = row.get("affected_columns") or []
+        relationship_risks = row.get("relationship_risks") or []
+        rows.append(
+            "<tr>"
+            f"<td><code>{_h(row.get('table', ''))}</code></td>"
+            f"<td>{_h(row.get('role', ''))}</td>"
+            f"<td><span class=\"pill {_h(row.get('readiness', 'unknown'))}\">{_h(row.get('readiness', 'unknown'))}</span></td>"
+            f"<td>{_h(row.get('health_score', 0))}</td>"
+            f"<td>{_h(row.get('row_count', 0))}</td>"
+            f"<td>{_h(row.get('column_count', 0))}</td>"
+            f"<td>{_h(issue_total)}</td>"
+            f"<td>{_h(len(relationship_risks))}</td>"
+            f"<td>{_h(', '.join(str(column) for column in affected_columns[:8]) or 'none')}</td>"
+            f"<td>{_h(actions[0] if actions else 'No deterministic fix step was generated.')}</td>"
+            "</tr>"
+        )
+    if not rows:
+        rows.append('<tr><td colspan="10">No table overview rows were included.</td></tr>')
+    return f"""
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Table</th><th>Role</th><th>Readiness</th><th>Health</th><th>Rows</th><th>Columns</th><th>Issues</th><th>Relationship risks</th><th>Affected columns</th><th>First fix step</th></tr></thead>
+          <tbody>{''.join(rows)}</tbody>
+        </table>
+      </div>
+    """
+
+
+def package_column_issue_matrix_html(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return '<p class="meta">No column or table issues were generated for this run.</p>'
+    html_rows = []
+    for row in rows:
+        html_rows.append(
+            "<tr>"
+            f"<td><code>{_h(row.get('field', ''))}</code></td>"
+            f"<td>{_h(_issue_status_label(str(row.get('severity', ''))))}</td>"
+            f"<td><code>{_h(row.get('issue_id', ''))}</code> {_h(row.get('issue_type', ''))}</td>"
+            f"<td><span class=\"pill {_h(row.get('severity', 'unknown'))}\">{_h(row.get('severity', 'unknown'))}</span></td>"
+            f"<td>{_h(row.get('evidence', ''))}</td>"
+            f"<td>{_h(row.get('analysis_consequence', ''))}</td>"
+            f"<td>{_h(row.get('advisory_next_step', ''))}</td>"
+            "</tr>"
+        )
+    return f"""
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Status</th><th>Issue</th><th>Severity</th><th>Bad rows</th><th>Meaning</th><th>What should be fixed?</th></tr></thead>
+          <tbody>{''.join(html_rows)}</tbody>
+        </table>
+      </div>
+    """
+
+
+def package_action_plans_html(issue_action_plans: dict[str, Any]) -> str:
+    plans = issue_action_plans.get("plans") if issue_action_plans else None
+    if not isinstance(plans, list):
+        return '<p class="meta">Issue action plans were not included in this package.</p>'
+    summary = issue_action_plans.get("summary") or {}
+    valid_plans = [plan for plan in plans if isinstance(plan, dict)]
+    plan_rows = []
+    for plan in valid_plans[:PACKAGE_ACTION_PLAN_SUMMARY_LIMIT]:
+        row = _package_action_plan_summary_row(plan)
+        plan_rows.append(
+            "<tr>"
+            f"<td><code>{_h(row['issue_id'])}</code> {_h(row['issue_type'])}</td>"
+            f"<td>{_h(row['priority'])}</td>"
+            f"<td><code>{_h(row['table'])}</code></td>"
+            f"<td>{_h(row['columns'])}</td>"
+            f"<td>{_h(row['first_fix'])}</td>"
+            f"<td>{_h(row['first_verify'])}</td>"
+            f"<td>coverage {_h(row['evidence_coverage'])}/100 · actionability {_h(row['actionability'])}/100</td>"
+            "</tr>"
+        )
+    plan_rows_html = (
+        "".join(plan_rows)
+        or "<tr><td colspan=\"7\">No issue action plans were generated.</td></tr>"
+    )
+    expanded_cards = []
+    for plan in valid_plans[:PACKAGE_ACTION_PLAN_LIMIT]:
+        coverage = plan.get("evidence_coverage") or {}
+        actionability = plan.get("actionability_score") or {}
+        hidden_evidence_value_count = max(
+            0,
+            len(plan.get("evidence_values") or []) - PACKAGE_EVIDENCE_VALUE_LIMIT,
+        )
+        hidden_evidence_html = (
+            f'<p class="meta">{hidden_evidence_value_count} additional finding values are available in '
+            '<code>issue_action_plans.json</code>.</p>'
+            if hidden_evidence_value_count
+            else ""
+        )
+        expanded_cards.append(
+            f"""
+            <details class="panel">
+              <summary>{_h(plan.get('issue_id', 'UNKNOWN'))} {_h(plan.get('issue_type', 'Issue'))} · {_h(plan.get('priority', 'Needs human review'))}</summary>
+              <p class="meta"><strong>Finding:</strong> {_h(plan.get('finding_summary', 'No finding summary was generated.'))}</p>
+              <p class="meta"><strong>Table:</strong> <code>{_h(plan.get('table', 'unknown'))}</code> · <strong>Columns:</strong> {_h(_package_columns_text(plan.get('columns')))}</p>
+              <h3>Finding Values</h3>
+              {package_evidence_values_html((plan.get('evidence_values') or [])[:PACKAGE_EVIDENCE_VALUE_LIMIT])}
+              {hidden_evidence_html}
+              <h3>Fix data checklist</h3>
+              {_package_list_html(plan.get('fix_data_checklist'), 'No deterministic fix checklist was generated.')}
+              <h3>Verify after fix checklist</h3>
+              {_package_list_html(plan.get('verify_after_fix_checklist'), 'No deterministic verification checklist was generated.')}
+              <h3>Guidelines</h3>
+              {_package_list_html(plan.get('guidelines'), 'No deterministic guidelines were generated.')}
+              <p class="meta">Evidence coverage: {_h(coverage.get('score', 0))}/100. {_h(coverage.get('explanation', ''))}</p>
+              <p class="meta">Actionability: {_h(actionability.get('score', 0))}/100. {_h(actionability.get('explanation', ''))}</p>
+            </details>
+            """
+        )
+    if not expanded_cards:
+        expanded_cards.append('<p class="meta">No issue action plans were generated.</p>')
+    remaining_count = max(0, len(valid_plans) - min(len(valid_plans), PACKAGE_ACTION_PLAN_LIMIT))
+    remaining_html = (
+        f'<p class="meta">{remaining_count} additional plans are available in '
+        '<code>issue_action_plans.json</code> and the issue todo summary.</p>'
+        if remaining_count
+        else ""
+    )
+    return f"""
+      <p class="meta">Plans: {_h(summary.get('plan_count', len(valid_plans)))} · human review: {_h(summary.get('human_review_count', 0))} · average actionability: {_h(summary.get('average_actionability_score', 0))}/100.</p>
+      <p class="meta">Main package index expands the first {PACKAGE_ACTION_PLAN_LIMIT} highest-priority plans. Full deterministic action-plan evidence remains in <code>issue_action_plans.json</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Issue</th><th>Priority</th><th>Table</th><th>Columns</th><th>First fix</th><th>First verification</th><th>Metrics</th></tr></thead>
+          <tbody>{plan_rows_html}</tbody>
+        </table>
+      </div>
+      {remaining_html}
+      <div class="stack">{''.join(expanded_cards)}</div>
+    """
+
+
+def _package_action_plan_summary_row(plan: dict[str, Any]) -> dict[str, str]:
+    fix_items = [str(item) for item in plan.get("fix_data_checklist") or [] if str(item).strip()]
+    verify_items = [
+        str(item) for item in plan.get("verify_after_fix_checklist") or [] if str(item).strip()
+    ]
+    coverage = plan.get("evidence_coverage") or {}
+    actionability = plan.get("actionability_score") or {}
+    return {
+        "issue_id": str(plan.get("issue_id") or "UNKNOWN"),
+        "issue_type": str(plan.get("issue_type") or "Issue"),
+        "priority": str(plan.get("priority") or "Needs human review"),
+        "table": str(plan.get("table") or "unknown"),
+        "columns": _package_columns_text(plan.get("columns")),
+        "first_fix": fix_items[0] if fix_items else "Needs human review.",
+        "first_verify": verify_items[0] if verify_items else "Needs human review.",
+        "evidence_coverage": str(coverage.get("score", 0)),
+        "actionability": str(actionability.get("score", 0)),
+    }
+
+
+def _package_columns_text(columns: Any) -> str:
+    if not isinstance(columns, list):
+        return "table-level"
+    return ", ".join(str(column) for column in columns if str(column).strip()) or "table-level"
+
+
+def package_todos_html(issue_todos: dict[str, Any]) -> str:
+    groups = issue_todos.get("groups") if issue_todos else None
+    if not isinstance(groups, list):
+        return '<p class="meta">Todo groups were not included in this package.</p>'
+    summary = issue_todos.get("summary") or {}
+    fix_groups = [group for group in groups if isinstance(group, dict) and group.get("todo_type") == "fix_data"]
+    verify_groups = [
+        group for group in groups if isinstance(group, dict) and group.get("todo_type") == "verify_after_fix"
+    ]
+    issue_rows = _package_todo_issue_rows(groups, PACKAGE_TODO_ISSUE_LIMIT)
+    issue_count = _package_todo_issue_count(groups)
+    remaining_issue_count = max(0, issue_count - len(issue_rows))
+    remaining_html = (
+        f'<p class="todo-more">{remaining_issue_count} additional issues have todo detail in '
+        '<code>issue_todos.json</code>.</p>'
+        if remaining_issue_count
+        else ""
+    )
+    fix_occurrence_count = summary.get("fix_data_occurrence_count", _package_todo_occurrence_total(fix_groups))
+    verify_occurrence_count = summary.get(
+        "verify_after_fix_occurrence_count",
+        _package_todo_occurrence_total(verify_groups),
+    )
+    return f"""
+      <p class="meta">Issue-first todo queue. Full fix/verify checklist detail belongs in the issue detail drawer and <code>issue_todos.json</code>.</p>
+      <div class="todo-summary-cards" aria-label="Todo summary">
+        <div><strong>{_h(issue_count)}</strong><span>Issues</span><p>Grouped by selected issue, not by repeated todo text.</p></div>
+        <div><strong>{_h(fix_occurrence_count)}/{_h(verify_occurrence_count)}</strong><span>Fix data / Verify after fix</span><p>Action counts from deterministic issue plans.</p></div>
+      </div>
+      <h3>Issue todo queue</h3>
+      {_package_todo_issue_list_html(issue_rows)}
+      {remaining_html}
+    """
+
+
+def package_evidence_values_html(values: Any) -> str:
+    evidence_values = values if isinstance(values, list) else []
+    rows = []
+    for value in evidence_values:
+        if not isinstance(value, dict):
+            continue
+        meaning = _package_display_artifact_text(str(value.get("meaning", "")))
+        raw_value = value.get("raw_value", "")
+        if isinstance(raw_value, str) and raw_value.endswith(".json"):
+            raw_value = _package_display_artifact_text(raw_value)
+        rows.append(
+            "<tr>"
+            f"<td>{_h(value.get('label', 'value'))}</td>"
+            f"<td>{_h(raw_value)}</td>"
+            f"<td>{_h(meaning)}</td>"
+            "</tr>"
+        )
+    if not rows:
+        rows.append('<tr><td>none</td><td>none</td><td>No finding values were available.</td></tr>')
+    return f"""
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Finding value</th><th>Raw value</th><th>Meaning</th></tr></thead>
+          <tbody>{''.join(rows)}</tbody>
+        </table>
+      </div>
+    """
+
+
+def package_developer_artifact_links_html(
+    artifact_index: dict[str, dict[str, Any]],
+    *,
+    chart_paths: list[str],
+    sample_paths: list[str],
+) -> str:
+    named_paths = [
+        ("Connector metadata", "connector_metadata.json"),
+        ("Preflight review", "preflight_review.json"),
+        *_artifact_links(),
+        ("Issue LLM enrichments", "issue_llm_enrichments.json"),
+        ("Evaluation ground truth", "ground_truth_issues.json"),
+        ("Great Expectations baseline comparison", "baseline_comparison.json"),
+        ("Evaluation summary", "evaluation_summary.json"),
+        ("Compatibility LLM report", "l4_report.md"),
+        ("LLM output validation report", "guardrail_report.json"),
+    ]
+    links: list[str] = []
+    seen: set[str] = set()
+    for label, path in named_paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        links.append(_artifact_link(label, path, artifact_index))
+    links.extend(_artifact_link(Path(path).name, path, artifact_index) for path in chart_paths)
+    html_links = "".join(link for link in links if link)
+    sample_note = (
+        f'<p class="meta">{_h(len(sample_paths))} bounded sample CSV files are included for '
+        "report previews and manifest audit; report.html previews rows inline without direct CSV links.</p>"
+        if sample_paths
+        else ""
+    )
+    if html_links or sample_note:
+        return html_links + sample_note
+    return html_links or '<p class="meta">No developer artifacts were included.</p>'
+
+
+def package_evaluation_summary_html(evaluation_summary: dict[str, Any]) -> str:
+    if not evaluation_summary:
+        return ""
+    status = evaluation_summary.get("status") or evaluation_summary.get("result") or "included"
+    return f"""
+      <p class="meta">Evaluation status: {_h(status)}</p>
+      <pre>{_h(json.dumps(evaluation_summary.get('summary', evaluation_summary), indent=2, ensure_ascii=False))}</pre>
+    """
+
+
+def _package_gate_answers(quality_gates: dict[str, Any]) -> dict[str, dict[str, str]]:
+    gates = quality_gates.get("gates") if quality_gates else []
+    if not isinstance(gates, list):
+        return {}
+    answers: dict[str, dict[str, str]] = {}
+    for gate in gates:
+        if isinstance(gate, dict):
+            answers[str(gate.get("label") or "")] = _package_gate_answer(gate)
+    return answers
+
+
+def _package_gate_answer(gate: dict[str, Any]) -> dict[str, str]:
+    label = str(gate.get("label") or "")
+    status = str(gate.get("status") or "")
+    if label == "Can run analysis":
+        answer = "No. Analysis is blocked." if status == "Blocked" else "Yes, with the gate status shown."
+    elif label == "Can trust joins":
+        answer = "No. Join evidence is blocked." if status == "Blocked" else "Yes, with the gate status shown."
+    elif status == "Clean":
+        answer = "No action required."
+    elif status in {"Needs Review", "Usable With Caution"}:
+        answer = "Review before sharing."
+    else:
+        answer = "Needs review."
+    evidence = "; ".join(
+        f"{value.get('label')}: {value.get('raw_value')}"
+        for value in (gate.get("evidence_values") or [])
+        if isinstance(value, dict)
+    )
+    return {"answer": answer, "evidence": evidence}
+
+
+def _package_list_html(items: Any, empty_text: str) -> str:
+    values = [str(item) for item in items] if isinstance(items, list) else []
+    if not values:
+        values = [empty_text]
+    return "<ul>" + "".join(f"<li>{_h(item)}</li>" for item in values) + "</ul>"
+
+
+def _package_todo_issue_count(groups: list[dict[str, Any]]) -> int:
+    issue_ids: set[str] = set()
+    for group in groups:
+        occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+        for occurrence in occurrences:
+            if isinstance(occurrence, dict):
+                issue_ids.add(str(occurrence.get("issue_id") or "UNKNOWN"))
+    return len(issue_ids)
+
+
+def _package_todo_issue_rows(groups: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    by_issue: dict[str, dict[str, Any]] = {}
+    for group in groups:
+        occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+        todo_type = str(group.get("todo_type") or "fix_data")
+        for occurrence in occurrences:
+            if not isinstance(occurrence, dict):
+                continue
+            issue_id = str(occurrence.get("issue_id") or "UNKNOWN")
+            item = by_issue.setdefault(
+                issue_id,
+                {
+                    "issue_id": issue_id,
+                    "severity": str(occurrence.get("severity") or "P?"),
+                    "field": _package_todo_occurrence_field(occurrence),
+                    "issue_type": str(occurrence.get("issue_type") or "UNKNOWN").replace("_", " ").title(),
+                    "fix_count": 0,
+                    "verify_count": 0,
+                },
+            )
+            if todo_type == "verify_after_fix":
+                item["verify_count"] += 1
+            else:
+                item["fix_count"] += 1
+    rows = list(by_issue.values())
+    rows.sort(
+        key=lambda row: (
+            _package_priority_rank(str(row.get("severity") or "")),
+            -(int(row.get("fix_count") or 0) + int(row.get("verify_count") or 0)),
+            str(row.get("issue_id") or ""),
+        )
+    )
+    return rows[:limit]
+
+
+def _package_todo_occurrence_field(occurrence: dict[str, Any]) -> str:
+    table = str(occurrence.get("table") or "unknown")
+    columns = occurrence.get("columns")
+    if isinstance(columns, list) and columns:
+        return f"{table}.{', '.join(str(column) for column in columns if str(column).strip())}"
+    return f"{table}.table"
+
+
+def _package_todo_issue_list_html(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return '<p class="meta">No issue-specific todos were generated.</p>'
+    items = []
+    for row in rows:
+        items.append(
+            f"""
+            <article class="todo-card issue-first-card">
+              <header><code>{_h(row.get('issue_id', 'ISSUE'))}</code><span class="pill {_h(row.get('severity', 'P?'))}">{_h(row.get('severity', 'P?'))}</span></header>
+              <p><strong>{_h(row.get('field', 'table.column'))}</strong> · {_h(row.get('issue_type', 'Issue'))}</p>
+              <div class="todo-card-meta"><span>{_h(row.get('fix_count', 0))} fix data</span><span>{_h(row.get('verify_count', 0))} verify after fix</span></div>
+            </article>
+            """
+        )
+    return '<div class="todo-card-list">' + "".join(items) + "</div>"
+
+
+def _package_todo_report_groups(groups: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    candidates = [group for group in groups if not _package_is_routine_todo(group)]
+    selected = sorted(candidates, key=_package_todo_sort_key)[:limit]
+    if not selected:
+        selected = sorted(groups, key=_package_todo_sort_key)[:limit]
+    return [_package_todo_report_group(group) for group in selected]
+
+
+def _package_todo_report_group(group: dict[str, Any]) -> dict[str, Any]:
+    occurrences = group.get("occurrences") if isinstance(group.get("occurrences"), list) else []
+    tables = [str(table) for table in group.get("tables") or [] if str(table).strip()]
+    priorities = [str(priority).split(" - ", maxsplit=1)[0] for priority in group.get("priorities") or [] if str(priority).strip()]
+    return {
+        "todo_id": str(group.get("todo_id") or "TODO"),
+        "text": str(group.get("text") or "Todo needs review."),
+        "short_text": _package_short_text(str(group.get("text") or "Todo needs review."), 118),
+        "occurrence_count": int(group.get("occurrence_count") or len(occurrences) or 0),
+        "tables_text": _package_compact_list(tables, empty="table context"),
+        "priorities_text": _package_compact_list(sorted(set(priorities)), empty="priority n/a"),
+    }
+
+
+def _package_todo_occurrence_total(groups: list[dict[str, Any]]) -> int:
+    return sum(int(group.get("occurrence_count") or 0) for group in groups)
+
+
+def _package_is_routine_todo(group: dict[str, Any]) -> bool:
+    text = " ".join(str(group.get("text") or "").lower().split())
+    routine_fragments = [
+        "do not edit generated artifacts",
+        "rerun the profiler on the corrected csv + dbml inputs",
+    ]
+    return any(fragment in text for fragment in routine_fragments)
+
+
+def _package_todo_sort_key(group: dict[str, Any]) -> tuple[int, int, str]:
+    priorities = [str(priority) for priority in group.get("priorities") or []]
+    priority_rank = min((_package_priority_rank(priority) for priority in priorities), default=9)
+    return (priority_rank, -int(group.get("occurrence_count") or 0), str(group.get("text") or ""))
+
+
+def _package_priority_rank(value: str) -> int:
+    label = str(value).upper()
+    for index, severity in enumerate(("P0", "P1", "P2", "P3")):
+        if label.startswith(severity):
+            return index
+    return 9
+
+
+def _package_short_text(text: str, limit: int) -> str:
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    cutoff = normalized.rfind(" ", 0, max(1, limit - 3))
+    if cutoff < 48:
+        cutoff = max(1, limit - 3)
+    return normalized[:cutoff].rstrip() + "..."
+
+
+def _package_compact_list(values: list[str], *, empty: str, limit: int = 3) -> str:
+    unique_values = []
+    seen = set()
+    for value in values:
+        if value and value not in seen:
+            unique_values.append(value)
+            seen.add(value)
+    if not unique_values:
+        return empty
+    visible = unique_values[:limit]
+    remaining = len(unique_values) - len(visible)
+    suffix = f" +{remaining}" if remaining > 0 else ""
+    return ", ".join(visible) + suffix
+
+
+def _package_display_artifact_text(text: str) -> str:
+    replacements = {
+        "dataset_verdict.json": "dataset readiness evidence",
+        "issues.json": "issue evidence",
+        "table_assessments.json": "table readiness evidence",
+        "issue_action_plans.json": "issue action-plan evidence",
+        "issue_todos.json": "todo evidence",
+        "quality_gates.json": "quality gate evidence",
+        "profile_summary.json": "profile evidence",
+        "relationship_graph.json": "relationship evidence",
+        "schema_evaluation.json": "schema mapping evidence",
+        "schema_parse_report.json": "schema parse evidence",
+        "run_summary.json": "run summary evidence",
+        "preflight_review.json": "preflight review evidence",
+    }
+    for artifact_name, label in replacements.items():
+        text = text.replace(artifact_name, label)
+    return text
+
+
+def _issue_status_label(severity: str) -> str:
+    if severity in {"P0", "P1"}:
+        return "Blocked"
+    if severity == "P2":
+        return "Needs preparation"
+    return "Needs review"
+
+
+def top_numeric_outlier_rows(profile_summary: dict[str, Any], *, limit: int = 10) -> list[dict[str, Any]]:
+    rows = []
+    for table_name, table in sorted((profile_summary.get("tables") or {}).items()):
+        for column_name, column in sorted((table.get("columns") or {}).items()):
+            outliers = column.get("outliers") or {}
+            outlier_count = int(outliers.get("outlier_count") or 0)
+            if outlier_count <= 0:
+                continue
+            rows.append(
+                {
+                    "field": f"{table_name}.{column_name}",
+                    "method": outliers.get("method") or "iqr",
+                    "outlier_count": outlier_count,
+                    "outlier_rate": outliers.get("outlier_rate") or 0,
+                    "lower_fence": outliers.get("lower_fence"),
+                    "upper_fence": outliers.get("upper_fence"),
+                }
+            )
+    rows.sort(key=lambda row: (-int(row["outlier_count"]), -float(row["outlier_rate"]), row["field"]))
+    return rows[:limit]
+
+
+def numeric_outlier_rows_html(rows: list[dict[str, Any]]) -> str:
+    html_rows = []
+    for row in rows:
+        fence = f"{_h(row.get('lower_fence'))} to {_h(row.get('upper_fence'))}"
+        html_rows.append(
+            "<tr>"
+            f"<td><code>{_h(row.get('field', ''))}</code></td>"
+            f"<td>{_h(row.get('method', ''))}</td>"
+            f"<td>{_h(row.get('outlier_count', 0))}</td>"
+            f"<td>{_h(_format_percent(row.get('outlier_rate', 0)))}</td>"
+            f"<td>{fence}</td>"
+            "</tr>"
+        )
+    if not html_rows:
+        return '<tr><td colspan="5">No numeric IQR outliers were detected.</td></tr>'
+    return "".join(html_rows)
+
+
+def _worst_issue_severity(issues: list[dict[str, Any]]) -> str:
+    if not issues:
+        return ""
+    return min((str(issue.get("severity") or "") for issue in issues), key=_severity_rank)
+
+
+def _severity_rank(severity: str) -> int:
+    return {"P0": 0, "P1": 1, "P2": 2, "P3": 3}.get(severity, 4)
+
+
+def _column_usability_status(
+    *,
+    severity: str,
+    null_rate: float,
+    invalid_cast_count: int,
+    outlier_count: int,
+) -> str:
+    if severity in {"P0", "P1"}:
+        return "blocked"
+    if severity in {"P2", "P3"} or null_rate > 0 or invalid_cast_count > 0 or outlier_count > 0:
+        return "needs_preparation"
+    return "ready"
+
+
+def _column_usability_label(status: str) -> str:
+    return {
+        "blocked": "Blocked for analysis",
+        "needs_preparation": "Needs preparation",
+        "ready": "Ready",
+    }.get(status, status)
+
+
+def _package_column_evidence(
+    column: dict[str, Any],
+    issues: list[dict[str, Any]],
+    outlier_count: int,
+) -> str:
+    parts = [
+        f"null rate {_format_percent(column.get('null_rate', 0))}",
+        f"distinct={int(column.get('distinct_count') or 0)}",
+    ]
+    invalid_cast_count = int(column.get("invalid_cast_count") or 0)
+    if invalid_cast_count:
+        parts.append(f"invalid_casts={invalid_cast_count}")
+    if outlier_count:
+        parts.append(f"iqr_outliers={outlier_count}")
+    if issues:
+        parts.append(f"issues={len(issues)}")
+    return "; ".join(parts)
+
+
+def _package_column_next_step(
+    column: dict[str, Any],
+    issues: list[dict[str, Any]],
+    outlier_count: int,
+) -> str:
+    for issue in issues:
+        fixes = issue.get("suggested_fix") or []
+        if fixes:
+            return str(fixes[0])
+    if outlier_count:
+        return "Review IQR outlier evidence before scaling, aggregation, or feature use."
+    if int(column.get("invalid_cast_count") or 0):
+        return "Normalize typed values before using this column in analysis."
+    if float(column.get("null_rate") or 0) > 0:
+        return "Choose an imputation, exclusion, or missingness flag strategy before modeling."
+    return "No deterministic cleanup step was generated."
+
+
+def _analysis_consequence(issue_type: str) -> str:
+    if issue_type in {"PRIMARY_KEY_NULL", "DUPLICATE_PRIMARY_KEY", "UNIQUE_DUPLICATE"}:
+        return "Entity-level joins, de-duplication, and train/test splits may be unreliable until key evidence is fixed."
+    if issue_type in {
+        "ORPHAN_FOREIGN_KEY",
+        "PARENT_KEY_DUPLICATE",
+        "FOREIGN_KEY_NULL",
+        "CHILD_RELATIONSHIP_DUPLICATE",
+    }:
+        return "Cross-table joins may drop, multiply, or misalign records during feature construction."
+    if issue_type in {"REQUIRED_FIELD_NULL", "EMPTY_STRING", "INVALID_PLACEHOLDER_TOKEN"}:
+        return "Missingness handling is required before aggregate analysis or model feature use."
+    if issue_type in {"VALUE_OUT_OF_RANGE", "NEGATIVE_VALUE_NOT_ALLOWED", "NUMERIC_OUTLIER"}:
+        return "Distribution-sensitive aggregates and models may need capping, transformation, or exclusion decisions."
+    if issue_type in {"TYPE_CAST_INVALID", "DATE_ORDER_INVALID", "REGEX_MISMATCH"}:
+        return "Typed, time-based, or pattern-derived features need normalization before analysis use."
+    if issue_type in {"TABLE_MISSING", "COLUMN_MISSING", "EXTRA_COLUMN"}:
+        return "Schema coverage should be confirmed before comparing tables or training models."
+    return "Dataset readiness is reduced until this evidence is reviewed."
+
+
 def _scorecard_row(label: str, value: Any, detail: str) -> str:
     return f"<tr><td>{_h(label)}</td><td><strong>{_h(value)}</strong></td><td>{_h(detail)}</td></tr>"
 
 
+def _l4_display_status(status: str) -> str:
+    if status == "passed":
+        return "LLM text valid"
+    if status == "failed":
+        return "LLM text failed"
+    if status == "fallback_used":
+        return "fallback used"
+    if status == "not_enabled":
+        return "not enabled"
+    return str(status or "unknown").replace("_", " ")
+
+
 def _artifact_links() -> list[tuple[str, str]]:
     return [
-        ("Dataset verdict", "dataset_verdict.json"),
-        ("Table assessments", "table_assessments.json"),
+        ("Data-quality readiness", "dataset_verdict.json"),
+        ("Table readiness", "table_assessments.json"),
+        ("Issue action plans", "issue_action_plans.json"),
+        ("Issue todos", "issue_todos.json"),
+        ("Quality gates", "quality_gates.json"),
         ("Profile summary", "profile_summary.json"),
         ("Issues", "issues.json"),
         ("Schema parse", "schema_parse_report.json"),
         ("Schema evaluation", "schema_evaluation.json"),
         ("Relationship graph", "relationship_graph.json"),
-        ("Lineage graph", "lineage_graph.json"),
-        ("Influence", "influence.json"),
+        ("Developer runtime context", "lineage_graph.json"),
+        ("Legacy association artifact", "influence.json"),
         ("Runtime summary", "run_summary.json"),
         ("Runtime events", "run_events.jsonl"),
         ("Runtime log", "run.log"),

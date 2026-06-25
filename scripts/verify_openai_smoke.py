@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 
 
-BASELINE_DIR = Path("outputs/olist_demo")
-OPENAI_DIR = Path("outputs/olist_l4_openai_smoke")
-BASELINE_MANIFEST = Path("outputs/olist_deterministic_manifest_before_openai.json")
+BASELINE_DIR = Path("outputs/demo_small")
+OPENAI_DIR = Path("outputs/demo_small_l4_openai_smoke")
+BASELINE_MANIFEST = Path("outputs/demo_small_deterministic_manifest_before_openai.json")
 
 DETERMINISTIC_ARTIFACTS = [
     "profile_summary.json",
@@ -83,7 +83,7 @@ def main() -> None:
         ]
     )
     prompt_markers = [
-        "Generate the guarded L4 Senior Data Scientist narrative",
+        "Generate the guarded L4 Data Scientist EDA narrative",
         "privacy_contract",
         "source_artifacts",
         "top_issues",
@@ -123,7 +123,7 @@ def _env_values(path: Path) -> dict[str, str]:
 
 def _raw_row_hits(scan_text: str) -> list[str]:
     hits = []
-    for csv_path in sorted(Path("data/demo_olist/csv").glob("*.csv")):
+    for csv_path in sorted(Path("data/demo_small/csv").glob("*.csv")):
         with csv_path.open(newline="", encoding="utf-8") as handle:
             reader = csv.reader(handle)
             next(reader, None)

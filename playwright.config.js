@@ -4,14 +4,13 @@ const venvBin =
   process.platform === "win32"
     ? path.join(__dirname, ".venv", "Scripts")
     : path.join(__dirname, ".venv", "bin");
-
-const e2ePort = Number(process.env.VSF_E2E_PORT || 18765);
-const baseURL = `http://127.0.0.1:${e2ePort}`;
+const webPort = Number(process.env.VSF_E2E_PORT || 8765);
+const webBaseUrl = `http://127.0.0.1:${webPort}`;
 
 const webCommand =
   process.platform === "win32"
-    ? `set "PATH=${venvBin};%PATH%" && vsf-profiler web --port ${e2ePort}`
-    : `PATH="${venvBin}:$PATH" vsf-profiler web --port ${e2ePort}`;
+    ? `set "OPENAI_API_KEY=" && set "VSF_PROFILER_LLM_PROVIDER=" && set "PATH=${venvBin};%PATH%" && vsf-profiler web --port ${webPort}`
+    : `OPENAI_API_KEY= VSF_PROFILER_LLM_PROVIDER= PATH="${venvBin}:$PATH" vsf-profiler web --port ${webPort}`;
 
 /** @type {import('@playwright/test').PlaywrightTestConfig} */
 module.exports = {
@@ -22,12 +21,12 @@ module.exports = {
   },
   reporter: [["list"]],
   use: {
-    baseURL,
+    baseURL: webBaseUrl,
     trace: "retain-on-failure",
   },
   webServer: {
     command: webCommand,
-    url: `${baseURL}/api/health`,
+    url: `${webBaseUrl}/api/health`,
     reuseExistingServer: false,
     timeout: 30_000,
   },

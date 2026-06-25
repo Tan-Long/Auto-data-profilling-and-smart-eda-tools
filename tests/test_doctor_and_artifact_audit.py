@@ -44,6 +44,28 @@ def test_doctor_command_redacts_secret_environment_values(monkeypatch):
         assert leaked_value not in result.output
 
 
+def test_doctor_reads_openai_config_from_dotenv_without_leaking_values(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("VSF_PROFILER_LLM_PROVIDER", raising=False)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "VSF_PROFILER_LLM_PROVIDER=openai",
+                "OPENAI_API_KEY=sk-dotenv-secret-value-123456789",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["doctor"])
+
+    assert result.exit_code == 0, result.output
+    assert "OPENAI_API_KEY present (redacted)" in result.output
+    assert "VSF_PROFILER_LLM_PROVIDER present" in result.output
+    assert "sk-dotenv-secret-value-123456789" not in result.output
+
+
 def test_artifact_audit_passes_for_demo_run_package_and_zip(tmp_path):
     out_dir = _demo_output(tmp_path)
     package_dir = tmp_path / "analysis_package"

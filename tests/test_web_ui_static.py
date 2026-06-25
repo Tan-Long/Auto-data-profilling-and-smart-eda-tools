@@ -1,4 +1,11 @@
+import re
 from pathlib import Path
+
+
+def _css_block(css: str, selector: str) -> str:
+    match = re.search(rf"{re.escape(selector)}\s*\{{(?P<body>.*?)\n\}}", css, re.S)
+    assert match, f"Missing CSS selector {selector}"
+    return match.group("body")
 
 
 def test_web_ui_contains_upload_mapping_and_visualization_regions():
@@ -6,13 +13,77 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     design_system = Path(__file__).resolve().parents[1] / ".interface-design" / "system.md"
     html = (root / "index.html").read_text()
     css = (root / "styles.css").read_text()
-    js = (root / "app.js").read_text()
+    app_js = (root / "app.js").read_text()
+    js_modules = [
+        root / "js" / "demo-data.js",
+        root / "js" / "source-parsers.js",
+        root / "js" / "dashboard-config.js",
+        root / "js" / "workflow-nav-config.js",
+    ]
+    js = app_js + "\n" + "\n".join(path.read_text() for path in js_modules)
     design = design_system.read_text()
 
     required_html = [
-        "Data Quality Console",
+        "Data Quality Profiler",
+        'rel="icon"',
+        'href="favicon.svg"',
+        'id="flowChooser"',
+        'id="workflowNav"',
+        'aria-label="Workflow navigator"',
+        'src="js/workflow-nav-config.js"',
+        'id="profileFlow"',
+        'data-profile-step="connect"',
+        'id="evaluateFlow"',
+        'id="profileFlowButton"',
+        'id="evaluateFlowButton"',
+        'id="flowModeStatus"',
+        'id="profileStepBack"',
+        'id="profileStepNext"',
+        'id="profileStepHint"',
+        "Add source",
+        "Inspect results",
+        'data-profile-step-card="connect"',
+        'data-profile-step-card="preflight"',
+        'data-profile-step-card="run"',
+        'data-profile-step-card="review"',
+        'data-profile-step-section="connect"',
+        'data-profile-step-section="preflight"',
+        'data-profile-step-section="run"',
+        'data-profile-step-section="review"',
+        "Profile my data",
+        "Evaluate tool",
+        "Built-in faulty dataset comparison",
+        'id="evaluateStatusBadge"',
+        'id="evaluationCatalogCount"',
+        'id="evaluationDatasetList"',
+        'id="startEvaluationButton"',
+        'id="evaluateMessage"',
+        'id="evaluationComparison"',
+        'id="evaluationComparisonStatus"',
+        'id="evaluationSummaryStrip"',
+        'id="evaluationExpectedList"',
+        'id="evaluationUsefulnessList"',
+        'id="evaluationBaselineList"',
+        'id="evaluationArtifactLinks"',
+        "Comparison Summary",
+        "Curated dataset catalog",
+        "Great Expectations baseline",
+        "No arbitrary uploads are accepted in Evaluate.",
         'id="dbmlInput"',
         'id="csvInput"',
+        'id="sourceState"',
+        'id="sourceStateBadge"',
+        'id="sourceStateSummary"',
+        'id="sourceStateDetails"',
+        'id="quickDemoButton"',
+        'id="clearUploadButton"',
+        "Input source",
+        "Source status",
+        "Connect DBML + CSV",
+        "Upload files and map tables",
+        "DBML contract",
+        "CSV files",
+        "Use sample DBML + CSV",
         'id="visualizeButton"',
         'id="mappingBody"',
         'id="diagramFrame"',
@@ -22,24 +93,137 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="diagramWarnings"',
         'id="diagramSourceBadge"',
         'id="diagramFitButton"',
-        'id="diagramDensityToggle"',
+        'id="diagramZoomOutButton"',
+        'id="diagramZoomValue"',
+        'id="diagramZoomInButton"',
         'id="diagramColumnsToggle"',
         'id="diagramResetSelection"',
         'id="diagramCanvas"',
         'id="diagramInspector"',
         'id="runnerForm"',
         'id="pathRunnerForm"',
+        'id="preflightReview"',
+        'id="preflightGateBadge"',
+        'id="preflightRunSummary"',
+        'id="preflightBlockerList"',
+        'id="preflightWarningList"',
+        'aria-label="What are preflight blockers?"',
+        'aria-label="What are preflight warnings?"',
+        'id="preflightBlockersInfo"',
+        'id="preflightWarningsInfo"',
+        'role="tooltip"',
+        "Preflight Review",
+        "Review connection and mapping readiness",
+        "Blockers stop the run.",
+        "Warnings need review.",
+        "OpenAI issue guidance",
+        "Enrich every issue with OpenAI",
+        "bounded issue-level guidance before Review",
+        "visible human-review fallback",
+        'id="llmModeToggle"',
+        'role="switch"',
+        'aria-checked="true"',
+        'class="llm-switch-track"',
+        'class="llm-switch-thumb"',
+        'id="llmModeStatus"',
         'id="runProfilerButton"',
         'id="runPathProfilerButton"',
         'id="dbmlPathInput"',
         'id="csvDirPathInput"',
-        'id="rulesPathInput"',
+        'type="hidden"',
+        'id="runSourcePreview"',
+        'id="runSourceMode"',
+        'id="runSourceDbml"',
+        'id="runSourceCsvCount"',
+        'id="runSourceCsvList"',
+        "Selected source",
         'id="stageList"',
-        'id="mappingShowAllToggle"',
-        'id="generatedResults"',
         'id="artifactList"',
+        'id="runHistory"',
+        'id="runHistoryList"',
+        'id="runHistoryStatus"',
+        'id="selectedRunTimeline"',
+        'id="selectedRunTimelineStatus"',
         'id="dashboard"',
         'id="dashboardPanelGrid"',
+        'aria-label="Review Issues visual charts and issue table"',
+        "Issue detail drawer",
+        "Select an issue to inspect where it happened, evidence, impact, and fix guidance.",
+        'id="dashboardSummaryStrip"',
+        'id="qualityGates"',
+        'id="qualityGatesStatus"',
+        'id="qualityGatesGrid"',
+        "Quality Gates",
+        'id="reportExport"',
+        'id="reportExportStatus"',
+        'id="reportExportGrid"',
+        'id="reportExportTodos"',
+        'id="reportExportMessage"',
+        "Report / Export",
+        'id="tableImpact"',
+        'id="tableImpactGrid"',
+        'id="tableImpactStatus"',
+        'id="dashboardDrilldown"',
+        "DBML diagram preview",
+        "Local diagram preview renders from browser DBML state",
+        "Fit view",
+        "Zoom out",
+        "Zoom in",
+        "Hide full columns",
+        "Reset layout",
+        "CSV to DBML Table Mapping",
+        "Run a local CSV + DBML data-quality profile",
+        "Generated results",
+        "Review Issues",
+        "Table Readiness",
+        "Upload CSV + DBML",
+        "Local CSV path",
+        "OpenAI issue guidance",
+        "OPENAI_API_KEY",
+        "Upload DBML to preview schema",
+        "Reset demo",
+        'src="js/demo-data.js"',
+        'src="js/source-parsers.js"',
+        'src="js/dashboard-config.js"',
+    ]
+    for marker in required_html:
+        assert marker in html
+    assert "Previous runs" not in html
+    assert "Run History" not in html
+    assert "Select prior run and timeline" not in js
+    assert "Issue review snapshot" not in html
+    assert "Issue review snapshot" in js
+    assert "generatedReviewResultsReady" in js
+    assert "Current DBML + CSV source" not in html
+    assert "Upload DBML contract" not in html
+    assert "Upload related CSV files" not in html
+
+    forbidden_html = [
+        'id="databaseRunnerForm"',
+        'id="runDatabaseProfilerButton"',
+        'id="rulesPathInput"',
+        'id="pathTargetInput"',
+        'id="runnerModeDatabase"',
+        'id="databaseSourceType"',
+        'id="databaseUrlInput"',
+        'id="databaseSchemaInput"',
+        'id="databaseTablesInput"',
+        'id="databaseChunkRowsInput"',
+        'id="databaseRulesPathInput"',
+        'id="databaseTargetInput"',
+        "Developer DB source",
+        "Compatibility run options",
+        "Compatibility rule config",
+        "Compatibility rule config path",
+        "Compatibility association field",
+        "Connection URL",
+        "Schema / database",
+        "Table list",
+        "Boundary",
+        "Full profiling runs through the Python/DuckDB backend",
+        "Hosted previews do not run profiler jobs",
+        'id="graphs"',
+        'id="artifacts"',
         'id="dashboardGraphModeLineage"',
         'id="dashboardGraphModeRelationship"',
         'id="dashboardGraphDisplayOverview"',
@@ -54,70 +238,18 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="dashboardGraphSvg"',
         'id="dashboardGraphLegend"',
         'id="dashboardGraphDrilldown"',
+        'id="dashboardArtifactLinks"',
+        "Developer Schema Context",
+        "Graph drilldown",
+        "Developer artifact sources",
+        "Schema context",
+        "Developer artifacts",
         "Reset graph view",
         "Invalid/warning only",
-        'id="dashboardSeverityFilter"',
-        'id="dashboardIssueTypeFilter"',
-        'id="dashboardTableFilter"',
-        'id="dashboardSummaryStrip"',
-        'id="tableImpact"',
-        'id="tableImpactGrid"',
-        'id="tableImpactStatus"',
-        'id="report"',
-        "dashboard-detail-primary",
-        "dashboard-detail-secondary",
-        "dashboard-artifact-sources",
-        'id="dashboardDrilldown"',
-        'id="dashboardDrilldown" tabindex="-1"',
-        'id="artifactPreview"',
-        'id="artifactPreviewMeta"',
-        'id="reportChartPreview"',
-        "Generated report",
-        "Run a job to render report charts from generated artifact data.",
-        "Run a job to open <code>report.html</code> here automatically.",
-        "DBML diagram preview",
-        "Run a profiler job to render schema_diagram.json.",
-        "Fit view",
-        "Expanded cards",
-        "All columns",
-        "Reset selection",
-        "Schema coverage",
-        "Relationship evidence",
-        "Show all tables",
-        "Start a local Python/DuckDB run",
-        "Generated results",
-        "Dashboard",
-        "Table Impact",
-        "Evidence panels stay empty until a run writes artifacts.",
-        "Upload mode",
-        "Local path mode",
-        "Run profiler to build the DBML diagram",
-        "Reset local paths",
+        '<details class="info-popover">',
     ]
-    for marker in required_html:
-        assert marker in html
-
-    expected_section_order = [
-        'id="runner"',
-        'id="diagram"',
-        'id="mapping"',
-        'id="generatedResults"',
-        'id="report"',
-        'id="dashboard"',
-    ]
-    section_positions = [html.index(marker) for marker in expected_section_order]
-    assert section_positions == sorted(section_positions)
-
-    expected_nav_order = [
-        'href="#runner"',
-        'href="#diagram"',
-        'href="#mapping"',
-        'href="#generatedResults"',
-        'href="#report"',
-        'href="#dashboard"',
-    ]
-    nav_positions = [html.index(marker) for marker in expected_nav_order]
-    assert nav_positions == sorted(nav_positions)
+    for marker in forbidden_html:
+        assert marker not in html
 
     required_css_tokens = [
         "--surface-canvas",
@@ -125,144 +257,336 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "--surface-rail",
         "--accent",
         "--focus-ring",
+        ".flow-chooser",
+        ".flow-card",
+        ".profile-flow",
+        ".profile-step-strip",
+        ".status-card-copy",
+        ".sr-only",
+        ".profile-step-footer",
+        ".profile-step-actions",
+        ".source-state-panel",
+        ".source-state-grid",
+        ".evaluate-flow-surface",
+        ".evaluation-dataset-card",
+        ".evaluation-summary-strip",
+        ".evaluation-comparison-table",
+        ".evaluation-comparison-row",
+        ".evaluation-comparison-cell",
+        ".evaluation-tool-status",
+        ".evaluation-row",
+        ".evaluation-metric-grid",
+        ".preflight-review-panel",
+        ".preflight-heading-label",
+        ".info-popover",
+        ".info-popover-trigger",
+        ".info-popover-card",
+        ".preflight-item",
+        ".issue-inbox-grid",
+        ".issue-inbox-side",
+        ".issue-table-controls",
+        ".issue-table-filter",
+        ".issue-sort-note",
+        ".issue-review-table",
+        ".issue-review-header",
+        ".issue-review-body",
+        ".issue-row-meter",
+        ".issue-detail-drawer",
+        ".issue-detail-disclosure",
+        ".issue-context-strip",
+        ".evidence-value",
+        ".issue-llm-priority-panel",
+        ".issue-llm-callout",
+        ".issue-llm-enrichment",
+        ".issue-llm-controls",
+        ".issue-llm-section",
+        ".action-plan-source-chips",
+        ".action-plan-llm-additions",
+        ".action-plan-llm-heading",
+        ".action-plan-step.llm",
+        ".workflow-nav",
+        ".nav-stage-item",
+        ".nav-substep-list",
+        ".nav-subitem",
+        ".runtime-stage-item",
+        ".stage-info-icon",
+        ".stage-info-tooltip",
+        ".runtime-stage-item.active",
+        ".llm-toggle-button.locked",
+        ".stage-dropdown",
+        ".stage-detail-grid",
+        ".generated-result-info",
+        ".generated-result-details",
+        ".generated-result-detail-grid",
+        ".todo-visual-summary",
+        ".todo-summary-card",
+        ".todo-signal-card",
+        ".todo-issue-queue",
+        ".todo-issue-work-card",
+        ".todo-queue-priority-strip",
+        ".todo-queue-priority-chip",
+        ".todo-priority-cell",
+        ".todo-priority-token",
+        ".todo-queue-open-label",
+        ".todo-more-groups",
+        ".todo-compact-row",
+        ".quality-gates-section",
+        ".quality-gate-card",
+        ".quality-gate-evidence-value",
+        ".issue-active-lens",
+        ".table-impact-card.selected",
+        ".table-assessment-detail-heading",
+        ".table-severity-strip",
+        ".table-column-evidence-summary",
+        ".table-score-formula",
+        ".table-score-breakdown",
+        ".table-column-evidence-table",
+        ".table-column-evidence-row",
+        ".issue-visual-summary",
+        ".review-briefing",
+        ".review-briefing-card",
+        ".review-data-map",
+        ".review-table-map-card",
+        ".review-fix-lane",
+        ".issue-visual-chart",
+        ".issue-visual-row.selected",
+        ".severity-priority-panel",
+        ".severity-priority-card",
+        ".issue-severity-token",
+        ".drilldown-severity-strip",
+        ".drilldown-severity-chip",
+        ".dashboard-issue-header",
+        ".drilldown-priority-cell",
+        ".drilldown-priority-token",
+        ".drilldown-issue-location",
+        ".sample-preview-button",
+        ".issue-focus-map",
+        ".developer-options",
+        ".runner-source-switch",
         ".diagram-role-bridge",
-        ".diagram-inspector",
         ".diagram-edge-hit",
-        ".dashboard-detail-primary",
-        ".dashboard-detail-secondary",
-        ".dashboard-issue-list",
-        ".stage-result",
-        ".schema-coverage-grid",
-        ".mapping-toolbar",
-        ".generated-results-panel",
-        ".stage-result-grid",
-        ".stage-result-artifacts",
-        ".artifact-link-list",
-        ".artifact-preview",
-        ".artifact-review",
-        ".artifact-review-kpis",
-        ".artifact-chart-preview",
-        ".artifact-chart-gauge",
-        ".artifact-chart-bar-row",
-        ".issue-location-summary",
-        ".issue-sample-banner",
-        ".issue-column-highlight",
-        ".issue-row-marker",
-        ".artifact-preview-json",
-        ".artifact-preview-table",
+        ".diagram-edge-flow",
+        ".diagram-cardinality-glyph",
+        ".diagram-column-icon-key",
+        ".diagram-column-icon-link",
+        ".diagram-column-type",
+        ".pill-status.manual",
+        ".pill-status.ambiguous",
+        ".pill-status.failed",
         "@media (prefers-reduced-motion: reduce)",
     ]
     for marker in required_css_tokens:
         assert marker in css
 
+    assert "grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));" in _css_block(css, ".profile-step-strip")
+
     required_js = [
         "parseDbml",
+        "flowMode",
+        "profileStep",
+        "setFlowMode",
+        "setProfileStep",
+        "moveProfileStep",
+        "profileStepGuard",
+        "profileSourceReady",
+        "profileRunComplete",
+        "canOpenProfileStep",
+        "data-profile-step-section",
+        "profileStepLabels",
+        "profileFlowButton",
+        "evaluateFlowButton",
+        "evaluationCatalog",
+        "loadEvaluationCatalog",
+        "startEvaluationRun",
+        "pollEvaluationJob",
+        "renderEvaluation",
+        "renderEvaluationComparison",
+        "renderEvaluationComparisonMatrix",
+        "renderEvaluationComparisonRow",
+        "renderEvaluationBaselineSummary",
+        "baselineStatusLabel",
+        "humanEvaluationReason",
+        "/api/evaluation-catalog",
+        "/api/evaluations",
+        "evaluation_summary.json",
+        "ground_truth_issues.json",
+        "baseline_comparison.json",
+        "Not covered by baseline",
+        "GE not installed",
         "parseCsvHeader",
-        "csvStemFromName",
-        "normalizeCsvFile",
-        "resetLocalPathDefaults",
+        "VSF_DEMO_DATA",
+        "VSF_SOURCE_PARSERS",
+        "VSF_DASHBOARD_CONFIG",
+        "markCustomUploadSource",
+        "Custom CSV upload replaced the previous source inventory",
         "autoLinkCsvs",
+        "manualMappings",
+        "preflightAcceptedWarnings",
+        "demoPresets",
+        "runnerUiDemoPresets",
+        "quickDemo",
+        "mappingOverridesForRun",
+        "buildPreflightReview",
+        "buildPreflightReviewPayload",
+        "preflightGateMessage",
+        "conflictingMappingGroups",
+        "csvColumnDiff",
+        "dbml_parse_failure",
+        "zero_mapped_tables",
+        "preflight_review",
+        "llmRunOptions",
+        "appendLlmFormFields",
+        "jobIsRunning",
+        "OpenAI issue guidance is locked while the pipeline is running.",
+        "Locked for this run.",
+        "use_llm",
+        "use_issue_llm",
+        "llm_provider",
         "checkRunnerHealth",
         "startProfilerRun",
         "startPathRun",
-        "hasGeneratedEvidence",
-        "generatedContractSummary",
-        "generatedMappingTables",
-        "generatedRelationships",
         "renderGeneratedResults",
         "renderGeneratedResultPreviews",
+        "renderGeneratedL4Preview",
+        "renderGeneratedIssueLlmPreview",
         "renderGeneratedReportLinks",
-        "renderReportPanel",
-        "renderReportIssueSeverityPanel",
-        "renderReportMissingnessPanel",
-        "renderReportBars",
-        "renderStageResult",
-        "stageResultItems",
-        "stageArtifactPaths",
+        "renderReportExportSection",
+        "renderReportExportLinks",
+        "renderReportIssueLlmAction",
+        "reportIssueForLlmAction",
+        "data-dashboard-open-llm",
         "artifactUrlFromArtifacts",
         "loadDashboard",
         "renderDashboard",
+        "preserveViewportAroundRender",
+        "renderDashboardPreservingViewport",
+        "renderDashboardDrilldownPreservingViewport",
+        "keepCurrentArtifactsDuringLoad",
+        "preserveViewportSelector",
         "renderDashboardSummary",
+        "renderDashboardRiskMeter",
+        "renderDashboardRiskBreakdown",
+        "fallbackRiskComponentsFromVerdict",
+        "renderIssueInbox",
+        "renderIssueDetailDrawer",
+        "renderIssueLlmPriorityPanel",
+        "renderIssueLlmEnrichment",
+        "runIssueLlmEnrichment",
+        "getIssueLlmEnrichment",
+        "issueEvidenceValues",
+        "issueStatus",
+        "Review warning: numeric outlier",
+        "Schema/table-level checks",
+        "Where",
+        "Evidence",
+        "Additional evidence",
+        "Detection query",
+        "Recommended work",
+        "OpenAI issue guidance",
+        "Additional review context",
+        "Why this was flagged",
+        "OpenAI additions applied",
+        "OpenAI fix additions",
+        "OpenAI verify additions",
+        "Human review needed",
+        "renderL4GuardrailPanel",
         "renderTableImpactSection",
         "renderDashboardDrilldown",
-        "renderDrilldownSeverityFilters",
-        "setDrilldownSeverityFilter",
-        "data-drilldown-severity",
-        "previewIssueSample",
-        "renderIssueSampleButton",
-        "renderIssueSampleContext",
-        "renderIssueLocationSummary",
-        "handleArtifactNavigationClick",
-        "els.artifactPreview.addEventListener",
-        "previewArtifact",
-        "renderJsonArtifactPreview",
-        "renderRelationshipGraphArtifactReview",
-        "renderChartSpecPreview",
-        "renderArtifactGaugePreview",
-        "renderArtifactBarPreview",
-        "renderGenericJsonArtifactReview",
-        "renderMarkdownArtifactPreview",
-        "renderCsvArtifactPreview",
-        "renderIssueSampleCsvPreview",
-        "artifactPreviewKind",
-        "data-artifact-action=\"preview-issue-sample\"",
-        "data-artifact-action=\"preview-artifact\"",
-        "focusDashboardArtifact",
-        "focusDashboardDrilldown",
-        "isDashboardChartArtifact",
-        "renderArtifactNavigationCard",
-        "data-artifact-action",
-        "data-dashboard-panel-path",
-        "renderDashboardGraph",
+        "renderIssueAdditionalEvidence",
+        "renderDrilldownSeverityStrip",
+        "drilldownIssueSeverityRows",
+        "renderDrilldownIssueRow",
+        "drilldownIssueLocation",
+        "Show full review",
+        'data-dashboard-scroll="drilldown"',
+        "renderL4GuardrailDetails",
+        "guardrailStatusClass",
         "renderDiagram",
         "buildDiagramModel",
+        "buildPreflightDiagramModel",
         "buildArtifactDiagramModel",
-        "schemaEvaluation",
-        "dbml_type",
         "drawLocalDiagram",
         "layoutLocalDiagram",
         "diagramTableRole",
-        "diagramNonAdjacentBusY",
         "diagramVisibleColumns",
-        "diagramColumnRowSvg",
+        "diagramManualPositions",
+        "handleDiagramPointerDown",
+        "handleDiagramPointerMove",
+        "handleDiagramPointerEnd",
+        "applyDiagramManualPositions",
+        "findDiagramTableElement",
+        "syncDiagramRelationshipGeometry",
+        "diagramRelationshipTablePosition",
+        "diagramColumnAbsoluteY",
+        "diagramColumnIconSvg",
+        "diagramKeyIconSvg",
+        "diagramLinkIconSvg",
+        "const rightLimit",
+        "titleType",
+        "diagramTableSelectionStatus",
+        "diagramRelationshipSelectionStatus",
         "handleDiagramSelectionEvent",
-        "clearDiagramSelection",
-        "diagramRelationshipStatusLabel",
-        "relationshipStatusDisplayLabel",
-        "relationshipStatusDisplayDetail",
         "renderDiagramInspector",
         "diagramSelectionContext",
         "localDiagramLimits",
         "Local DBML preview unavailable",
         "Diagram is too large for local preview",
-        "Run profiler to build the DBML diagram",
+        "Upload DBML to preview schema",
         "schema_diagram.json",
         "schema_parse_report.json",
+        "l4_report.md",
+        "guardrail_report.json",
+        "issue_llm_enrichments.json",
+        "/issue-enrichments",
+        "data-issue-llm-run",
         "data-diagram-table",
         "data-diagram-relationship",
         "diagram-relationship",
-        "buildLineageGraphView",
-        "buildRelationshipGraphView",
-        "dashboardGraphSelection",
-        "dashboardGraphDisplay",
-        "dashboardGraphShowColumns",
-        "dashboardGraphShowRuntime",
-        "dashboardGraphInvalidOnly",
-        "applyDashboardGraphFocus",
-        "graphSelectionContext",
-        "renderGraphDirectConnections",
-        "renderGraphTableColumns",
-        "artifact-summary:generated",
+        "diagram-cardinality-one",
+        "diagram-cardinality-many",
+        "one-to-many",
         "EventSource",
-        "resetLocalPathDefaults();",
+        "renderAll();",
         "buildDbdiagramUrl",
         "https://dbdiagram.io/embed?c=",
     ]
     for marker in required_js:
         assert marker in js
 
-    assert "restrained data-quality console" in design
-    assert "Table Impact" in design
+    evaluate_start = html.index('id="evaluateFlow"')
+    evaluate_end = html.index("</section>", evaluate_start)
+    evaluate_shell = html[evaluate_start:evaluate_end]
+    for marker in [
+        'id="dbmlInput"',
+        'id="csvInput"',
+        'id="runnerForm"',
+        'id="pathRunnerForm"',
+        'id="databaseRunnerForm"',
+        'type="file"',
+        'fetch("/api/jobs"',
+        'fetch("/api/path-jobs"',
+    ]:
+        assert marker not in evaluate_shell
+
+    source_switch_start = html.index('class="runner-mode-switch runner-source-switch"')
+    source_switch_end = html.index('id="profileDeveloperOptions"', source_switch_start)
+    primary_source_switch = html[source_switch_start:source_switch_end]
+    assert 'aria-label="Runner mode" hidden' in primary_source_switch
+    assert "Upload CSV + DBML" in primary_source_switch
+    assert "Local CSV path" in primary_source_switch
+    assert 'id="llmModeOff"' not in html
+    assert 'id="llmModeOpenAI"' not in html
+    assert "DBML file path" not in html
+    assert "CSV directory path" not in html
+    assert "Developer DB source" not in primary_source_switch
+    assert "Legacy Olist sample" not in primary_source_switch
+    assert "Legacy Olist sample" not in html
+    assert "examples/olist/schema.dbml" not in html
+    assert "data/olist" not in html
+
+    assert "restrained guided data-quality console" in design
+    assert "Single-Flow Review Stack" in design
+    assert "Table Readiness" in design
     assert "Local ERD Diagram" in design
     assert "orthogonal elbow paths" in design
     assert "Georgia" not in css
@@ -270,40 +594,226 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     assert "#fffaf0" not in css
 
 
+def test_web_review_surfaces_use_single_flow_layouts():
+    root = Path(__file__).resolve().parents[1]
+    css = (root / "web" / "styles.css").read_text()
+    design = (root / ".interface-design" / "system.md").read_text()
+
+    single_flow_selectors = [
+        ".dashboard-layout",
+        ".quality-gate-grid",
+        ".quality-gate-heading",
+        ".quality-gate-evidence",
+        ".table-impact-grid",
+        ".dashboard-detail-grid",
+        ".table-assessment-detail",
+        ".issue-detail-grid div",
+        ".evidence-value",
+        ".action-plan-metrics",
+        ".issue-fix-todo-grid",
+        ".runner-grid",
+        ".preflight-review-grid",
+        ".preflight-item",
+        ".runtime-panel",
+    ]
+    for selector in single_flow_selectors:
+        assert "grid-template-columns: minmax(0, 1fr);" in _css_block(css, selector)
+
+    assert "max-height:" in _css_block(css, ".issue-review-body")
+    assert "overflow: auto;" in _css_block(css, ".issue-review-body")
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in _css_block(css, ".drilldown-summary")
+    assert "grid-template-columns:" in _css_block(css, ".issue-inbox-row")
+    assert ".dashboard-issue-header,\n.dashboard-issue-row" in css
+    assert "grid-template-columns: minmax(118px, 0.72fr) minmax(160px, 1.1fr)" in css
+    assert "role=\"table\"" in (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    assert "border-top: 1px solid var(--border-subtle);" in css
+    assert ".dashboard-issue-row.priority-p0" in css
+    assert ".dashboard-issue-row.priority-p1" in css
+    assert ".priority-p0 .drilldown-priority-token" in css
+    assert ".drilldown-severity-chip.priority-p0" in css
+    assert "position: absolute;" in _css_block(css, ".dashboard-risk-breakdown")
+    assert ".dashboard-risk-meter[open] .dashboard-risk-breakdown" in css
+    assert ".dashboard-risk-meter:hover .dashboard-risk-breakdown" in css
+    assert ".todo-visual-summary" in css
+    assert ".todo-issue-queue" in css
+    assert ".todo-issue-work-card" in css
+    assert ".todo-issue-work-card.priority-p0" in css
+    assert ".todo-issue-work-card.priority-p1" in css
+    assert ".todo-priority-token" in css
+    assert ".todo-work-counts" in css
+    assert ".todo-more-groups" in css
+    assert ".todo-distribution-row" in css
+    assert ".todo-summary-strip" not in css
+    assert ".todo-group-heading" not in css
+    assert ".todo-occurrence" not in css
+    assert "Avoid primary two-column split layouts for review surfaces" in design
+
+
 def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     root = Path(__file__).resolve().parents[1] / "web"
-    js = (root / "app.js").read_text()
     css = (root / "styles.css").read_text()
+    js = "\n".join(
+        [
+            (root / "app.js").read_text(),
+            (root / "js" / "dashboard-config.js").read_text(),
+            (root / "js" / "workflow-nav-config.js").read_text(),
+        ]
+    )
     assert 'fetch("/api/health"' in js
     assert 'fetch("/api/jobs"' in js
     assert 'fetch("/api/path-jobs"' in js
+    assert 'fetch("/api/history"' in js
     assert 'fetch(`/api/jobs/${jobId}/dashboard`' in js
     assert "new EventSource" in js
     assert "run_events.jsonl" in js
     assert "run_summary.json" in js
+    assert "runtimeStageDescriptions" in js
+    assert "renderRuntimeStage" in js
+    assert "renderRuntimeStageDropdown" in js
+    assert "insertInferredRuntimeStages" in js
+    assert "activeRuntimeStageName" in js
+    assert "followActiveRuntimeStage" in js
+    assert "runtimeAutoFollowStageName" in js
+    assert "Waiting for provider response and guardrail validation." in js
+    assert "runtimeStageStatusClass" in js
+    assert "renderRunHistory" in js
+    assert "sourceStageStatusText" in js
+    assert "compactPreflightStatusText" in js
+    assert "titleCaseStatus" in js
+    assert "renderSidebarNavigation" in js
+    assert "profileStageCompleteForSidebar" in js
+    assert "workflowTargetFromViewport" in js
+    assert "data-workflow-nav-target" in js
+    assert "Quality Gates" in js
+    assert "Issue table" in js
+    assert "Charts and issue table" in js
+    assert "renderIssueVisualSummary" in js
+    assert "renderStage4ReviewBriefing" in js
+    assert "Review briefing" in js
+    assert "Default fix" in js
+    assert "Default verify" in js
+    assert "OpenAI add-on" in js
+    assert "renderIssueFocusMap" in js
+    assert "selectedRunTimeline" in js
+    assert 'return stage?.name === "influence_analysis";' in js
+    assert "LLM output validation" in js
+    assert "LLM text valid" in js
+    assert "Validates LLM text only; data readiness still comes from quality gates." in js
+    assert 'data-generated-details="llm-validation"' in js
+    assert "Why this is not a readiness pass" in js
+    assert "What it does not mean" in js
+    assert "Optional LLM guardrail" not in js
+    assert "data-run-history-job-id" in js
     assert "charts/issue_counts_by_severity.json" in js
     assert "charts/issue_counts_by_type.json" in js
     assert "charts/missingness_by_table.json" in js
+    assert "charts/outliers_top_columns.json" in js
     assert "charts/relationship_fk_health.json" in js
     assert "charts/influence_top_features.json" in js
+    assert "renderOutliersPanel" in js
     assert "lineage_graph.json" in js
     assert "relationship_graph.json" in js
     assert "table_assessments.json" in js
+    assert "issue_action_plans.json" in js
+    assert "issue_llm_enrichments.json" in js
+    assert "issue_todos.json" in js
+    assert "quality_gates.json" in js
+    assert "guardrail_report.json" in js
+    assert "renderQualityGatesSection" in js
+    assert "getQualityGatesArtifact" in js
+    assert "quality_gates.json was not available" in js
     assert "renderTableImpactSection" in js
-    assert "data-graph-node-id" in js
+    assert "tableReadinessEvidence" in js
+    assert "tableColumnEvidenceRows" in js
+    assert "tableScoreBreakdown" in js
+    assert "tableIssueScoreWeights" in js
+    assert "tableRelationshipScoreWeights" in js
+    assert "renderTableRelationshipRisks" in js
+    assert "relatedIssueIdsForTableAssessment" in js
+    assert "relationshipEdgeForRisk" in js
+    assert "Invalid FK risk" in js
+    assert "Score calculation" in js
+    assert "Column readiness evidence" in js
+    assert "renderTodosSection" in js
+    assert "renderReportExportSection" in js
+    assert "renderReportVisualPreview" not in js
+    assert "Report preview" not in js
+    assert "Summary before opening the report" not in js
+    assert "Missing values by table" not in js
+    assert "report-preview" not in css
+    assert "report-fix-row" not in css
+    assert "issueForTodoOccurrence" in js
+    assert "Open optional selected-issue enrichment evidence." not in js
+    assert "data-dashboard-scroll=\"drilldown\"" in js
+    assert "todoIssueWorkItems" in js
+    assert "todoIssuePriorityRows" in js
+    assert "todoUrgencyMeta" in js
+    assert "todoPriorityClass" in js
+    assert "Urgency order" in js
+    assert "Open issue for checklist" in js
+    assert "open issue detail" not in js
+    assert "Copy Fix data Markdown" not in js
+    assert "Copy Verify after fix Markdown" not in js
+    assert "data-todo-export" not in js
+    assert "Reports and issue todo summaries are ready for review." in js
+    assert "Developer artifacts below" not in js
+    assert "getIssueTodosArtifact" in js
+    assert "No todos generated" in js
+    assert "Todo artifact missing" in js
+    assert "getIssueActionPlans" in js
+    assert "renderIssueActionPlan" in js
+    assert "renderActionPlanSteps" in js
+    assert "fix_data_steps" in js
+    assert "verify_after_fix_steps" in js
+    assert "renderIssueLlmEnrichment" in js
+    assert "runIssueLlmEnrichment" in js
+    assert "renderDashboardDrilldownPreservingViewport" in js
+    assert "keepCurrentArtifactsDuringLoad" in js
+    assert "preserveViewportSelector" in js
+    assert "getIssueLlmEnrichment" in js
+    assert "data-issue-llm-provider" not in js
+    assert "data-issue-llm-run" in js
+    assert 'issueLlmProvider: "openai"' in js
+    assert "Need issue-specific reasoning?" not in js
+    assert "Run OpenAI guidance" in js
+    assert "/issue-enrichments" in js
+    assert "Why this was flagged" in js
+    assert "Additional review context" in js
+    assert "OpenAI additions applied" in js
+    assert "OpenAI fix additions" in js
+    assert "OpenAI verify additions" in js
+    assert "Updates Fix / Todo when available" in js
+    assert "issueLlmActionAdditions" in js
+    assert "renderIssueLlmActionAdditions" in js
+    assert "Human review needed" in js
+    assert "Copy Markdown" in js
+    assert "Copy CSV row" in js
+    assert "Copy JSON" in js
+    assert "data-action-plan-export" in js
+    assert "issueActionPlanMarkdown" in js
+    assert "actionPlanMarkdownLlmAdditions" in js
+    assert "actionPlanMarkdownSteps" in js
+    assert "issueActionPlanCsvRow" in js
+    assert "issueActionPlanJson" in js
+    assert "Fix data checklist" in js
+    assert "Verify after fix checklist" in js
+    assert "Evidence facts" not in js
+    assert "Additional evidence" in js
+    assert '"Bad rows",' in js
+    assert '"Affected rate",' in js
+    assert '"Total rows checked",' in js
+    assert '"Parent table",' in js
+    assert "Detection query" in js
+    assert "Recommended work" in js
+    assert "Finding values" not in js
+    assert "Evidence coverage" in js
+    assert "Actionability" in js
+    assert "source=deterministic" in js
+    assert "data-graph-node-id" not in js
     assert "profile_dataset" not in js
     assert "run_quality_checks" not in js
     assert "XMLHttpRequest" not in js
     assert "diagramFrame.src =" not in js
-    assert "window.open" not in js
-    assert "Review chart" in js
-    assert "Likely cause:" in js
-    assert "Suggested fix:" in js
-    assert "Severity filter" in js
-    assert "FK issue means the declared relationship exists" in js
-    assert "data-quality evidence" in js
-    assert ".drilldown-severity-chip.active" in css
-    assert 'target="_blank"' not in js
 
 
 def test_web_ui_path_mode_avoids_browser_directory_permission_api():
@@ -315,17 +825,14 @@ def test_web_ui_path_mode_avoids_browser_directory_permission_api():
     assert "showDirectoryPicker" not in js
 
 
-def test_playwright_dashboard_uses_isolated_configurable_port():
-    config = (Path(__file__).resolve().parents[1] / "playwright.config.js").read_text()
-
-    assert "VSF_E2E_PORT" in config
-    assert "18765" in config
-    assert "--port 8765" not in config
-    assert "127.0.0.1:8765" not in config
-
-
 def test_web_dashboard_uses_artifacts_not_raw_csv_fetches():
-    js = (Path(__file__).resolve().parents[1] / "web" / "app.js").read_text()
+    root = Path(__file__).resolve().parents[1] / "web"
+    js = "\n".join(
+        [
+            (root / "app.js").read_text(),
+            (root / "js" / "source-parsers.js").read_text(),
+        ]
+    )
 
     assert "fetchCsv" not in js
     assert "fetchRawCsv" not in js

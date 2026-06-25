@@ -2,46 +2,52 @@
 
 ## Product
 
-VSF Data Profiler is a local CLI for profiling CSV datasets against a DBML
-schema contract.
+VSF Data Profiler is a local-first guided data-quality profiler for related
+CSV files described by a DBML/schema contract. The product contract is centered
+on a user who wants to understand whether a CSV dataset matches its schema,
+which tables and columns have quality problems, what evidence supports each
+finding, and what cleanup or verification step should happen next.
 
-## v0.2 Local Release Candidate Contract
+DuckDB is an internal execution detail used for bounded local scans. Users
+interact with CSV files, DBML schema files, issue evidence, table/column
+readiness, and deterministic reports.
 
-The CLI accepts:
+The current codebase still contains older advanced capabilities. They remain
+available for compatibility and developer validation, but they are not the main
+product workflow and should not be described as required user surfaces.
 
-- A DBML schema file.
-- A directory of CSV files.
-- Or a Postgres connection URL/environment variable plus selected schema/tables.
-- Or a MySQL/MariaDB connection URL/environment variable plus selected
-  database/tables.
-- An optional YAML business-rules file.
-- An optional target column in `table.column` format.
-- An optional `--use-llm` flag for a guarded Senior Data Scientist narrative.
-- An optional `--llm-provider` value, currently `fake` or `openai`, used only
-  when `--use-llm` is set.
+## Core Product Contract
+
+The supported user workflow is:
+
+1. Provide one DBML schema and a related CSV dataset.
+2. Review CSV-to-table mapping and schema diagnostics.
+3. Run the local profiler.
+4. Review issues by table, column, issue type, severity, sample evidence, and
+   data-quality next step.
+5. Review deterministic action plans, grouped todos, and quality gates.
+6. Open the deterministic HTML/Markdown report and bounded sample evidence.
+
+The core CLI accepts:
+
+- A DBML/schema file.
+- A directory of related CSV files.
 - An output directory.
-- A local-only web runner command, `vsf-profiler web`, with browser upload mode
-  for demo/small-medium runs and local path mode for larger local datasets.
-- A package command, `vsf-profiler package`, that exports an existing output
-  directory for offline review without rerunning profiling.
-- A doctor command, `vsf-profiler doctor`, that reports required and optional
-  local environment readiness without printing secret values.
-- A local benchmark script, `scripts/benchmark_large_dataset.py`, that
-  generates deterministic relational CSV/DBML/rules inputs, runs the existing
-  Python/DuckDB pipeline, and writes benchmark evidence.
+- Optional explicit table-to-CSV mapping overrides when filenames do not match
+  table names.
 
-The CLI produces:
+The primary product evidence includes:
 
 - `profile_summary.json`
 - `issues.json`
-- `influence.json`
 - `schema_parse_report.json`
-- optionally, `connector_metadata.json` when a database connector runs
-- `lineage_graph.json`
 - `schema_evaluation.json`
 - `relationship_graph.json`
 - `dataset_verdict.json`
 - `table_assessments.json`
+- `issue_action_plans.json`
+- `issue_todos.json`
+- `quality_gates.json`
 - `schema_diagram.json`
 - `schema_diagram.dbml`
 - `run.log`
@@ -50,29 +56,62 @@ The CLI produces:
 - JSON chart specs under `charts/`
 - `report.md`
 - `report.html`
-- issue sample CSV files under `samples/`
-- optionally, `l4_report.md` and `guardrail_report.json` when `--use-llm`
-  runs the narrative path. Reports and the local web dashboard surface the
-  guardrail status, provider, fallback reason, and links when those optional
-  artifacts exist.
-- export packages with `index.html`, `export_manifest.json`, copied generated
-  artifacts, bounded sample evidence, an optional zip archive, and optional
-  `analysis_report.pdf` when `vsf-profiler package` is run.
+- bounded issue sample CSV files under `samples/`
 
-The web workspace presents a local data-quality console. It accepts DBML and CSV
-files in the browser, maps uploaded CSV files to DBML tables, shows primary keys
-and foreign keys, renders a local schema diagram preview, keeps a dbdiagram.io
-visualization link as a secondary external action, and can run local
-`127.0.0.1` backend jobs through either browser upload mode or local path mode.
-Both modes run the same Python pipeline as the CLI. Completed web-runner jobs
-are reviewed primarily through an interactive dashboard that fetches generated
-artifact URLs instead of raw CSV files.
+`dataset_verdict.json` remains the artifact name for compatibility. In user
+copy it represents data-quality readiness: readiness label, risk score, top
+blockers, affected tables, and data-quality next steps.
 
-The hosted Vercel deployment is a static preflight surface only. It serves the
-browser-side DBML/CSV mapping and visualization UI, but it does not host the
-Python/DuckDB profiler, database connectors, local path jobs, LLM narrative
-generation, package/PDF export, or dashboard backend. Full browser-driven runs
-require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
+`table_assessments.json` remains the artifact name for compatibility. In user
+copy it represents table readiness: role, health score, readiness, issue
+counts, affected columns, relationship risks, analysis-impact metadata, and
+data-quality next steps.
+
+`quality_gates.json` represents deterministic post-run gate decisions such as
+Can run analysis, Can trust joins, Needs cleanup before sharing, and Outliers
+need review. Gates use the approved status labels Clean, Needs Review, Usable
+With Caution, and Blocked.
+
+`issue_action_plans.json` is the deterministic source of truth for issue-level
+remediation guidance. `issue_todos.json` groups fix and verification work from
+those action plans while preserving table, column, issue, and priority context.
+
+The web runner also exposes a separate Evaluate tool. It uses built-in faulty
+datasets only, writes `ground_truth_issues.json`, `baseline_comparison.json`,
+and `evaluation_summary.json`, and renders unavailable or not-covered baseline
+states explicitly when Great Expectations is not installed. With the
+`evaluation` extra installed, the same comparison runs GE-native checks for
+the supported rule types. Public demo datasets are cached local snapshots under
+`data/evaluation_public/`, currently derived from Plotly `diabetes.csv` and
+`cost_output_defective.csv` with seeded faults and MIT-license attribution.
+
+## Compatibility And Developer Surfaces
+
+These capabilities are implemented and test-covered, but they are not the
+product-facing guided workflow for US-073:
+
+- Optional rules config accepted by the existing CLI/backend.
+- Optional target-based association artifacts such as `influence.json` and
+  `charts/influence_top_features.json`.
+- Local Postgres and MySQL/MariaDB connector modes through the CLI or local web
+  runner.
+- Additive `lineage_graph.json` artifacts and developer graph context.
+- Historical static browser preview deployment for DBML/CSV mapping only.
+- Legacy Olist sample paths that require Kaggle credentials.
+- `vsf-profiler package` export of an existing output directory into an
+  offline package.
+- `vsf-profiler doctor`, `make demo-full`, artifact audit commands, and
+  benchmark commands used for release-candidate validation.
+- Optional guarded LLM summary artifacts. When enabled, `l4_report.md` and
+  `guardrail_report.json` are generated from structured artifacts only.
+- Optional selected-issue LLM enrichment. When a concrete issue is selected,
+  the web runner can append `issue_llm_enrichments.json` without changing
+  deterministic action plans, todos, quality gates, severity, readiness, or
+  evaluation scores.
+
+Compatibility surfaces may remain visible behind developer/debug areas or in
+release validation docs, but they should not be the first-run story or the main
+copy used to explain the product.
 
 ## Required Capabilities
 
@@ -84,180 +123,83 @@ require `vsf-profiler web` or `make web-runner` on `127.0.0.1`.
 - Generate `schema_parse_report.json` with parsed object counts, parser
   diagnostics, warnings, and unsupported constructs so unsupported DBML syntax
   is explicit instead of silently ignored.
-- Parse DBML `Ref:` direction variants `>`, `<`, and `-`, including composite
-  relationship endpoints where declared.
-- Map CSV file stems to DBML table names and detect missing or extra CSV files.
-- Profile selected Postgres or MySQL/MariaDB tables through a connector
-  abstraction without manual CSV export. Connectors support connection URL/env
-  var, selected schema/database and tables, optional DBML, and schema
-  introspection when DBML is absent.
-- Stream connector data through bounded/chunked extraction into
-  DuckDB-readable files, remove raw extracts after the run, and generate
-  `connector_metadata.json` with source type, tables scanned, row-count
-  estimates when available, introspection status, extraction status, warnings,
-  and redaction status.
-- Provide an optional real Postgres acceptance smoke that creates a disposable
-  local schema, runs connector introspection mode and DBML-supplied mode,
-  verifies canonical artifacts and web/dashboard artifact discovery, confirms
-  temporary extract cleanup, and scans outputs for connection URL, password,
-  token, or secret-like leaks. It must skip explicitly when no
-  `VSF_POSTGRES_TEST_URL` or local fixture capability is available.
-- Provide an optional real MySQL/MariaDB acceptance smoke that creates
-  disposable tables in a configured local database, runs connector
-  introspection, verifies canonical artifacts and redaction, confirms temporary
-  extract cleanup, and skips explicitly when no `VSF_MYSQL_TEST_URL` or local
-  fixture capability is available.
-- Redact connection strings, passwords, tokens, API keys, and auth material
-  from runtime logs, events, summaries, reports, dashboard payloads, and errors.
+- Map CSV files to DBML table names by exact file stem first, then conservative
+  schema/header inference when confidence is high and the top candidate is
+  clearly better than alternatives.
+- Support explicit manual table-to-CSV mapping overrides through backend run
+  configuration without renaming columns, mutating data, or weakening schema
+  checks.
+- Detect missing, ambiguous, and extra CSV files with mapping candidate
+  evidence.
 - Profile CSV data with DuckDB without loading entire input files into pandas.
+- Add numeric percentiles (`p25`, `p50`, `p75`, `p95`, `p99`) and default IQR
+  outlier evidence to numeric column profiles using DuckDB SQL.
 - Materialize DuckDB results into pandas only through bounded helpers with
   explicit row and column limits.
-- Generate automatic quality checks from DBML constraints.
-- Run YAML rules for range, accepted values, regex, and expressions.
-- Validate foreign-key relationships with orphan, duplicate parent key, null FK,
-  child duplicate checks for one-to-one relationships, composite FK joins, and
-  join coverage metrics.
-- Save issue evidence, sample rows, probable causes, and suggested fixes.
+- Generate automatic checks from DBML constraints.
+- Validate foreign-key relationships with orphan, duplicate parent key, null
+  FK, child duplicate checks for one-to-one relationships, composite FK joins,
+  and join coverage metrics.
+- Save issue evidence, bounded sample rows, evidence notes, and data-quality
+  next steps.
+- Emit `NUMERIC_OUTLIER` P3 review findings with bounded sample evidence when
+  numeric values fall outside their profiled IQR fence.
 - Generate schema evaluation artifacts with DBML-vs-CSV table/column
-  conformance, PK/FK metadata, and schema issue references.
-- Generate a local lineage graph artifact that connects CSV or connector input
-  sources, DBML or connector-introspected schema entities, tables, columns,
-  relationships, profiler stages, runtime evidence, and generated artifacts.
-  The graph must use existing structured artifacts and redacted connector
-  metadata only, and must not read raw CSV rows.
-- Generate relationship graph artifacts with table nodes, FK edges, declared and
-  observed cardinality, runtime FK metrics, statuses, junction-table detection,
-  and issue/sample evidence links.
-- Generate a deterministic dataset verdict artifact with normalized severity
-  counts, review-risk score, scoring formula metadata, top blockers, affected
-  tables, and recommended next actions.
-- Generate a deterministic per-table assessment artifact with one row per
-  profiled table, including role, review score, scoring formula metadata,
-  readiness, issue counts, affected columns, relationship risks, name-token
-  business impact category, evidence artifact references, and recommended next
-  actions. The review score is a deterministic EDA prioritization heuristic,
-  not a statistical health model.
-- Generate deterministic chart-spec artifacts from aggregate outputs for issue
-  counts, missingness, relationship FK status, dataset risk, and influence top
-  features when available.
-- Generate DBML diagram artifacts, including a stateless dbdiagram.io embed
-  link when the encoded DBML fits safely in a URL.
-- Show CSV-file-to-DBML-table mapping, primary keys, foreign keys, and
-  relationships in the report.
-- Provide a local-first web UI for uploading DBML/CSV files, rendering a local
-  ERD-style DBML diagram with deterministic table layers, compact PK/FK-focused
-  table cards, CSV mapping status, orthogonal relationship edges, fit/expanded
-  controls, and selected table or relationship detail, then linking uploaded
-  CSV files with DBML tables before running profiling.
-- Provide a local-only browser runner with separate upload mode and local path
-  mode. Upload mode handles demo/small-medium DBML, CSV, and optional rules
-  files. Local path mode validates browser-entered DBML, CSV directory, optional
-  rules, and optional target paths without sending CSV bytes through the
-  browser. Both modes must call the existing Python DuckDB pipeline, preserve
-  artifact names, and visualize `run_events.jsonl` and `run_summary.json`
-  rather than infer stage status in JavaScript.
-- Provide an interactive web-runner dashboard after completed jobs. The
-  dashboard must render existing `charts/*.json` and canonical machine
-  artifacts through web-runner artifact URLs, support severity/type/table
-  filters, and show drilldown details with matching issues, affected
-  tables/columns, counts/rates, relevant artifact links, and bounded sample CSV
-  links when available. The runner's Generated results panel previews dataset
-  verdict, issue counts, table impact, runtime summary, and report links from
-  those generated artifacts while preserving raw artifact links. It also
-  switches the DBML diagram panel from browser preflight state to generated
-  `schema_diagram.json`, `relationship_graph.json`, and
-  `schema_parse_report.json` artifact evidence after a run. The diagram
-  renderer remains local-only and presentation-only: it does not add backend
-  routes, rename artifacts, fetch raw CSV rows, or infer new profiler facts. It
-  also renders a dedicated Table Impact section from
-  `table_assessments.json`, including table readiness, review score, role,
-  affected-column count, relationship-risk count, and deterministic
-  business-impact category.
-- Provide interactive lineage and relationship graph views in the web-runner
-  dashboard from `lineage_graph.json` and `relationship_graph.json`. The graph
-  views support table, column, relationship, and runtime/artifact scopes plus
-  node drilldown with metadata, matching issues, and evidence artifact links.
-- Package existing run output directories into self-contained offline analysis
-  packages. Packages must include canonical generated artifacts, chart specs,
-  relationship and lineage graphs, reports, runtime traces, bounded sample
-  evidence, `export_manifest.json` with SHA-256 checksums and source run
-  metadata, and an offline `index.html` entrypoint. Packages may optionally
-  include `analysis_report.pdf` generated from existing report/package
-  artifacts without rerunning profiling. Packages must exclude raw source CSV
-  files and connector temporary extracts, and must fail if the included text
-  artifacts or generated PDF contain unredacted secret-like values.
-- Provide release-candidate operational checks: `vsf-profiler doctor` must
-  check Python, required imports, DuckDB, optional Postgres and MySQL/MariaDB
-  connector readiness, optional PDF backend readiness, optional
-  Node/Playwright, and OpenAI env presence without leaking secrets; `make
-  demo-full` must compose the existing demo, package export, artifact audit,
-  and optional Playwright dashboard E2E; and
-  `scripts/verify_vsf_artifacts.py` must audit canonical artifacts, package
-  contents, raw CSV exclusions, secret-like strings, and deterministic artifact
-  names.
-- Provide large-dataset benchmark guardrails. The benchmark must generate
-  deterministic configurable multi-table relational CSV data, run the existing
-  Python/DuckDB pipeline without a second profiler engine, create charts,
-  reports, package output, and artifact audit evidence, and write
-  `performance_guard_report.json` with total/per-table rows, stage runtime,
-  peak RSS memory when supported, artifact sizes, influence row/feature limits,
-  default Postgres chunk size, package/audit status, and source materialization
-  guard scan results.
-- Run association-based influence analysis for a target column, including an
-  Olist review-score preset, with explicit max analysis rows and max feature
-  columns.
+  conformance, mapping method/confidence/candidate evidence, PK/FK metadata,
+  and schema issue references.
+- Generate relationship graph artifacts with table nodes, FK edges, declared
+  and observed cardinality, runtime FK metrics, statuses, junction-table
+  detection, and issue/sample evidence links.
+- Generate deterministic readiness, table-readiness, and chart-spec artifacts
+  from aggregate outputs.
+- Include a top numeric outlier chart spec in `charts/outliers_top_columns.json`
+  for reports, packages, and local dashboard review.
 - Record runtime execution flow through a human-readable log, ordered JSONL
   events, and a summary with stage timings, issue counts, artifact paths, and
   skipped or failed stage details.
-- Generate deterministic Markdown and HTML reports with a Senior Data Scientist
-  review layout: executive scorecard, visual summaries from chart specs, table
-  impact, issue evidence, relationship/schema/lineage summary, and explicit
-  no-LLM or L4 guardrail state.
-- Link schema parse diagnostics from deterministic Markdown/HTML reports and
-  web-runner artifact lists.
-- Link `lineage_graph.json` from deterministic Markdown/HTML reports and
-  web-runner artifact/dashboard lists.
-- Optionally generate a Senior Data Scientist narrative from existing structured
-  artifacts only, guarded by validation that checks numeric claims,
-  table/column/issue references, unsupported table/business-impact claims, and
-  unsupported causal wording. `guardrail_report.json` records provider, model,
-  status, fallback reason, raw CSV inclusion flag, checked claims, violations,
-  and additive `violation_count` metadata.
-- Support a real OpenAI provider adapter behind the same guarded narrative
-  boundary, configured by `.env` or environment variables, without making
-  external calls in tests.
-- Fall back to deterministic narrative output when `--use-llm` is enabled but
-  provider configuration is missing or guardrails reject provider output.
-- Link to `l4_report.md` and `guardrail_report.json` from the deterministic
-  reports when those optional artifacts exist.
-- Keep the export package `index.html` and optional `analysis_report.pdf`
-  aligned with the same evidence-first review structure without adding raw CSV
-  files or changing generated artifact contracts.
+- Generate deterministic Markdown and HTML data-quality reports with readiness
+  summary, issue evidence, column readiness, table readiness, schema/mapping
+  diagnostics, runtime flow, and developer artifact appendix.
+
+## Optional Capability Requirements
+
+- Database connectors must redact connection strings, passwords, tokens, API
+  keys, and auth material from runtime logs, events, summaries, reports,
+  dashboard payloads, and errors.
+- The local web-runner database source may accept a raw connection URL only
+  through the `127.0.0.1` backend request. Persisted input manifests, job
+  payloads, generated artifacts, reports, and dashboard payloads must expose
+  only redacted connection details or source type summaries.
+- Real Postgres and MySQL/MariaDB smokes must skip explicitly when local test
+  URLs are absent.
+- The local web runner dashboard must consume generated artifacts only; it must
+  not fetch raw CSV files or rerun profiler logic in JavaScript.
+- Export packages must exclude raw source CSV files and connector temporary
+  extracts. Bounded `samples/*.csv` evidence is the only CSV content allowed in
+  packages.
+- LLM guardrails must reject unsupported numeric claims, references,
+  analysis-impact claims, and causal wording. No raw CSV rows or unbounded
+  samples may enter the LLM path.
+- Tests must not make real LLM API calls.
 
 ## Non-Goals
 
-- No hosted Python/DuckDB backend job runner in the v0.2 local RC.
-- No large company-data upload mode in the browser runner; use local path mode
-  or the CLI for larger local datasets.
-- No Kafka, Spark, realtime processing, or production database monitoring.
-- No database connectors beyond Postgres and MySQL/MariaDB in the v0.2 local
-  RC.
+- No hosted Python/DuckDB backend job runner.
+- No requirement to use database connectors, package export, PDF export,
+  benchmark commands, developer graph views, static deployment, or Olist for
+  the core product workflow.
+- No Spark, Kafka, realtime processing, or production database monitoring.
 - No production database mutations.
-- No external enterprise lineage catalog publishing or hosted metadata service.
+- No external lineage catalog publishing or hosted metadata service.
 - No automatic data repair.
 - No causal-inference claims.
-- No raw CSV rows or unbounded samples sent through the LLM narrative path.
-- No browser dashboard reads of raw CSV files after a run; the dashboard
-  consumes generated artifacts only.
-- No export package inclusion of raw source CSV files or connector temporary
-  extracts; bounded `samples/*.csv` evidence is the only CSV content allowed in
-  packages.
-- No real LLM API calls in tests.
+- No raw CSV rows or unbounded samples sent through the LLM path.
 
 ## Demo Contract
 
-`make demo-small` must run without internet and create a synthetic dataset with
-known data defects. The resulting `issues.json` must include:
+`make demo-small` must run without internet and create a synthetic relational
+CSV plus DBML dataset with known data defects. The resulting `issues.json` must
+include:
 
 - `DUPLICATE_PRIMARY_KEY`
 - `ORPHAN_FOREIGN_KEY`
@@ -267,11 +209,11 @@ known data defects. The resulting `issues.json` must include:
 - `REQUIRED_FIELD_NULL`
 
 Olist support is optional at runtime because it depends on Kaggle credentials,
-but the CLI must provide clear download and run commands.
+but the CLI may retain clear download and run commands for compatibility.
 
-`make demo-full` must run the local release-candidate path: doctor checks,
-`make demo-small`, package export with zip and PDF, final artifact audit,
-optional Playwright dashboard E2E when installed, and key output path printing.
+`make demo-full` is a developer validation path: doctor checks, `make
+demo-small`, package export with zip and PDF, final artifact audit, optional
+Playwright dashboard E2E when installed, and key output path printing.
 
 `make benchmark-small` must run a CI-safe benchmark. `make benchmark-large`
 must run an optional larger local benchmark. Both write
