@@ -4,12 +4,13 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from vsf_profiler.cli import app
-from vsf_profiler.demo_data import create_small_demo
+from vsf_profiler.demo_data import create_small_corrected_demo, create_small_demo
 from vsf_profiler.models import CatalogTable, ColumnSchema, CsvCatalog, Schema, TableSchema
 from vsf_profiler import web_runner
 from vsf_profiler.action_plans import build_issue_action_plans
@@ -38,6 +39,7 @@ REQUIRED_ARTIFACTS = {
     "issue_action_plans.json",
     "issue_todos.json",
     "quality_gates.json",
+    "remediation_plan.json",
     "run_events.jsonl",
     "run_summary.json",
     "report.html",
@@ -85,6 +87,7 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     assert (job.out_dir / "issue_action_plans.json").exists()
     assert (job.out_dir / "issue_todos.json").exists()
     assert (job.out_dir / "quality_gates.json").exists()
+    assert (job.out_dir / "remediation_plan.json").exists()
     assert (job.out_dir / "charts" / "issue_counts_by_type.json").exists()
     assert (job.out_dir / "run_events.jsonl").exists()
     assert (job.out_dir / "run_summary.json").exists()
@@ -134,6 +137,11 @@ def test_web_runner_upload_job_writes_canonical_artifacts(tmp_path):
     assert gates["can_trust_joins"]["status"] == "Blocked"
     assert gates["needs_cleanup_before_sharing"]["recommended_next_action"]["target"] == "Todos"
     assert gates["outliers_need_review"]["status"] == "Clean"
+    remediation_plan = json.loads((job.out_dir / "remediation_plan.json").read_text())
+    assert remediation_plan["artifact"] == "remediation_plan"
+    assert remediation_plan["policy"]["source_data_mutation"] == "never"
+    assert remediation_plan["policy"]["llm_may_mutate_data"] is False
+    assert remediation_plan["summary"]["auto_applicable_count"] > 0
 
 
 def test_web_runner_path_job_writes_canonical_artifacts_without_csv_upload(tmp_path):
@@ -158,6 +166,173 @@ def test_web_runner_path_job_writes_canonical_artifacts_without_csv_upload(tmp_p
     assert payload["input_mode"] == "path"
     artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
     assert REQUIRED_ARTIFACTS.issubset(artifact_paths)
+
+
+def test_web_runner_remediation_recheck_uses_staged_copy_only(tmp_path):
+    data_dir = create_small_demo(tmp_path / "data" / "demo_small")
+    source_csv_dir = data_dir / "csv"
+    source_csv_before = {path.name: path.read_bytes() for path in sorted(source_csv_dir.glob("*.csv"))}
+    store = WebRunStore(run_root=tmp_path / "web_runs")
+
+    source_job = store.start_path_job(
+        dbml_path=data_dir / "schema.dbml",
+        csv_dir=source_csv_dir,
+        rules_path=data_dir / "rules.yaml",
+        target="order_reviews.review_score",
+    )
+    wait_for_job(source_job)
+    assert source_job.status == "succeeded"
+
+    plan = json.loads((source_job.out_dir / "remediation_plan.json").read_text())
+    approved_ids = [
+        action["remediation_id"]
+        for action in plan["actions"]
+        if action["deterministic_operation"]["supported"]
+    ]
+    assert approved_ids
+
+    remediation_job = store.start_remediation_job(
+        source_job,
+        approved_remediation_ids=approved_ids,
+    )
+    wait_for_job(remediation_job)
+
+    assert remediation_job.status == "succeeded"
+    assert remediation_job.input_mode == "remediation"
+    assert remediation_job.remediation_source_job_id == source_job.job_id
+    assert {path.name: path.read_bytes() for path in sorted(source_csv_dir.glob("*.csv"))} == source_csv_before
+
+    approved = json.loads((remediation_job.out_dir / "approved_remediations.json").read_text())
+    assert approved["artifact"] == "approved_remediations"
+    assert approved["policy"]["source_data_mutation"] == "never"
+    assert approved["summary"]["approved_count"] == len(approved_ids)
+    assert approved["summary"]["matched_action_count"] == len(approved_ids)
+    assert approved["summary"]["affected_count"] > 0
+
+    diff = json.loads((remediation_job.out_dir / "before_after_quality_diff.json").read_text())
+    assert diff["before_job_id"] == source_job.job_id
+    assert diff["after_job_id"] == remediation_job.job_id
+    assert diff["summary"]["before_issue_count"] > diff["summary"]["after_issue_count"]
+    assert diff["summary"]["resolved_issue_count"] > 0
+
+    remediation_summary = json.loads((remediation_job.out_dir / "remediation_run_summary.json").read_text())
+    assert remediation_summary["source_data_mutation"] is False
+    assert remediation_summary["application_target"] == "staged_copy_only"
+    assert remediation_summary["approved_summary"]["affected_count"] == approved["summary"]["affected_count"]
+
+    payload = store.job_payload(remediation_job)
+    assert payload["remediation"] == {"source_job_id": source_job.job_id}
+    artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
+    assert {
+        "approved_remediations.json",
+        "before_after_quality_diff.json",
+        "remediation_run_summary.json",
+        "remediation_plan.json",
+    }.issubset(artifact_paths)
+
+
+def test_web_runner_manual_recheck_uses_corrected_copy_and_diff(tmp_path):
+    data_dir = create_small_demo(tmp_path / "data" / "demo_small")
+    corrected_dir = create_small_corrected_demo(tmp_path / "data" / "demo_small_corrected")
+    source_csv_dir = data_dir / "csv"
+    source_csv_before = {path.name: path.read_bytes() for path in sorted(source_csv_dir.glob("*.csv"))}
+    store = WebRunStore(run_root=tmp_path / "web_runs")
+
+    source_job = store.start_path_job(
+        dbml_path=data_dir / "schema.dbml",
+        csv_dir=source_csv_dir,
+        rules_path=data_dir / "rules.yaml",
+        target="order_reviews.review_score",
+    )
+    wait_for_job(source_job)
+    assert source_job.status == "succeeded"
+
+    recheck_job = store.start_manual_recheck_path_job(
+        source_job,
+        dbml_path=corrected_dir / "schema.dbml",
+        csv_dir=corrected_dir / "csv",
+        target="order_reviews.review_score",
+        source_label="demo_corrected_path",
+    )
+    wait_for_job(recheck_job)
+
+    assert recheck_job.status == "succeeded"
+    assert recheck_job.input_mode == "manual_recheck"
+    assert recheck_job.remediation_source_job_id == source_job.job_id
+    assert {path.name: path.read_bytes() for path in sorted(source_csv_dir.glob("*.csv"))} == source_csv_before
+
+    manifest = json.loads((recheck_job.input_dir / "manual_recheck_inputs.json").read_text())
+    assert manifest["source_data_mutation"] is False
+    assert manifest["application_target"] == "corrected_path_copy"
+    assert Path(manifest["staged_csv_dir"]).is_dir()
+    assert Path(manifest["staged_csv_dir"]) != (corrected_dir / "csv").resolve()
+    assert manifest["baseline_rules_reused"] is True
+    assert Path(manifest["staged_rules_path"]).read_text() == (data_dir / "rules.yaml").read_text()
+
+    diff = json.loads((recheck_job.out_dir / "before_after_quality_diff.json").read_text())
+    assert diff["before_job_id"] == source_job.job_id
+    assert diff["after_job_id"] == recheck_job.job_id
+    assert diff["summary"]["before_issue_count"] > diff["summary"]["after_issue_count"]
+    assert diff["summary"]["resolved_issue_count"] > 0
+
+    recheck_summary = json.loads((recheck_job.out_dir / "remediation_run_summary.json").read_text())
+    assert recheck_summary["source"] == "demo_corrected_path"
+    assert recheck_summary["source_data_mutation"] is False
+    assert recheck_summary["application_target"] == "corrected_path_copy"
+    assert recheck_summary["manual_recheck_summary"]["corrected_inputs_supplied"] is True
+    assert recheck_summary["quality_diff_summary"] == diff["summary"]
+
+    payload = store.job_payload(recheck_job)
+    assert payload["input_mode"] == "manual_recheck"
+    assert payload["remediation"] == {"source_job_id": source_job.job_id}
+    artifact_paths = {artifact["path"] for artifact in payload["artifacts"]}
+    assert {
+        "before_after_quality_diff.json",
+        "remediation_run_summary.json",
+        "remediation_plan.json",
+    }.issubset(artifact_paths)
+
+    restarted_store = WebRunStore(run_root=tmp_path / "web_runs")
+    restarted_job = restarted_store.get_job(recheck_job.job_id)
+    assert restarted_job is not None
+    assert restarted_job.input_mode == "manual_recheck"
+    assert restarted_job.remediation_source_job_id == source_job.job_id
+
+
+def test_web_runner_manual_csv_upload_reuses_baseline_dbml_and_rules(tmp_path):
+    data_dir = create_small_demo(tmp_path / "data" / "demo_small")
+    corrected_dir = create_small_corrected_demo(tmp_path / "data" / "demo_small_corrected")
+    store = WebRunStore(run_root=tmp_path / "web_runs")
+
+    source_job = store.start_path_job(
+        dbml_path=data_dir / "schema.dbml",
+        csv_dir=data_dir / "csv",
+        rules_path=data_dir / "rules.yaml",
+        target="order_reviews.review_score",
+    )
+    wait_for_job(source_job)
+    assert source_job.status == "succeeded"
+
+    recheck_job = store.start_manual_recheck_job(
+        source_job,
+        dbml=None,
+        csv_files=[
+            UploadedFile(filename=path.name, content=path.read_bytes())
+            for path in sorted((corrected_dir / "csv").glob("*.csv"))
+        ],
+    )
+    wait_for_job(recheck_job)
+
+    assert recheck_job.status == "succeeded"
+    manifest = json.loads((recheck_job.input_dir / "manual_recheck_inputs.json").read_text())
+    assert manifest["baseline_dbml_reused"] is True
+    assert manifest["baseline_rules_reused"] is True
+    assert Path(manifest["staged_dbml_path"]).read_text() == (data_dir / "schema.dbml").read_text()
+    assert Path(manifest["staged_rules_path"]).read_text() == (data_dir / "rules.yaml").read_text()
+
+    diff = json.loads((recheck_job.out_dir / "before_after_quality_diff.json").read_text())
+    assert diff["summary"]["before_issue_count"] > diff["summary"]["after_issue_count"]
+    assert diff["summary"]["resolved_issue_count"] > 0
 
 
 def test_web_runner_evaluation_job_uses_built_in_dataset_catalog(tmp_path, monkeypatch):

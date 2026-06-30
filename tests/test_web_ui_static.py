@@ -40,18 +40,25 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="profileStepBack"',
         'id="profileStepNext"',
         'id="profileStepHint"',
+        'class="topbar-status-grid"',
+        'class="flow-command-strip"',
         "Add source",
         "Inspect results",
         'data-profile-step-card="connect"',
         'data-profile-step-card="preflight"',
         'data-profile-step-card="run"',
         'data-profile-step-card="review"',
+        'data-profile-step-card="fix"',
         'data-profile-step-section="connect"',
         'data-profile-step-section="preflight"',
         'data-profile-step-section="run"',
         'data-profile-step-section="review"',
+        'data-profile-step-section="fix"',
         "Profile my data",
         "Evaluate tool",
+        "Profile CSV+DBML data, review evidence, and recheck copy-only fixes.",
+        "Connect -> Run -> Review -> Fix",
+        "Never on source files",
         "Built-in faulty dataset comparison",
         'id="evaluateStatusBadge"',
         'id="evaluationCatalogCount"',
@@ -137,13 +144,18 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="runSourceCsvCount"',
         'id="runSourceCsvList"',
         "Selected source",
+        'id="runtimeRecheckComparison"',
         'id="stageList"',
         'id="artifactList"',
         'id="runHistory"',
+        'id="runHistoryTitle"',
         'id="runHistoryList"',
         'id="runHistoryStatus"',
+        'id="refreshRunHistoryButton"',
         'id="selectedRunTimeline"',
         'id="selectedRunTimelineStatus"',
+        "History remediation",
+        "Open a prior run",
         'id="dashboard"',
         'id="dashboardPanelGrid"',
         'aria-label="Review Issues visual charts and issue table"',
@@ -154,10 +166,21 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         'id="qualityGatesStatus"',
         'id="qualityGatesGrid"',
         "Quality Gates",
+        'id="remediation"',
+        'id="remediationStatus"',
+        'id="remediationGrid"',
+        'id="remediationMessage"',
+        "Remediation + Recheck",
+        'id="manualRecheck"',
+        'id="manualRecheckForm"',
+        'id="manualRecheckDbmlInput"',
+        'id="manualRecheckCsvInput"',
+        'id="manualRecheckDemoButton"',
+        "Upload corrected inputs",
+        "Run corrected demo",
         'id="reportExport"',
         'id="reportExportStatus"',
         'id="reportExportGrid"',
-        'id="reportExportTodos"',
         'id="reportExportMessage"',
         "Report / Export",
         'id="tableImpact"',
@@ -188,8 +211,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     ]
     for marker in required_html:
         assert marker in html
-    assert "Previous runs" not in html
-    assert "Run History" not in html
+    assert "Fix &amp; Recheck" in html
     assert "Select prior run and timeline" not in js
     assert "Issue review snapshot" not in html
     assert "Issue review snapshot" in js
@@ -197,6 +219,11 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     assert "Current DBML + CSV source" not in html
     assert "Upload DBML contract" not in html
     assert "Upload related CSV files" not in html
+    assert "manualRecheckRulesInput" not in html
+    assert "manualRecheckRulesInput" not in js
+    assert "Rules file" not in html
+    assert "rulesPath" not in js
+    assert "payload.rules_path" not in js
 
     forbidden_html = [
         'id="databaseRunnerForm"',
@@ -258,7 +285,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "--accent",
         "--focus-ring",
         ".flow-chooser",
+        ".flow-command-strip",
         ".flow-card",
+        ".topbar-status-grid",
         ".profile-flow",
         ".profile-step-strip",
         ".status-card-copy",
@@ -267,6 +296,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".profile-step-actions",
         ".source-state-panel",
         ".source-state-grid",
+        ".panel-actions",
         ".evaluate-flow-surface",
         ".evaluation-dataset-card",
         ".evaluation-summary-strip",
@@ -312,6 +342,9 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".stage-info-icon",
         ".stage-info-tooltip",
         ".runtime-stage-item.active",
+        ".runtime-recheck-card",
+        ".runtime-recheck-metrics",
+        ".run-history-item.unavailable",
         ".llm-toggle-button.locked",
         ".stage-dropdown",
         ".stage-detail-grid",
@@ -330,6 +363,17 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".todo-queue-open-label",
         ".todo-more-groups",
         ".todo-compact-row",
+        ".manual-recheck-section",
+        ".manual-recheck-grid",
+        ".manual-recheck-form",
+        ".manual-recheck-policy",
+        ".manual-recheck-actions",
+        ".remediation-section",
+        ".remediation-grid",
+        ".remediation-summary-card",
+        ".remediation-apply-control",
+        ".remediation-diff-card",
+        ".remediation-action-row",
         ".quality-gates-section",
         ".quality-gate-card",
         ".quality-gate-evidence-value",
@@ -347,7 +391,6 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         ".review-briefing-card",
         ".review-data-map",
         ".review-table-map-card",
-        ".review-fix-lane",
         ".issue-visual-chart",
         ".issue-visual-row.selected",
         ".severity-priority-panel",
@@ -378,7 +421,7 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
     for marker in required_css_tokens:
         assert marker in css
 
-    assert "grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));" in _css_block(css, ".profile-step-strip")
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in _css_block(css, ".profile-step-strip")
 
     required_js = [
         "parseDbml",
@@ -393,8 +436,10 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "canOpenProfileStep",
         "data-profile-step-section",
         "profileStepLabels",
+        '"fix"',
         "profileFlowButton",
         "evaluateFlowButton",
+        "Locked",
         "evaluationCatalog",
         "loadEvaluationCatalog",
         "startEvaluationRun",
@@ -423,6 +468,8 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "manualMappings",
         "preflightAcceptedWarnings",
         "demoPresets",
+        "smallCorrected",
+        "data/demo_small_corrected/schema.dbml",
         "runnerUiDemoPresets",
         "quickDemo",
         "mappingOverridesForRun",
@@ -450,6 +497,28 @@ def test_web_ui_contains_upload_mapping_and_visualization_regions():
         "renderGeneratedL4Preview",
         "renderGeneratedIssueLlmPreview",
         "renderGeneratedReportLinks",
+        "renderRuntimeRecheckComparison",
+        "renderRuntimeRecheckMetric",
+        "runCanRemediate",
+        "hasRemediableHistoryRun",
+        "refreshRunHistoryButton",
+        "Fix & Recheck",
+        "renderRemediationSection",
+        "renderRemediationActionQueue",
+        "renderRemediationDiff",
+        "deterministicRemediationEligibility",
+        "remediationApplyButtonLabel",
+        "generateRemediationPlan",
+        "startRemediationRecheck",
+        "renderManualRecheckSection",
+        "startManualUploadRecheck",
+        "startCorrectedDemoRecheck",
+        "/remediation-plan",
+        "/remediation-runs",
+        "/manual-recheck-runs",
+        "remediation_plan.json",
+        "approved_remediations.json",
+        "before_after_quality_diff.json",
         "renderReportExportSection",
         "renderReportExportLinks",
         "renderReportIssueLlmAction",
@@ -690,9 +759,10 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "renderIssueVisualSummary" in js
     assert "renderStage4ReviewBriefing" in js
     assert "Review briefing" in js
-    assert "Default fix" in js
-    assert "Default verify" in js
-    assert "OpenAI add-on" in js
+    assert "What to inspect and escalate" in js
+    assert "Default fix" not in js
+    assert "Default verify" not in js
+    assert "review-fix-lane" not in js
     assert "renderIssueFocusMap" in js
     assert "selectedRunTimeline" in js
     assert 'return stage?.name === "influence_analysis";' in js
@@ -755,7 +825,9 @@ def test_web_ui_uses_local_backend_runner_without_js_profiler_port():
     assert "Copy Fix data Markdown" not in js
     assert "Copy Verify after fix Markdown" not in js
     assert "data-todo-export" not in js
-    assert "Reports and issue todo summaries are ready for review." in js
+    assert "Reports are ready for review." in js
+    assert "reportExportTodos" not in js
+    assert "report-export-todo" not in css
     assert "Developer artifacts below" not in js
     assert "getIssueTodosArtifact" in js
     assert "No todos generated" in js

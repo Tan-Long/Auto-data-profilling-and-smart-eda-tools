@@ -614,12 +614,9 @@ test("local path run renders the interactive dashboard from generated artifacts"
   const dashboard = page.locator("#dashboardPanelGrid");
   await expect(dashboard).toContainText("Issue table");
   await expect(dashboard).toContainText("Review briefing");
-  await expect(dashboard).toContainText("Default fix");
-  await expect(dashboard).toContainText("Default verify");
-  await expect(dashboard).toContainText("OpenAI add-on");
+  await expect(dashboard).toContainText("What to inspect and escalate");
   await expect(dashboard.locator(".review-briefing")).toBeVisible();
   await expect(dashboard.locator(".review-table-map-card").first()).toBeVisible();
-  await expect(dashboard.locator(".review-fix-lane")).toContainText("Default fix");
   await expect(dashboard.locator(".issue-review-table")).toBeVisible();
   await expect(dashboard.locator(".issue-review-header")).toContainText("Affected");
   await expect(dashboard.locator(".issue-row-meter").first()).toBeVisible();

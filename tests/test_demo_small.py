@@ -41,6 +41,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert (out_dir / "issue_action_plans.json").exists()
     assert (out_dir / "issue_todos.json").exists()
     assert (out_dir / "quality_gates.json").exists()
+    assert (out_dir / "remediation_plan.json").exists()
     assert (out_dir / "charts").is_dir()
     assert (out_dir / "schema_diagram.dbml").exists()
     assert (out_dir / "schema_diagram.json").exists()
@@ -61,6 +62,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     issue_action_plans = json.loads((out_dir / "issue_action_plans.json").read_text())
     issue_todos = json.loads((out_dir / "issue_todos.json").read_text())
     quality_gates = json.loads((out_dir / "quality_gates.json").read_text())
+    remediation_plan = json.loads((out_dir / "remediation_plan.json").read_text())
     profile_summary = json.loads((out_dir / "profile_summary.json").read_text())
     chart_specs = {
         path.name: json.loads(path.read_text())
@@ -123,6 +125,8 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     verify_todo_group_count = sum(
         1 for group in issue_todos["groups"] if group["todo_type"] == "verify_after_fix"
     )
+    assert fix_todo_group_count == issue_todos["summary"]["fix_data_group_count"]
+    assert verify_todo_group_count == issue_todos["summary"]["verify_after_fix_group_count"]
     assert quality_gates["artifact"] == "quality_gates"
     assert quality_gates["source"] == "deterministic"
     assert set(quality_gates["derived_from"]) == {
@@ -144,6 +148,10 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
     assert gates["Can trust joins"]["status"] == "Blocked"
     assert gates["Needs cleanup before sharing"]["recommended_next_action"]["target"] == "Todos"
     assert all(gate["evidence_values"] for gate in quality_gates["gates"])
+    assert remediation_plan["artifact"] == "remediation_plan"
+    assert remediation_plan["summary"]["action_count"] == len(issues)
+    assert remediation_plan["summary"]["auto_applicable_count"] > 0
+    assert remediation_plan["policy"]["application_target"] == "staged_copy_only"
     assert list(chart_specs) == [
         "dataset_verdict_risk_summary.json",
         "influence_top_features.json",
@@ -268,6 +276,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "quality_gates.json",
         "issue_action_plans.json",
         "issue_todos.json",
+        "remediation_plan.json",
         "run_summary.json",
     ]:
         assert artifact_name in report_md
@@ -317,6 +326,7 @@ def test_demo_small_pipeline_writes_required_outputs(tmp_path):
         "issue_action_plans",
         "issue_todos",
         "quality_gates",
+        "remediation_plan",
         "charts_dir",
         "chart_dataset_verdict_risk_summary",
         "chart_influence_top_features",

@@ -25,7 +25,7 @@ from vsf_profiler.connectors import (
 from vsf_profiler.csv_catalog import build_catalog, load_mapping_overrides
 from vsf_profiler.dataset_verdict import build_dataset_verdict
 from vsf_profiler.dbml_parser import parse_dbml_with_report
-from vsf_profiler.demo_data import create_small_demo, download_olist
+from vsf_profiler.demo_data import create_small_corrected_demo, create_small_demo, download_olist
 from vsf_profiler.doctor import (
     build_doctor_report,
     format_doctor_report,
@@ -58,6 +58,7 @@ from vsf_profiler.quality_gates import build_quality_gates
 from vsf_profiler.quality_rules import run_quality_checks
 from vsf_profiler.relationship_checker import run_relationship_checks
 from vsf_profiler.relationship_graph import build_relationship_graph
+from vsf_profiler.remediation import build_remediation_plan
 from vsf_profiler.report_generator import generate_reports
 from vsf_profiler.runtime import RuntimeRecorder
 from vsf_profiler.schema_diagram import build_schema_diagram
@@ -217,6 +218,15 @@ def demo_create_small(
     """Create a small local demo dataset with known injected defects."""
     root = create_small_demo(out)
     typer.echo(f"Created small demo dataset: {root}")
+
+
+@demo_app.command("create-small-corrected")
+def demo_create_small_corrected(
+    out: Path = typer.Option(Path("data/demo_small_corrected"), "--out", help="Output directory."),
+) -> None:
+    """Create the corrected companion dataset used for Stage 5 recheck demos."""
+    root = create_small_corrected_demo(out)
+    typer.echo(f"Created corrected small demo dataset: {root}")
 
 
 @demo_app.command("download-olist")
@@ -551,6 +561,13 @@ def run_pipeline(
                 issue_todos=issue_todos,
                 dataset_verdict=dataset_verdict,
             )
+            remediation_plan = build_remediation_plan(
+                issues=issues_payload,
+                issue_action_plans=issue_action_plans,
+                schema_evaluation=schema_evaluation,
+                runtime_inputs=runtime_inputs,
+                rules_path=rules_path,
+            )
             chart_specs = build_chart_specs(
                 profile_summary=profile_summary_payload,
                 issues=issues_payload,
@@ -642,6 +659,12 @@ def run_pipeline(
                 runtime=runtime,
                 key="quality_gates",
             )
+            _write_json(
+                out_dir / "remediation_plan.json",
+                remediation_plan,
+                runtime=runtime,
+                key="remediation_plan",
+            )
             _write_chart_specs(out_dir / "charts", chart_specs, runtime=runtime)
             runtime.set_issue_counts(issue_catalog.issues)
             stage.add_detail("artifact_count", len(runtime.report_context()["artifact_paths"]))
@@ -661,6 +684,10 @@ def run_pipeline(
             stage.add_detail(
                 "quality_gate_blocked_count",
                 quality_gates["summary"]["blocked_count"],
+            )
+            stage.add_detail(
+                "remediation_supported_action_count",
+                remediation_plan["summary"]["auto_applicable_count"],
             )
 
         l4_report_path: Path | None = None

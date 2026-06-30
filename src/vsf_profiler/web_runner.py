@@ -4,6 +4,7 @@ import json
 import mimetypes
 import re
 import secrets
+import shutil
 import threading
 import time
 from collections import Counter
@@ -39,6 +40,7 @@ MAX_PATH_JOB_BYTES = 16 * 1024
 MAX_DATABASE_JOB_BYTES = 16 * 1024
 MAX_EVALUATION_JOB_BYTES = 4 * 1024
 MAX_ISSUE_ENRICHMENT_BYTES = 4 * 1024
+MAX_REMEDIATION_BYTES = 16 * 1024
 MAX_PREFLIGHT_REVIEW_BYTES = 64 * 1024
 TARGET_PATTERN = re.compile(r"^[A-Za-z_][\w]*\.[A-Za-z_][\w]*$")
 ALLOWED_LLM_PROVIDERS = {"fake", "openai"}
@@ -71,12 +73,20 @@ ARTIFACT_LABELS = {
     "ground_truth_issues.json": "Evaluation ground truth",
     "baseline_comparison.json": "Great Expectations baseline comparison",
     "evaluation_summary.json": "Evaluation summary",
+    "remediation_plan.json": "Remediation plan",
+    "approved_remediations.json": "Approved remediations",
+    "remediation_run_summary.json": "Remediation run summary",
+    "before_after_quality_diff.json": "Before/after quality diff",
 }
 OPTIONAL_DASHBOARD_ARTIFACTS = [
     "connector_metadata.json",
     "l4_report.md",
     "guardrail_report.json",
     "issue_llm_enrichments.json",
+    "remediation_plan.json",
+    "approved_remediations.json",
+    "remediation_run_summary.json",
+    "before_after_quality_diff.json",
 ]
 DASHBOARD_REQUIRED_ARTIFACTS = [
     "issues.json",
@@ -115,6 +125,7 @@ class WebRunJob:
     input_mode: str = "upload"
     database_source_type: str | None = None
     evaluation_dataset_id: str | None = None
+    remediation_source_job_id: str | None = None
     use_llm: bool = False
     use_issue_llm: bool = False
     llm_provider: str | None = None
@@ -494,6 +505,389 @@ class WebRunStore:
             "dashboard": self.dashboard_payload(job),
         }
 
+    def remediation_plan(self, job: WebRunJob) -> dict[str, Any]:
+        from vsf_profiler.remediation import (
+            REMEDIATION_PLAN_FILENAME,
+            build_remediation_plan_from_artifacts,
+        )
+
+        if _normalized_web_status(job.status) not in {"succeeded", "unknown"}:
+            raise ValueError("Remediation plan requires a completed run.")
+        plan_path = job.out_dir / REMEDIATION_PLAN_FILENAME
+        plan = _read_json_if_exists(plan_path)
+        if plan is None:
+            plan = build_remediation_plan_from_artifacts(job.out_dir)
+        return {
+            "job_id": job.job_id,
+            "artifact_path": REMEDIATION_PLAN_FILENAME,
+            "artifact_url": f"/api/jobs/{job.job_id}/artifacts/{REMEDIATION_PLAN_FILENAME}",
+            "plan": plan,
+            "artifacts": self.artifact_payload(job),
+            "dashboard": self.dashboard_payload(job),
+        }
+
+    def start_remediation_job(
+        self,
+        source_job: WebRunJob,
+        *,
+        approved_remediation_ids: list[str],
+    ) -> WebRunJob:
+        from vsf_profiler.remediation import (
+            APPROVED_REMEDIATIONS_FILENAME,
+            REMEDIATION_PLAN_FILENAME,
+            apply_remediation_actions_to_csv_dir,
+            build_remediation_plan_from_artifacts,
+            copy_csv_inputs_for_remediation,
+        )
+
+        if _normalized_web_status(source_job.status) not in {"succeeded", "unknown"}:
+            raise ValueError("Remediation recheck requires a completed source run.")
+        if source_job.input_mode not in {"upload", "path", "remediation"}:
+            raise ValueError("Remediation recheck is only available for CSV + DBML runs.")
+
+        source_paths = _source_paths_for_remediation(source_job)
+        if not approved_remediation_ids:
+            raise ValueError("At least one approved remediation id is required.")
+
+        source_plan_path = source_job.out_dir / REMEDIATION_PLAN_FILENAME
+        plan = _read_json_if_exists(source_plan_path)
+        if plan is None:
+            plan = build_remediation_plan_from_artifacts(source_job.out_dir)
+        action_ids = {
+            str(action.get("remediation_id"))
+            for action in plan.get("actions", [])
+            if isinstance(action, dict)
+        }
+        unknown_ids = sorted(set(approved_remediation_ids) - action_ids)
+        if unknown_ids:
+            raise ValueError(f"Unknown remediation id(s): {', '.join(unknown_ids)}")
+
+        job_id = _new_job_id()
+        root_dir = self.run_root / job_id
+        input_dir = root_dir / "input"
+        out_dir = root_dir / "artifacts"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        copied = copy_csv_inputs_for_remediation(
+            source_dbml_path=source_paths["dbml_path"],
+            source_csv_dir=source_paths["csv_dir"],
+            source_rules_path=source_paths["rules_path"],
+            input_dir=input_dir,
+        )
+        staged_dbml_path = copied["dbml_path"]
+        staged_csv_dir = copied["csv_dir"]
+        staged_rules_path = copied["rules_path"]
+        if not isinstance(staged_dbml_path, Path) or not isinstance(staged_csv_dir, Path):
+            raise ValueError("Unable to stage remediation input copy.")
+
+        shutil.copy2(source_plan_path, out_dir / REMEDIATION_PLAN_FILENAME)
+        approved_artifact = apply_remediation_actions_to_csv_dir(
+            remediation_plan=plan,
+            csv_dir=staged_csv_dir,
+            approved_remediation_ids=approved_remediation_ids,
+        )
+        (out_dir / APPROVED_REMEDIATIONS_FILENAME).write_text(
+            json.dumps(approved_artifact, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        manifest = {
+            "input_mode": "remediation",
+            "source_job_id": source_job.job_id,
+            "source_artifacts_dir": str(source_job.out_dir),
+            "source_data_mutation": False,
+            "application_target": "staged_copy_only",
+            "original_dbml_path": str(source_paths["dbml_path"]),
+            "original_csv_dir": str(source_paths["csv_dir"]),
+            "original_rules_path": str(source_paths["rules_path"]) if source_paths["rules_path"] else None,
+            "staged_dbml_path": str(staged_dbml_path),
+            "staged_csv_dir": str(staged_csv_dir),
+            "staged_rules_path": str(staged_rules_path) if staged_rules_path else None,
+            "target": source_paths["target"],
+            "mapping_overrides": source_paths["mapping_overrides"],
+            "approved_remediation_ids": approved_remediation_ids,
+            "use_llm": False,
+            "use_issue_llm": False,
+            "llm_provider": None,
+        }
+        (input_dir / "remediation_inputs.json").write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        job = WebRunJob(
+            job_id=job_id,
+            root_dir=root_dir,
+            input_dir=input_dir,
+            csv_dir=staged_csv_dir,
+            out_dir=out_dir,
+            input_mode="remediation",
+            remediation_source_job_id=source_job.job_id,
+            use_llm=False,
+            use_issue_llm=False,
+            llm_provider=None,
+        )
+        with self._lock:
+            self._jobs[job_id] = job
+        thread = threading.Thread(
+            target=self._run_remediation_job,
+            args=(
+                job,
+                source_job,
+                staged_dbml_path,
+                staged_csv_dir,
+                staged_rules_path if isinstance(staged_rules_path, Path) else None,
+                source_paths["target"],
+                source_paths["mapping_overrides"],
+                approved_artifact,
+            ),
+            name=f"vsf-web-remediation-{job_id}",
+            daemon=True,
+        )
+        thread.start()
+        return job
+
+    def start_manual_recheck_job(
+        self,
+        source_job: WebRunJob,
+        *,
+        dbml: UploadedFile | None,
+        csv_files: list[UploadedFile],
+        rules: UploadedFile | None = None,
+        target: str | None = None,
+        mapping_overrides: dict[str, str] | None = None,
+    ) -> WebRunJob:
+        if _normalized_web_status(source_job.status) not in {"succeeded", "unknown"}:
+            raise ValueError("Manual recheck requires a completed source run.")
+        if source_job.input_mode not in {"upload", "path", "remediation", "manual_recheck"}:
+            raise ValueError("Manual recheck is only available for CSV + DBML runs.")
+        if not csv_files:
+            raise ValueError("At least one corrected CSV file is required.")
+
+        defaults = _source_recheck_defaults(source_job)
+        source_paths = None
+        if dbml is None or rules is None:
+            try:
+                source_paths = _source_paths_for_remediation(source_job)
+            except ValueError as exc:
+                if dbml is None:
+                    raise ValueError(
+                        "Corrected DBML is required when the baseline DBML cannot be reused."
+                    ) from exc
+        job_id = _new_job_id()
+        root_dir = self.run_root / job_id
+        input_dir = root_dir / "input"
+        csv_dir = input_dir / "csv"
+        out_dir = root_dir / "artifacts"
+        csv_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        dbml_path = input_dir / "schema.dbml"
+        if dbml is None:
+            if source_paths is None:
+                raise ValueError("Corrected DBML is required.")
+            shutil.copy2(source_paths["dbml_path"], dbml_path)
+        else:
+            dbml_path = input_dir / _safe_filename(dbml.filename, fallback="schema.dbml")
+            dbml_path.write_bytes(dbml.content)
+        stored_csv_names: dict[str, str] = {}
+        for index, csv_file in enumerate(csv_files, start=1):
+            fallback = f"corrected_table_{index}.csv"
+            safe_name = _safe_filename(csv_file.filename, fallback=fallback)
+            (csv_dir / safe_name).write_bytes(csv_file.content)
+            stored_csv_names[csv_file.filename] = safe_name
+            stored_csv_names[Path(csv_file.filename).stem] = Path(safe_name).stem
+        rules_path: Path | None = None
+        if rules is not None and rules.content.strip():
+            rules_path = input_dir / _safe_filename(rules.filename, fallback="rules.yaml")
+            rules_path.write_bytes(rules.content)
+        elif source_paths is not None and source_paths["rules_path"] is not None:
+            rules_path = input_dir / "rules.yaml"
+            shutil.copy2(source_paths["rules_path"], rules_path)
+        cleaned_mapping = _clean_mapping_overrides(mapping_overrides or defaults["mapping_overrides"])
+        stored_mapping_overrides = _translate_uploaded_mapping_overrides(
+            cleaned_mapping,
+            stored_csv_names=stored_csv_names,
+        )
+        validated_target = _validated_target(target or defaults["target"])
+
+        manifest = {
+            "input_mode": "manual_recheck",
+            "source_job_id": source_job.job_id,
+            "source_artifacts_dir": str(source_job.out_dir),
+            "source_data_mutation": False,
+            "application_target": "uploaded_corrected_inputs",
+            "staged_dbml_path": str(dbml_path),
+            "staged_csv_dir": str(csv_dir),
+            "staged_rules_path": str(rules_path) if rules_path else None,
+            "baseline_dbml_reused": dbml is None,
+            "baseline_rules_reused": rules is None and rules_path is not None,
+            "target": validated_target,
+            "mapping_overrides": stored_mapping_overrides,
+            "use_llm": False,
+            "use_issue_llm": False,
+            "llm_provider": None,
+        }
+        (input_dir / "manual_recheck_inputs.json").write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        job = WebRunJob(
+            job_id=job_id,
+            root_dir=root_dir,
+            input_dir=input_dir,
+            csv_dir=csv_dir,
+            out_dir=out_dir,
+            input_mode="manual_recheck",
+            remediation_source_job_id=source_job.job_id,
+            use_llm=False,
+            use_issue_llm=False,
+            llm_provider=None,
+        )
+        with self._lock:
+            self._jobs[job_id] = job
+        thread = threading.Thread(
+            target=self._run_manual_recheck_job,
+            args=(
+                job,
+                source_job,
+                dbml_path,
+                csv_dir,
+                rules_path,
+                validated_target,
+                stored_mapping_overrides,
+                "manual_upload",
+                "uploaded_corrected_inputs",
+            ),
+            name=f"vsf-web-manual-recheck-{job_id}",
+            daemon=True,
+        )
+        thread.start()
+        return job
+
+    def start_manual_recheck_path_job(
+        self,
+        source_job: WebRunJob,
+        *,
+        dbml_path: str | Path,
+        csv_dir: str | Path,
+        rules_path: str | Path | None = None,
+        target: str | None = None,
+        mapping_overrides: dict[str, str] | None = None,
+        source_label: str = "manual_path",
+    ) -> WebRunJob:
+        if _normalized_web_status(source_job.status) not in {"succeeded", "unknown"}:
+            raise ValueError("Manual recheck requires a completed source run.")
+        if source_job.input_mode not in {"upload", "path", "remediation", "manual_recheck"}:
+            raise ValueError("Manual recheck is only available for CSV + DBML runs.")
+
+        validated_dbml_path = _validated_file_path(
+            dbml_path,
+            label="Corrected DBML path",
+            extensions={".dbml"},
+        )
+        validated_csv_dir = _validated_csv_dir(csv_dir)
+        validated_rules_path: Path | None = None
+        if rules_path is not None and str(rules_path).strip():
+            validated_rules_path = _validated_file_path(
+                rules_path,
+                label="Corrected rules path",
+                extensions={".yaml", ".yml"},
+            )
+        defaults = _source_recheck_defaults(source_job)
+        source_paths = None
+        if validated_rules_path is None:
+            try:
+                source_paths = _source_paths_for_remediation(source_job)
+            except ValueError:
+                source_paths = None
+        validated_target = _validated_target(target or defaults["target"])
+        cleaned_mapping = _clean_mapping_overrides(mapping_overrides or defaults["mapping_overrides"])
+
+        job_id = _new_job_id()
+        root_dir = self.run_root / job_id
+        input_dir = root_dir / "input"
+        out_dir = root_dir / "artifacts"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        staged_dbml_path = input_dir / "schema.dbml"
+        staged_csv_dir = input_dir / "csv"
+        baseline_rules_path = (
+            source_paths.get("rules_path")
+            if isinstance(source_paths, dict)
+            else None
+        )
+        staged_rules_path = input_dir / "rules.yaml" if validated_rules_path or baseline_rules_path else None
+        shutil.copy2(validated_dbml_path, staged_dbml_path)
+        if staged_csv_dir.exists():
+            shutil.rmtree(staged_csv_dir)
+        shutil.copytree(validated_csv_dir, staged_csv_dir)
+        if validated_rules_path and staged_rules_path:
+            shutil.copy2(validated_rules_path, staged_rules_path)
+        elif baseline_rules_path and staged_rules_path:
+            shutil.copy2(baseline_rules_path, staged_rules_path)
+
+        normalized_source_label = _manual_recheck_source_label(source_label)
+        manifest = {
+            "input_mode": "manual_recheck",
+            "source": normalized_source_label,
+            "source_job_id": source_job.job_id,
+            "source_artifacts_dir": str(source_job.out_dir),
+            "source_data_mutation": False,
+            "application_target": "corrected_path_copy",
+            "original_dbml_path": str(validated_dbml_path),
+            "original_csv_dir": str(validated_csv_dir),
+            "original_rules_path": str(validated_rules_path) if validated_rules_path else None,
+            "staged_dbml_path": str(staged_dbml_path),
+            "staged_csv_dir": str(staged_csv_dir),
+            "staged_rules_path": str(staged_rules_path) if staged_rules_path else None,
+            "baseline_rules_reused": validated_rules_path is None and staged_rules_path is not None,
+            "target": validated_target,
+            "mapping_overrides": cleaned_mapping,
+            "use_llm": False,
+            "use_issue_llm": False,
+            "llm_provider": None,
+        }
+        (input_dir / "manual_recheck_inputs.json").write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        job = WebRunJob(
+            job_id=job_id,
+            root_dir=root_dir,
+            input_dir=input_dir,
+            csv_dir=staged_csv_dir,
+            out_dir=out_dir,
+            input_mode="manual_recheck",
+            remediation_source_job_id=source_job.job_id,
+            use_llm=False,
+            use_issue_llm=False,
+            llm_provider=None,
+        )
+        with self._lock:
+            self._jobs[job_id] = job
+        thread = threading.Thread(
+            target=self._run_manual_recheck_job,
+            args=(
+                job,
+                source_job,
+                staged_dbml_path,
+                staged_csv_dir,
+                staged_rules_path,
+                validated_target,
+                cleaned_mapping,
+                normalized_source_label,
+                "corrected_path_copy",
+            ),
+            name=f"vsf-web-manual-recheck-{job_id}",
+            daemon=True,
+        )
+        thread.start()
+        return job
+
     def get_job(self, job_id: str) -> WebRunJob | None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -535,6 +929,7 @@ class WebRunStore:
             "duration_seconds": summary.get("duration_seconds"),
             "input_mode": job.input_mode,
             "source_mode": _source_mode_label(job),
+            "remediation_source_job_id": job.remediation_source_job_id,
             "issue_count": _issue_count(summary, job.out_dir / "issues.json"),
             "quality_gate_summary": quality_gate_summary,
             "stage_count": len(stages),
@@ -573,6 +968,11 @@ class WebRunStore:
             "evaluation": (
                 {"dataset_id": job.evaluation_dataset_id}
                 if job.evaluation_dataset_id is not None
+                else None
+            ),
+            "remediation": (
+                {"source_job_id": job.remediation_source_job_id}
+                if job.remediation_source_job_id is not None
                 else None
             ),
             "summary": summary,
@@ -722,6 +1122,162 @@ class WebRunStore:
         finally:
             job.finished_at = _iso_now()
 
+    def _run_remediation_job(
+        self,
+        job: WebRunJob,
+        source_job: WebRunJob,
+        dbml_path: Path,
+        csv_dir: Path,
+        rules_path: Path | None,
+        target: str | None,
+        mapping_overrides: dict[str, str] | None,
+        approved_artifact: dict[str, Any],
+    ) -> None:
+        from vsf_profiler.cli import run_pipeline
+        from vsf_profiler.remediation import (
+            APPROVED_REMEDIATIONS_FILENAME,
+            BEFORE_AFTER_QUALITY_DIFF_FILENAME,
+            REMEDIATION_RUN_SUMMARY_FILENAME,
+            compare_quality_runs,
+        )
+
+        job.status = "running"
+        job.started_at = _iso_now()
+        try:
+            run_pipeline(
+                dbml_path=dbml_path,
+                csv_dir=csv_dir,
+                mapping_overrides=mapping_overrides,
+                rules_path=rules_path,
+                target=target,
+                out_dir=job.out_dir,
+                use_llm=False,
+                use_issue_llm=False,
+            )
+            (job.out_dir / APPROVED_REMEDIATIONS_FILENAME).write_text(
+                json.dumps(approved_artifact, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            diff = compare_quality_runs(
+                before_out_dir=source_job.out_dir,
+                after_out_dir=job.out_dir,
+                before_job_id=source_job.job_id,
+                after_job_id=job.job_id,
+            )
+            (job.out_dir / BEFORE_AFTER_QUALITY_DIFF_FILENAME).write_text(
+                json.dumps(diff, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            remediation_summary = {
+                "artifact": "remediation_run_summary",
+                "version": 1,
+                "source": "deterministic",
+                "source_job_id": source_job.job_id,
+                "remediation_job_id": job.job_id,
+                "source_data_mutation": False,
+                "application_target": "staged_copy_only",
+                "approved_summary": approved_artifact.get("summary", {}),
+                "quality_diff_summary": diff.get("summary", {}),
+                "staged_inputs": {
+                    "dbml_path": str(dbml_path),
+                    "csv_dir": str(csv_dir),
+                    "rules_path": str(rules_path) if rules_path else None,
+                },
+            }
+            (job.out_dir / REMEDIATION_RUN_SUMMARY_FILENAME).write_text(
+                json.dumps(remediation_summary, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            job.status = "failed"
+            job.error = f"{exc.__class__.__name__}: {exc}"
+        else:
+            job.status = "succeeded"
+        finally:
+            job.finished_at = _iso_now()
+
+    def _run_manual_recheck_job(
+        self,
+        job: WebRunJob,
+        source_job: WebRunJob,
+        dbml_path: Path,
+        csv_dir: Path,
+        rules_path: Path | None,
+        target: str | None,
+        mapping_overrides: dict[str, str] | None,
+        source_label: str,
+        application_target: str,
+    ) -> None:
+        from vsf_profiler.cli import run_pipeline
+        from vsf_profiler.remediation import (
+            BEFORE_AFTER_QUALITY_DIFF_FILENAME,
+            REMEDIATION_RUN_SUMMARY_FILENAME,
+            compare_quality_runs,
+        )
+
+        job.status = "running"
+        job.started_at = _iso_now()
+        try:
+            run_pipeline(
+                dbml_path=dbml_path,
+                csv_dir=csv_dir,
+                mapping_overrides=mapping_overrides,
+                rules_path=rules_path,
+                target=target,
+                out_dir=job.out_dir,
+                use_llm=False,
+                use_issue_llm=False,
+            )
+            diff = compare_quality_runs(
+                before_out_dir=source_job.out_dir,
+                after_out_dir=job.out_dir,
+                before_job_id=source_job.job_id,
+                after_job_id=job.job_id,
+            )
+            (job.out_dir / BEFORE_AFTER_QUALITY_DIFF_FILENAME).write_text(
+                json.dumps(diff, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            recheck_summary = {
+                "artifact": "remediation_run_summary",
+                "version": 1,
+                "source": source_label,
+                "source_job_id": source_job.job_id,
+                "recheck_job_id": job.job_id,
+                "remediation_job_id": job.job_id,
+                "source_data_mutation": False,
+                "application_target": application_target,
+                "approved_summary": {
+                    "approved_count": 0,
+                    "matched_action_count": 0,
+                    "applied_count": 0,
+                    "changed_action_count": 0,
+                    "affected_count": 0,
+                },
+                "manual_recheck_summary": {
+                    "corrected_inputs_supplied": True,
+                    "input_source": source_label,
+                    "llm_used": False,
+                },
+                "quality_diff_summary": diff.get("summary", {}),
+                "staged_inputs": {
+                    "dbml_path": str(dbml_path),
+                    "csv_dir": str(csv_dir),
+                    "rules_path": str(rules_path) if rules_path else None,
+                },
+            }
+            (job.out_dir / REMEDIATION_RUN_SUMMARY_FILENAME).write_text(
+                json.dumps(recheck_summary, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            job.status = "failed"
+            job.error = f"{exc.__class__.__name__}: {exc}"
+        else:
+            job.status = "succeeded"
+        finally:
+            job.finished_at = _iso_now()
+
     def _run_evaluation_job(self, job: WebRunJob, dataset_id: str) -> None:
         from vsf_profiler.evaluation_benchmark import run_evaluation_benchmark
 
@@ -793,6 +1349,7 @@ class WebRunStore:
             input_mode=metadata["input_mode"],
             database_source_type=metadata["database_source_type"],
             evaluation_dataset_id=metadata["evaluation_dataset_id"],
+            remediation_source_job_id=metadata["remediation_source_job_id"],
             use_llm=metadata["use_llm"],
             use_issue_llm=metadata["use_issue_llm"],
             llm_provider=metadata["llm_provider"],
@@ -875,6 +1432,53 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
                 job = self.store.start_evaluation_job(
                     dataset_id=payload["dataset_id"],
                 )
+            elif _remediation_plan_post_path(parsed.path):
+                job_id = parsed.path.strip("/").split("/")[2]
+                job = self.store.get_job(job_id)
+                if job is None:
+                    self.send_error(HTTPStatus.NOT_FOUND)
+                    return
+                result = self.store.remediation_plan(job)
+                self._send_json(result)
+                return
+            elif _remediation_run_post_path(parsed.path):
+                job_id = parsed.path.strip("/").split("/")[2]
+                source_job = self.store.get_job(job_id)
+                if source_job is None:
+                    self.send_error(HTTPStatus.NOT_FOUND)
+                    return
+                payload = self._parse_remediation_run_body()
+                job = self.store.start_remediation_job(
+                    source_job,
+                    approved_remediation_ids=payload["approved_remediation_ids"],
+                )
+            elif _manual_recheck_run_post_path(parsed.path):
+                job_id = parsed.path.strip("/").split("/")[2]
+                source_job = self.store.get_job(job_id)
+                if source_job is None:
+                    self.send_error(HTTPStatus.NOT_FOUND)
+                    return
+                if "multipart/form-data" in self.headers.get("Content-Type", ""):
+                    payload = self._parse_manual_recheck_upload()
+                    job = self.store.start_manual_recheck_job(
+                        source_job,
+                        dbml=payload.get("dbml"),
+                        csv_files=payload["csv_files"],
+                        rules=payload.get("rules"),
+                        target=payload.get("target"),
+                        mapping_overrides=payload.get("mapping_overrides"),
+                    )
+                else:
+                    payload = self._parse_manual_recheck_path_body()
+                    job = self.store.start_manual_recheck_path_job(
+                        source_job,
+                        dbml_path=payload["dbml_path"],
+                        csv_dir=payload["csv_dir"],
+                        rules_path=payload.get("rules_path"),
+                        target=payload.get("target"),
+                        mapping_overrides=payload.get("mapping_overrides"),
+                        source_label=payload.get("source_label") or "manual_path",
+                    )
             elif _issue_enrichment_post_path(parsed.path):
                 job_id = parsed.path.strip("/").split("/")[2]
                 job = self.store.get_job(job_id)
@@ -1022,6 +1626,58 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
             "llm_provider": _optional_llm_provider_string(fields.get("llm_provider")),
         }
 
+    def _parse_manual_recheck_upload(self) -> dict[str, Any]:
+        content_type = self.headers.get("Content-Type", "")
+        if "multipart/form-data" not in content_type:
+            raise ValueError("Expected multipart/form-data manual recheck upload.")
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length <= 0:
+            raise ValueError("Manual recheck upload body is empty.")
+        if content_length > MAX_UPLOAD_BYTES:
+            raise ValueError("Manual recheck upload is too large for demo mode.")
+        body = self.rfile.read(content_length)
+        header = (
+            f"Content-Type: {content_type}\r\n"
+            "MIME-Version: 1.0\r\n"
+            "\r\n"
+        ).encode("utf-8")
+        message = BytesParser(policy=default).parsebytes(header + body)
+        if not message.is_multipart():
+            raise ValueError("Manual recheck payload is not multipart.")
+
+        dbml: UploadedFile | None = None
+        rules: UploadedFile | None = None
+        csv_files: list[UploadedFile] = []
+        fields: dict[str, str] = {}
+
+        for part in message.iter_parts():
+            field_name = part.get_param("name", header="content-disposition")
+            filename = part.get_filename()
+            if not field_name:
+                continue
+            content = part.get_payload(decode=True) or b""
+            if filename:
+                upload = UploadedFile(filename=filename, content=content)
+                if field_name == "dbml":
+                    dbml = upload
+                elif field_name == "rules":
+                    rules = upload
+                elif field_name in {"csv", "csvFiles"}:
+                    csv_files.append(upload)
+            else:
+                charset = part.get_content_charset() or "utf-8"
+                fields[field_name] = content.decode(charset, errors="replace").strip()
+
+        if not csv_files:
+            raise ValueError("At least one corrected CSV file is required.")
+        return {
+            "dbml": dbml,
+            "csv_files": csv_files,
+            "rules": rules,
+            "target": fields.get("target") or None,
+            "mapping_overrides": _parse_mapping_overrides_field(fields.get("mapping_overrides")),
+        }
+
     def _parse_path_job_body(self) -> dict[str, Any]:
         content_type = self.headers.get("Content-Type", "")
         if "application/json" not in content_type:
@@ -1122,6 +1778,57 @@ class WebRunnerHandler(BaseHTTPRequestHandler):
         return {
             "issue_id": _required_string(payload, "issue_id"),
             "provider": provider,
+        }
+
+    def _parse_remediation_run_body(self) -> dict[str, Any]:
+        content_type = self.headers.get("Content-Type", "")
+        if "application/json" not in content_type:
+            raise ValueError("Expected application/json remediation payload.")
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length <= 0:
+            raise ValueError("Remediation payload is empty.")
+        if content_length > MAX_REMEDIATION_BYTES:
+            raise ValueError("Remediation payload is too large.")
+        body = self.rfile.read(content_length)
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Remediation payload must be valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("Remediation payload must be a JSON object.")
+        raw_ids = payload.get("approved_remediation_ids")
+        if not isinstance(raw_ids, list):
+            raise ValueError("approved_remediation_ids must be a list.")
+        ids = []
+        for value in raw_ids:
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("approved_remediation_ids must contain non-empty strings.")
+            ids.append(value.strip())
+        return {"approved_remediation_ids": ids}
+
+    def _parse_manual_recheck_path_body(self) -> dict[str, Any]:
+        content_type = self.headers.get("Content-Type", "")
+        if "application/json" not in content_type:
+            raise ValueError("Expected multipart/form-data or application/json manual recheck payload.")
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length <= 0:
+            raise ValueError("Manual recheck payload is empty.")
+        if content_length > MAX_REMEDIATION_BYTES:
+            raise ValueError("Manual recheck payload is too large.")
+        body = self.rfile.read(content_length)
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Manual recheck payload must be valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("Manual recheck payload must be a JSON object.")
+        return {
+            "dbml_path": _required_string(payload, "dbml_path"),
+            "csv_dir": _required_string(payload, "csv_dir"),
+            "rules_path": _optional_string(payload, "rules_path"),
+            "target": _optional_string(payload, "target"),
+            "mapping_overrides": _optional_mapping_overrides(payload, "mapping_overrides"),
+            "source_label": _optional_string(payload, "source_label"),
         }
 
     def _serve_static(self, path: str) -> None:
@@ -1227,6 +1934,10 @@ def _canonical_artifact_paths(out_dir: Path) -> list[str]:
         "ground_truth_issues.json",
         "baseline_comparison.json",
         "evaluation_summary.json",
+        "remediation_plan.json",
+        "approved_remediations.json",
+        "remediation_run_summary.json",
+        "before_after_quality_diff.json",
     ]
     chart_dir = out_dir / "charts"
     if chart_dir.exists():
@@ -1265,6 +1976,21 @@ def _issue_enrichment_post_path(path: str) -> bool:
     return len(parts) == 4 and parts[0] == "api" and parts[1] == "jobs" and parts[3] == "issue-enrichments"
 
 
+def _remediation_plan_post_path(path: str) -> bool:
+    parts = path.strip("/").split("/")
+    return len(parts) == 4 and parts[0] == "api" and parts[1] == "jobs" and parts[3] == "remediation-plan"
+
+
+def _remediation_run_post_path(path: str) -> bool:
+    parts = path.strip("/").split("/")
+    return len(parts) == 4 and parts[0] == "api" and parts[1] == "jobs" and parts[3] == "remediation-runs"
+
+
+def _manual_recheck_run_post_path(path: str) -> bool:
+    parts = path.strip("/").split("/")
+    return len(parts) == 4 and parts[0] == "api" and parts[1] == "jobs" and parts[3] == "manual-recheck-runs"
+
+
 def _historical_input_metadata(
     root_dir: Path,
     input_dir: Path,
@@ -1273,6 +1999,8 @@ def _historical_input_metadata(
     path_inputs = _read_json_if_exists(input_dir / "path_inputs.json") or {}
     database_inputs = _read_json_if_exists(input_dir / "database_inputs.json") or {}
     evaluation_inputs = _read_json_if_exists(input_dir / "evaluation_inputs.json") or {}
+    remediation_inputs = _read_json_if_exists(input_dir / "remediation_inputs.json") or {}
+    manual_recheck_inputs = _read_json_if_exists(input_dir / "manual_recheck_inputs.json") or {}
     summary_inputs = summary.get("inputs") if isinstance(summary.get("inputs"), dict) else {}
     source_type = str(database_inputs.get("source_type") or summary_inputs.get("source_type") or "")
     use_llm = bool(
@@ -1299,6 +2027,7 @@ def _historical_input_metadata(
             "input_mode": "database",
             "database_source_type": source_type if source_type in ALLOWED_DATABASE_SOURCE_TYPES else None,
             "evaluation_dataset_id": None,
+            "remediation_source_job_id": None,
             "csv_dir": input_dir,
             "use_llm": use_llm,
             "use_issue_llm": use_issue_llm,
@@ -1311,7 +2040,36 @@ def _historical_input_metadata(
             "input_mode": "evaluation",
             "database_source_type": None,
             "evaluation_dataset_id": dataset_id if isinstance(dataset_id, str) else None,
+            "remediation_source_job_id": None,
             "csv_dir": input_dir,
+            "use_llm": False,
+            "use_issue_llm": False,
+            "llm_provider": None,
+        }
+
+    if manual_recheck_inputs:
+        source_job_id = manual_recheck_inputs.get("source_job_id")
+        csv_dir_value = manual_recheck_inputs.get("staged_csv_dir") or summary_inputs.get("csv_dir")
+        return {
+            "input_mode": "manual_recheck",
+            "database_source_type": None,
+            "evaluation_dataset_id": None,
+            "remediation_source_job_id": source_job_id if isinstance(source_job_id, str) else None,
+            "csv_dir": Path(str(csv_dir_value)) if csv_dir_value else input_dir / "csv",
+            "use_llm": False,
+            "use_issue_llm": False,
+            "llm_provider": None,
+        }
+
+    if remediation_inputs:
+        source_job_id = remediation_inputs.get("source_job_id")
+        csv_dir_value = remediation_inputs.get("staged_csv_dir") or summary_inputs.get("csv_dir")
+        return {
+            "input_mode": "remediation",
+            "database_source_type": None,
+            "evaluation_dataset_id": None,
+            "remediation_source_job_id": source_job_id if isinstance(source_job_id, str) else None,
+            "csv_dir": Path(str(csv_dir_value)) if csv_dir_value else input_dir / "csv",
             "use_llm": False,
             "use_issue_llm": False,
             "llm_provider": None,
@@ -1323,6 +2081,7 @@ def _historical_input_metadata(
             "input_mode": "path",
             "database_source_type": None,
             "evaluation_dataset_id": None,
+            "remediation_source_job_id": None,
             "csv_dir": Path(str(csv_dir_value)) if csv_dir_value else input_dir,
             "use_llm": use_llm,
             "use_issue_llm": use_issue_llm,
@@ -1341,10 +2100,86 @@ def _historical_input_metadata(
         "input_mode": input_mode,
         "database_source_type": None,
         "evaluation_dataset_id": None,
+        "remediation_source_job_id": None,
         "csv_dir": csv_dir,
         "use_llm": use_llm,
         "use_issue_llm": use_issue_llm,
         "llm_provider": llm_provider if isinstance(llm_provider, str) else None,
+    }
+
+
+def _source_paths_for_remediation(job: WebRunJob) -> dict[str, Any]:
+    summary = _read_json_if_exists(job.summary_path) or {}
+    summary_inputs = summary.get("inputs") if isinstance(summary.get("inputs"), dict) else {}
+    path_inputs = _read_json_if_exists(job.input_dir / "path_inputs.json") or {}
+    remediation_inputs = _read_json_if_exists(job.input_dir / "remediation_inputs.json") or {}
+    manual_recheck_inputs = _read_json_if_exists(job.input_dir / "manual_recheck_inputs.json") or {}
+
+    dbml_value = (
+        summary_inputs.get("dbml_path")
+        or path_inputs.get("dbml_path")
+        or remediation_inputs.get("staged_dbml_path")
+        or manual_recheck_inputs.get("staged_dbml_path")
+    )
+    csv_dir_value = (
+        summary_inputs.get("csv_dir")
+        or path_inputs.get("csv_dir")
+        or remediation_inputs.get("staged_csv_dir")
+        or manual_recheck_inputs.get("staged_csv_dir")
+    )
+    rules_value = (
+        summary_inputs.get("rules_path")
+        or path_inputs.get("rules_path")
+        or remediation_inputs.get("staged_rules_path")
+        or manual_recheck_inputs.get("staged_rules_path")
+    )
+    target = (
+        summary_inputs.get("target")
+        or path_inputs.get("target")
+        or remediation_inputs.get("target")
+        or manual_recheck_inputs.get("target")
+    )
+    mapping_value = (
+        path_inputs.get("mapping_overrides")
+        or remediation_inputs.get("mapping_overrides")
+        or manual_recheck_inputs.get("mapping_overrides")
+        or {}
+    )
+    dbml_path = _validated_file_path(dbml_value, label="DBML path", extensions={".dbml"})
+    csv_dir = _validated_csv_dir(csv_dir_value)
+    rules_path = None
+    if rules_value:
+        rules_path = _validated_file_path(rules_value, label="Rules path", extensions={".yaml", ".yml"})
+    return {
+        "dbml_path": dbml_path,
+        "csv_dir": csv_dir,
+        "rules_path": rules_path,
+        "target": _validated_target(target),
+        "mapping_overrides": _clean_mapping_overrides(mapping_value if isinstance(mapping_value, dict) else {}),
+    }
+
+
+def _source_recheck_defaults(job: WebRunJob) -> dict[str, Any]:
+    summary = _read_json_if_exists(job.summary_path) or {}
+    summary_inputs = summary.get("inputs") if isinstance(summary.get("inputs"), dict) else {}
+    path_inputs = _read_json_if_exists(job.input_dir / "path_inputs.json") or {}
+    remediation_inputs = _read_json_if_exists(job.input_dir / "remediation_inputs.json") or {}
+    manual_recheck_inputs = _read_json_if_exists(job.input_dir / "manual_recheck_inputs.json") or {}
+    target = (
+        summary_inputs.get("target")
+        or path_inputs.get("target")
+        or remediation_inputs.get("target")
+        or manual_recheck_inputs.get("target")
+    )
+    mapping_value = (
+        path_inputs.get("mapping_overrides")
+        or remediation_inputs.get("mapping_overrides")
+        or manual_recheck_inputs.get("mapping_overrides")
+        or {}
+    )
+    return {
+        "target": _validated_target(target),
+        "mapping_overrides": _clean_mapping_overrides(mapping_value if isinstance(mapping_value, dict) else {}),
     }
 
 
@@ -1552,6 +2387,18 @@ def _source_mode_label(job: WebRunJob) -> str:
         return f"database:{job.database_source_type}" if job.database_source_type else "database"
     if job.input_mode == "evaluation":
         return f"evaluation:{job.evaluation_dataset_id}" if job.evaluation_dataset_id else "evaluation"
+    if job.input_mode == "manual_recheck":
+        return (
+            f"manual_recheck:{job.remediation_source_job_id}"
+            if job.remediation_source_job_id
+            else "manual_recheck"
+        )
+    if job.input_mode == "remediation":
+        return (
+            f"remediation:{job.remediation_source_job_id}"
+            if job.remediation_source_job_id
+            else "remediation"
+        )
     return job.input_mode
 
 
@@ -1777,6 +2624,14 @@ def _validated_evaluation_dataset_id(dataset_id: str) -> str:
     from vsf_profiler.evaluation_benchmark import get_evaluation_dataset
 
     return get_evaluation_dataset(stripped).dataset_id
+
+
+def _manual_recheck_source_label(value: str | None) -> str:
+    label = str(value or "").strip().lower()
+    if not label:
+        return "manual_path"
+    label = re.sub(r"[^a-z0-9_.-]+", "_", label).strip("._-")
+    return label[:80] or "manual_path"
 
 
 def _validated_llm_options(

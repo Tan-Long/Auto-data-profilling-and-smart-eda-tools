@@ -22,6 +22,7 @@ REQUIRED_ARTIFACTS = {
     "dataset_verdict.json",
     "table_assessments.json",
     "quality_gates.json",
+    "remediation_plan.json",
     "influence.json",
     "run.log",
     "run_events.jsonl",
