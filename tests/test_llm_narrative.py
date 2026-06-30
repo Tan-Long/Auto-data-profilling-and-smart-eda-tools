@@ -467,7 +467,7 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
     assert call["headers"]["Content-Type"] == "application/json"
     assert call["timeout_seconds"] == 12.5
     assert call["payload"]["model"] == "gpt-test"
-    assert call["payload"]["max_output_tokens"] == 345
+    assert call["payload"]["max_completion_tokens"] == 345
     assert provider.config_summary() == {
         "provider": "openai",
         "model": "gpt-test",
@@ -475,16 +475,16 @@ def test_openai_provider_uses_responses_api_without_raw_csv_payload():
         "timeout_seconds": 12.5,
         "max_output_tokens": 345,
     }
-    assert "raw CSV data" in call["payload"]["instructions"]
-    request_payload = json.loads(call["payload"]["input"])
+    assert "raw CSV data" in call["payload"]["messages"][0]["content"]
+    request_payload = json.loads(call["payload"]["messages"][1]["content"])
     request_context = request_payload["context"]
     assert request_payload["guardrail_safe_draft"] == context["guardrail_safe_draft"]
     assert request_payload["guardrail_contract"] == context["guardrail_contract"]
-    assert "Return that Markdown exactly" in call["payload"]["instructions"]
+    assert "Return that Markdown exactly" in call["payload"]["messages"][0]["content"]
     assert request_context["privacy_contract"]["raw_csv_included"] is False
     assert request_context["privacy_contract"]["sample_rows_included"] is False
-    assert ".csv" not in call["payload"]["input"]
-    assert "data/demo_small/csv" not in call["payload"]["input"]
+    assert ".csv" not in call["payload"]["messages"][1]["content"]
+    assert "data/demo_small/csv" not in call["payload"]["messages"][1]["content"]
 
 
 @pytest.mark.parametrize(

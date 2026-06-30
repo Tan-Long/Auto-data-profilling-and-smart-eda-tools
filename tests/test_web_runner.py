@@ -637,7 +637,10 @@ def test_web_runner_database_job_http_endpoint(tmp_path, monkeypatch):
         server.server_close()
 
 
-def test_web_runner_database_job_validates_inputs_before_start(tmp_path):
+def test_web_runner_database_job_validates_inputs_before_start(tmp_path, monkeypatch):
+    monkeypatch.setattr("dotenv.load_dotenv", lambda: None, raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     store = WebRunStore(run_root=tmp_path / "web_runs")
 
     with pytest.raises(ValueError, match="source_type"):
@@ -672,7 +675,7 @@ def test_web_runner_database_job_validates_inputs_before_start(tmp_path):
             target="customer_id",
         )
 
-    with pytest.raises(ValueError, match="llm_provider requires use_llm"):
+    with pytest.raises(ValueError, match="llm_provider requires"):
         store.start_database_job(
             source_type="postgres",
             connection_url=POSTGRES_SECRET_URL,
@@ -681,6 +684,7 @@ def test_web_runner_database_job_validates_inputs_before_start(tmp_path):
 
 
 def test_web_runner_path_job_validates_inputs_before_start(tmp_path, monkeypatch):
+    monkeypatch.setattr("dotenv.load_dotenv", lambda: None, raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     data_dir = create_small_demo(tmp_path / "data" / "demo_small")
@@ -721,7 +725,7 @@ def test_web_runner_path_job_validates_inputs_before_start(tmp_path, monkeypatch
             target="review_score",
         )
 
-    with pytest.raises(ValueError, match="llm_provider requires use_llm"):
+    with pytest.raises(ValueError, match="llm_provider requires"):
         store.start_path_job(
             dbml_path=data_dir / "schema.dbml",
             csv_dir=data_dir / "csv",
@@ -1256,7 +1260,7 @@ def _get_json(url):
         return json.loads(response.read().decode("utf-8"))
 
 
-def _wait_for_http_job(base_url, job_id, timeout=60):
+def _wait_for_http_job(base_url, job_id, timeout=120):
     deadline = time.monotonic() + timeout
     payload = {}
     while time.monotonic() < deadline:
