@@ -62,6 +62,10 @@ OPTIONAL_ARTIFACT_PATHS = {
     "issue_action_plans": "issue_action_plans.json",
     "issue_todos": "issue_todos.json",
     "quality_gates": "quality_gates.json",
+    "remediation_plan": "remediation_plan.json",
+    "approved_remediations": "approved_remediations.json",
+    "remediation_run_summary": "remediation_run_summary.json",
+    "before_after_quality_diff": "before_after_quality_diff.json",
     "samples_dir": "samples",
 }
 SCAN_SUFFIXES = TEXT_SUFFIXES

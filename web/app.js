@@ -44,6 +44,12 @@ const state = {
   issueLlmRunningIssueId: "",
   issueLlmMessage: "",
   issueLlmMessageStatus: "",
+  remediationRunning: false,
+  remediationMessage: "",
+  remediationMessageStatus: "",
+  manualRecheckRunning: false,
+  manualRecheckMessage: "",
+  manualRecheckMessageStatus: "",
   diagramSelection: null,
   diagramExpanded: false,
   diagramShowNonKey: true,
@@ -142,6 +148,7 @@ const els = {
   runnerMessage: document.querySelector("#runnerMessage"),
   jobStatusBadge: document.querySelector("#jobStatusBadge"),
   eventCount: document.querySelector("#eventCount"),
+  runtimeRecheckComparison: document.querySelector("#runtimeRecheckComparison"),
   stageList: document.querySelector("#stageList"),
   artifactPanelTitle: document.querySelector("#artifactPanelTitle"),
   artifactCount: document.querySelector("#artifactCount"),
@@ -149,6 +156,7 @@ const els = {
   runHistoryStatus: document.querySelector("#runHistoryStatus"),
   runHistoryCount: document.querySelector("#runHistoryCount"),
   runHistoryList: document.querySelector("#runHistoryList"),
+  refreshRunHistoryButton: document.querySelector("#refreshRunHistoryButton"),
   selectedRunTimelineStatus: document.querySelector("#selectedRunTimelineStatus"),
   selectedRunTimeline: document.querySelector("#selectedRunTimeline"),
   dashboardStatusBadge: document.querySelector("#dashboardStatusBadge"),
@@ -164,8 +172,18 @@ const els = {
   todosFilterVerify: document.querySelector("#todosFilterVerify"),
   reportExportStatus: document.querySelector("#reportExportStatus"),
   reportExportGrid: document.querySelector("#reportExportGrid"),
-  reportExportTodos: document.querySelector("#reportExportTodos"),
   reportExportMessage: document.querySelector("#reportExportMessage"),
+  remediationStatus: document.querySelector("#remediationStatus"),
+  remediationGrid: document.querySelector("#remediationGrid"),
+  remediationMessage: document.querySelector("#remediationMessage"),
+  manualRecheckStatus: document.querySelector("#manualRecheckStatus"),
+  manualRecheckForm: document.querySelector("#manualRecheckForm"),
+  manualRecheckDbmlInput: document.querySelector("#manualRecheckDbmlInput"),
+  manualRecheckCsvInput: document.querySelector("#manualRecheckCsvInput"),
+  manualRecheckButton: document.querySelector("#manualRecheckButton"),
+  manualRecheckDemoButton: document.querySelector("#manualRecheckDemoButton"),
+  manualRecheckBaseline: document.querySelector("#manualRecheckBaseline"),
+  manualRecheckMessage: document.querySelector("#manualRecheckMessage"),
   tableImpactStatus: document.querySelector("#tableImpactStatus"),
   tableImpactGrid: document.querySelector("#tableImpactGrid"),
   dashboardPanelGrid: document.querySelector("#dashboardPanelGrid"),
@@ -217,12 +235,13 @@ const {
   evaluateWorkflowSteps,
 } = window.VSF_WORKFLOW_NAV_CONFIG;
 
-const profileSteps = ["connect", "preflight", "run", "review"];
+const profileSteps = ["connect", "preflight", "run", "review", "fix"];
 const profileStepLabels = {
   connect: "Connect",
   preflight: "Preflight Review",
   run: "Run",
   review: "Review",
+  fix: "Fix & Recheck",
 };
 const runnerUiDemoPresets = new Set(["small"]);
 const runtimeStageDescriptions = {
@@ -430,6 +449,10 @@ els.runHistoryList.addEventListener("click", async (event) => {
   await selectRunHistory(button.dataset.runHistoryJobId);
 });
 
+els.refreshRunHistoryButton.addEventListener("click", async () => {
+  await loadRunHistory({ force: true });
+});
+
 [
   els.dbmlPathInput,
   els.csvDirPathInput,
@@ -466,6 +489,29 @@ els.dashboardPanelGrid.addEventListener("change", (event) => {
 
 els.todosGrid.addEventListener("click", (event) => {
   handleDashboardSelectionClick(event);
+});
+
+els.remediationGrid.addEventListener("click", async (event) => {
+  const generateTarget = event.target.closest("[data-remediation-generate]");
+  if (generateTarget) {
+    await generateRemediationPlan();
+    return;
+  }
+  const applyTarget = event.target.closest("[data-remediation-apply]");
+  if (applyTarget) {
+    await startRemediationRecheck();
+    return;
+  }
+  handleDashboardSelectionClick(event);
+});
+
+els.manualRecheckForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await startManualUploadRecheck();
+});
+
+els.manualRecheckDemoButton.addEventListener("click", async () => {
+  await startCorrectedDemoRecheck();
 });
 
 els.tableImpactGrid.addEventListener("click", (event) => {
@@ -640,6 +686,7 @@ async function checkRunnerHealth() {
   }
   renderAll();
   if (state.runnerAvailable) {
+    await loadRunHistory({ force: true });
     if (state.flowMode === "evaluate") {
       await loadEvaluationCatalog();
     }
@@ -669,13 +716,15 @@ async function loadRunHistory(options = {}) {
     state.runHistory = Array.isArray(payload.runs) ? payload.runs : [];
     const preferredJobId = options.preferredJobId || state.selectedHistoryJobId || state.currentJob?.job_id || "";
     const preferredEntry = state.runHistory.find((run) => run.job_id === preferredJobId);
-    state.selectedHistoryJobId = preferredEntry?.job_id || state.runHistory[0]?.job_id || "";
+    const firstRemediable = state.runHistory.find((run) => runCanRemediate(run));
+    state.selectedHistoryJobId = preferredEntry?.job_id || firstRemediable?.job_id || state.runHistory[0]?.job_id || "";
   } catch (error) {
     state.runHistoryError = error.message || "Unable to load run history.";
   } finally {
     state.runHistoryLoading = false;
     renderRunHistory();
     renderProfileStepper();
+    renderSidebarNavigation();
   }
 }
 
@@ -853,9 +902,17 @@ async function selectRunHistory(jobId) {
     state.runEvents = [];
     renderJob();
     await loadDashboard(jobId, { force: true });
-    state.profileStep = "review";
+    const targetStep = state.profileStep === "fix" ? "fix" : "review";
+    state.profileStep = targetStep;
+    markProfileStepVisited("run");
     markProfileStepVisited("review");
-    renderRunnerMessage(`Loaded run ${jobId} from history.`, "success");
+    markProfileStepVisited(targetStep);
+    renderRunnerMessage(
+      targetStep === "fix"
+        ? `Loaded run ${jobId} from history for Fix & Recheck.`
+        : `Loaded run ${jobId} from history.`,
+      "success",
+    );
   } catch (error) {
     renderRunnerMessage(error.message || "Unable to load the selected run.", "error");
   } finally {
@@ -939,6 +996,12 @@ async function startPathRun() {
     dbml_path: dbmlPath,
     csv_dir: csvDir,
   };
+  const preset = demoPresets[state.selectedDemoPreset];
+  if (preset?.dbmlPath === dbmlPath && preset?.csvDir === csvDir) {
+    if (preset.target) {
+      payload.target = preset.target;
+    }
+  }
   const mappingOverrides = mappingOverridesForRun();
   if (Object.keys(mappingOverrides).length) {
     payload.mapping_overrides = mappingOverrides;
@@ -1098,6 +1161,7 @@ function connectEventStream(eventsUrl) {
           : state.currentJob.error || "Run failed.",
         state.currentJob.status === "succeeded" ? "success" : "error",
       );
+      updateRecheckMessagesAfterJobFinished(state.currentJob);
       if (state.currentJob.status === "succeeded") {
         loadDashboard(state.currentJob.job_id)
           .then(() => renderAll())
@@ -1113,6 +1177,23 @@ function connectEventStream(eventsUrl) {
       renderRunnerMessage("Runtime stream interrupted. Refresh job status from generated artifacts.", "error");
     }
   };
+}
+
+function updateRecheckMessagesAfterJobFinished(job) {
+  if (job?.input_mode === "manual_recheck") {
+    state.manualRecheckRunning = false;
+    state.manualRecheckMessage = job.status === "succeeded"
+      ? "Manual corrected-input recheck complete. Stage 3 now shows the before/after comparison."
+      : job.error || "Manual corrected-input recheck failed.";
+    state.manualRecheckMessageStatus = job.status === "succeeded" ? "success" : "error";
+  }
+  if (job?.input_mode === "remediation") {
+    state.remediationRunning = false;
+    state.remediationMessage = job.status === "succeeded"
+      ? "Copy-only remediation recheck complete. Stage 3 now shows the before/after comparison."
+      : job.error || "Copy-only remediation recheck failed.";
+    state.remediationMessageStatus = job.status === "succeeded" ? "success" : "error";
+  }
 }
 
 function renderRunnerMessage(message, status) {
@@ -1428,7 +1509,7 @@ function renderProfileStepper() {
   els.profileStepNext.disabled = !nextStep || !guard.allowed;
   els.profileStepNext.textContent = nextStep
     ? `Next: ${profileStepLabels[nextStep]}`
-    : "Review ready";
+    : "Workflow ready";
   els.profileStepHint.textContent = guard.message;
   els.profileStepHint.dataset.status = guard.allowed ? "ready" : "blocked";
 }
@@ -1479,7 +1560,7 @@ function renderProfileStageNavItem(stage, activeTarget) {
   const isCurrent = isProfileFlow && state.profileStep === stage.step;
   const complete = profileStageCompleteForSidebar(stage.step);
   const canOpen = canOpenProfileStepFromSidebar(stage.step);
-  const status = isCurrent ? "Current" : complete ? "Done" : "Ready";
+  const status = isCurrent ? "Current" : complete ? "Done" : canOpen ? "Ready" : "Locked";
   const target = isCurrent ? workflowStageActiveSubtarget(stage, activeTarget) : stage.target;
   const stageClasses = [
     "nav-item",
@@ -1507,7 +1588,7 @@ function profileStageVisibleForSidebar(step) {
   if (state.flowMode !== "profile") {
     return false;
   }
-  return state.profileStep === step || state.profileVisitedSteps.includes(step);
+  return profileSteps.includes(step);
 }
 
 function renderWorkflowSubsteps(stage, activeTarget) {
@@ -1765,6 +1846,23 @@ function profileStepGuard(step) {
           : "Start the profiler here. Review unlocks after a successful run.",
     };
   }
+  if (step === "review") {
+    const ready = profileRunComplete() || Boolean(state.dashboardArtifactIndex);
+    return {
+      allowed: ready || hasRemediableHistoryRun(),
+      message: ready
+        ? "Review complete. Continue to Fix & Recheck."
+        : "Open a prior completed run in Fix & Recheck, or finish a profile run first.",
+    };
+  }
+  if (step === "fix") {
+    return {
+      allowed: false,
+      message: hasRemediationResult()
+        ? "Remediation recheck artifacts are ready."
+        : "Select a completed run, approve copy-only fixes, and recheck the staged copy.",
+    };
+  }
   return {
     allowed: false,
     message: "Review generated quality gates, issues, todos, reports, and table readiness.",
@@ -1796,6 +1894,19 @@ function profileRunComplete() {
   return succeeded && Boolean(state.dashboardArtifactIndex) && !state.dashboardLoadingJobId;
 }
 
+function hasRemediableHistoryRun() {
+  return state.runHistory.some((run) => runCanRemediate(run));
+}
+
+function runCanRemediate(run) {
+  const inputMode = run?.input_mode || "";
+  return run?.status === "succeeded" && ["upload", "path", "remediation", "manual_recheck"].includes(inputMode);
+}
+
+function hasRemediationResult() {
+  return Boolean(getBeforeAfterQualityDiffArtifact() || getApprovedRemediationsArtifact());
+}
+
 function canOpenProfileStep(step) {
   if (step === "connect") {
     return true;
@@ -1808,6 +1919,9 @@ function canOpenProfileStep(step) {
   }
   if (step === "review") {
     return profileRunComplete() || Boolean(state.dashboardArtifactIndex);
+  }
+  if (step === "fix") {
+    return profileRunComplete() || Boolean(state.dashboardArtifactIndex) || hasRemediableHistoryRun();
   }
   return false;
 }
@@ -1822,7 +1936,13 @@ function profileStepComplete(step) {
   if (step === "run") {
     return profileRunComplete();
   }
-  return Boolean(state.dashboardArtifactIndex);
+  if (step === "review") {
+    return Boolean(state.dashboardArtifactIndex);
+  }
+  if (step === "fix") {
+    return hasRemediationResult();
+  }
+  return false;
 }
 
 function renderEvaluation() {
@@ -2838,7 +2958,88 @@ function renderJob() {
     els.artifactCount.textContent = "Waiting for run";
   }
   renderStages(job);
+  renderRuntimeRecheckComparison(job);
   renderArtifacts(artifacts);
+}
+
+function renderRuntimeRecheckComparison(job) {
+  if (!els.runtimeRecheckComparison) {
+    return;
+  }
+  if (!isRecheckJob(job)) {
+    els.runtimeRecheckComparison.hidden = true;
+    els.runtimeRecheckComparison.innerHTML = "";
+    return;
+  }
+
+  els.runtimeRecheckComparison.hidden = false;
+  const diff = getBeforeAfterQualityDiffArtifact();
+  const runSummary = getRemediationRunSummaryArtifact();
+  const summary = diff?.summary || runSummary?.quality_diff_summary || null;
+  const sourceJobId = diff?.before_job_id || runSummary?.source_job_id || job?.remediation?.source_job_id || "";
+  const afterJobId = diff?.after_job_id || runSummary?.recheck_job_id || job?.job_id || "";
+  const sourceLabel = runSummary?.source || (job?.input_mode === "remediation" ? "copy-only remediation" : "corrected inputs");
+
+  if (!summary) {
+    const status = jobIsRunning(job)
+      ? "Recheck running"
+      : state.dashboardLoadingJobId
+        ? "Loading comparison"
+        : "Comparison pending";
+    els.runtimeRecheckComparison.innerHTML = `
+      <section class="runtime-recheck-card pending" aria-label="Before and after recheck comparison">
+        <div class="runtime-recheck-heading">
+          <div>
+            <span>Stage 5 recheck</span>
+            <strong>Before / after comparison</strong>
+          </div>
+          <code>${escapeHtml(status)}</code>
+        </div>
+        <div class="runtime-recheck-flow">
+          <div><span>before</span><strong>${escapeHtml(sourceJobId || "baseline run")}</strong></div>
+          <div class="runtime-recheck-arrow" aria-hidden="true">-></div>
+          <div><span>after</span><strong>${escapeHtml(afterJobId || "current run")}</strong></div>
+        </div>
+        <p>Comparison appears here after <code>before_after_quality_diff.json</code> is loaded.</p>
+      </section>
+    `;
+    return;
+  }
+
+  const issueDelta = Number(summary.issue_delta || 0);
+  const tone = issueDelta < 0 ? "success" : issueDelta > 0 ? "danger" : "neutral";
+  const diffUrl = artifactUrlFromArtifacts("before_after_quality_diff.json", job?.artifacts || []);
+  els.runtimeRecheckComparison.innerHTML = `
+    <section class="runtime-recheck-card ${tone}" aria-label="Before and after recheck comparison">
+      <div class="runtime-recheck-heading">
+        <div>
+          <span>Stage 5 recheck · ${escapeHtml(sourceLabel)}</span>
+          <strong>${escapeHtml(sourceJobId || "baseline")} -> ${escapeHtml(afterJobId || "current")}</strong>
+        </div>
+        ${diffUrl ? `<a href="${escapeHtml(diffUrl)}" target="_blank" rel="noopener">Open diff</a>` : `<code>before_after_quality_diff.json</code>`}
+      </div>
+      <div class="runtime-recheck-metrics">
+        ${renderRuntimeRecheckMetric("issues", `${integerText(summary.before_issue_count)} -> ${integerText(summary.after_issue_count)}`, tone)}
+        ${renderRuntimeRecheckMetric("resolved", integerText(summary.resolved_issue_count), "success")}
+        ${renderRuntimeRecheckMetric("new", integerText(summary.new_issue_count), Number(summary.new_issue_count || 0) ? "danger" : "success")}
+        ${renderRuntimeRecheckMetric("blocked gates", `${integerText(summary.before_blocked_gates)} -> ${integerText(summary.after_blocked_gates)}`, Number(summary.after_blocked_gates || 0) ? "warning" : "success")}
+        ${renderRuntimeRecheckMetric("verdict", `${summary.before_verdict || "unknown"} -> ${summary.after_verdict || "unknown"}`, summary.after_verdict === "READY" ? "success" : "warning")}
+      </div>
+    </section>
+  `;
+}
+
+function renderRuntimeRecheckMetric(label, value, tone) {
+  return `
+    <div class="runtime-recheck-metric ${escapeHtml(tone || "")}">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
+function isRecheckJob(job) {
+  return ["manual_recheck", "remediation"].includes(job?.input_mode) || Boolean(job?.remediation?.source_job_id);
 }
 
 function renderStages(job) {
@@ -3157,6 +3358,7 @@ function renderRunHistory() {
       : runs.length
         ? "History ready"
         : "No runs";
+  els.refreshRunHistoryButton.disabled = state.runHistoryLoading || !state.runnerAvailable;
 
   if (state.runHistoryLoading && !runs.length) {
     els.runHistoryList.innerHTML = `<p class="muted">Scanning <code>outputs/web_runs</code> for prior runs...</p>`;
@@ -3173,6 +3375,7 @@ function renderRunHistory() {
 
 function renderRunHistoryItem(run) {
   const selected = run.job_id === state.selectedHistoryJobId;
+  const remediable = runCanRemediate(run);
   const gateSummary = run.quality_gate_summary || {};
   const stages = visibleRuntimeStages(run.stages);
   const stageCount = stages.length || run.stage_count || 0;
@@ -3182,7 +3385,7 @@ function renderRunHistoryItem(run) {
   const finished = run.finished_at ? `finished ${formatRunTimestamp(run.finished_at)}` : "finish time unavailable";
   const created = run.created_at ? `created ${formatRunTimestamp(run.created_at)}` : "created time unavailable";
   return `
-    <button class="run-history-item ${selected ? "selected" : ""}" type="button" data-run-history-job-id="${escapeHtml(run.job_id)}" aria-pressed="${selected ? "true" : "false"}">
+    <button class="run-history-item ${selected ? "selected" : ""} ${remediable ? "" : "unavailable"}" type="button" data-run-history-job-id="${escapeHtml(run.job_id)}" aria-pressed="${selected ? "true" : "false"}" ${remediable ? "" : "disabled"}>
       <span class="run-history-main">
         <strong>${escapeHtml(run.name || run.job_id)}</strong>
         <span class="pill-status ${run.status === "failed" ? "missing" : "mapped"}">${escapeHtml(run.status || "unknown")}</span>
@@ -3197,6 +3400,7 @@ function renderRunHistoryItem(run) {
         <span>${escapeHtml(gateSummaryText(gateSummary))}</span>
         <span>${integerText(stageCount)} stages</span>
         <span>${integerText(failedStageCount)} failed</span>
+        <span>${remediable ? "remediate" : "view only"}</span>
       </span>
     </button>
   `;
@@ -3821,6 +4025,12 @@ function resetDashboardState() {
   state.issueLlmPanelOpen = true;
   state.issueLlmMessage = "";
   state.issueLlmMessageStatus = "";
+  state.remediationRunning = false;
+  state.remediationMessage = "";
+  state.remediationMessageStatus = "";
+  state.manualRecheckRunning = false;
+  state.manualRecheckMessage = "";
+  state.manualRecheckMessageStatus = "";
   state.diagramSelection = null;
   renderDashboard();
 }
@@ -3944,6 +4154,218 @@ async function runIssueLlmEnrichment(issueId) {
   }
 }
 
+async function generateRemediationPlan() {
+  const jobId = state.dashboardArtifactIndex?.job_id || state.currentJob?.job_id || "";
+  if (!jobId) {
+    state.remediationMessage = "Run a completed profile before generating a remediation plan.";
+    state.remediationMessageStatus = "error";
+    renderRemediationSection();
+    return;
+  }
+  state.remediationRunning = true;
+  state.remediationMessage = "Generating remediation_plan.json from completed artifacts...";
+  state.remediationMessageStatus = "pending";
+  renderRemediationSection();
+  try {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/remediation-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Remediation plan generation failed.");
+    }
+    if (state.currentJob?.job_id === jobId) {
+      state.currentJob = {
+        ...state.currentJob,
+        artifacts: payload.artifacts || state.currentJob.artifacts || [],
+      };
+    }
+    state.remediationMessage = "Remediation plan is ready for approval.";
+    state.remediationMessageStatus = "success";
+    await loadDashboard(jobId, {
+      force: true,
+      preserveSelection: true,
+      keepCurrentArtifactsDuringLoad: true,
+      preserveViewportSelector: ".remediation-section",
+    });
+  } catch (error) {
+    state.remediationMessage = error.message || "Remediation plan generation failed.";
+    state.remediationMessageStatus = "error";
+    renderRemediationSection();
+  } finally {
+    state.remediationRunning = false;
+    renderRemediationSection();
+  }
+}
+
+async function startRemediationRecheck() {
+  const sourceJobId = state.dashboardArtifactIndex?.job_id || state.currentJob?.job_id || "";
+  const plan = getRemediationPlanArtifact();
+  const approvedIds = remediationSupportedActions(plan)
+    .map((action) => action.remediation_id)
+    .filter(Boolean);
+  const eligibility = deterministicRemediationEligibility(plan, approvedIds);
+  if (!sourceJobId || !eligibility.allowed) {
+    state.remediationMessage = eligibility.reason || "Generate a remediation plan before starting recheck.";
+    state.remediationMessageStatus = "error";
+    renderRemediationSection();
+    return;
+  }
+  state.remediationRunning = true;
+  state.remediationMessage = "Creating staged copy and starting remediation recheck...";
+  state.remediationMessageStatus = "pending";
+  renderRemediationSection();
+
+  try {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(sourceJobId)}/remediation-runs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approved_remediation_ids: approvedIds }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Remediation recheck failed to start.");
+    }
+    state.runEvents = [];
+    state.runtimeAutoFollowStageName = "";
+    state.currentJob = payload;
+    state.profileStep = "run";
+    markProfileStepVisited("run");
+    resetDashboardState();
+    state.remediationRunning = true;
+    state.remediationMessage = "Remediation recheck is running on a staged copy.";
+    state.remediationMessageStatus = "pending";
+    renderRunnerMessage("Remediation recheck started on staged CSV + DBML copy.", "pending");
+    connectEventStream(payload.events_url);
+  } catch (error) {
+    state.remediationMessage = error.message || "Remediation recheck failed to start.";
+    state.remediationMessageStatus = "error";
+    renderRemediationSection();
+  } finally {
+    state.remediationRunning = false;
+    renderAll();
+  }
+}
+
+async function startManualUploadRecheck() {
+  const sourceJobId = manualRecheckBaselineJobId();
+  if (!sourceJobId) {
+    setManualRecheckMessage("Open a completed baseline run before uploading corrected files.", "error");
+    renderManualRecheckSection();
+    return;
+  }
+  const dbmlFile = els.manualRecheckDbmlInput.files?.[0] || null;
+  const csvFiles = [...(els.manualRecheckCsvInput.files || [])];
+  if (!csvFiles.length) {
+    setManualRecheckMessage("At least one corrected CSV file is required. DBML reuses the baseline unless supplied.", "error");
+    renderManualRecheckSection();
+    return;
+  }
+  if (!state.runnerAvailable) {
+    setManualRecheckMessage("Open this page with vsf-profiler web to run manual recheck.", "error");
+    renderManualRecheckSection();
+    return;
+  }
+
+  const form = new FormData();
+  if (dbmlFile) {
+    form.append("dbml", dbmlFile, dbmlFile.name);
+  }
+  csvFiles.forEach((file) => {
+    form.append("csv", file, file.name);
+  });
+
+  state.manualRecheckRunning = true;
+  state.manualRecheckMessage = "Uploading corrected files and starting recheck...";
+  state.manualRecheckMessageStatus = "pending";
+  renderManualRecheckSection();
+  try {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(sourceJobId)}/manual-recheck-runs`, {
+      method: "POST",
+      body: form,
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Manual upload recheck failed to start.");
+    }
+    els.manualRecheckDbmlInput.value = "";
+    els.manualRecheckCsvInput.value = "";
+    startRecheckRuntime(payload, "Manual corrected upload recheck started.");
+  } catch (error) {
+    state.manualRecheckMessage = error.message || "Manual upload recheck failed to start.";
+    state.manualRecheckMessageStatus = "error";
+    renderManualRecheckSection();
+  } finally {
+    state.manualRecheckRunning = false;
+    renderAll();
+  }
+}
+
+async function startCorrectedDemoRecheck() {
+  const sourceJobId = manualRecheckBaselineJobId();
+  const preset = demoPresets.smallCorrected;
+  if (!sourceJobId) {
+    setManualRecheckMessage("Open a completed baseline run before running the corrected demo.", "error");
+    renderManualRecheckSection();
+    return;
+  }
+  if (!preset) {
+    setManualRecheckMessage("Corrected demo preset is not available in js/demo-data.js.", "error");
+    renderManualRecheckSection();
+    return;
+  }
+  if (!state.runnerAvailable) {
+    setManualRecheckMessage("Open this page with vsf-profiler web to run corrected demo recheck.", "error");
+    renderManualRecheckSection();
+    return;
+  }
+
+  state.manualRecheckRunning = true;
+  state.manualRecheckMessage = "Starting corrected small demo recheck from local path...";
+  state.manualRecheckMessageStatus = "pending";
+  renderManualRecheckSection();
+  try {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(sourceJobId)}/manual-recheck-runs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dbml_path: preset.dbmlPath,
+        csv_dir: preset.csvDir,
+        target: preset.target,
+        source_label: "demo_corrected_path",
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Corrected demo recheck failed to start.");
+    }
+    startRecheckRuntime(payload, "Corrected demo recheck started from data/demo_small_corrected.");
+  } catch (error) {
+    state.manualRecheckMessage = error.message || "Corrected demo recheck failed to start.";
+    state.manualRecheckMessageStatus = "error";
+    renderManualRecheckSection();
+  } finally {
+    state.manualRecheckRunning = false;
+    renderAll();
+  }
+}
+
+function startRecheckRuntime(payload, message) {
+  state.runEvents = [];
+  state.runtimeAutoFollowStageName = "";
+  state.currentJob = payload;
+  state.profileStep = "run";
+  markProfileStepVisited("run");
+  resetDashboardState();
+  state.manualRecheckRunning = true;
+  state.manualRecheckMessage = message;
+  state.manualRecheckMessageStatus = "pending";
+  renderRunnerMessage(`${message} Runtime events are streaming from run_events.jsonl.`, "pending");
+  connectEventStream(payload.events_url);
+}
+
 function wait(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
@@ -4008,6 +4430,8 @@ function renderDashboard() {
   renderQualityGatesSection();
   renderTableImpactSection();
   renderTodosSection();
+  renderManualRecheckSection();
+  renderRemediationSection();
   renderReportExportSection();
 
   if (!loaded) {
@@ -4737,15 +5161,284 @@ function renderTodosSection() {
   `;
 }
 
+function renderRemediationSection() {
+  const loaded = Boolean(state.dashboardArtifactIndex);
+  const plan = getRemediationPlanArtifact();
+  const approved = getApprovedRemediationsArtifact();
+  const runSummary = getRemediationRunSummaryArtifact();
+  const diff = getBeforeAfterQualityDiffArtifact();
+
+  if (!loaded) {
+    els.remediationStatus.textContent = state.dashboardLoadingJobId
+      ? "Fetching remediation artifacts"
+      : "Waiting for remediation_plan.json";
+    els.remediationGrid.innerHTML = `<p class="muted">Run a job to prepare copy-only remediation actions.</p>`;
+    setRemediationMessage("Remediation actions require approval and apply only to a staged copy.", "");
+    return;
+  }
+
+  if (!plan) {
+    els.remediationStatus.textContent = "Plan artifact missing";
+    els.remediationGrid.innerHTML = `
+      <section class="remediation-empty">
+        <strong>Generate remediation plan</strong>
+        <p>Build remediation_plan.json from generated issues and deterministic action plans.</p>
+        <button class="button secondary compact" type="button" data-remediation-generate ${state.remediationRunning ? "disabled" : ""}>
+          ${state.remediationRunning ? "Generating..." : "Generate plan"}
+        </button>
+      </section>
+    `;
+    setRemediationMessage(state.remediationMessage || "No source data will be changed.", state.remediationMessageStatus);
+    return;
+  }
+
+  const actions = Array.isArray(plan.actions) ? plan.actions : [];
+  const supported = remediationSupportedActions(plan);
+  const summary = plan.summary || {};
+  els.remediationStatus.textContent = `${integerText(supported.length)}/${integerText(actions.length)} copy actions · source=deterministic`;
+  els.remediationGrid.innerHTML = `
+    ${renderRemediationSummary(plan, supported)}
+    ${renderRemediationDiff(diff, runSummary)}
+    ${renderApprovedRemediations(approved)}
+    ${renderRemediationActionQueue(actions)}
+  `;
+  setRemediationMessage(
+    state.remediationMessage ||
+      `${integerText(summary.review_required_count || 0)} actions need manual review; supported actions apply only to a staged copy.`,
+    state.remediationMessageStatus,
+  );
+}
+
+function renderRemediationSummary(plan, supported) {
+  const summary = plan.summary || {};
+  const policy = plan.policy || {};
+  const supportedIds = supported.map((action) => action.remediation_id).filter(Boolean);
+  const eligibility = deterministicRemediationEligibility(plan, supportedIds);
+  const disabled = !eligibility.allowed;
+  return `
+    <section class="remediation-summary-card">
+      <div class="remediation-summary-copy">
+        <span>Copy-only policy</span>
+        <strong>${escapeHtml(policy.application_target || "staged_copy_only")}</strong>
+        <p>LLM role: ${escapeHtml(policy.llm_role || "advisory_only")} · source mutation: ${escapeHtml(policy.source_data_mutation || "never")}</p>
+      </div>
+      <div class="remediation-summary-metrics">
+        <div><span>actions</span><strong>${integerText(summary.action_count || 0)}</strong></div>
+        <div><span>supported</span><strong>${integerText(supported.length)}</strong></div>
+        <div><span>review</span><strong>${integerText(summary.review_required_count || 0)}</strong></div>
+      </div>
+      <div class="remediation-apply-control">
+        <button class="button primary" type="button" data-remediation-apply ${disabled ? "disabled" : ""} title="${escapeHtml(eligibility.reason || "")}">
+          ${escapeHtml(remediationApplyButtonLabel(eligibility))}
+        </button>
+        <p>${escapeHtml(eligibility.reason || "Creates a staged CSV + DBML copy, applies supported deterministic actions, then reruns profiling.")}</p>
+      </div>
+    </section>
+  `;
+}
+
+function deterministicRemediationEligibility(plan, approvedIds) {
+  const sourceJobId = state.dashboardArtifactIndex?.job_id || state.currentJob?.job_id || "";
+  const sourceMode = state.currentJob?.job_id === sourceJobId
+    ? state.currentJob?.input_mode || ""
+    : "";
+  if (state.remediationRunning) {
+    return { allowed: false, reason: "Remediation recheck is already starting." };
+  }
+  if (jobIsRunning()) {
+    return { allowed: false, reason: "Wait for the current pipeline run to finish before starting another recheck." };
+  }
+  if (!sourceJobId || !plan) {
+    return { allowed: false, reason: "Generate remediation_plan.json before starting a copy-only recheck." };
+  }
+  if (!["upload", "path", "remediation"].includes(sourceMode)) {
+    return {
+      allowed: false,
+      reason: "Copy-only auto-apply starts from an original CSV+DBML run. For corrected-demo or manual-recheck runs, use Upload corrected inputs / Run corrected demo from a baseline.",
+    };
+  }
+  if (!approvedIds.length) {
+    return {
+      allowed: false,
+      reason: "No supported deterministic fixes are available for this run. Use corrected inputs when the remaining work needs human edits.",
+    };
+  }
+  return { allowed: true, reason: "" };
+}
+
+function remediationApplyButtonLabel(eligibility) {
+  if (state.remediationRunning) {
+    return "Starting recheck...";
+  }
+  if (eligibility.allowed) {
+    return "Apply supported fixes to copy + re-run";
+  }
+  if (jobIsRunning()) {
+    return "Pipeline still running";
+  }
+  if (!state.currentJob || !getRemediationPlanArtifact()) {
+    return "Generate plan first";
+  }
+  if (!["upload", "path", "remediation"].includes(state.currentJob.input_mode || "")) {
+    return "Auto-apply unavailable for this run";
+  }
+  return "No supported fixes to apply";
+}
+
+function renderRemediationDiff(diff, runSummary) {
+  const summary = diff?.summary || runSummary?.quality_diff_summary;
+  if (!summary) {
+    return `
+      <section class="remediation-diff-card pending">
+        <strong>Before / after diff</strong>
+        <p>Run a remediation recheck to compare issue count, readiness, and blocked gates.</p>
+      </section>
+    `;
+  }
+  const issueDelta = Number(summary.issue_delta || 0);
+  const issueTone = issueDelta < 0 ? "success" : issueDelta > 0 ? "danger" : "neutral";
+  return `
+    <section class="remediation-diff-card ${issueTone}">
+      <div class="remediation-diff-heading">
+        <strong>Before / after diff</strong>
+        <span>${escapeHtml(diff?.after_job_id || runSummary?.remediation_job_id || "recheck")}</span>
+      </div>
+      <div class="remediation-diff-grid">
+        <div><span>issues</span><strong>${integerText(summary.before_issue_count)} -> ${integerText(summary.after_issue_count)}</strong></div>
+        <div><span>resolved</span><strong>${integerText(summary.resolved_issue_count)}</strong></div>
+        <div><span>new</span><strong>${integerText(summary.new_issue_count)}</strong></div>
+        <div><span>blocked gates</span><strong>${integerText(summary.before_blocked_gates)} -> ${integerText(summary.after_blocked_gates)}</strong></div>
+      </div>
+      <p>${escapeHtml(summary.before_verdict || "unknown")} -> ${escapeHtml(summary.after_verdict || "unknown")}</p>
+    </section>
+  `;
+}
+
+function renderApprovedRemediations(approved) {
+  if (!approved) {
+    return "";
+  }
+  const summary = approved.summary || {};
+  return `
+    <section class="remediation-approved-card">
+      <strong>Approved batch</strong>
+      <div class="remediation-approved-grid">
+        <div><span>approved</span><strong>${integerText(summary.approved_count || 0)}</strong></div>
+        <div><span>changed</span><strong>${integerText(summary.changed_action_count || 0)}</strong></div>
+        <div><span>affected</span><strong>${integerText(summary.affected_count || 0)}</strong></div>
+      </div>
+    </section>
+  `;
+}
+
+function renderRemediationActionQueue(actions) {
+  if (!actions.length) {
+    return `
+      <section class="remediation-empty">
+        <strong>No remediation actions generated.</strong>
+        <p>No issues were present, so there is nothing to apply or recheck.</p>
+      </section>
+    `;
+  }
+  const visible = actions.slice(0, 8);
+  const remaining = actions.slice(visible.length);
+  return `
+    <section class="remediation-action-queue">
+      <div class="remediation-action-heading">
+        <strong>Action approval queue</strong>
+        <span>${integerText(actions.length)} actions</span>
+      </div>
+      <div class="remediation-action-list">
+        ${visible.map(renderRemediationActionRow).join("")}
+      </div>
+      ${remaining.length ? `
+        <details class="remediation-more">
+          <summary>Show ${integerText(remaining.length)} more action${remaining.length === 1 ? "" : "s"}</summary>
+          <div class="remediation-action-list compact">
+            ${remaining.map(renderRemediationActionRow).join("")}
+          </div>
+        </details>
+      ` : ""}
+    </section>
+  `;
+}
+
+function renderRemediationActionRow(action) {
+  const operation = action.deterministic_operation || {};
+  const supported = Boolean(operation.supported);
+  const columns = Array.isArray(action.columns) && action.columns.length
+    ? action.columns.join(", ")
+    : "table";
+  return `
+    <article class="remediation-action-row ${supported ? "supported" : "review"}">
+      <span class="remediation-action-status">${supported ? "copy fix" : "review"}</span>
+      <div>
+        <code>${escapeHtml(action.remediation_id || "REMEDY")}</code>
+        <strong>${escapeHtml(action.table || "dataset")}.${escapeHtml(columns)}</strong>
+        <p>${escapeHtml(action.proposed_change || operation.reason || "Review remediation action.")}</p>
+      </div>
+      <span class="remediation-action-meta">
+        <code>${escapeHtml(action.issue_id || "issue")}</code>
+        <small>${escapeHtml(action.issue_type || "UNKNOWN")}</small>
+      </span>
+    </article>
+  `;
+}
+
+function remediationSupportedActions(plan) {
+  return (Array.isArray(plan?.actions) ? plan.actions : []).filter((action) => (
+    action?.deterministic_operation?.supported
+  ));
+}
+
+function renderManualRecheckSection() {
+  const loaded = Boolean(state.dashboardArtifactIndex);
+  const baselineJobId = manualRecheckBaselineJobId();
+  const disabled = state.manualRecheckRunning || !loaded || !baselineJobId || !state.runnerAvailable || jobIsRunning();
+  const correctedPreset = demoPresets.smallCorrected;
+  els.manualRecheckStatus.textContent = loaded
+    ? `Baseline ${baselineJobId}`
+    : state.dashboardLoadingJobId
+      ? "Fetching baseline artifacts"
+      : "Waiting for baseline run";
+  els.manualRecheckBaseline.textContent = baselineJobId || "No run selected";
+  els.manualRecheckButton.disabled = disabled;
+  els.manualRecheckDemoButton.disabled = disabled || !correctedPreset;
+  const message = state.manualRecheckMessage ||
+    (loaded
+      ? "Upload corrected CSV files, optionally override DBML, or run the bundled corrected demo against this baseline."
+      : "Open a completed run from history, then recheck corrected CSV files or the bundled corrected demo.");
+  els.manualRecheckMessage.textContent = message;
+  els.manualRecheckMessage.dataset.status = state.manualRecheckMessageStatus || "";
+  els.manualRecheckMessage.hidden = !message;
+}
+
+function manualRecheckBaselineJobId() {
+  return state.dashboardArtifactIndex?.job_id || "";
+}
+
+function setManualRecheckMessage(message, status) {
+  state.manualRecheckMessage = message || "";
+  state.manualRecheckMessageStatus = status || "";
+  els.manualRecheckMessage.textContent = state.manualRecheckMessage;
+  els.manualRecheckMessage.dataset.status = state.manualRecheckMessageStatus;
+  els.manualRecheckMessage.hidden = !state.manualRecheckMessage;
+}
+
+function setRemediationMessage(message, status) {
+  els.remediationMessage.textContent = message || "";
+  els.remediationMessage.dataset.status = status || "";
+  els.remediationMessage.hidden = !message;
+}
+
 function renderReportExportSection() {
   const loaded = Boolean(state.dashboardArtifactIndex);
   if (!loaded) {
     els.reportExportStatus.textContent = state.dashboardLoadingJobId
       ? "Fetching reports"
       : "Waiting for reports";
-    els.reportExportGrid.innerHTML = `<p class="muted">Run a job to open generated reports and review issue todo summaries.</p>`;
-    els.reportExportTodos.innerHTML = `<p class="muted">Issue todo summary loads after deterministic todos are generated.</p>`;
-    els.reportExportMessage.textContent = "Reports and issue todo summaries are ready after a completed run.";
+    els.reportExportGrid.innerHTML = `<p class="muted">Run a job to open generated reports.</p>`;
+    els.reportExportMessage.textContent = "Reports are ready after a completed run.";
     els.reportExportMessage.dataset.status = "";
     return;
   }
@@ -4758,35 +5451,9 @@ function renderReportExportSection() {
     </section>
   `;
   els.reportExportStatus.textContent = reportLinks ? "Reports ready" : "Reports missing";
-
-  const todoArtifact = getIssueTodosArtifact();
-  if (!todoArtifact) {
-    els.reportExportTodos.innerHTML = `
-      <section class="report-export-empty">
-        <strong>Issue todo summary unavailable.</strong>
-        <p>Fix data and Verify after fix exports load when deterministic todos are generated.</p>
-      </section>
-    `;
-    els.reportExportMessage.textContent = "Issue todo summary needs issue_todos.json from a completed run.";
-    els.reportExportMessage.dataset.status = "";
-    return;
-  }
-
-  const groups = Array.isArray(todoArtifact.groups) ? todoArtifact.groups : [];
-  const fixGroups = groups.filter((group) => group.todo_type === "fix_data");
-  const verifyGroups = groups.filter((group) => group.todo_type === "verify_after_fix");
-  const issueCount = todoIssueWorkItems(groups).length;
-  els.reportExportTodos.innerHTML = `
-    <div class="runtime-heading compact">
-      <strong>Issue todo summary</strong>
-      <span>${integerText(issueCount)} issues</span>
-    </div>
-    <div class="report-export-todo-split" aria-label="Todo export summary">
-      ${renderReportExportTodoSummary("Fix data", fixGroups)}
-      ${renderReportExportTodoSummary("Verify after fix", verifyGroups)}
-    </div>
-  `;
-  els.reportExportMessage.textContent = "Reports and issue todo summaries are ready for review.";
+  els.reportExportMessage.textContent = reportLinks
+    ? "Reports are ready for review."
+    : "Report output was not found for this run.";
   els.reportExportMessage.dataset.status = "";
 }
 
@@ -4851,17 +5518,6 @@ function issueLlmActionTarget(issue) {
     ? issue.columns.join(", ")
     : "table-level";
   return `${issueGuid(issue)} · ${issue.table || "dataset"}.${columns}`;
-}
-
-function renderReportExportTodoSummary(title, groups) {
-  const occurrenceCount = groups.reduce((sum, group) => sum + Number(group.occurrence_count || 0), 0);
-  const issueCount = todoIssueWorkItems(groups).length;
-  return `
-    <article class="report-export-todo-card">
-      <strong>${escapeHtml(title)}</strong>
-      <p>${integerText(issueCount)} issues · ${integerText(occurrenceCount)} actions</p>
-    </article>
-  `;
 }
 
 function todoTypeLabel(todoType) {
@@ -5478,7 +6134,6 @@ function renderStage4ReviewBriefing(allIssues, filteredIssues) {
   const issues = sortIssuesForReview(allIssues || []);
   const focusedIssues = Array.isArray(filteredIssues) ? filteredIssues : issues;
   const topIssue = issues[0] || null;
-  const topPlan = topIssue ? getIssueActionPlan(topIssue) : null;
   const topLlm = topIssue ? getIssueLlmEnrichment(topIssue, "openai") : null;
   const missingRows = dashboardChartRows(dashboardChartPaths.missingColumns)
     .filter((row) => Number(row.null_count || 0) > 0);
@@ -5497,7 +6152,7 @@ function renderStage4ReviewBriefing(allIssues, filteredIssues) {
       <div class="review-briefing-heading">
         <div>
           <p class="eyebrow">Review briefing</p>
-          <h4>What to fix, verify, and escalate</h4>
+          <h4>What to inspect and escalate</h4>
         </div>
         <span>${integerText(focusedIssues.length)}/${integerText(issues.length)} issues in current view</span>
       </div>
@@ -5508,7 +6163,6 @@ function renderStage4ReviewBriefing(allIssues, filteredIssues) {
         ${renderStage4TableMap(tableRows)}
         ${renderStage4DataSignals(missingRows, outlierRows)}
       </div>
-      ${renderStage4FixVerifyLane(topIssue, topPlan, topLlm)}
     </section>
   `;
 }
@@ -5551,7 +6205,7 @@ function stage4BriefingCards({ issues, topIssue, missingRows, outlierRows, topLl
       tone: topLlm?.status === "succeeded" ? "info" : "warning",
       bullets: [
         `Top issue guidance: ${llmStatus}.`,
-        topLlm?.status === "succeeded" ? "Add-on bullets merge into Fix / Todo." : "Run OpenAI guidance on selected issue if needed.",
+        topLlm?.status === "succeeded" ? "Selected-issue guidance is available." : "Run OpenAI guidance on selected issue if needed.",
         "Human review required before applying AI advice.",
       ],
     },
@@ -5650,38 +6304,6 @@ function renderStage4SignalRows(rows, emptyText) {
       `).join("")}
     </div>
   `;
-}
-
-function renderStage4FixVerifyLane(issue, plan, llmEntry) {
-  if (!issue) {
-    return "";
-  }
-  const defaultFix = firstActionPlanText(plan, "fix_data_checklist") || "Inspect bounded sample rows, then fix source extract, pipeline, or DBML contract.";
-  const defaultVerify = firstActionPlanText(plan, "verify_after_fix_checklist") || `Rerun and confirm ${issueGuid(issue)} no longer appears.`;
-  const response = llmEntry?.structured_response || {};
-  const llmFix = firstArrayText(response.extra_fix_suggestion);
-  const llmVerify = firstArrayText(response.extra_verification);
-  return `
-    <article class="review-fix-lane">
-      <header>
-        <div>
-          <strong>${escapeHtml(issueGuid(issue))} · ${escapeHtml(issueTypeLabel(issue))}</strong>
-          <span>${escapeHtml(issue.table || "dataset")}.${escapeHtml(issuePrimaryColumn(issue))} · ${integerText(issue.bad_count)} bad rows</span>
-        </div>
-        <span class="issue-severity-token ${dashboardTone(issue.severity)}">${escapeHtml(todoPriorityToken(issue.severity))}</span>
-      </header>
-      <div class="review-fix-lane-grid">
-        <div><span>Default fix</span><p>${escapeHtml(defaultFix)}</p></div>
-        <div><span>Default verify</span><p>${escapeHtml(defaultVerify)}</p></div>
-        <div><span>OpenAI add-on</span><p>${escapeHtml(llmFix || llmVerify || "Not generated for this issue.")}</p></div>
-      </div>
-    </article>
-  `;
-}
-
-function firstActionPlanText(plan, key) {
-  const values = Array.isArray(plan?.[key]) ? plan[key] : [];
-  return firstArrayText(values);
 }
 
 function firstArrayText(values) {
@@ -7619,6 +8241,26 @@ function getQualityGatesArtifact() {
   return artifact && typeof artifact === "object" && !Array.isArray(artifact) ? artifact : null;
 }
 
+function getRemediationPlanArtifact() {
+  const artifact = state.dashboardArtifacts["remediation_plan.json"];
+  return artifact && typeof artifact === "object" && !Array.isArray(artifact) ? artifact : null;
+}
+
+function getApprovedRemediationsArtifact() {
+  const artifact = state.dashboardArtifacts["approved_remediations.json"];
+  return artifact && typeof artifact === "object" && !Array.isArray(artifact) ? artifact : null;
+}
+
+function getRemediationRunSummaryArtifact() {
+  const artifact = state.dashboardArtifacts["remediation_run_summary.json"];
+  return artifact && typeof artifact === "object" && !Array.isArray(artifact) ? artifact : null;
+}
+
+function getBeforeAfterQualityDiffArtifact() {
+  const artifact = state.dashboardArtifacts["before_after_quality_diff.json"];
+  return artifact && typeof artifact === "object" && !Array.isArray(artifact) ? artifact : null;
+}
+
 function getL4Guardrail() {
   const artifact = state.dashboardArtifacts["guardrail_report.json"];
   return artifact && typeof artifact === "object" && !Array.isArray(artifact) ? artifact : {};
@@ -7672,6 +8314,10 @@ function artifactLabel(path) {
     "run_summary.json": "Run summary",
     "l4_report.md": "Optional LLM report",
     "guardrail_report.json": "LLM output validation report",
+    "remediation_plan.json": "Remediation plan",
+    "approved_remediations.json": "Approved remediations",
+    "remediation_run_summary.json": "Remediation run summary",
+    "before_after_quality_diff.json": "Before/after quality diff",
   };
   return labels[path] || path.replace(/^charts\//, "Chart: ");
 }

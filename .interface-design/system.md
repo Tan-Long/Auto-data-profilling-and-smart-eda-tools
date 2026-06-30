@@ -97,6 +97,37 @@ Data style: monospace with tabular numbers.
 - Main workspace uses a neutral canvas and white panels.
 - Primary sequence is CSV+DBML setup, runtime progress, issue review, table
   readiness, report links, developer artifact evidence, then setup details.
+- The first viewport should read as an operational command surface, not a
+  landing page: concise workflow mode selection, local runner boundaries, and
+  source/mutation policy are visible before long explanatory copy.
+- UI presets and path-run controls submit DBML, CSV directory, optional target,
+  and mapping overrides only. Rule files are treated as backend/API
+  compatibility, not a product-facing UI input.
+
+### Workflow Timeline
+
+- Profile flow uses five visible stages: Connect, Preflight Review, Run,
+  Review, and Fix & Recheck.
+- Locked stages remain visible with muted styling instead of disappearing; this
+  preserves orientation and makes history-based remediation discoverable.
+- The main stage strip uses five stable columns on desktop and responsive
+  wrapping/stacking only at smaller breakpoints.
+
+### Fix & Recheck
+
+- Stage 5 exposes two separate recheck paths: user-supplied corrected inputs and
+  deterministic copy-only remediation.
+- Manual recheck always starts from a selected baseline run, stores corrected
+  CSV files plus an optional DBML override as a new run input, runs LLM-off, and
+  reports before/after quality diff artifacts.
+- Demo support uses a bundled corrected small dataset so the recheck path can be
+  shown without editing source files during a walkthrough.
+- Deterministic remediation stays advisory/approval-based and writes only to a
+  staged copy; LLM guidance must not mutate source data.
+- The deterministic apply button must expose why it cannot run: no supported
+  actions, an in-progress pipeline, or a source run type that is only valid for
+  manual corrected-input recheck. Disabled controls need a visible reason near
+  the control, not only a browser-disabled state.
 
 ### Button
 
@@ -146,6 +177,9 @@ Data style: monospace with tabular numbers.
   duration, skip/error information, and stage-specific key/value evidence.
 - Expanded details should use compact key/value rows, not a separate developer
   artifact pane.
+- Stage 5 recheck runs should surface a compact before/after comparison inside
+  Stage 3 runtime after completion, using `before_after_quality_diff.json`, so
+  corrected-demo runs keep baseline context while users inspect runtime stages.
 
 ### Compact Report Layering
 
@@ -182,6 +216,8 @@ Data style: monospace with tabular numbers.
 - Issue detail should appear immediately after the issue table, keep raw
   evidence collapsible by default, and use internal scrolling for long
   deterministic action plans instead of stretching the whole review stage.
+- Todos are a single dedicated Stage 4 surface. Review briefing and
+  Report / Export should not repeat todo summary cards or fix/verify lanes.
 
 ### Local ERD Diagram
 
@@ -227,3 +263,10 @@ Data style: monospace with tabular numbers.
 | Add compact visual issue review | Stage 4 text-only issue review was hard to scan; compact charts, an issue table, and a selected-issue focus map make table, column, type, and affected rows visible before detailed text | 2026-06-24 |
 | Keep Run-to-Review transition manual | Demo users need to see all runtime stages and generated artifacts before entering Stage 4; successful runs unlock Review but do not auto-navigate away from Stage 3 | 2026-06-24 |
 | Add runtime stage explainability | Demo users need to understand what each Stage 3 runtime step does without reading raw artifacts, so rows expose hover help and expandable deterministic details in place | 2026-06-24 |
+| Use a fixed five-stage workflow timeline | Hiding locked stages made the console feel fragmented after adding Fix & Recheck; visible locked stages preserve orientation and make history remediation discoverable | 2026-06-30 |
+| Use command-strip boundaries on the first viewport | The product should open as a local data-quality console, so the first screen now exposes source type, local runner, and source-mutation policy before detailed workflow surfaces | 2026-06-30 |
+| Split Stage 5 into manual corrected recheck and deterministic staged remediation | Users need to prove their own fixed CSV upload, with DBML override only when needed, as well as demo copy-only automation; both paths must preserve source files while producing before/after diff artifacts | 2026-06-30 |
+| Keep Todos as the only Stage 4 todo surface | Repeating fix/verify lanes in Review briefing or Report / Export made Stage 4 feel duplicated; todo work now lives only in the dedicated Todos section | 2026-06-30 |
+| Remove rule-file inputs from UI presets and run controls | The demo workflow is CSV+DBML first; hidden preset rule paths caused missing-file failures and made the UI contract harder to explain | 2026-06-30 |
+| Show recheck comparison in Stage 3 runtime | Corrected-demo and copy-remediation reruns otherwise looked like ordinary fresh runs; the runtime stage now keeps before/after issue, verdict, and gate deltas visible next to the execution timeline | 2026-06-30 |
+| Make deterministic apply eligibility explicit | The copy-only remediation button previously looked inert when no supported action or invalid source mode applied; it now renders the exact reason and shares the same eligibility check with the click handler | 2026-06-30 |

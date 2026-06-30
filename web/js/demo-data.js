@@ -1,7 +1,7 @@
 (function () {
   const demoDbml = `Table customers {
   customer_id varchar [pk, not null]
-  customer_name varchar
+  customer_name varchar [not null]
   customer_state varchar
 }
 
@@ -233,8 +233,52 @@ Table olist_geolocation_dataset {
       dbmlName: "demo_schema.dbml",
       dbmlPath: "data/demo_small/schema.dbml",
       csvDir: "data/demo_small/csv",
+      target: "order_reviews.review_score",
       dbmlText: demoDbml,
       csvs: demoCsvs,
+    },
+    smallCorrected: {
+      label: "Corrected small demo",
+      dbmlName: "demo_schema_corrected.dbml",
+      dbmlPath: "data/demo_small_corrected/schema.dbml",
+      csvDir: "data/demo_small_corrected/csv",
+      target: "order_reviews.review_score",
+      dbmlText: demoDbml,
+      csvs: [
+        { name: "customers.csv", stem: "customers", columns: ["customer_id", "customer_name", "customer_state"], size: 95 },
+        {
+          name: "orders.csv",
+          stem: "orders",
+          columns: [
+            "order_id",
+            "customer_id",
+            "order_status",
+            "order_purchase_timestamp",
+            "order_delivered_customer_date",
+          ],
+          size: 308,
+        },
+        {
+          name: "order_items.csv",
+          stem: "order_items",
+          columns: ["order_id", "order_item_id", "product_id", "seller_id", "price", "freight_value"],
+          size: 178,
+        },
+        {
+          name: "order_payments.csv",
+          stem: "order_payments",
+          columns: ["order_id", "payment_sequential", "payment_type", "payment_installments", "payment_value"],
+          size: 154,
+        },
+        {
+          name: "order_reviews.csv",
+          stem: "order_reviews",
+          columns: ["review_id", "order_id", "review_score", "review_comment_message"],
+          size: 135,
+        },
+        { name: "products.csv", stem: "products", columns: ["product_id", "product_category_name"], size: 61 },
+        { name: "sellers.csv", stem: "sellers", columns: ["seller_id", "seller_state"], size: 39 },
+      ],
     },
     olist: {
       label: "Legacy Olist sample",

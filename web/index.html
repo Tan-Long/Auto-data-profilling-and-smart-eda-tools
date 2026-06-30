@@ -28,8 +28,13 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Guided data-quality workflow</p>
-          <h2>Choose whether to profile your CSV+DBML data or evaluate the tool on built-in faulty datasets.</h2>
-          <p class="topbar-note">Profile runs use the Python/DuckDB runner started from this repo. Evaluation runs curated local faulty datasets only and compares VSF output with seeded ground truth and the Great Expectations baseline state.</p>
+          <h2>Profile CSV+DBML data, review evidence, and recheck copy-only fixes.</h2>
+          <p class="topbar-note">The console keeps each step tied to local runner artifacts: source contract, runtime events, quality gates, issue evidence, and remediation diffs.</p>
+        </div>
+        <div class="topbar-status-grid" aria-label="Runner boundary">
+          <div><span>Source</span><strong>CSV + DBML</strong></div>
+          <div><span>Runner</span><strong>Local DuckDB</strong></div>
+          <div><span>Fixes</span><strong>Staged copy</strong></div>
         </div>
         <div class="topbar-actions" id="topbarActions" hidden>
           <button class="button ghost" id="loadDemoButton" type="button">Reset demo</button>
@@ -40,17 +45,22 @@
       <section class="flow-chooser" id="flowChooser" aria-labelledby="flowChooserTitle">
         <div class="flow-chooser-heading">
           <div>
-            <p class="eyebrow">First step</p>
+            <p class="eyebrow">Console mode</p>
             <h3 id="flowChooserTitle">What do you want to do?</h3>
           </div>
           <span class="badge" id="flowModeStatus">Choose a flow</span>
+        </div>
+        <div class="flow-command-strip" aria-label="Workflow boundaries">
+          <div><span>Profile path</span><strong>Connect -> Run -> Review -> Fix</strong></div>
+          <div><span>Evaluate path</span><strong>Curated benchmark only</strong></div>
+          <div><span>Data mutation</span><strong>Never on source files</strong></div>
         </div>
         <div class="flow-grid">
           <article class="flow-card" id="profileFlowCard">
             <div>
               <p class="eyebrow">Profile</p>
               <h4>Profile my data</h4>
-              <p>Use a DBML schema and related CSV files, then run the existing local profiler.</p>
+              <p>Use a DBML schema and related CSV files, then move through the five-stage local review workflow.</p>
             </div>
             <button class="button primary" id="profileFlowButton" type="button" aria-pressed="false">Profile my data</button>
           </article>
@@ -58,7 +68,7 @@
             <div>
               <p class="eyebrow">Evaluate</p>
               <h4>Evaluate tool</h4>
-              <p>Run a built-in faulty dataset benchmark with known ground truth and baseline coverage.</p>
+              <p>Run a built-in faulty dataset benchmark with known ground truth and Great Expectations baseline coverage.</p>
             </div>
             <button class="button secondary" id="evaluateFlowButton" type="button" aria-pressed="false">Evaluate tool</button>
           </article>
@@ -154,6 +164,13 @@
           <div class="status-card-copy">
             <strong>Review</strong>
             <p>Inspect results</p>
+          </div>
+        </article>
+        <article class="status-card" data-profile-step-card="fix" role="button" tabindex="-1">
+          <span class="step-number">05</span>
+          <div class="status-card-copy">
+            <strong>Fix &amp; Recheck</strong>
+            <p>Copy + rerun</p>
           </div>
         </article>
       </section>
@@ -293,6 +310,7 @@
           </div>
 
           <div class="runtime-panel" aria-live="polite">
+            <div class="runtime-recheck-comparison" id="runtimeRecheckComparison" hidden></div>
             <div class="runtime-column">
               <div class="runtime-heading">
                 <strong>Runtime stages</strong>
@@ -313,14 +331,6 @@
             </div>
           </div>
         </div>
-      </section>
-
-      <section id="runHistory" hidden aria-hidden="true">
-        <span id="runHistoryStatus">Hidden</span>
-        <span id="runHistoryCount">0 runs</span>
-        <div id="runHistoryList"></div>
-        <span id="selectedRunTimelineStatus">No selection</span>
-        <div id="selectedRunTimeline"></div>
       </section>
 
       <section class="panel dashboard-panel" id="dashboard" data-profile-step-section="review">
@@ -390,12 +400,9 @@
                 <span id="reportExportStatus">Waiting for reports</span>
               </div>
               <div class="report-export-grid" id="reportExportGrid">
-                <p class="muted">Run a job to open generated reports and review issue todo summaries.</p>
+                <p class="muted">Run a job to open generated reports.</p>
               </div>
-              <div class="report-export-todos" id="reportExportTodos">
-                <p class="muted">Issue todo summary loads after deterministic todos are generated.</p>
-              </div>
-              <p class="form-message" id="reportExportMessage" role="status">Reports and issue todo summaries are ready after a completed run.</p>
+              <p class="form-message" id="reportExportMessage" role="status">Reports are ready after a completed run.</p>
             </section>
 
             <section class="dashboard-section table-impact-section" id="tableImpact" aria-labelledby="tableImpactTitle">
@@ -409,6 +416,76 @@
             </section>
           </div>
         </div>
+      </section>
+
+      <section class="panel run-history-panel" id="runHistory" data-profile-step-section="fix" aria-labelledby="runHistoryTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">History remediation</p>
+            <h3 id="runHistoryTitle">Open a prior run</h3>
+          </div>
+          <div class="panel-actions">
+            <span class="badge" id="runHistoryStatus">Hidden</span>
+            <button class="button secondary compact" id="refreshRunHistoryButton" type="button">Refresh history</button>
+          </div>
+        </div>
+        <div class="run-history-layout">
+          <div class="run-history-column">
+            <div class="runtime-heading compact">
+              <strong>Runs</strong>
+              <span id="runHistoryCount">0 runs</span>
+            </div>
+            <div class="run-history-list" id="runHistoryList"></div>
+          </div>
+          <div class="run-history-column">
+            <div class="runtime-heading compact">
+              <strong>Selected run</strong>
+              <span id="selectedRunTimelineStatus">No selection</span>
+            </div>
+            <div class="selected-run-timeline" id="selectedRunTimeline"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel manual-recheck-section" id="manualRecheck" data-profile-step-section="fix" aria-labelledby="manualRecheckTitle">
+        <div class="runtime-heading">
+          <strong id="manualRecheckTitle">Upload corrected inputs</strong>
+          <span id="manualRecheckStatus">Waiting for baseline run</span>
+        </div>
+        <div class="manual-recheck-grid">
+          <form class="manual-recheck-form" id="manualRecheckForm">
+            <label class="field-label">
+              DBML override <span class="optional-label">optional</span>
+              <input id="manualRecheckDbmlInput" type="file" accept=".dbml,.txt">
+            </label>
+            <label class="field-label">
+              Corrected CSV files
+              <input id="manualRecheckCsvInput" type="file" accept=".csv,text/csv" multiple>
+            </label>
+            <div class="manual-recheck-actions">
+              <button class="button primary" id="manualRecheckButton" type="submit" disabled>Run upload recheck</button>
+              <button class="button secondary" id="manualRecheckDemoButton" type="button" disabled>Run corrected demo</button>
+            </div>
+          </form>
+          <div class="manual-recheck-policy" aria-label="Manual recheck policy">
+            <div><span>Baseline</span><strong id="manualRecheckBaseline">No run selected</strong></div>
+            <div><span>Input</span><strong>Corrected copy</strong></div>
+            <div><span>LLM</span><strong>Off for recheck</strong></div>
+            <p>User edits happen outside the app. Upload corrected CSV files; DBML reuses the baseline unless supplied as an override.</p>
+          </div>
+        </div>
+        <p class="form-message" id="manualRecheckMessage" role="status">Open a completed run from history, then recheck a corrected upload or the bundled corrected demo.</p>
+      </section>
+
+      <section class="panel remediation-section" id="remediation" data-profile-step-section="fix" aria-labelledby="remediationTitle">
+        <div class="runtime-heading">
+          <strong id="remediationTitle">Remediation + Recheck</strong>
+          <span id="remediationStatus">Waiting for remediation_plan.json</span>
+        </div>
+        <div class="remediation-grid" id="remediationGrid">
+          <p class="muted">Run a job to prepare copy-only remediation actions.</p>
+        </div>
+        <p class="form-message" id="remediationMessage" role="status">Remediation actions require approval and apply only to a staged copy.</p>
       </section>
 
       <section class="section-label" id="inputSetup" data-profile-step-section="connect">

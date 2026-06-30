@@ -172,6 +172,80 @@ def create_small_demo(out: str | Path) -> Path:
     return root
 
 
+def create_small_corrected_demo(out: str | Path) -> Path:
+    root = Path(out)
+    csv_dir = root / "csv"
+    csv_dir.mkdir(parents=True, exist_ok=True)
+    (root / "schema.dbml").write_text(SMALL_SCHEMA)
+
+    _write_csv(
+        csv_dir / "customers.csv",
+        ["customer_id", "customer_name", "customer_state"],
+        [
+            ["C001", "Alice", "SP"],
+            ["C002", "Bob", "RJ"],
+            ["C003", "Carla", "MG"],
+            ["C004", "Diego", "BA"],
+        ],
+    )
+    _write_csv(
+        csv_dir / "orders.csv",
+        [
+            "order_id",
+            "customer_id",
+            "order_status",
+            "order_purchase_timestamp",
+            "order_delivered_customer_date",
+        ],
+        [
+            ["O001", "C001", "delivered", "2024-01-01 10:00:00", "2024-01-03 10:00:00"],
+            ["O002", "C002", "delivered", "2024-01-02 10:00:00", "2024-01-04 10:00:00"],
+            ["O003", "C003", "delivered", "2024-01-05 10:00:00", "2024-01-06 10:00:00"],
+            ["O004", "C004", "created", "2024-01-07 10:00:00", ""],
+        ],
+    )
+    _write_csv(
+        csv_dir / "order_items.csv",
+        ["order_id", "order_item_id", "product_id", "seller_id", "price", "freight_value"],
+        [
+            ["O001", "1", "P001", "S001", "100.00", "10.00"],
+            ["O002", "1", "P002", "S001", "50.00", "5.00"],
+            ["O003", "1", "P002", "S002", "25.00", "2.50"],
+            ["O004", "1", "P001", "S001", "10.00", "1.00"],
+        ],
+    )
+    _write_csv(
+        csv_dir / "order_payments.csv",
+        ["order_id", "payment_sequential", "payment_type", "payment_installments", "payment_value"],
+        [
+            ["O001", "1", "credit_card", "1", "110.00"],
+            ["O002", "1", "credit_card", "2", "25.00"],
+            ["O003", "1", "voucher", "1", "27.50"],
+        ],
+    )
+    _write_csv(
+        csv_dir / "order_reviews.csv",
+        ["review_id", "order_id", "review_score", "review_comment_message"],
+        [
+            ["R001", "O001", "5", "great"],
+            ["R002", "O002", "1", "late"],
+            ["R003", "O003", "4", "resolved"],
+            ["R004", "O004", "2", "valid order"],
+        ],
+    )
+    _write_csv(
+        csv_dir / "products.csv",
+        ["product_id", "product_category_name"],
+        [["P001", "books"], ["P002", "electronics"]],
+    )
+    _write_csv(
+        csv_dir / "sellers.csv",
+        ["seller_id", "seller_state"],
+        [["S001", "SP"], ["S002", "RJ"]],
+    )
+    return root
+
+
 def download_olist(out: str | Path) -> Path:
     root = Path(out)
     root.mkdir(parents=True, exist_ok=True)

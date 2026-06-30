@@ -60,6 +60,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
         "issue_action_plans.json",
         "issue_todos.json",
         "quality_gates.json",
+        "remediation_plan.json",
         "lineage_graph.json",
         "relationship_graph.json",
         "schema_parse_report.json",
@@ -85,6 +86,8 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     verify_todo_group_count = sum(
         1 for group in issue_todos["groups"] if group["todo_type"] == "verify_after_fix"
     )
+    assert fix_todo_group_count == issue_todos["summary"]["fix_data_group_count"]
+    assert verify_todo_group_count == issue_todos["summary"]["verify_after_fix_group_count"]
     assert "Data Quality Package" in index_html
     assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in index_html
     assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in packaged_report_html
@@ -143,6 +146,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert index_html.rindex("issue_action_plans.json") > developer_section
     assert index_html.rindex("issue_todos.json") > developer_section
     assert index_html.rindex("quality_gates.json") > developer_section
+    assert index_html.rindex("remediation_plan.json") > developer_section
     assert index_html.rindex("charts/outliers_top_columns.json") > developer_section
     assert "lineage_graph.json" in index_html
     assert "relationship_graph.json" in index_html
@@ -150,6 +154,7 @@ def test_package_output_directory_writes_manifest_index_and_zip(tmp_path):
     assert "issue_action_plans.json" in index_html
     assert "issue_todos.json" in index_html
     assert "quality_gates.json" in index_html
+    assert "remediation_plan.json" in index_html
     assert "Executive scorecard" not in index_html
     assert "Column Readiness Summary" not in index_html
     assert "Developer LLM Guardrail Artifact" not in index_html

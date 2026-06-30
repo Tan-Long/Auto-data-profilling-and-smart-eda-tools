@@ -53,6 +53,10 @@ OPTIONAL_ARTIFACTS = [
     "evaluation_summary.json",
     "l4_report.md",
     "guardrail_report.json",
+    "remediation_plan.json",
+    "approved_remediations.json",
+    "remediation_run_summary.json",
+    "before_after_quality_diff.json",
 ]
 TEXT_SUFFIXES = {".json", ".jsonl", ".log", ".md", ".html", ".txt", ".dbml", ".csv", ".pdf"}
 SENSITIVE_ASSIGNMENT_RE = re.compile(
@@ -355,10 +359,7 @@ def _render_index_html(
     verdict = _read_json(source_root / "dataset_verdict.json")
     relationship_graph = _read_json(source_root / "relationship_graph.json")
     table_assessments = _read_json(source_root / "table_assessments.json")
-    lineage_graph = _read_json(source_root / "lineage_graph.json")
-    schema_parse = _read_json(source_root / "schema_parse_report.json")
     schema_evaluation = _read_json(source_root / "schema_evaluation.json")
-    connector_metadata = _read_json(source_root / "connector_metadata.json")
     profile_summary = _read_json(source_root / "profile_summary.json")
     issues = _read_json_list(source_root / "issues.json")
     quality_gates = _read_json(source_root / "quality_gates.json")
@@ -378,14 +379,11 @@ def _render_index_html(
     risk_score = verdict.get("risk_score", "n/a")
     relationship_summary = relationship_graph.get("summary") or {}
     table_assessment_summary = table_assessments.get("summary") or {}
-    lineage_summary = lineage_graph.get("summary") or {}
-    parse_counts = schema_parse.get("counts") or {}
     eval_summary = schema_evaluation.get("summary") or {}
     profile_tables = profile_summary.get("tables") or {}
     row_count = sum(int(table.get("row_count") or 0) for table in profile_tables.values())
     column_count = sum(int(table.get("column_count") or 0) for table in profile_tables.values())
     all_outlier_rows = top_numeric_outlier_rows(profile_summary, limit=10_000)
-    outlier_rows = all_outlier_rows[:10]
     outlier_count = sum(int(row.get("outlier_count") or 0) for row in all_outlier_rows)
     column_usability_rows = package_column_usability_rows(profile_summary, issues)
     blocked_column_count = sum(1 for row in column_usability_rows if row["status"] == "blocked")
@@ -1842,6 +1840,10 @@ def _artifact_links() -> list[tuple[str, str]]:
         ("Issue action plans", "issue_action_plans.json"),
         ("Issue todos", "issue_todos.json"),
         ("Quality gates", "quality_gates.json"),
+        ("Remediation plan", "remediation_plan.json"),
+        ("Approved remediations", "approved_remediations.json"),
+        ("Remediation run summary", "remediation_run_summary.json"),
+        ("Before/after quality diff", "before_after_quality_diff.json"),
         ("Profile summary", "profile_summary.json"),
         ("Issues", "issues.json"),
         ("Schema parse", "schema_parse_report.json"),

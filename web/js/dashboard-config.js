@@ -25,6 +25,10 @@
     "influence.json",
     "guardrail_report.json",
     "run_summary.json",
+    "remediation_plan.json",
+    "approved_remediations.json",
+    "remediation_run_summary.json",
+    "before_after_quality_diff.json",
   ];
 
   const graphScopeLabels = {
