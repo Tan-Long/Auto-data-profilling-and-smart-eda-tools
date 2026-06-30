@@ -19,6 +19,11 @@ The product implemented here is `VSF Data Profiler`.
 
 ## Clone and Run Locally
 
+For the current component-by-component development, run, and deployment
+reference, use [docs/DEV_RUN_DEPLOY.md](docs/DEV_RUN_DEPLOY.md). It covers
+data fixtures, Python/Node libraries, environment variables, CLI runs, the
+local web runner, Stage 5 recheck, Docker, and static-deploy boundaries.
+
 Clone the repository and install the Python package in a virtual environment:
 
 ```bash
